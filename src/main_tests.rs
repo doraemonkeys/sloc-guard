@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use sloc_guard::checker::{CheckResult, CheckStatus, ThresholdChecker};
-use sloc_guard::cli::{CheckArgs, InitArgs, StatsArgs};
+use sloc_guard::cli::{CheckArgs, ColorChoice, InitArgs, StatsArgs};
 use sloc_guard::config::Config;
 use sloc_guard::counter::LineStats;
 use sloc_guard::language::LanguageRegistry;
@@ -10,10 +10,12 @@ use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 use tempfile::TempDir;
 
 use crate::{
-    apply_cli_overrides, collect_file_stats, compute_effective_stats, format_output,
-    format_stats_output, generate_config_template, get_scan_paths, get_stats_scan_paths,
-    load_config, process_file, run_init_impl,
+    apply_cli_overrides, collect_file_stats, color_choice_to_mode, compute_effective_stats,
+    format_output, format_stats_output, generate_config_template, get_scan_paths,
+    get_stats_scan_paths, load_config, process_file, run_check_impl, run_init_impl,
+    run_stats_impl, write_output,
 };
+use sloc_guard::cli::Cli;
 
 #[test]
 fn exit_codes_documented() {
@@ -826,4 +828,341 @@ fn format_config_text_with_include_paths() {
     assert!(output.contains("include_paths"));
     assert!(output.contains("src"));
     assert!(output.contains("lib"));
+}
+
+// color_choice_to_mode tests
+
+#[test]
+fn color_choice_to_mode_auto() {
+    assert_eq!(color_choice_to_mode(ColorChoice::Auto), ColorMode::Auto);
+}
+
+#[test]
+fn color_choice_to_mode_always() {
+    assert_eq!(color_choice_to_mode(ColorChoice::Always), ColorMode::Always);
+}
+
+#[test]
+fn color_choice_to_mode_never() {
+    assert_eq!(color_choice_to_mode(ColorChoice::Never), ColorMode::Never);
+}
+
+// write_output tests
+
+#[test]
+fn write_output_to_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_path = temp_dir.path().join("output.txt");
+
+    let result = write_output(Some(&output_path), "test content", false);
+    assert!(result.is_ok());
+    assert!(output_path.exists());
+
+    let content = std::fs::read_to_string(&output_path).unwrap();
+    assert_eq!(content, "test content");
+}
+
+#[test]
+fn write_output_quiet_mode() {
+    // In quiet mode, nothing should be written to stdout (no error)
+    let result = write_output(None, "test content", true);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn write_output_normal_mode() {
+    // Normal mode should succeed (writes to stdout)
+    let result = write_output(None, "", false);
+    assert!(result.is_ok());
+}
+
+// Integration tests for run_check_impl
+
+fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: bool) -> Cli {
+    Cli {
+        command: sloc_guard::cli::Commands::Init(InitArgs {
+            output: PathBuf::from(".sloc-guard.toml"),
+            force: false,
+        }),
+        verbose,
+        quiet,
+        color,
+        no_config,
+    }
+}
+
+fn make_cli_for_stats(color: ColorChoice, verbose: u8, quiet: bool, no_config: bool) -> Cli {
+    Cli {
+        command: sloc_guard::cli::Commands::Init(InitArgs {
+            output: PathBuf::from(".sloc-guard.toml"),
+            force: false,
+        }),
+        verbose,
+        quiet,
+        color,
+        no_config,
+    }
+}
+
+#[test]
+fn run_check_impl_with_valid_directory() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec!["**/target/**".to_string()],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn run_check_impl_with_warn_only() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1), // Very low threshold to trigger failures
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: true, // Enable warn-only mode
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // With warn_only, should return SUCCESS even with failures
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn run_check_impl_with_threshold_exceeded() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1), // Very low threshold
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}
+
+#[test]
+fn run_check_impl_with_json_output() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_path = temp_dir.path().join("report.json");
+
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Json,
+        output: Some(output_path.clone()),
+        warn_only: false,
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert!(output_path.exists());
+
+    let content = std::fs::read_to_string(&output_path).unwrap();
+    assert!(content.contains("summary"));
+}
+
+#[test]
+fn run_check_impl_with_verbose() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: Some(0.8),
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn run_check_impl_with_no_skip_flags() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(5000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: true,
+        no_skip_blank: true,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn run_check_impl_with_include_paths() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        max_lines: Some(1000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec!["src".to_string()],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+}
+
+// Integration tests for run_stats_impl
+
+#[test]
+fn run_stats_impl_with_valid_directory() {
+    let args = StatsArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec!["**/target/**".to_string()],
+        include: vec![],
+        format: OutputFormat::Text,
+        output: None,
+    };
+
+    let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
+
+    let result = run_stats_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn run_stats_impl_with_json_output() {
+    let temp_dir = TempDir::new().unwrap();
+    let output_path = temp_dir.path().join("stats.json");
+
+    let args = StatsArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        format: OutputFormat::Json,
+        output: Some(output_path.clone()),
+    };
+
+    let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
+
+    let result = run_stats_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert!(output_path.exists());
+
+    let content = std::fs::read_to_string(&output_path).unwrap();
+    assert!(content.contains("summary"));
+}
+
+#[test]
+fn run_stats_impl_with_include_paths() {
+    let args = StatsArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec!["src".to_string()],
+        format: OutputFormat::Text,
+        output: None,
+    };
+
+    let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
+
+    let result = run_stats_impl(&args, &cli);
+    assert!(result.is_ok());
+}
+
+// format_config_text additional tests
+
+#[test]
+fn format_config_text_with_rule_skip_blank() {
+    let mut config = Config::default();
+    config.rules.insert(
+        "test".to_string(),
+        sloc_guard::config::RuleConfig {
+            extensions: vec!["rs".to_string()],
+            max_lines: Some(300),
+            skip_comments: None,
+            skip_blank: Some(false),
+        },
+    );
+
+    let output = format_config_text(&config);
+    assert!(output.contains("[rules.test]"));
+    assert!(output.contains("skip_blank = false"));
 }
