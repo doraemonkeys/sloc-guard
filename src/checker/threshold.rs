@@ -85,8 +85,7 @@ impl ThresholdChecker {
     fn get_limit_for_path(&self, path: &Path) -> usize {
         let path_str = path.to_string_lossy();
         for override_config in &self.config.overrides {
-            if path_str.ends_with(&override_config.path) || path_str.contains(&override_config.path)
-            {
+            if path_str.ends_with(&override_config.path) {
                 return override_config.max_lines;
             }
         }

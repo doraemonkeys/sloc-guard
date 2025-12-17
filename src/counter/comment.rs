@@ -11,8 +11,7 @@ impl<'a> CommentDetector<'a> {
     }
 
     #[must_use]
-    pub fn is_single_line_comment(&self, line: &str) -> bool {
-        let trimmed = line.trim();
+    pub fn is_single_line_comment(&self, trimmed: &str) -> bool {
         self.syntax
             .single_line
             .iter()

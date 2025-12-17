@@ -108,7 +108,7 @@ impl<'a> SlocCounter<'a> {
             return;
         }
 
-        if self.detector.is_single_line_comment(line) {
+        if self.detector.is_single_line_comment(trimmed) {
             stats.comment += 1;
             return;
         }

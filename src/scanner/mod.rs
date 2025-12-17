@@ -31,9 +31,8 @@ impl<F: FileFilter> DirectoryScanner<F> {
         WalkDir::new(root)
             .into_iter()
             .filter_map(std::result::Result::ok)
-            .filter(|e| e.file_type().is_file())
-            .map(|e| e.path().to_path_buf())
-            .filter(|p| self.filter.should_include(p))
+            .filter(|e| e.file_type().is_file() && self.filter.should_include(e.path()))
+            .map(walkdir::DirEntry::into_path)
             .collect()
     }
 }
