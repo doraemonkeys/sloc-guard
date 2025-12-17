@@ -58,103 +58,18 @@ make ci
 
 ---
 
-## Phase 1: Core MVP (P0)
+## Completed Phases (Compressed)
 
-### Task 1.1: Implement FileConfigLoader ✅
-
-Location: `src/config/loader.rs`
-
-```
-- [x] Implement concrete FileConfigLoader struct
-- [x] Load from .sloc-guard.toml in current directory
-- [x] Load from $HOME/.config/sloc-guard/config.toml as fallback
-- [x] Return Config::default() if no config found
-- [x] Add tests for each scenario
-```
-
-### Task 1.2: Implement run_check Command ✅
-
-Location: `src/main.rs`
-
-```
-- [x] Load configuration (from file or defaults, respect --no-config)
-- [x] Apply CLI argument overrides:
-  - --max-lines, --ext, --exclude, --include
-  - --no-skip-comments, --no-skip-blank
-  - --warn-threshold
-- [x] Create GlobFilter from config + CLI args
-- [x] Scan directories with DirectoryScanner
-- [x] For each file:
-  - Detect language from extension
-  - Count lines with SlocCounter
-  - Check against threshold
-- [x] Collect results
-- [x] Format output (text/json based on --format; sarif/markdown return error as not implemented)
-- [x] Write to --output file if specified
-- [x] Return appropriate exit code (0/1/2, or 0 if --warn-only)
-- [x] Add tests for all functions (20 tests, 82.38% coverage)
-```
-
-### Task 1.3: Implement run_stats Command ✅
-
-Location: `src/main.rs`, `src/output/stats.rs`
-
-```
-- [x] Similar flow to check but without threshold checking
-- [x] Load config for exclude patterns (respect --no-config)
-- [x] Support --config, --ext, --exclude, --include options
-- [x] Just count and display statistics
-- [x] Support --format (text/json) and --output options
-- [x] Add FileStatistics, ProjectStatistics types
-- [x] Add StatsTextFormatter and StatsJsonFormatter
-- [x] Add tests (12 tests for main, 9 tests for stats module)
-```
-
-### Task 1.4: Implement run_init Command ✅
-
-Location: `src/main.rs`
-
-```
-- [x] Generate default .sloc-guard.toml
-- [x] Check if file exists (error unless --force)
-- [x] Write template config with comments
-- [x] Add tests (8 tests for init command)
-```
-
-### Task 1.5: Implement run_config Commands ✅
-
-Location: `src/main.rs`
-
-```
-- [x] config validate:
-  - [x] Parse specified config file (or find default)
-  - [x] Validate TOML syntax
-  - [x] Validate semantic correctness (valid glob patterns, threshold in range, rule validity)
-  - [x] Output validation errors with context
-  - [x] Return EXIT_CONFIG_ERROR on failure
-- [x] config show:
-  - [x] Load and merge configuration (file + defaults)
-  - [x] Support --format (text/json)
-  - [x] Show effective configuration
-- [x] Add tests (18 tests for config commands, 83.68% coverage)
-```
+| Phase | Tasks | Status |
+|-------|-------|--------|
+| **Phase 1: Core MVP** | 1.1 FileConfigLoader, 1.2 run_check, 1.3 run_stats, 1.4 run_init, 1.5 run_config | ✅ All Done |
+| **Phase 2.1** | Color Support (TextFormatter with Auto/Always/Never) | ✅ Done |
+| **Phase 3.1** | Git Diff Mode (gix-based --diff) | ✅ Done |
+| **Phase 4.3** | Path-Based Rules ([[path_rules]] with glob patterns) | ✅ Done |
 
 ---
 
 ## Phase 2: Output Enhancements (P1)
-
-### Task 2.1: Add Color Support to TextFormatter ✅
-
-Location: `src/output/text.rs`
-
-```
-- [x] Add ColorMode enum (Auto/Always/Never)
-- [x] Red for FAILED, yellow for WARNING, green for PASSED
-- [x] Detect terminal capability (isatty) in Auto mode
-- [x] Respect NO_COLOR environment variable
-- [x] Wire --color CLI flag to TextFormatter
-- [x] Add tests for colored/non-colored output
-```
 
 ### Task 2.2: Implement SARIF Output
 
@@ -206,19 +121,6 @@ Location: `src/output/text.rs`, `src/output/json.rs`
 
 ## Phase 3: Git Integration (P1)
 
-### Task 3.1: Implement Diff Mode ✅
-
-Location: `src/git/diff.rs`
-
-```
-- [x] Use gix crate for git operations
-- [x] Parse --diff argument (branch name or commit hash)
-- [x] Get list of changed files from diff (tree comparison)
-- [x] Filter scanner results to only changed files
-- [x] Handle case where git repo not found
-- [x] Add tests (8 tests for git module)
-```
-
 ### Task 3.2: Add Git-Aware Exclude Patterns
 
 Location: `src/scanner/filter.rs`
@@ -245,7 +147,7 @@ Location: `src/baseline/mod.rs` (new module)
 - Track file hash to detect changes
 ```
 
-### Task 4.2: Warning Threshold Configuration
+### Task 4.2: Warning Threshold Configuration (Partial)
 
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
@@ -253,19 +155,7 @@ Location: `src/config/model.rs`, `src/checker/threshold.rs`
 - [x] Add warn_threshold to DefaultConfig (default 0.9)
 - [ ] Allow per-rule warning thresholds (e.g., [rules.rust] warn_threshold = 0.85)
 - [ ] Update ThresholdChecker to read warn_threshold from config
-- [x] Support --warn-threshold CLI override (implemented in Task 1.2)
-```
-
-### Task 4.3: Path-Based Rules ✅
-
-Location: `src/config/model.rs`, `src/checker/threshold.rs`
-
-```
-- [x] Add [[path_rules]] section support in config
-- [x] Support path patterns (e.g., "src/generated/**")
-- [x] Higher priority than extension-based rules, lower than override
-- [x] Use glob matching for path patterns
-- [x] Support warn_threshold per path rule
+- [x] Support --warn-threshold CLI override
 ```
 
 ### Task 4.4: Override with Reason
@@ -285,10 +175,7 @@ Location: `src/config/model.rs`, `src/language/registry.rs`
 
 ```
 - Add [languages.<name>] section in config
-- Allow defining:
-  - extensions: ["ext1", "ext2"]
-  - single_line_comments: ["//", "#"]
-  - multi_line_comments: [["/*", "*/"], ["<!--", "-->"]]
+- Allow defining: extensions, single_line_comments, multi_line_comments
 - Register custom languages at config load time
 - Override built-in language definitions if same extension
 ```
@@ -298,13 +185,9 @@ Location: `src/config/model.rs`, `src/language/registry.rs`
 Location: `src/counter/sloc.rs`, `src/checker/threshold.rs`
 
 ```
-- Support inline directives in source files:
-  - // sloc-guard:ignore-file   → skip entire file from check
-  - // sloc-guard:ignore-next   → exclude next N lines from count
-  - // sloc-guard:ignore-start/end → exclude block from count
+- Support inline directives: // sloc-guard:ignore-file, ignore-next, ignore-start/end
 - Parse directives during line counting phase
 - More flexible than [[override]] - exemption lives with code
-- Easier for code review (reason visible in diff)
 - Support language-specific comment prefixes (# for Python, etc.)
 ```
 
@@ -319,7 +202,6 @@ Location: `src/cache/mod.rs` (new module)
 - Invalidate on config change (hash config too)
 - Config option: [cache] enabled = true, path = ".sloc-guard-cache"
 - CLI flag: --no-cache to bypass
-- Significant speedup for large projects on repeated runs
 ```
 
 ### Task 4.8: Configuration Inheritance (extends)
@@ -327,12 +209,8 @@ Location: `src/cache/mod.rs` (new module)
 Location: `src/config/loader.rs`, `src/config/model.rs`
 
 ```
-- Add "extends" field to config:
-  extends = "../shared/.sloc-guard.toml"
-  extends = "https://company.com/configs/base.toml"
+- Add "extends" field to config (local paths and URLs)
 - Load base config first, then merge local overrides
-- Support both local paths and URLs
-- Useful for enterprise: shared base config across repos
 - Recursive extends (with cycle detection)
 - CLI: --no-extends to skip inheritance
 ```
@@ -345,7 +223,6 @@ Location: `src/cli.rs`, `src/main.rs`
 - Add --strict flag to check command
 - In strict mode: warnings also cause exit code 1
 - Opposite of --warn-only
-- Useful for CI pipelines that want zero tolerance
 - Config option: [default] strict = true
 ```
 
@@ -355,41 +232,24 @@ Location: `src/cli.rs`, `src/main.rs`
 
 ### Task 5.1: Project-Wide Statistics
 
-Location: `src/stats/mod.rs` (new module)
-
 ```
-- Total SLOC across project
-- Breakdown by language
-- Top N largest files
-- Average file size
-- Distribution histogram
-- Per-directory breakdown
+- Breakdown by language, Top N largest files, Average file size
+- Distribution histogram, Per-directory breakdown
 - Group output by language/directory (--group-by lang|dir)
 ```
 
 ### Task 5.2: Trend Tracking
 
-Location: `src/stats/trend.rs`
-
 ```
 - Store historical stats in .sloc-guard-history.json
 - Show change from previous run
-- Useful for monitoring code growth
 ```
 
 ### Task 5.3: HTML Report Generation
 
-Location: `src/output/html.rs` (new module)
-
 ```
-- Create HtmlFormatter struct
-- Support --report flag to generate HTML file
-- Include:
-  - Summary dashboard with key metrics
-  - Interactive charts (file size distribution, language breakdown)
-  - Top N largest files table
-  - Per-directory statistics
-  - Trend visualization (if history available)
+- Create HtmlFormatter struct with --report flag
+- Include: dashboard, charts, top files, per-directory stats, trends
 - Use embedded CSS for standalone HTML file
 ```
 
@@ -399,8 +259,6 @@ Location: `src/output/html.rs` (new module)
 
 ### Task 6.1: GitHub Action
 
-Location: `.github/action.yml`
-
 ```
 - Create reusable GitHub Action
 - Input: paths, config-path, fail-on-warning
@@ -409,8 +267,6 @@ Location: `.github/action.yml`
 ```
 
 ### Task 6.2: Pre-commit Hook Integration
-
-Location: `docs/pre-commit.md`, config examples
 
 ```
 - Document .pre-commit-config.yaml setup
@@ -424,29 +280,20 @@ Location: `docs/pre-commit.md`, config examples
 
 ### Task 7.1: Function-Level Analysis
 
-Location: `src/counter/function.rs` (new module)
-
 ```
 - Parse function/method boundaries (language-specific)
 - Count lines per function/method
 - Add function_max_lines to config (optional)
-- Report functions exceeding limit
-- Support languages: Rust, Go, Python, JavaScript/TypeScript
-- Note: Requires language-specific parsing, consider tree-sitter
+- Note: Requires tree-sitter or similar
 ```
 
 ---
 
 ## Priority Order
 
-1. **Immediate (MVP)**: ~~1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5~~ ✅
-2. **Quick Wins**:
-   - ~~2.1 Color Support~~ ✅
-   - ~~Implement `--verbose` real output~~ ✅
-   - ~~Fix override path matching logic (too loose with `contains`)~~ ✅
-   - ~~4.3 Path-Based Rules~~ ✅
+1. **MVP**: ✅ Complete
+2. **Quick Wins**: ✅ Color, verbose, override path fix, path-based rules
 3. **Short-term (High Value)**:
-   - ~~3.1 Git Diff Mode (`--diff`, gix already imported)~~ ✅
    - 4.6 Inline Ignore Comments (better DX than [[override]])
    - 4.9 Strict Mode (simple, high CI value)
 4. **Medium-term (High Value)**:
@@ -454,19 +301,9 @@ Location: `src/counter/function.rs` (new module)
    - 2.2 SARIF Output (CI/CD integration)
    - 4.1 Baseline Support (essential for large projects)
    - 4.8 Configuration Inheritance (enterprise use case)
-5. **Medium Priority**:
-   - 2.4 Progress Bar (UX improvement)
-   - 2.5 Top-N Files Report (useful for triage)
-   - 3.2 Git-Aware Exclude (.gitignore respect)
-6. **Lower Priority**:
-   - 2.3 Markdown Output
-   - 4.2 Per-rule warn_threshold
-   - 4.4 Override with Reason display
-   - 4.5 Custom Language Definition
-7. **Deferred**:
-   - 5.1 -> 5.2 -> 5.3 (Statistics Extension)
-   - 6.1 -> 6.2 (CI/CD Support)
-   - 7.1 (Function-Level Analysis)
+5. **Medium Priority**: 2.4 Progress Bar, 2.5 Top-N Files, 3.2 Git-Aware Exclude
+6. **Lower Priority**: 2.3 Markdown, 4.2 Per-rule warn_threshold, 4.4 Override Reason, 4.5 Custom Languages
+7. **Deferred**: Phase 5, 6, 7
 
 ---
 
