@@ -27,10 +27,12 @@ impl GlobFilter {
             })?;
             builder.add(glob);
         }
-        let exclude_patterns = builder.build().map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: "combined patterns".to_string(),
-            source: e,
-        })?;
+        let exclude_patterns = builder
+            .build()
+            .map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: "combined patterns".to_string(),
+                source: e,
+            })?;
 
         Ok(Self {
             extensions,

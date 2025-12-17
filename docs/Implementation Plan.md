@@ -46,6 +46,64 @@ lint:
 make ci
 ```
 
+## Phase 0: Performance Optimization (P0 - Critical)
+
+> **Priority**: Execute immediately after MVP completion. Critical for large codebases.
+
+### Task 0.1: Parallel File Processing with Rayon ✅
+
+Location: `src/main.rs`, `Cargo.toml`
+
+**Problem**: Single-threaded file processing is the main bottleneck for large projects (thousands of files).
+
+```
+- [x] Add rayon = "1.10" to Cargo.toml
+- [x] Parallelize file processing loop in run_check_impl using par_iter()
+- [x] Parallelize file processing loop in run_stats_impl using par_iter()
+- [x] Ensure thread-safe access to shared state (registry, checker are read-only)
+```
+
+**Expected improvement**: Linear speedup with CPU cores (4x-16x on modern machines).
+
+### Task 0.2: HashSet for Extension Filtering ✅
+
+Location: `src/scanner/filter.rs`
+
+**Problem**: Linear search O(n) for extension matching on every file.
+
+```
+- [x] Replace Vec<String> with HashSet<String> for extensions field
+- [x] Update has_valid_extension() to use HashSet::contains() for O(1) lookup
+- [x] Update GlobFilter::new() constructor
+```
+
+### Task 0.3: Pre-indexed Rule Lookup in ThresholdChecker ✅
+
+Location: `src/checker/threshold.rs`
+
+**Problem**: Linear traversal of all rules for every file check.
+
+```
+- [x] Add extension_limits: HashMap<String, usize> field
+- [x] Build index at ThresholdChecker construction time
+- [x] Use HashMap lookup in get_limit_for_path() for extension-based rules
+```
+
+### Task 0.4: Streaming File Reading (Deferred)
+
+Location: `src/main.rs`, `src/counter/sloc.rs`
+
+**Problem**: `fs::read_to_string()` loads entire file into memory.
+
+**Status**: Deferred - current approach is acceptable for typical source files (<1MB). Revisit if memory issues arise with extremely large files.
+
+```
+- [ ] Add BufReader-based line counting for files > threshold (e.g., 10MB)
+- [ ] Maintain backward compatibility with current API
+```
+
+---
+
 ## Phase 1: Core MVP (P0)
 
 ### Task 1.1: Implement FileConfigLoader ✅
@@ -345,11 +403,12 @@ Location: `src/counter/function.rs` (new module)
 
 ## Priority Order
 
-1. **Immediate (MVP)**: 1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5
-2. **Short-term**: 2.1 -> 3.1 -> 3.2
-3. **Medium-term**: 2.2 -> 2.3 -> 4.1 -> 4.2 -> 4.3 -> 4.4
-4. **Long-term**: 4.5 -> 5.1 -> 5.2 -> 5.3 -> 6.1 -> 6.2
-5. **Future**: 7.1
+1. **Critical (Performance)**: 0.1 -> 0.2 -> 0.3 (execute now)
+2. **Immediate (MVP)**: 1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5
+3. **Short-term**: 2.1 -> 3.1 -> 3.2
+4. **Medium-term**: 2.2 -> 2.3 -> 4.1 -> 4.2 -> 4.3 -> 4.4
+5. **Long-term**: 4.5 -> 5.1 -> 5.2 -> 5.3 -> 6.1 -> 6.2
+6. **Future**: 7.1
 
 ---
 

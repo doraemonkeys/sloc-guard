@@ -67,9 +67,7 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
 
     // 6. Process each file
     let registry = LanguageRegistry::default();
-    let warn_threshold = args
-        .warn_threshold
-        .unwrap_or(config.default.warn_threshold);
+    let warn_threshold = args.warn_threshold.unwrap_or(config.default.warn_threshold);
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
 
     let skip_comments = config.default.skip_comments && !args.no_skip_comments;
