@@ -12,7 +12,9 @@
       "Bash(export TMP=\"$HOME/tmp\")",
       "Bash(export TEMP=\"$HOME/tmp\")",
       "Bash(cargo run:*)",
-      "Skill(docs-maintenance)"
+      "Skill(docs-maintenance)",
+      "Bash(tree:*)",
+      "Bash(find:*)"
     ]
   }
 }

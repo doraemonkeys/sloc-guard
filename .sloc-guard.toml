@@ -4,5 +4,9 @@ extensions = ["rs"]
 skip_comments = true
 skip_blank = true
 
+[[path_rules]]
+pattern = "**/*_tests.rs"
+max_lines = 1500
+
 [exclude]
-patterns = ["**/target/**", "**/.git/**", "**/*_tests.rs"]
+patterns = ["**/target/**", "**/.git/**"]
