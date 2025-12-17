@@ -1,3 +1,4 @@
+pub mod baseline;
 pub mod checker;
 pub mod cli;
 pub mod config;

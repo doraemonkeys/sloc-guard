@@ -24,6 +24,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
+| `baseline` | `baseline/types.rs` | `Baseline`, `BaselineEntry` - baseline file for grandfathering violations |
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
@@ -58,6 +59,11 @@ ProjectStatistics { files, total_files, total_lines, total_code, total_comment, 
 // Git integration
 GitDiff::discover(path) → GitDiff  // Finds git repo from path
 ChangedFiles::get_changed_files(base_ref) → HashSet<PathBuf>  // Files changed since reference
+
+// Baseline (grandfathering violations)
+Baseline { version: u32, files: HashMap<String, BaselineEntry> }  // .sloc-guard-baseline.json
+BaselineEntry { lines: usize, hash: String }  // SHA-256 content hash
+compute_file_hash(path) → String  // SHA-256 of file content
 ```
 
 ## Data Flow (check command)
@@ -118,6 +124,7 @@ config show:
 - `globset` - glob pattern matching
 - `rayon` - parallel file processing
 - `gix` - git integration (--diff mode)
+- `sha2` - SHA-256 hashing (baseline)
 - `thiserror` - error handling
 
 ## Test Files

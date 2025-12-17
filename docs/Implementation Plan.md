@@ -21,6 +21,7 @@
 | `output/json` | Done | JsonFormatter with structured output |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
+| `baseline` | Partial | Baseline, BaselineEntry, compute_file_hash, compute_content_hash (pending: CLI commands) |
 | `error` | Done | SlocGuardError enum with thiserror |
 | `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
 
@@ -65,6 +66,7 @@ make ci
 | **Phase 4.3** | Path-Based Rules ([[path_rules]] with glob patterns) | ✅ Done |
 | **Phase 4.6a** | Inline Ignore (// sloc-guard:ignore-file in first 10 lines) | ✅ Done |
 | **Phase 4.9** | Strict Mode (--strict flag, config option) | ✅ Done |
+| **Phase 4.1a** | Baseline File Format (Baseline, BaselineEntry, SHA-256 hash) | ✅ Done |
 
 ---
 
@@ -117,16 +119,6 @@ Location: `src/scanner/filter.rs`
 ---
 
 ## Phase 4: Advanced Features (P2)
-
-### Task 4.1a: Baseline File Format
-
-Location: `src/baseline/mod.rs`
-
-```
-- Design .sloc-guard-baseline.json structure:
-  { "files": { "path": { "lines": N, "hash": "sha256" } } }
-- Implement read/write baseline functions
-```
 
 ### Task 4.1b: Baseline Update Command
 
@@ -332,8 +324,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.1a Baseline File Format | ~2h |
-| | 4.1b Baseline Update Command | ~2h |
+| **1. Short-term** | 4.1b Baseline Update Command | ~2h |
 | | 4.1c Baseline Compare | ~2h |
 | **2. Medium-term** | 2.2 SARIF Output | ~3h |
 | | 4.7a File Hash Cache | ~3h |
