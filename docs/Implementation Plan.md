@@ -8,7 +8,7 @@
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `cli` | Done | CLI with check, stats, init, config, baseline commands + global options (verbose, quiet, color, no-config) |
+| `cli` | Done | CLI with check (--baseline), stats, init, config, baseline commands + global options (verbose, quiet, color, no-config) |
 | `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
@@ -16,12 +16,12 @@
 | `counter/sloc` | Done | SlocCounter with LineStats, CountResult, inline ignore-file directive |
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
 | `scanner/mod` | Done | DirectoryScanner with walkdir integration |
-| `checker/threshold` | Partial | ThresholdChecker with override > path_rules > rule > default priority (pending: per-rule skip_comments/skip_blank/warn_threshold) |
-| `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary |
-| `output/json` | Done | JsonFormatter with structured output |
+| `checker/threshold` | Done | ThresholdChecker with override > path_rules > rule > default priority, CheckStatus: Passed/Warning/Failed/Grandfathered |
+| `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary, grandfathered count |
+| `output/json` | Done | JsonFormatter with structured output including grandfathered count |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
-| `baseline` | Partial | Baseline, BaselineEntry, compute_file_hash, `baseline update` command (pending: baseline compare in check) |
+| `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
 | `error` | Done | SlocGuardError enum with thiserror |
 | `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
 
@@ -68,6 +68,7 @@ make ci
 | **Phase 4.9** | Strict Mode (--strict flag, config option) | ✅ Done |
 | **Phase 4.1a** | Baseline File Format (Baseline, BaselineEntry, SHA-256 hash) | ✅ Done |
 | **Phase 4.1b** | Baseline Update Command (`baseline update` with --output) | ✅ Done |
+| **Phase 4.1c** | Baseline Compare (`--baseline` flag, grandfathered status) | ✅ Done |
 
 ---
 
@@ -120,16 +121,6 @@ Location: `src/scanner/filter.rs`
 ---
 
 ## Phase 4: Advanced Features (P2)
-
-### Task 4.1c: Baseline Compare in Check
-
-Location: `src/main.rs`
-
-```
-- Add --baseline flag to check command
-- Compare against baseline, only fail on NEW violations
-- Show "baseline: N files grandfathered" in summary
-```
 
 ### Task 4.2: Per-rule warn_threshold (Partial)
 
@@ -315,21 +306,20 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.1c Baseline Compare | ~2h |
-| **2. Medium-term** | 2.2 SARIF Output | ~3h |
+| **1. Short-term** | 2.2 SARIF Output | ~3h |
 | | 4.7a File Hash Cache | ~3h |
 | | 4.7b Cache Integration | ~2h |
-| **3. Medium** | 2.4 Progress Bar | ~2h |
+| **2. Medium** | 2.4 Progress Bar | ~2h |
 | | 5.1a Language Breakdown | ~2h |
 | | 5.1b Top-N & Metrics | ~2h |
 | | 3.2 Git-Aware Exclude | ~3h |
-| **4. Lower** | 2.3 Markdown Output | ~2h |
+| **3. Lower** | 2.3 Markdown Output | ~2h |
 | | 4.2 Per-rule warn_threshold | ~1h |
 | | 4.4 Override Reason | ~1h |
 | | 4.5 Custom Languages | ~3h |
 | | 4.6b Inline Ignore (block/next) | ~2h |
 | | 4.8a Config Inheritance (local) | ~2h |
-| **5. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
+| **4. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
 | | 5.1c Directory Statistics | ~2h |
 | | 5.2 Trend Tracking | ~3h |
 | | 5.3a Basic HTML Report | ~4h |

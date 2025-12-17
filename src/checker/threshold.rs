@@ -13,6 +13,7 @@ pub enum CheckStatus {
     Passed,
     Warning,
     Failed,
+    Grandfathered,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +38,16 @@ impl CheckResult {
     #[must_use]
     pub const fn is_warning(&self) -> bool {
         matches!(self.status, CheckStatus::Warning)
+    }
+
+    #[must_use]
+    pub const fn is_grandfathered(&self) -> bool {
+        matches!(self.status, CheckStatus::Grandfathered)
+    }
+
+    /// Set the status to grandfathered (used for baseline comparison).
+    pub const fn set_grandfathered(&mut self) {
+        self.status = CheckStatus::Grandfathered;
     }
 
     #[must_use]

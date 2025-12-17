@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check`, `stats`, `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline), `stats`, `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig`, `ExcludeConfig`, `FileOverride`, `PathRule` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
@@ -45,7 +45,7 @@ CountResult::Stats(LineStats) | IgnoredFile  // IgnoredFile when "// sloc-guard:
 CommentSyntax { single_line: Vec<&str>, multi_line: Vec<(start, end)> }
 
 // Check results
-CheckStatus::Passed | Warning | Failed
+CheckStatus::Passed | Warning | Failed | Grandfathered
 CheckResult { path, status, stats, limit }
 
 // Output formatting
@@ -70,6 +70,7 @@ compute_file_hash(path) → String  // SHA-256 of file content
 
 ```
 CLI args → load_config() → apply_cli_overrides()
+         → [if --baseline] load_baseline() → Baseline
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
@@ -78,6 +79,7 @@ CLI args → load_config() → apply_cli_overrides()
               SlocCounter::count(content) → CountResult
               [if IgnoredFile] skip file (inline ignore directive)
               [if Stats] ThresholdChecker::check(path, stats) → CheckResult
+         → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
          → TextFormatter/JsonFormatter::format(results)
          → write to stdout or --output file
 ```

@@ -121,6 +121,10 @@ pub struct CheckArgs {
     /// Treat warnings as failures (exit code 1)
     #[arg(long)]
     pub strict: bool,
+
+    /// Path to baseline file for grandfathering violations
+    #[arg(long)]
+    pub baseline: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]

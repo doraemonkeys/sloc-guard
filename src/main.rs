@@ -64,7 +64,10 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     // 2. Apply CLI argument overrides
     apply_cli_overrides(&mut config, args);
 
-    // 3. Create GlobFilter
+    // 3. Load baseline if specified
+    let baseline = load_baseline(args.baseline.as_deref())?;
+
+    // 4. Create GlobFilter
     let extensions = args
         .ext
         .clone()
@@ -73,10 +76,10 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     exclude_patterns.extend(args.exclude.clone());
     let filter = GlobFilter::new(extensions, &exclude_patterns)?;
 
-    // 4. Determine paths to scan
+    // 5. Determine paths to scan
     let paths_to_scan = get_scan_paths(args, &config);
 
-    // 5. Scan directories
+    // 6. Scan directories
     let scanner = DirectoryScanner::new(filter);
     let mut all_files = Vec::new();
     for path in &paths_to_scan {
@@ -84,10 +87,10 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         all_files.extend(files);
     }
 
-    // 5.1 Filter by git diff if --diff is specified
+    // 6.1 Filter by git diff if --diff is specified
     let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
 
-    // 6. Process each file (parallel with rayon)
+    // 7. Process each file (parallel with rayon)
     let registry = LanguageRegistry::default();
     let warn_threshold = args.warn_threshold.unwrap_or(config.default.warn_threshold);
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
@@ -95,21 +98,26 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let skip_comments = config.default.skip_comments && !args.no_skip_comments;
     let skip_blank = config.default.skip_blank && !args.no_skip_blank;
 
-    let results: Vec<_> = all_files
+    let mut results: Vec<_> = all_files
         .par_iter()
         .filter_map(|file_path| {
             process_file(file_path, &registry, &checker, skip_comments, skip_blank)
         })
         .collect();
 
-    // 7. Format output
+    // 8. Apply baseline comparison: mark failures as grandfathered if in baseline
+    if let Some(ref baseline) = baseline {
+        apply_baseline_comparison(&mut results, baseline);
+    }
+
+    // 9. Format output
     let color_mode = color_choice_to_mode(cli.color);
     let output = format_output(args.format, &results, color_mode, cli.verbose)?;
 
-    // 8. Write output
+    // 10. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
 
-    // 9. Determine exit code
+    // 11. Determine exit code
     let has_failures = results
         .iter()
         .any(sloc_guard::checker::CheckResult::is_failed);
@@ -138,6 +146,34 @@ fn load_config(config_path: Option<&Path>, no_config: bool) -> sloc_guard::Resul
 
     let loader = FileConfigLoader::new();
     config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
+}
+
+fn load_baseline(baseline_path: Option<&Path>) -> sloc_guard::Result<Option<Baseline>> {
+    let Some(path) = baseline_path else {
+        return Ok(None);
+    };
+
+    if !path.exists() {
+        return Err(sloc_guard::SlocGuardError::Config(format!(
+            "Baseline file not found: {}",
+            path.display()
+        )));
+    }
+
+    Ok(Some(Baseline::load(path)?))
+}
+
+fn apply_baseline_comparison(results: &mut [sloc_guard::checker::CheckResult], baseline: &Baseline) {
+    for result in results.iter_mut() {
+        if !result.is_failed() {
+            continue;
+        }
+
+        let path_str = result.path.to_string_lossy().replace('\\', "/");
+        if baseline.contains(&path_str) {
+            result.set_grandfathered();
+        }
+    }
 }
 
 const fn apply_cli_overrides(config: &mut Config, args: &CheckArgs) {

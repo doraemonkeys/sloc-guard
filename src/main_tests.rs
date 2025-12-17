@@ -61,6 +61,7 @@ fn apply_cli_overrides_max_lines() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -87,6 +88,7 @@ fn apply_cli_overrides_no_skip_comments() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -113,6 +115,7 @@ fn apply_cli_overrides_no_skip_blank() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -137,6 +140,7 @@ fn apply_cli_overrides_warn_threshold() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -161,6 +165,7 @@ fn get_scan_paths_uses_include_override() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -185,6 +190,7 @@ fn get_scan_paths_uses_cli_paths() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -211,6 +217,7 @@ fn get_scan_paths_uses_config_include_paths() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -235,6 +242,7 @@ fn get_scan_paths_defaults_to_current_dir() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -929,6 +937,7 @@ fn run_check_impl_with_valid_directory() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -955,6 +964,7 @@ fn run_check_impl_with_warn_only() {
         warn_only: true, // Enable warn-only mode
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -982,6 +992,7 @@ fn run_check_impl_with_threshold_exceeded() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1011,6 +1022,7 @@ fn run_check_impl_with_json_output() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -1040,6 +1052,7 @@ fn run_check_impl_with_verbose() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -1065,6 +1078,7 @@ fn run_check_impl_with_no_skip_flags() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1090,6 +1104,7 @@ fn run_check_impl_with_include_paths() {
         warn_only: false,
         diff: None,
         strict: false,
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1203,6 +1218,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         warn_only: false,
         diff: None,
         strict: true, // Enable strict mode
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1231,6 +1247,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         warn_only: false,
         diff: None,
         strict: false, // Strict mode disabled
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1259,6 +1276,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         warn_only: true, // Enable warn-only mode
         diff: None,
         strict: true, // Also enable strict mode
+        baseline: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1533,5 +1551,253 @@ fn baseline_file_contains_correct_hash() {
     // Verify hash is a valid SHA-256 (64 hex characters)
     assert_eq!(entry.hash.len(), 64);
     assert!(entry.hash.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+// Baseline comparison tests
+
+use crate::{apply_baseline_comparison, load_baseline};
+
+#[test]
+fn load_baseline_none_path_returns_none() {
+    let result = load_baseline(None);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_none());
+}
+
+#[test]
+fn load_baseline_nonexistent_file_returns_error() {
+    let result = load_baseline(Some(std::path::Path::new("nonexistent-baseline.json")));
+    assert!(result.is_err());
+    assert!(result.unwrap_err().to_string().contains("not found"));
+}
+
+#[test]
+fn load_baseline_valid_file_returns_baseline() {
+    let temp_dir = TempDir::new().unwrap();
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+
+    // Create a valid baseline file
+    let mut baseline = Baseline::new();
+    baseline.set("test/file.rs", 100, "abc123".to_string());
+    baseline.save(&baseline_path).unwrap();
+
+    let result = load_baseline(Some(&baseline_path));
+    assert!(result.is_ok());
+    let loaded = result.unwrap();
+    assert!(loaded.is_some());
+    let loaded = loaded.unwrap();
+    assert_eq!(loaded.len(), 1);
+    assert!(loaded.contains("test/file.rs"));
+}
+
+#[test]
+fn apply_baseline_comparison_marks_failed_as_grandfathered() {
+    let mut results = vec![
+        CheckResult {
+            path: PathBuf::from("src/file.rs"),
+            status: CheckStatus::Failed,
+            stats: LineStats {
+                total: 600,
+                code: 600,
+                comment: 0,
+                blank: 0,
+            },
+            limit: 500,
+        },
+        CheckResult {
+            path: PathBuf::from("src/other.rs"),
+            status: CheckStatus::Passed,
+            stats: LineStats {
+                total: 100,
+                code: 100,
+                comment: 0,
+                blank: 0,
+            },
+            limit: 500,
+        },
+    ];
+
+    let mut baseline = Baseline::new();
+    baseline.set("src/file.rs", 600, "hash123".to_string());
+
+    apply_baseline_comparison(&mut results, &baseline);
+
+    assert!(results[0].is_grandfathered());
+    assert!(results[1].is_passed());
+}
+
+#[test]
+fn apply_baseline_comparison_does_not_mark_new_violations() {
+    let mut results = vec![CheckResult {
+        path: PathBuf::from("src/new_file.rs"),
+        status: CheckStatus::Failed,
+        stats: LineStats {
+            total: 600,
+            code: 600,
+            comment: 0,
+            blank: 0,
+        },
+        limit: 500,
+    }];
+
+    let baseline = Baseline::new(); // Empty baseline
+
+    apply_baseline_comparison(&mut results, &baseline);
+
+    assert!(results[0].is_failed());
+}
+
+#[test]
+fn apply_baseline_comparison_handles_windows_paths() {
+    let mut results = vec![CheckResult {
+        path: PathBuf::from("src\\file.rs"), // Windows path
+        status: CheckStatus::Failed,
+        stats: LineStats {
+            total: 600,
+            code: 600,
+            comment: 0,
+            blank: 0,
+        },
+        limit: 500,
+    }];
+
+    let mut baseline = Baseline::new();
+    baseline.set("src/file.rs", 600, "hash123".to_string()); // Unix path in baseline
+
+    apply_baseline_comparison(&mut results, &baseline);
+
+    assert!(results[0].is_grandfathered());
+}
+
+#[test]
+fn run_check_impl_with_baseline_grandfathers_violations() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a test file that will exceed the threshold
+    let test_file_path = temp_dir.path().join("large_file.rs");
+    let large_content = "fn main() {\n".to_string() + &"let x = 1;\n".repeat(100) + "}\n";
+    std::fs::write(&test_file_path, &large_content).unwrap();
+
+    // Create a baseline that includes this file
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+    let mut baseline = Baseline::new();
+    let file_path_str = test_file_path.to_string_lossy().replace('\\', "/");
+    baseline.set(&file_path_str, 102, "dummy_hash".to_string());
+    baseline.save(&baseline_path).unwrap();
+
+    // Create config with low threshold
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "[default]\nmax_lines = 10\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = CheckArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: Some(config_path),
+        max_lines: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: Some(baseline_path), // Use baseline
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Should return SUCCESS because the only failure is grandfathered
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn run_check_impl_without_baseline_fails_on_violations() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a test file that will exceed the threshold
+    let test_file_path = temp_dir.path().join("large_file.rs");
+    let large_content = "fn main() {\n".to_string() + &"let x = 1;\n".repeat(100) + "}\n";
+    std::fs::write(&test_file_path, &large_content).unwrap();
+
+    // Create config with low threshold
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "[default]\nmax_lines = 10\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = CheckArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: Some(config_path),
+        max_lines: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None, // No baseline
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Should return THRESHOLD_EXCEEDED because no baseline
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}
+
+#[test]
+fn run_check_impl_with_baseline_fails_on_new_violations() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a test file that will exceed the threshold
+    let test_file_path = temp_dir.path().join("new_file.rs");
+    let large_content = "fn main() {\n".to_string() + &"let x = 1;\n".repeat(100) + "}\n";
+    std::fs::write(&test_file_path, &large_content).unwrap();
+
+    // Create an empty baseline (file not in baseline = new violation)
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+    let baseline = Baseline::new();
+    baseline.save(&baseline_path).unwrap();
+
+    // Create config with low threshold
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "[default]\nmax_lines = 10\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = CheckArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: Some(config_path),
+        max_lines: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: Some(baseline_path), // Baseline exists but doesn't include this file
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Should return THRESHOLD_EXCEEDED because file is not in baseline
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
 }
 

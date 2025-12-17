@@ -19,6 +19,7 @@ struct Summary {
     passed: usize,
     warnings: usize,
     failed: usize,
+    grandfathered: usize,
 }
 
 #[derive(Serialize)]
@@ -40,13 +41,14 @@ struct FileStats {
 
 impl OutputFormatter for JsonFormatter {
     fn format(&self, results: &[CheckResult]) -> Result<String> {
-        let (passed, warnings, failed) =
+        let (passed, warnings, failed, grandfathered) =
             results
                 .iter()
-                .fold((0, 0, 0), |(p, w, f), r| match r.status {
-                    CheckStatus::Passed => (p + 1, w, f),
-                    CheckStatus::Warning => (p, w + 1, f),
-                    CheckStatus::Failed => (p, w, f + 1),
+                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r.status {
+                    CheckStatus::Passed => (p + 1, w, f, g),
+                    CheckStatus::Warning => (p, w + 1, f, g),
+                    CheckStatus::Failed => (p, w, f + 1, g),
+                    CheckStatus::Grandfathered => (p, w, f, g + 1),
                 });
 
         let output = JsonOutput {
@@ -55,6 +57,7 @@ impl OutputFormatter for JsonFormatter {
                 passed,
                 warnings,
                 failed,
+                grandfathered,
             },
             results: results.iter().map(convert_result).collect(),
         };
@@ -70,6 +73,7 @@ fn convert_result(result: &CheckResult) -> FileResult {
             CheckStatus::Passed => "passed".to_string(),
             CheckStatus::Warning => "warning".to_string(),
             CheckStatus::Failed => "failed".to_string(),
+            CheckStatus::Grandfathered => "grandfathered".to_string(),
         },
         sloc: result.stats.sloc(),
         limit: result.limit,

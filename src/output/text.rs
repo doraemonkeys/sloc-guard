@@ -1,4 +1,5 @@
-use std::io::Write;
+use std::fmt::Write;
+use std::io::Write as IoWrite;
 
 use crate::checker::{CheckResult, CheckStatus};
 use crate::error::Result;
@@ -22,6 +23,7 @@ mod ansi {
     pub const RED: &str = "\x1b[31m";
     pub const GREEN: &str = "\x1b[32m";
     pub const YELLOW: &str = "\x1b[33m";
+    pub const CYAN: &str = "\x1b[36m";
     pub const RESET: &str = "\x1b[0m";
 }
 
@@ -62,6 +64,7 @@ impl TextFormatter {
             CheckStatus::Passed => "✓",
             CheckStatus::Warning => "⚠",
             CheckStatus::Failed => "✗",
+            CheckStatus::Grandfathered => "◉",
         }
     }
 
@@ -74,6 +77,7 @@ impl TextFormatter {
             CheckStatus::Passed => ansi::GREEN,
             CheckStatus::Warning => ansi::YELLOW,
             CheckStatus::Failed => ansi::RED,
+            CheckStatus::Grandfathered => ansi::CYAN,
         };
 
         format!("{color}{text}{}", ansi::RESET)
@@ -89,6 +93,7 @@ impl TextFormatter {
             CheckStatus::Passed => "PASSED",
             CheckStatus::Warning => "WARNING",
             CheckStatus::Failed => "FAILED",
+            CheckStatus::Grandfathered => "GRANDFATHERED",
         };
         let colored_status = self.colorize(status_str, &result.status);
 
@@ -110,14 +115,28 @@ impl TextFormatter {
         .ok();
     }
 
-    fn format_summary(&self, total: usize, passed: usize, warnings: usize, failed: usize) -> String {
+    fn format_summary(
+        &self,
+        total: usize,
+        passed: usize,
+        warnings: usize,
+        failed: usize,
+        grandfathered: usize,
+    ) -> String {
         let passed_str = self.colorize_number(passed, &CheckStatus::Passed);
         let warnings_str = self.colorize_number(warnings, &CheckStatus::Warning);
         let failed_str = self.colorize_number(failed, &CheckStatus::Failed);
 
-        format!(
+        let mut summary = format!(
             "Summary: {total} files checked, {passed_str} passed, {warnings_str} warnings, {failed_str} failed"
-        )
+        );
+
+        if grandfathered > 0 {
+            let grandfathered_str = self.colorize_number(grandfathered, &CheckStatus::Grandfathered);
+            let _ = write!(summary, " (baseline: {grandfathered_str} grandfathered)");
+        }
+
+        summary
     }
 }
 
@@ -131,17 +150,19 @@ impl OutputFormatter for TextFormatter {
     fn format(&self, results: &[CheckResult]) -> Result<String> {
         let mut output = Vec::new();
 
-        let (passed, warnings, failed): (Vec<_>, Vec<_>, Vec<_>) = results.iter().fold(
-            (Vec::new(), Vec::new(), Vec::new()),
-            |(mut p, mut w, mut f), r| {
-                match r.status {
-                    CheckStatus::Passed => p.push(r),
-                    CheckStatus::Warning => w.push(r),
-                    CheckStatus::Failed => f.push(r),
-                }
-                (p, w, f)
-            },
-        );
+        let (passed, warnings, failed, grandfathered): (Vec<_>, Vec<_>, Vec<_>, Vec<_>) =
+            results.iter().fold(
+                (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+                |(mut p, mut w, mut f, mut g), r| {
+                    match r.status {
+                        CheckStatus::Passed => p.push(r),
+                        CheckStatus::Warning => w.push(r),
+                        CheckStatus::Failed => f.push(r),
+                        CheckStatus::Grandfathered => g.push(r),
+                    }
+                    (p, w, f, g)
+                },
+            );
 
         for result in &failed {
             self.format_result(result, &mut output);
@@ -153,6 +174,14 @@ impl OutputFormatter for TextFormatter {
             writeln!(output).ok();
         }
 
+        // Show grandfathered files in verbose mode
+        if self.verbose >= 1 {
+            for result in &grandfathered {
+                self.format_result(result, &mut output);
+                writeln!(output).ok();
+            }
+        }
+
         // Show passed files only in verbose mode
         if self.verbose >= 1 {
             for result in &passed {
@@ -161,7 +190,13 @@ impl OutputFormatter for TextFormatter {
             }
         }
 
-        let summary = self.format_summary(results.len(), passed.len(), warnings.len(), failed.len());
+        let summary = self.format_summary(
+            results.len(),
+            passed.len(),
+            warnings.len(),
+            failed.len(),
+            grandfathered.len(),
+        );
         writeln!(output, "{summary}").ok();
 
         Ok(String::from_utf8_lossy(&output).to_string())

@@ -6,14 +6,14 @@ ci:
 	@mkdir -p .tmp
 	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo tarpaulin --config tarpaulin.toml 2>&1 | tail -n 30
 	@mkdir -p .tmp
-	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check src
+	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check --strict src 
 
 # 详细模式
 ci-verbose:
 	cargo clippy --all-targets --all-features -- -D warnings
 	mkdir -p .tmp
 	TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo tarpaulin --config tarpaulin.toml
-	TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check src
+	TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check --strict src
 
 clippy:
 	@cargo clippy --all-targets --all-features -q -- -D warnings
