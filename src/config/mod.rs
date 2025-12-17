@@ -1,8 +1,8 @@
 mod loader;
 mod model;
 
-pub use loader::ConfigLoader;
-pub use model::{Config, ExcludeConfig, FileOverride, RuleConfig};
+pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
+pub use model::{Config, DefaultConfig, ExcludeConfig, FileOverride, RuleConfig};
 
 #[cfg(test)]
 mod tests {

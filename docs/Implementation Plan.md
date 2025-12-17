@@ -8,8 +8,8 @@
 | Module | Status | Description |
 |--------|--------|-------------|
 | `cli` | Done | CLI with check, stats, init, config commands + global options (verbose, quiet, color, no-config) |
-| `config/model` | Done | Configuration data structures with include_paths, warn_threshold |
-| `config/loader` | Stub | Only ConfigLoader trait defined, FileConfigLoader not implemented |
+| `config/model` | Partial | Configuration data structures with include_paths, warn_threshold (path_rules, per-rule warn_threshold pending) |
+| `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
 | `counter/sloc` | Done | SlocCounter with LineStats (total, code, comment, blank) |
@@ -20,8 +20,9 @@
 | `output/json` | Done | JsonFormatter with structured output |
 | `output/sarif` | Pending | SARIF formatter for GitHub Code Scanning |
 | `output/markdown` | Pending | Markdown formatter for PR comments |
+| `output/html` | Pending | HTML report with charts and trends |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Stub | Command dispatch done, all handlers are TODO stubs |
+| `main` | Partial | Command dispatch done, `run_check` implemented, other handlers are TODO stubs |
 
 ---
 
@@ -45,38 +46,39 @@ make ci
 
 ## Phase 1: Core MVP (P0)
 
-### Task 1.1: Implement FileConfigLoader
+### Task 1.1: Implement FileConfigLoader ✅
 
 Location: `src/config/loader.rs`
 
 ```
-- Implement concrete FileConfigLoader struct
-- Load from .sloc-guard.toml in current directory
-- Load from $HOME/.config/sloc-guard/config.toml as fallback
-- Return Config::default() if no config found
-- Add tests for each scenario
+- [x] Implement concrete FileConfigLoader struct
+- [x] Load from .sloc-guard.toml in current directory
+- [x] Load from $HOME/.config/sloc-guard/config.toml as fallback
+- [x] Return Config::default() if no config found
+- [x] Add tests for each scenario
 ```
 
-### Task 1.2: Implement run_check Command
+### Task 1.2: Implement run_check Command ✅
 
 Location: `src/main.rs`
 
 ```
-- Load configuration (from file or defaults, respect --no-config)
-- Apply CLI argument overrides:
+- [x] Load configuration (from file or defaults, respect --no-config)
+- [x] Apply CLI argument overrides:
   - --max-lines, --ext, --exclude, --include
   - --no-skip-comments, --no-skip-blank
   - --warn-threshold
-- Create GlobFilter from config + CLI args
-- Scan directories with DirectoryScanner
-- For each file:
+- [x] Create GlobFilter from config + CLI args
+- [x] Scan directories with DirectoryScanner
+- [x] For each file:
   - Detect language from extension
   - Count lines with SlocCounter
   - Check against threshold
-- Collect results
-- Format output (text/json/sarif/markdown based on --format)
-- Write to --output file if specified
-- Return appropriate exit code (0/1/2, or 0 if --warn-only)
+- [x] Collect results
+- [x] Format output (text/json based on --format; sarif/markdown return error as not implemented)
+- [x] Write to --output file if specified
+- [x] Return appropriate exit code (0/1/2, or 0 if --warn-only)
+- [x] Add tests for all functions (20 tests, 82.38% coverage)
 ```
 
 ### Task 1.3: Implement run_stats Command
@@ -200,15 +202,15 @@ Location: `src/baseline/mod.rs` (new module)
 - Track file hash to detect changes
 ```
 
-### Task 4.2: Warning Threshold Configuration (Partial)
+### Task 4.2: Warning Threshold Configuration
 
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
 ```
 - [x] Add warn_threshold to DefaultConfig (default 0.9)
-- [ ] Allow per-rule warning thresholds
+- [ ] Allow per-rule warning thresholds (e.g., [rules.rust] warn_threshold = 0.85)
 - [ ] Update ThresholdChecker to read warn_threshold from config
-- [ ] Support --warn-threshold CLI override
+- [x] Support --warn-threshold CLI override (implemented in Task 1.2)
 ```
 
 ### Task 4.3: Path-Based Rules
@@ -216,9 +218,36 @@ Location: `src/config/model.rs`, `src/checker/threshold.rs`
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
 ```
-- Support path patterns in rules (e.g., "src/generated/**")
-- Higher priority than extension-based rules
-- Use glob matching
+- Add [[path_rules]] section support in config
+- Support path patterns (e.g., "src/generated/**")
+- Higher priority than extension-based rules, lower than override
+- Use glob matching for path patterns
+- Support warn_threshold per path rule
+```
+
+### Task 4.4: Override with Reason
+
+Location: `src/config/model.rs`, `src/checker/threshold.rs`
+
+```
+- Add reason field to [[override]] section
+- Document purpose of exemption (e.g., "Legacy code, scheduled for Q2 refactor")
+- Show reason in verbose output and reports
+- Highest priority in rule matching
+```
+
+### Task 4.5: Custom Language Definition
+
+Location: `src/config/model.rs`, `src/language/registry.rs`
+
+```
+- Add [languages.<name>] section in config
+- Allow defining:
+  - extensions: ["ext1", "ext2"]
+  - single_line_comments: ["//", "#"]
+  - multi_line_comments: [["/*", "*/"], ["<!--", "-->"]]
+- Register custom languages at config load time
+- Override built-in language definitions if same extension
 ```
 
 ---
@@ -235,6 +264,7 @@ Location: `src/stats/mod.rs` (new module)
 - Top N largest files
 - Average file size
 - Distribution histogram
+- Per-directory breakdown
 ```
 
 ### Task 5.2: Trend Tracking
@@ -245,6 +275,22 @@ Location: `src/stats/trend.rs`
 - Store historical stats in .sloc-guard-history.json
 - Show change from previous run
 - Useful for monitoring code growth
+```
+
+### Task 5.3: HTML Report Generation
+
+Location: `src/output/html.rs` (new module)
+
+```
+- Create HtmlFormatter struct
+- Support --report flag to generate HTML file
+- Include:
+  - Summary dashboard with key metrics
+  - Interactive charts (file size distribution, language breakdown)
+  - Top N largest files table
+  - Per-directory statistics
+  - Trend visualization (if history available)
+- Use embedded CSS for standalone HTML file
 ```
 
 ---
@@ -274,12 +320,30 @@ Location: `docs/pre-commit.md`, config examples
 
 ---
 
+## Phase 7: Future Enhancements (P3)
+
+### Task 7.1: Function-Level Analysis
+
+Location: `src/counter/function.rs` (new module)
+
+```
+- Parse function/method boundaries (language-specific)
+- Count lines per function/method
+- Add function_max_lines to config (optional)
+- Report functions exceeding limit
+- Support languages: Rust, Go, Python, JavaScript/TypeScript
+- Note: Requires language-specific parsing, consider tree-sitter
+```
+
+---
+
 ## Priority Order
 
 1. **Immediate (MVP)**: 1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5
 2. **Short-term**: 2.1 -> 3.1 -> 3.2
-3. **Medium-term**: 2.2 -> 2.3 -> 4.1 -> 4.2 -> 4.3
-4. **Long-term**: 5.1 -> 5.2 -> 6.1 -> 6.2
+3. **Medium-term**: 2.2 -> 2.3 -> 4.1 -> 4.2 -> 4.3 -> 4.4
+4. **Long-term**: 4.5 -> 5.1 -> 5.2 -> 5.3 -> 6.1 -> 6.2
+5. **Future**: 7.1
 
 ---
 
@@ -297,17 +361,3 @@ main.rs
   -> checker/threshold (check limits)
   -> output/* (format results)
 ```
-
-### Design Principles
-
-- All components use traits for testability
-- Dependency injection via constructor parameters
-- No global state
-- Error handling via Result<T, SlocGuardError>
-
-### Testing Strategy
-
-- Unit tests in each module
-- Integration tests in `tests/` directory
-- Use tempfile for filesystem tests
-- Use assert_cmd for CLI tests
