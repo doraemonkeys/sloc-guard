@@ -1,5 +1,6 @@
 # sloc-guard Implementation Plan
 
+> **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
 
 ## Current Status
 
@@ -8,21 +9,22 @@
 | Module | Status | Description |
 |--------|--------|-------------|
 | `cli` | Done | CLI with check, stats, init, config commands + global options (verbose, quiet, color, no-config) |
-| `config/model` | Partial | Configuration data structures with include_paths, warn_threshold (path_rules, per-rule warn_threshold pending) |
+| `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride (pending: path_rules, per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
 | `counter/sloc` | Done | SlocCounter with LineStats (total, code, comment, blank) |
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
 | `scanner/mod` | Done | DirectoryScanner with walkdir integration |
-| `checker/threshold` | Done | ThresholdChecker with rule priority (override > rule > default) |
+| `checker/threshold` | Partial | ThresholdChecker with override > rule > default priority (pending: path_rules, per-rule skip_comments/skip_blank/warn_threshold) |
 | `output/text` | Done | TextFormatter with status icons and summary |
 | `output/json` | Done | JsonFormatter with structured output |
+| `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `output/sarif` | Pending | SARIF formatter for GitHub Code Scanning |
 | `output/markdown` | Pending | Markdown formatter for PR comments |
 | `output/html` | Pending | HTML report with charts and trends |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Partial | Command dispatch done, `run_check` implemented, other handlers are TODO stubs |
+| `main` | Partial | Command dispatch done, `run_check` and `run_stats` implemented, init/config handlers are TODO stubs |
 
 ---
 
@@ -81,19 +83,22 @@ Location: `src/main.rs`
 - [x] Add tests for all functions (20 tests, 82.38% coverage)
 ```
 
-### Task 1.3: Implement run_stats Command
+### Task 1.3: Implement run_stats Command ✅
 
-Location: `src/main.rs`
+Location: `src/main.rs`, `src/output/stats.rs`
 
 ```
-- Similar flow to check but without threshold checking
-- Load config for exclude patterns (respect --no-config)
-- Support --config, --ext, --exclude, --include options
-- Just count and display statistics
-- Support --format (text/json) and --output options
+- [x] Similar flow to check but without threshold checking
+- [x] Load config for exclude patterns (respect --no-config)
+- [x] Support --config, --ext, --exclude, --include options
+- [x] Just count and display statistics
+- [x] Support --format (text/json) and --output options
+- [x] Add FileStatistics, ProjectStatistics types
+- [x] Add StatsTextFormatter and StatsJsonFormatter
+- [x] Add tests (12 tests for main, 9 tests for stats module)
 ```
 
-### Task 1.4: Implement run_init Command
+### Task 1.4: Implement run_init Command (Pending)
 
 Location: `src/main.rs`
 

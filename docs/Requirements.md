@@ -1,7 +1,8 @@
 ## Requirements
-  
 
-  一、核心功能 (MVP)
+> **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
+
+一、核心功能 (MVP)
 
   | 功能         | 描述                                                    |
   |--------------|---------------------------------------------------------|

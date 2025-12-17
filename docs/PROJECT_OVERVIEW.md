@@ -1,5 +1,7 @@
 # sloc-guard Project Overview
 
+> **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
+
 **SLOC (Source Lines of Code) enforcement tool** - enforces file size limits by counting code lines, excluding comments and blanks.
 
 ## Quick Reference
@@ -23,8 +25,9 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` → `CheckResult{status, stats, limit}` |
 | `output/text` | `output/text.rs` | `TextFormatter` - human-readable output with icons |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
+| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize |
-| `main` | `main.rs` | Command dispatch, `run_check` implemented, others TODO |
+| `main` | `main.rs` | Command dispatch, `run_check` and `run_stats` implemented, init/config TODO |
 
 ## Key Types
 
@@ -40,6 +43,10 @@ CommentSyntax { single_line: Vec<&str>, multi_line: Vec<(start, end)> }
 // Check results
 CheckStatus::Passed | Warning | Failed
 CheckResult { path, status, stats, limit }
+
+// Stats results (no threshold checking)
+FileStatistics { path, stats: LineStats }
+ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank }
 ```
 
 ## Data Flow (check command)
@@ -53,6 +60,21 @@ CLI args → load_config() → apply_cli_overrides()
               SlocCounter::count(content) → LineStats
               ThresholdChecker::check(path, stats) → CheckResult
          → TextFormatter/JsonFormatter::format(results)
+         → write to stdout or --output file
+```
+
+## Data Flow (stats command)
+
+```
+CLI args → load_config()
+         → GlobFilter::new(extensions, excludes)
+         → DirectoryScanner::scan(paths)
+         → for each file:
+              LanguageRegistry::get_by_extension()
+              SlocCounter::count(content) → LineStats
+              collect_file_stats() → FileStatistics
+         → ProjectStatistics::new(file_stats)
+         → StatsTextFormatter/StatsJsonFormatter::format(stats)
          → write to stdout or --output file
 ```
 

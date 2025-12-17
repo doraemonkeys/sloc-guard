@@ -5,6 +5,8 @@ description: Maintain sloc-guard project documentation. Use when user completes 
 
 # Documentation Maintenance
 
+**Maintenance Principle**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
+
 When user completes a feature and requests doc updates, update these three files:
 
 1. `docs/Implementation Plan.md` - Update module status table, check off completed tasks
