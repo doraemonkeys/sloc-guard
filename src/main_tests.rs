@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use sloc_guard::checker::{CheckResult, CheckStatus, ThresholdChecker};
-use sloc_guard::cli::CheckArgs;
+use sloc_guard::cli::{CheckArgs, StatsArgs};
 use sloc_guard::config::Config;
 use sloc_guard::counter::LineStats;
 use sloc_guard::language::LanguageRegistry;
@@ -9,8 +9,8 @@ use sloc_guard::output::OutputFormat;
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use crate::{
-    apply_cli_overrides, compute_effective_stats, format_output, get_scan_paths, load_config,
-    process_file,
+    apply_cli_overrides, collect_file_stats, compute_effective_stats, format_output,
+    format_stats_output, get_scan_paths, get_stats_scan_paths, load_config, process_file,
 };
 
 #[test]
@@ -349,5 +349,135 @@ fn format_output_sarif_not_implemented() {
 fn format_output_markdown_not_implemented() {
     let results: Vec<CheckResult> = vec![];
     let result = format_output(OutputFormat::Markdown, &results);
+    assert!(result.is_err());
+}
+
+// Stats command tests
+
+#[test]
+fn get_stats_scan_paths_uses_include_override() {
+    let config = Config::default();
+    let args = StatsArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        ext: None,
+        exclude: vec![],
+        include: vec!["src".to_string(), "lib".to_string()],
+        format: OutputFormat::Text,
+        output: None,
+    };
+
+    let paths = get_stats_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("lib")]);
+}
+
+#[test]
+fn get_stats_scan_paths_uses_cli_paths() {
+    let config = Config::default();
+    let args = StatsArgs {
+        paths: vec![PathBuf::from("src"), PathBuf::from("tests")],
+        config: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        format: OutputFormat::Text,
+        output: None,
+    };
+
+    let paths = get_stats_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("tests")]);
+}
+
+#[test]
+fn get_stats_scan_paths_uses_config_include_paths() {
+    let mut config = Config::default();
+    config.default.include_paths = vec!["src".to_string()];
+
+    let args = StatsArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        format: OutputFormat::Text,
+        output: None,
+    };
+
+    let paths = get_stats_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from("src")]);
+}
+
+#[test]
+fn get_stats_scan_paths_defaults_to_current_dir() {
+    let config = Config::default();
+    let args = StatsArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        format: OutputFormat::Text,
+        output: None,
+    };
+
+    let paths = get_stats_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from(".")]);
+}
+
+#[test]
+fn collect_file_stats_nonexistent_returns_none() {
+    let registry = LanguageRegistry::default();
+    let path = PathBuf::from("nonexistent_file.rs");
+
+    let result = collect_file_stats(&path, &registry);
+    assert!(result.is_none());
+}
+
+#[test]
+fn collect_file_stats_unknown_extension_returns_none() {
+    let registry = LanguageRegistry::default();
+    let path = PathBuf::from("Cargo.toml");
+
+    let result = collect_file_stats(&path, &registry);
+    assert!(result.is_none());
+}
+
+#[test]
+fn collect_file_stats_valid_rust_file() {
+    let registry = LanguageRegistry::default();
+    let path = PathBuf::from("src/lib.rs");
+
+    let result = collect_file_stats(&path, &registry);
+    assert!(result.is_some());
+    let file_stats = result.unwrap();
+    assert_eq!(file_stats.path, path);
+    assert!(file_stats.stats.total > 0);
+}
+
+#[test]
+fn format_stats_output_text() {
+    let stats = sloc_guard::output::ProjectStatistics::new(vec![]);
+    let output = format_stats_output(OutputFormat::Text, &stats).unwrap();
+    assert!(output.contains("Summary"));
+}
+
+#[test]
+fn format_stats_output_json() {
+    let stats = sloc_guard::output::ProjectStatistics::new(vec![]);
+    let output = format_stats_output(OutputFormat::Json, &stats).unwrap();
+    assert!(output.contains("summary"));
+}
+
+#[test]
+fn format_stats_output_sarif_not_implemented() {
+    let stats = sloc_guard::output::ProjectStatistics::new(vec![]);
+    let result = format_stats_output(OutputFormat::Sarif, &stats);
+    assert!(result.is_err());
+}
+
+#[test]
+fn format_stats_output_markdown_not_implemented() {
+    let stats = sloc_guard::output::ProjectStatistics::new(vec![]);
+    let result = format_stats_output(OutputFormat::Markdown, &stats);
     assert!(result.is_err());
 }

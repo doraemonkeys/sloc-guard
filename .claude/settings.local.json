@@ -10,7 +10,9 @@
       "Bash(TMPDIR=\"$HOME/tmp\" TMP=\"$HOME/tmp\" TEMP=\"$HOME/tmp\" make ci:*)",
       "Bash(export TMPDIR=\"$HOME/tmp\")",
       "Bash(export TMP=\"$HOME/tmp\")",
-      "Bash(export TEMP=\"$HOME/tmp\")"
+      "Bash(export TEMP=\"$HOME/tmp\")",
+      "Bash(cargo run:*)",
+      "Skill(docs-maintenance)"
     ]
   }
 }

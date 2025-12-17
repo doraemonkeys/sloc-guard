@@ -1,7 +1,9 @@
 mod json;
+mod stats;
 mod text;
 
 pub use json::JsonFormatter;
+pub use stats::{FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter};
 pub use text::TextFormatter;
 
 use crate::checker::CheckResult;

@@ -4,11 +4,14 @@ use std::path::Path;
 use clap::Parser;
 
 use sloc_guard::checker::{Checker, ThresholdChecker};
-use sloc_guard::cli::{CheckArgs, Cli, Commands, ConfigAction};
+use sloc_guard::cli::{CheckArgs, Cli, Commands, ConfigAction, StatsArgs};
 use sloc_guard::config::{Config, ConfigLoader, FileConfigLoader};
 use sloc_guard::counter::{LineStats, SlocCounter};
 use sloc_guard::language::LanguageRegistry;
-use sloc_guard::output::{JsonFormatter, OutputFormat, OutputFormatter, TextFormatter};
+use sloc_guard::output::{
+    FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
+    StatsFormatter, StatsJsonFormatter, StatsTextFormatter, TextFormatter,
+};
 use sloc_guard::scanner::{DirectoryScanner, FileScanner, GlobFilter};
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
@@ -214,10 +217,115 @@ fn write_output(output_path: Option<&Path>, content: &str, quiet: bool) -> sloc_
     Ok(())
 }
 
-fn run_stats(_args: &sloc_guard::cli::StatsArgs, _cli: &Cli) -> i32 {
-    // TODO: Implement stats command
-    println!("Stats command not yet implemented");
-    EXIT_SUCCESS
+fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
+    match run_stats_impl(args, cli) {
+        Ok(exit_code) => exit_code,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            EXIT_CONFIG_ERROR
+        }
+    }
+}
+
+fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
+    // 1. Load configuration (for exclude patterns)
+    let config = load_config(args.config.as_deref(), cli.no_config)?;
+
+    // 2. Create GlobFilter
+    let extensions = args
+        .ext
+        .clone()
+        .unwrap_or_else(|| config.default.extensions.clone());
+    let mut exclude_patterns = config.exclude.patterns.clone();
+    exclude_patterns.extend(args.exclude.clone());
+    let filter = GlobFilter::new(extensions, &exclude_patterns)?;
+
+    // 3. Determine paths to scan
+    let paths_to_scan = get_stats_scan_paths(args, &config);
+
+    // 4. Scan directories
+    let scanner = DirectoryScanner::new(filter);
+    let mut all_files = Vec::new();
+    for path in &paths_to_scan {
+        let files = scanner.scan(path)?;
+        all_files.extend(files);
+    }
+
+    // 5. Process each file and collect statistics
+    let registry = LanguageRegistry::default();
+    let mut file_stats = Vec::new();
+
+    for file_path in &all_files {
+        if let Some(stats) = collect_file_stats(file_path, &registry) {
+            file_stats.push(stats);
+        }
+    }
+
+    let project_stats = ProjectStatistics::new(file_stats);
+
+    // 6. Format output
+    let output = format_stats_output(args.format, &project_stats)?;
+
+    // 7. Write output
+    write_output(args.output.as_deref(), &output, cli.quiet)?;
+
+    Ok(EXIT_SUCCESS)
+}
+
+fn get_stats_scan_paths(args: &StatsArgs, config: &Config) -> Vec<std::path::PathBuf> {
+    // CLI --include overrides config include_paths
+    if !args.include.is_empty() {
+        return args.include.iter().map(std::path::PathBuf::from).collect();
+    }
+
+    // If CLI paths provided (other than default "."), use them
+    let default_path = std::path::PathBuf::from(".");
+    if args.paths.len() != 1 || args.paths[0] != default_path {
+        return args.paths.clone();
+    }
+
+    // Use config include_paths if available
+    if !config.default.include_paths.is_empty() {
+        return config
+            .default
+            .include_paths
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+    }
+
+    // Default to current directory
+    args.paths.clone()
+}
+
+fn collect_file_stats(file_path: &Path, registry: &LanguageRegistry) -> Option<FileStatistics> {
+    let ext = file_path.extension()?.to_str()?;
+    let language = registry.get_by_extension(ext)?;
+
+    let content = fs::read_to_string(file_path).ok()?;
+    let counter = SlocCounter::new(&language.comment_syntax);
+    let stats = counter.count(&content);
+
+    Some(FileStatistics {
+        path: file_path.to_path_buf(),
+        stats,
+    })
+}
+
+fn format_stats_output(
+    format: OutputFormat,
+    stats: &ProjectStatistics,
+) -> sloc_guard::Result<String> {
+    match format {
+        OutputFormat::Text => StatsTextFormatter.format(stats),
+        OutputFormat::Json => StatsJsonFormatter.format(stats),
+        OutputFormat::Sarif => Err(sloc_guard::SlocGuardError::Config(
+            "SARIF output format is not yet implemented".to_string(),
+        )),
+        OutputFormat::Markdown => Err(sloc_guard::SlocGuardError::Config(
+            "Markdown output format is not yet implemented".to_string(),
+        )),
+    }
 }
 
 fn run_init(_args: &sloc_guard::cli::InitArgs) -> i32 {
