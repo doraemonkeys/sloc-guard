@@ -2,6 +2,7 @@ pub mod baseline;
 pub mod cache;
 pub mod checker;
 pub mod cli;
+pub mod commands;
 pub mod config;
 pub mod counter;
 pub mod error;

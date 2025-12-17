@@ -1,13 +1,15 @@
+# 请严格遵守阈值，主动拆分大文件
 [default]
 max_lines = 700
 extensions = ["rs"]
 skip_comments = true
-skip_blank = true
+skip_blank = false
+warn_threshold = 1
 
 [[path_rules]]
 pattern = "**/*_tests.rs"
 max_lines = 1500
-warn_threshold = 1.0
+warn_threshold = 1
 
 [exclude]
 patterns = ["**/target/**", "**/.git/**"]
