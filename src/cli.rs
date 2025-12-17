@@ -125,6 +125,10 @@ pub struct CheckArgs {
     /// Path to baseline file for grandfathering violations
     #[arg(long)]
     pub baseline: Option<PathBuf>,
+
+    /// Disable file hash caching
+    #[arg(long)]
+    pub no_cache: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -156,6 +160,10 @@ pub struct StatsArgs {
     /// Write output to file instead of stdout
     #[arg(short, long)]
     pub output: Option<PathBuf>,
+
+    /// Disable file hash caching
+    #[arg(long)]
+    pub no_cache: bool,
 }
 
 #[derive(Parser, Debug)]

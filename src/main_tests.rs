@@ -62,6 +62,7 @@ fn apply_cli_overrides_max_lines() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -89,6 +90,7 @@ fn apply_cli_overrides_no_skip_comments() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -116,6 +118,7 @@ fn apply_cli_overrides_no_skip_blank() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -141,6 +144,7 @@ fn apply_cli_overrides_warn_threshold() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -166,6 +170,7 @@ fn get_scan_paths_uses_include_override() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -191,6 +196,7 @@ fn get_scan_paths_uses_cli_paths() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -218,6 +224,7 @@ fn get_scan_paths_uses_config_include_paths() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -243,6 +250,7 @@ fn get_scan_paths_defaults_to_current_dir() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -388,6 +396,7 @@ fn get_stats_scan_paths_uses_include_override() {
         include: vec!["src".to_string(), "lib".to_string()],
         format: OutputFormat::Text,
         output: None,
+        no_cache: true,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -405,6 +414,7 @@ fn get_stats_scan_paths_uses_cli_paths() {
         include: vec![],
         format: OutputFormat::Text,
         output: None,
+        no_cache: true,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -424,6 +434,7 @@ fn get_stats_scan_paths_uses_config_include_paths() {
         include: vec![],
         format: OutputFormat::Text,
         output: None,
+        no_cache: true,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -441,6 +452,7 @@ fn get_stats_scan_paths_defaults_to_current_dir() {
         include: vec![],
         format: OutputFormat::Text,
         output: None,
+        no_cache: true,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -941,6 +953,7 @@ fn run_check_impl_with_valid_directory() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -968,6 +981,7 @@ fn run_check_impl_with_warn_only() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -996,6 +1010,7 @@ fn run_check_impl_with_threshold_exceeded() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1026,6 +1041,7 @@ fn run_check_impl_with_json_output() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -1056,6 +1072,7 @@ fn run_check_impl_with_verbose() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -1082,6 +1099,7 @@ fn run_check_impl_with_no_skip_flags() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1108,6 +1126,7 @@ fn run_check_impl_with_include_paths() {
         diff: None,
         strict: false,
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1128,6 +1147,7 @@ fn run_stats_impl_with_valid_directory() {
         include: vec![],
         format: OutputFormat::Text,
         output: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -1150,6 +1170,7 @@ fn run_stats_impl_with_json_output() {
         include: vec![],
         format: OutputFormat::Json,
         output: Some(output_path.clone()),
+        no_cache: true,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -1172,6 +1193,7 @@ fn run_stats_impl_with_include_paths() {
         include: vec!["src".to_string()],
         format: OutputFormat::Text,
         output: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -1222,6 +1244,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         diff: None,
         strict: true, // Enable strict mode
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1251,6 +1274,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         diff: None,
         strict: false, // Strict mode disabled
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1280,6 +1304,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         diff: None,
         strict: true, // Also enable strict mode
         baseline: None,
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1709,6 +1734,7 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
         diff: None,
         strict: false,
         baseline: Some(baseline_path), // Use baseline
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1749,6 +1775,7 @@ fn run_check_impl_without_baseline_fails_on_violations() {
         diff: None,
         strict: false,
         baseline: None, // No baseline
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1794,6 +1821,7 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
         diff: None,
         strict: false,
         baseline: Some(baseline_path), // Baseline exists but doesn't include this file
+        no_cache: true,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);

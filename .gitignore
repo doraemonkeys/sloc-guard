@@ -4,3 +4,4 @@ build_rs_cov.profraw
 TODO
 *gitignore_*
 *_gitignore*
+.sloc-guard-cache.json

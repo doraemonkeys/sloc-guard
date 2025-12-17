@@ -1,11 +1,13 @@
 use std::fs::{self, File};
 use std::io::BufReader;
 use std::path::Path;
+use std::sync::Mutex;
 
 use clap::Parser;
 use rayon::prelude::*;
 
 use sloc_guard::baseline::{compute_file_hash, Baseline};
+use sloc_guard::cache::{compute_config_hash, Cache};
 use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{
     BaselineAction, BaselineArgs, BaselineUpdateArgs, CheckArgs, Cli, ColorChoice, Commands,
@@ -24,6 +26,9 @@ use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 /// File size threshold for streaming reads (10 MB)
 const LARGE_FILE_THRESHOLD: u64 = 10 * 1024 * 1024;
+
+/// Default cache file path
+const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
 
 const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
     match choice {
@@ -67,6 +72,15 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     // 3. Load baseline if specified
     let baseline = load_baseline(args.baseline.as_deref())?;
 
+    // 3.1 Load cache if not disabled
+    let config_hash = compute_config_hash(&config);
+    let cache = if args.no_cache {
+        None
+    } else {
+        load_cache(&config_hash)
+    };
+    let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
+
     // 4. Create GlobFilter
     let extensions = args
         .ext
@@ -101,9 +115,24 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let mut results: Vec<_> = all_files
         .par_iter()
         .filter_map(|file_path| {
-            process_file(file_path, &registry, &checker, skip_comments, skip_blank)
+            process_file_cached(
+                file_path,
+                &registry,
+                &checker,
+                skip_comments,
+                skip_blank,
+                &cache,
+            )
         })
         .collect();
+
+    // 7.1 Save cache if not disabled
+    #[allow(clippy::collapsible_if)]
+    if !args.no_cache {
+        if let Ok(cache_guard) = cache.lock() {
+            save_cache(&cache_guard);
+        }
+    }
 
     // 8. Apply baseline comparison: mark failures as grandfathered if in baseline
     if let Some(ref baseline) = baseline {
@@ -161,6 +190,23 @@ fn load_baseline(baseline_path: Option<&Path>) -> sloc_guard::Result<Option<Base
     }
 
     Ok(Some(Baseline::load(path)?))
+}
+
+fn load_cache(config_hash: &str) -> Option<Cache> {
+    let cache_path = Path::new(DEFAULT_CACHE_PATH);
+    if !cache_path.exists() {
+        return None;
+    }
+
+    Cache::load(cache_path)
+        .ok()
+        .filter(|cache| cache.is_valid(config_hash))
+}
+
+fn save_cache(cache: &Cache) {
+    let cache_path = Path::new(DEFAULT_CACHE_PATH);
+    // Silently ignore errors when saving cache
+    let _ = cache.save(cache_path);
 }
 
 fn apply_baseline_comparison(results: &mut [sloc_guard::checker::CheckResult], baseline: &Baseline) {
@@ -269,6 +315,48 @@ fn process_file(
     Some(checker.check(file_path, &effective_stats))
 }
 
+fn process_file_cached(
+    file_path: &Path,
+    registry: &LanguageRegistry,
+    checker: &ThresholdChecker,
+    skip_comments: bool,
+    skip_blank: bool,
+    cache: &Mutex<Cache>,
+) -> Option<sloc_guard::checker::CheckResult> {
+    let ext = file_path.extension()?.to_str()?;
+    let language = registry.get_by_extension(ext)?;
+
+    let path_key = file_path.to_string_lossy().replace('\\', "/");
+    let file_hash = compute_file_hash(file_path).ok()?;
+
+    // Try to get stats from cache
+    let stats = {
+        let cache_guard = cache.lock().ok()?;
+        cache_guard
+            .get_if_valid(&path_key, &file_hash)
+            .map(|entry| LineStats::from(&entry.stats))
+    };
+
+    let stats = if let Some(cached_stats) = stats {
+        cached_stats
+    } else {
+        // Cache miss: count lines and update cache
+        let counter = SlocCounter::new(&language.comment_syntax);
+        let stats = count_file_lines(file_path, &counter)?;
+
+        // Update cache
+        if let Ok(mut cache_guard) = cache.lock() {
+            cache_guard.set(&path_key, file_hash, &stats);
+        }
+
+        stats
+    };
+
+    let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
+
+    Some(checker.check(file_path, &effective_stats))
+}
+
 fn count_file_lines(file_path: &Path, counter: &SlocCounter) -> Option<LineStats> {
     let metadata = fs::metadata(file_path).ok()?;
 
@@ -344,6 +432,15 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     // 1. Load configuration (for exclude patterns)
     let config = load_config(args.config.as_deref(), cli.no_config)?;
 
+    // 1.1 Load cache if not disabled
+    let config_hash = compute_config_hash(&config);
+    let cache = if args.no_cache {
+        None
+    } else {
+        load_cache(&config_hash)
+    };
+    let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
+
     // 2. Create GlobFilter
     let extensions = args
         .ext
@@ -369,8 +466,16 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
 
     let file_stats: Vec<_> = all_files
         .par_iter()
-        .filter_map(|file_path| collect_file_stats(file_path, &registry))
+        .filter_map(|file_path| collect_file_stats_cached(file_path, &registry, &cache))
         .collect();
+
+    // 5.1 Save cache if not disabled
+    #[allow(clippy::collapsible_if)]
+    if !args.no_cache {
+        if let Ok(cache_guard) = cache.lock() {
+            save_cache(&cache_guard);
+        }
+    }
 
     let project_stats = ProjectStatistics::new(file_stats);
 
@@ -409,12 +514,53 @@ fn get_stats_scan_paths(args: &StatsArgs, config: &Config) -> Vec<std::path::Pat
     args.paths.clone()
 }
 
+#[allow(dead_code)]
 fn collect_file_stats(file_path: &Path, registry: &LanguageRegistry) -> Option<FileStatistics> {
     let ext = file_path.extension()?.to_str()?;
     let language = registry.get_by_extension(ext)?;
 
     let counter = SlocCounter::new(&language.comment_syntax);
     let stats = count_file_lines(file_path, &counter)?;
+
+    Some(FileStatistics {
+        path: file_path.to_path_buf(),
+        stats,
+    })
+}
+
+fn collect_file_stats_cached(
+    file_path: &Path,
+    registry: &LanguageRegistry,
+    cache: &Mutex<Cache>,
+) -> Option<FileStatistics> {
+    let ext = file_path.extension()?.to_str()?;
+    let language = registry.get_by_extension(ext)?;
+
+    let path_key = file_path.to_string_lossy().replace('\\', "/");
+    let file_hash = compute_file_hash(file_path).ok()?;
+
+    // Try to get stats from cache
+    let stats = {
+        let cache_guard = cache.lock().ok()?;
+        cache_guard
+            .get_if_valid(&path_key, &file_hash)
+            .map(|entry| LineStats::from(&entry.stats))
+    };
+
+    let stats = if let Some(cached_stats) = stats {
+        cached_stats
+    } else {
+        // Cache miss: count lines and update cache
+        let counter = SlocCounter::new(&language.comment_syntax);
+        let stats = count_file_lines(file_path, &counter)?;
+
+        // Update cache
+        if let Ok(mut cache_guard) = cache.lock() {
+            cache_guard.set(&path_key, file_hash, &stats);
+        }
+
+        stats
+    };
 
     Some(FileStatistics {
         path: file_path.to_path_buf(),

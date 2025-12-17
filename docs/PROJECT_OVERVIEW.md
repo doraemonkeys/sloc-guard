@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline), `stats`, `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache), `stats` (--no-cache), `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig`, `ExcludeConfig`, `FileOverride`, `PathRule` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
@@ -68,7 +68,7 @@ BaselineEntry { lines: usize, hash: String }  // SHA-256 content hash
 compute_file_hash(path) → String  // SHA-256 of file content
 
 // Cache (file hash caching)
-Cache { version: u32, config_hash: String, files: HashMap<String, CacheEntry> }  // .sloc-guard-cache
+Cache { version: u32, config_hash: String, files: HashMap<String, CacheEntry> }  // .sloc-guard-cache.json
 CacheEntry { hash: String, stats: CachedLineStats }  // file content hash + cached stats
 compute_config_hash(config) → String  // SHA-256 of serialized config
 ```
@@ -78,14 +78,19 @@ compute_config_hash(config) → String  // SHA-256 of serialized config
 ```
 CLI args → load_config() → apply_cli_overrides()
          → [if --baseline] load_baseline() → Baseline
+         → [if !--no-cache] load_cache(config_hash) → Cache
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
          → for each file:
-              LanguageRegistry::get_by_extension()
-              SlocCounter::count(content) → CountResult
+              compute_file_hash() → check cache for valid entry
+              [if cache hit] use cached LineStats
+              [if cache miss] LanguageRegistry::get_by_extension()
+                              SlocCounter::count(content) → CountResult
+                              update cache with new stats
               [if IgnoredFile] skip file (inline ignore directive)
               [if Stats] ThresholdChecker::check(path, stats) → CheckResult
+         → [if !--no-cache] save_cache()
          → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
          → TextFormatter/JsonFormatter/SarifFormatter::format(results)
          → write to stdout or --output file
@@ -95,13 +100,18 @@ CLI args → load_config() → apply_cli_overrides()
 
 ```
 CLI args → load_config()
+         → [if !--no-cache] load_cache(config_hash) → Cache
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
          → for each file:
-              LanguageRegistry::get_by_extension()
-              SlocCounter::count(content) → CountResult
+              compute_file_hash() → check cache for valid entry
+              [if cache hit] use cached LineStats
+              [if cache miss] LanguageRegistry::get_by_extension()
+                              SlocCounter::count(content) → CountResult
+                              update cache with new stats
               [if IgnoredFile] skip file
               [if Stats] collect_file_stats() → FileStatistics
+         → [if !--no-cache] save_cache()
          → ProjectStatistics::new(file_stats)
          → StatsTextFormatter/StatsJsonFormatter::format(stats)
          → write to stdout or --output file

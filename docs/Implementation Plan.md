@@ -8,7 +8,7 @@
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `cli` | Done | CLI with check (--baseline), stats, init, config, baseline commands + global options (verbose, quiet, color, no-config) |
+| `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
 | `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
@@ -73,6 +73,7 @@ make ci
 | **Phase 4.1c** | Baseline Compare (`--baseline` flag, grandfathered status) | ✅ Done |
 | **Phase 2.2** | SARIF Output (SarifFormatter with 2.1.0 spec, GitHub Code Scanning) | ✅ Done |
 | **Phase 4.7a** | File Hash Cache (Cache, CacheEntry, compute_config_hash) | ✅ Done |
+| **Phase 4.7b** | Cache Integration (--no-cache flag, cache in check/stats commands) | ✅ Done |
 
 ---
 
@@ -152,16 +153,6 @@ Location: `src/counter/sloc.rs`
 - Support: // sloc-guard:ignore-next N
 - Support: // sloc-guard:ignore-start / ignore-end
 - Exclude matched lines from count
-```
-
-### Task 4.7b: Cache Integration
-
-Location: `src/main.rs`
-
-```
-- Integrate cache into check/stats commands
-- Invalidate on config change
-- Add --no-cache flag
 ```
 
 ### Task 4.8a: Config Inheritance (local)
@@ -309,15 +300,14 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.7b Cache Integration | ~2h |
-| **2. Medium** | 2.4 Progress Bar | ~2h |
+| **1. Short-term** | 2.4 Progress Bar | ~2h |
 | | 5.1a Language Breakdown | ~2h |
 | | 5.1b Top-N & Metrics | ~2h |
-| | 3.2 Git-Aware Exclude | ~3h |
-| **3. Lower** | 2.3 Markdown Output | ~2h |
+| **2. Medium** | 3.2 Git-Aware Exclude | ~3h |
+| | 2.3 Markdown Output | ~2h |
 | | 4.2 Per-rule warn_threshold | ~1h |
 | | 4.4 Override Reason | ~1h |
-| | 4.5 Custom Languages | ~3h |
+| **3. Lower** | 4.5 Custom Languages | ~3h |
 | | 4.6b Inline Ignore (block/next) | ~2h |
 | | 4.8a Config Inheritance (local) | ~2h |
 | **4. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
