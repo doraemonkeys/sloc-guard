@@ -7,6 +7,7 @@ skip_blank = true
 [[path_rules]]
 pattern = "**/*_tests.rs"
 max_lines = 1500
+warn_threshold = 1.0
 
 [exclude]
 patterns = ["**/target/**", "**/.git/**"]
