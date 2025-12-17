@@ -25,7 +25,9 @@
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
 | `cache` | Done | Cache, CacheEntry, CachedLineStats, compute_config_hash for file hash caching |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
+| `commands/config` | Done | `run_config`, `validate_config_semantics`, `format_config_text` |
+| `commands/init` | Done | `run_init`, `generate_config_template` |
+| `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_baseline` |
 
 ---
 
@@ -328,6 +330,7 @@ Location: `src/output/html.rs`
 ```
 main.rs
   -> cli (parse args)
+  -> commands/* (init, config)
   -> config/loader (load config)
   -> scanner (find files)
   -> language/registry (get comment syntax)

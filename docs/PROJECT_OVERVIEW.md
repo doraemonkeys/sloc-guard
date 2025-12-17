@@ -31,7 +31,9 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
+| `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
+| `commands/init` | `commands/init.rs` | `run_init`, `generate_config_template` |
+| `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_baseline` |
 
 ## Key Types
 
