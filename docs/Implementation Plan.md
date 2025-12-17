@@ -23,6 +23,7 @@
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
+| `cache` | Done | Cache, CacheEntry, CachedLineStats, compute_config_hash for file hash caching |
 | `error` | Done | SlocGuardError enum with thiserror |
 | `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
 
@@ -71,6 +72,7 @@ make ci
 | **Phase 4.1b** | Baseline Update Command (`baseline update` with --output) | ✅ Done |
 | **Phase 4.1c** | Baseline Compare (`--baseline` flag, grandfathered status) | ✅ Done |
 | **Phase 2.2** | SARIF Output (SarifFormatter with 2.1.0 spec, GitHub Code Scanning) | ✅ Done |
+| **Phase 4.7a** | File Hash Cache (Cache, CacheEntry, compute_config_hash) | ✅ Done |
 
 ---
 
@@ -150,16 +152,6 @@ Location: `src/counter/sloc.rs`
 - Support: // sloc-guard:ignore-next N
 - Support: // sloc-guard:ignore-start / ignore-end
 - Exclude matched lines from count
-```
-
-### Task 4.7a: File Hash Cache
-
-Location: `src/cache/mod.rs`
-
-```
-- Implement content hash (xxhash or sha256)
-- Cache format: { "version": 1, "config_hash": "...", "files": {...} }
-- Store in .sloc-guard-cache
 ```
 
 ### Task 4.7b: Cache Integration
@@ -317,8 +309,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.7a File Hash Cache | ~3h |
-| | 4.7b Cache Integration | ~2h |
+| **1. Short-term** | 4.7b Cache Integration | ~2h |
 | **2. Medium** | 2.4 Progress Bar | ~2h |
 | | 5.1a Language Breakdown | ~2h |
 | | 5.1b Top-N & Metrics | ~2h |

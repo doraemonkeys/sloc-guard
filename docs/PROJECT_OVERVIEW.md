@@ -25,6 +25,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline` | `baseline/types.rs` | `Baseline`, `BaselineEntry` - baseline file for grandfathering violations |
+| `cache` | `cache/types.rs` | `Cache`, `CacheEntry`, `CachedLineStats`, `compute_config_hash` - file hash caching |
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
@@ -65,6 +66,11 @@ ChangedFiles::get_changed_files(base_ref) → HashSet<PathBuf>  // Files changed
 Baseline { version: u32, files: HashMap<String, BaselineEntry> }  // .sloc-guard-baseline.json
 BaselineEntry { lines: usize, hash: String }  // SHA-256 content hash
 compute_file_hash(path) → String  // SHA-256 of file content
+
+// Cache (file hash caching)
+Cache { version: u32, config_hash: String, files: HashMap<String, CacheEntry> }  // .sloc-guard-cache
+CacheEntry { hash: String, stats: CachedLineStats }  // file content hash + cached stats
+compute_config_hash(config) → String  // SHA-256 of serialized config
 ```
 
 ## Data Flow (check command)
@@ -142,7 +148,7 @@ CLI args → load_config()
 - `globset` - glob pattern matching
 - `rayon` - parallel file processing
 - `gix` - git integration (--diff mode)
-- `sha2` - SHA-256 hashing (baseline)
+- `sha2` - SHA-256 hashing (baseline, cache)
 - `thiserror` - error handling
 
 ## Test Files
