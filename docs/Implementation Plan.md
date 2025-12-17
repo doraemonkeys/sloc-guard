@@ -1,14 +1,15 @@
 # sloc-guard Implementation Plan
 
+
 ## Current Status
 
 ### Completed Components
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `cli` | Done | CLI argument parsing with clap (check, stats, init commands) |
-| `config/model` | Done | Configuration data structures (Config, RuleConfig, FileOverride, etc.) |
-| `config/loader` | Partial | ConfigLoader trait defined, no concrete implementation |
+| `cli` | Done | CLI with check, stats, init, config commands + global options (verbose, quiet, color, no-config) |
+| `config/model` | Done | Configuration data structures with include_paths, warn_threshold |
+| `config/loader` | Stub | Only ConfigLoader trait defined, FileConfigLoader not implemented |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
 | `counter/sloc` | Done | SlocCounter with LineStats (total, code, comment, blank) |
@@ -17,8 +18,23 @@
 | `checker/threshold` | Done | ThresholdChecker with rule priority (override > rule > default) |
 | `output/text` | Done | TextFormatter with status icons and summary |
 | `output/json` | Done | JsonFormatter with structured output |
+| `output/sarif` | Pending | SARIF formatter for GitHub Code Scanning |
+| `output/markdown` | Pending | Markdown formatter for PR comments |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Partial | Command dispatch skeleton, handlers not implemented |
+| `main` | Stub | Command dispatch done, all handlers are TODO stubs |
+
+---
+
+### Exit Codes
+
+| Code | Constant | Description |
+|------|----------|-------------|
+| 0 | `EXIT_SUCCESS` | All checks passed (or `--warn-only` mode) |
+| 1 | `EXIT_FAILURE` | One or more files exceeded threshold |
+| 2 | `EXIT_CONFIG_ERROR` | Configuration file error (syntax or semantic) |
+| 3 | `EXIT_IO_ERROR` | File system error (permission denied, not found) |
+
+Note: When `--warn-only` is set, exit code 1 is converted to 0.
 
 ---
 
@@ -46,8 +62,11 @@ Location: `src/config/loader.rs`
 Location: `src/main.rs`
 
 ```
-- Load configuration (from file or defaults)
-- Apply CLI argument overrides (--max-lines, --ext)
+- Load configuration (from file or defaults, respect --no-config)
+- Apply CLI argument overrides:
+  - --max-lines, --ext, --exclude, --include
+  - --no-skip-comments, --no-skip-blank
+  - --warn-threshold
 - Create GlobFilter from config + CLI args
 - Scan directories with DirectoryScanner
 - For each file:
@@ -55,8 +74,9 @@ Location: `src/main.rs`
   - Count lines with SlocCounter
   - Check against threshold
 - Collect results
-- Format output (text/json based on --format)
-- Return appropriate exit code (0/1/2)
+- Format output (text/json/sarif/markdown based on --format)
+- Write to --output file if specified
+- Return appropriate exit code (0/1/2, or 0 if --warn-only)
 ```
 
 ### Task 1.3: Implement run_stats Command
@@ -65,8 +85,10 @@ Location: `src/main.rs`
 
 ```
 - Similar flow to check but without threshold checking
+- Load config for exclude patterns (respect --no-config)
+- Support --config, --ext, --exclude, --include options
 - Just count and display statistics
-- Support same --ext and --format options
+- Support --format (text/json) and --output options
 ```
 
 ### Task 1.4: Implement run_init Command
@@ -77,6 +99,25 @@ Location: `src/main.rs`
 - Generate default .sloc-guard.toml
 - Check if file exists (error unless --force)
 - Write template config with comments
+```
+
+### Task 1.5: Implement run_config Commands
+
+Location: `src/main.rs`
+
+```
+- config validate:
+  - Parse specified config file (or find default)
+  - Validate TOML syntax
+  - Validate semantic correctness (valid glob patterns, threshold in range)
+  - Output validation errors with context
+  - Return EXIT_CONFIG_ERROR on failure
+
+- config show:
+  - Load and merge configuration (file + defaults)
+  - Support --format (text/json)
+  - Show effective configuration
+  - Indicate source of each value (file/default) in verbose mode
 ```
 
 ---
@@ -159,14 +200,15 @@ Location: `src/baseline/mod.rs` (new module)
 - Track file hash to detect changes
 ```
 
-### Task 4.2: Warning Threshold Configuration
+### Task 4.2: Warning Threshold Configuration (Partial)
 
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
 ```
-- Add warning_threshold to config (default 0.9)
-- Allow per-rule warning thresholds
-- Update ThresholdChecker to read from config
+- [x] Add warn_threshold to DefaultConfig (default 0.9)
+- [ ] Allow per-rule warning thresholds
+- [ ] Update ThresholdChecker to read warn_threshold from config
+- [ ] Support --warn-threshold CLI override
 ```
 
 ### Task 4.3: Path-Based Rules
@@ -234,7 +276,7 @@ Location: `docs/pre-commit.md`, config examples
 
 ## Priority Order
 
-1. **Immediate (MVP)**: 1.1 -> 1.2 -> 1.3 -> 1.4
+1. **Immediate (MVP)**: 1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5
 2. **Short-term**: 2.1 -> 3.1 -> 3.2
 3. **Medium-term**: 2.2 -> 2.3 -> 4.1 -> 4.2 -> 4.3
 4. **Long-term**: 5.1 -> 5.2 -> 6.1 -> 6.2

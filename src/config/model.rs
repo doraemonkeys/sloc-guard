@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     #[serde(default)]
     pub default: DefaultConfig,
@@ -15,7 +15,7 @@ pub struct Config {
     pub overrides: Vec<FileOverride>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DefaultConfig {
     #[serde(default = "default_max_lines")]
     pub max_lines: usize,
@@ -23,11 +23,17 @@ pub struct DefaultConfig {
     #[serde(default = "default_extensions")]
     pub extensions: Vec<String>,
 
+    #[serde(default)]
+    pub include_paths: Vec<String>,
+
     #[serde(default = "default_true")]
     pub skip_comments: bool,
 
     #[serde(default = "default_true")]
     pub skip_blank: bool,
+
+    #[serde(default = "default_warn_threshold")]
+    pub warn_threshold: f64,
 }
 
 impl Default for DefaultConfig {
@@ -35,8 +41,10 @@ impl Default for DefaultConfig {
         Self {
             max_lines: default_max_lines(),
             extensions: default_extensions(),
+            include_paths: Vec::new(),
             skip_comments: true,
             skip_blank: true,
+            warn_threshold: default_warn_threshold(),
         }
     }
 }
@@ -87,6 +95,10 @@ fn default_extensions() -> Vec<String> {
 
 const fn default_true() -> bool {
     true
+}
+
+const fn default_warn_threshold() -> f64 {
+    0.9
 }
 
 #[cfg(test)]
