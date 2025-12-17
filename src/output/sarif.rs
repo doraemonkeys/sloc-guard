@@ -13,7 +13,7 @@ const SARIF_SCHEMA: &str =
 const SARIF_VERSION: &str = "2.1.0";
 const TOOL_NAME: &str = "sloc-guard";
 const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
-const TOOL_INFO_URI: &str = "https://github.com/sloc-guard/sloc-guard";
+const TOOL_INFO_URI: &str = "https://github.com/doraemonkeys/sloc-guard";
 
 const RULE_LINE_LIMIT_EXCEEDED: &str = "sloc-guard/line-limit-exceeded";
 const RULE_LINE_LIMIT_WARNING: &str = "sloc-guard/line-limit-warning";

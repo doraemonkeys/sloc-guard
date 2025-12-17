@@ -2,6 +2,10 @@
 name = "sloc-guard"
 version = "0.1.0"
 edition = "2024"
+repository = "https://github.com/doraemonkeys/sloc-guard"
+homepage = "https://github.com/doraemonkeys/sloc-guard"
+license = "Apache-2.0"
+description = "SLOC enforcement tool - enforces file size limits by counting source lines of code"
 
 [dependencies]
 # CLI parsing
@@ -19,7 +23,10 @@ globset = "0.4"
 # Parallel processing
 rayon = "1.10"
 
-gix = { version = "0.75", default-features = false, features = ["revision", "index"] }
+gix = { version = "0.75", default-features = false, features = [
+    "revision",
+    "index",
+] }
 
 # Error handling
 thiserror = "2"
