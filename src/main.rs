@@ -5,8 +5,12 @@ use std::path::Path;
 use clap::Parser;
 use rayon::prelude::*;
 
+use sloc_guard::baseline::{compute_file_hash, Baseline};
 use sloc_guard::checker::{Checker, ThresholdChecker};
-use sloc_guard::cli::{CheckArgs, Cli, ColorChoice, Commands, ConfigAction, StatsArgs};
+use sloc_guard::cli::{
+    BaselineAction, BaselineArgs, BaselineUpdateArgs, CheckArgs, Cli, ColorChoice, Commands,
+    ConfigAction, StatsArgs,
+};
 use sloc_guard::config::{Config, ConfigLoader, FileConfigLoader};
 use sloc_guard::counter::{CountResult, LineStats, SlocCounter};
 use sloc_guard::git::{ChangedFiles, GitDiff};
@@ -37,6 +41,7 @@ fn main() {
         Commands::Stats(args) => run_stats(args, &cli),
         Commands::Init(args) => run_init(args),
         Commands::Config(args) => run_config(args),
+        Commands::Baseline(args) => run_baseline(args, &cli),
     };
 
     std::process::exit(exit_code);
@@ -667,6 +672,118 @@ fn format_config_text(config: &Config) -> String {
     }
 
     output
+}
+
+fn run_baseline(args: &BaselineArgs, cli: &Cli) -> i32 {
+    match &args.action {
+        BaselineAction::Update(update_args) => run_baseline_update(update_args, cli),
+    }
+}
+
+fn run_baseline_update(args: &BaselineUpdateArgs, cli: &Cli) -> i32 {
+    match run_baseline_update_impl(args, cli) {
+        Ok(count) => {
+            if !cli.quiet {
+                println!(
+                    "Baseline created with {} file(s): {}",
+                    count,
+                    args.output.display()
+                );
+            }
+            EXIT_SUCCESS
+        }
+        Err(e) => {
+            eprintln!("Error: {e}");
+            EXIT_CONFIG_ERROR
+        }
+    }
+}
+
+fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard::Result<usize> {
+    // 1. Load configuration
+    let config = load_config(args.config.as_deref(), cli.no_config)?;
+
+    // 2. Create GlobFilter
+    let extensions = args
+        .ext
+        .clone()
+        .unwrap_or_else(|| config.default.extensions.clone());
+    let mut exclude_patterns = config.exclude.patterns.clone();
+    exclude_patterns.extend(args.exclude.clone());
+    let filter = GlobFilter::new(extensions, &exclude_patterns)?;
+
+    // 3. Determine paths to scan
+    let paths_to_scan = get_baseline_scan_paths(args, &config);
+
+    // 4. Scan directories
+    let scanner = DirectoryScanner::new(filter);
+    let mut all_files = Vec::new();
+    for path in &paths_to_scan {
+        let files = scanner.scan(path)?;
+        all_files.extend(files);
+    }
+
+    // 5. Process each file and find violations
+    let registry = LanguageRegistry::default();
+    let warn_threshold = config.default.warn_threshold;
+    let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
+
+    let skip_comments = config.default.skip_comments;
+    let skip_blank = config.default.skip_blank;
+
+    let violations: Vec<_> = all_files
+        .par_iter()
+        .filter_map(|file_path| {
+            let result = process_file(file_path, &registry, &checker, skip_comments, skip_blank)?;
+            if result.is_failed() {
+                Some((file_path.clone(), result.stats.code))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // 6. Create baseline from violations
+    let mut baseline = Baseline::new();
+    for (path, lines) in &violations {
+        let path_str = path.to_string_lossy().replace('\\', "/");
+        let hash = compute_file_hash(path)?;
+        baseline.set(&path_str, *lines, hash);
+    }
+
+    // 7. Save baseline to file
+    baseline.save(&args.output)?;
+
+    Ok(violations.len())
+}
+
+fn get_baseline_scan_paths(
+    args: &BaselineUpdateArgs,
+    config: &Config,
+) -> Vec<std::path::PathBuf> {
+    // CLI --include overrides config include_paths
+    if !args.include.is_empty() {
+        return args.include.iter().map(std::path::PathBuf::from).collect();
+    }
+
+    // If CLI paths provided (other than default "."), use them
+    let default_path = std::path::PathBuf::from(".");
+    if args.paths.len() != 1 || args.paths[0] != default_path {
+        return args.paths.clone();
+    }
+
+    // Use config include_paths if available
+    if !config.default.include_paths.is_empty() {
+        return config
+            .default
+            .include_paths
+            .iter()
+            .map(std::path::PathBuf::from)
+            .collect();
+    }
+
+    // Default to current directory
+    args.paths.clone()
 }
 
 #[cfg(test)]

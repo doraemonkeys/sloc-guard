@@ -8,7 +8,7 @@
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `cli` | Done | CLI with check, stats, init, config commands + global options (verbose, quiet, color, no-config) |
+| `cli` | Done | CLI with check, stats, init, config, baseline commands + global options (verbose, quiet, color, no-config) |
 | `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
@@ -21,9 +21,9 @@
 | `output/json` | Done | JsonFormatter with structured output |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
-| `baseline` | Partial | Baseline, BaselineEntry, compute_file_hash, compute_content_hash (pending: CLI commands) |
+| `baseline` | Partial | Baseline, BaselineEntry, compute_file_hash, `baseline update` command (pending: baseline compare in check) |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
+| `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
 
 ---
 
@@ -67,6 +67,7 @@ make ci
 | **Phase 4.6a** | Inline Ignore (// sloc-guard:ignore-file in first 10 lines) | ✅ Done |
 | **Phase 4.9** | Strict Mode (--strict flag, config option) | ✅ Done |
 | **Phase 4.1a** | Baseline File Format (Baseline, BaselineEntry, SHA-256 hash) | ✅ Done |
+| **Phase 4.1b** | Baseline Update Command (`baseline update` with --output) | ✅ Done |
 
 ---
 
@@ -119,16 +120,6 @@ Location: `src/scanner/filter.rs`
 ---
 
 ## Phase 4: Advanced Features (P2)
-
-### Task 4.1b: Baseline Update Command
-
-Location: `src/main.rs`, `src/cli.rs`
-
-```
-- Add `sloc-guard baseline update` command
-- Generate baseline from current violations
-- Support --output path option
-```
 
 ### Task 4.1c: Baseline Compare in Check
 
@@ -324,8 +315,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.1b Baseline Update Command | ~2h |
-| | 4.1c Baseline Compare | ~2h |
+| **1. Short-term** | 4.1c Baseline Compare | ~2h |
 | **2. Medium-term** | 2.2 SARIF Output | ~3h |
 | | 4.7a File Hash Cache | ~3h |
 | | 4.7b Cache Integration | ~2h |

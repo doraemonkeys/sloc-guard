@@ -1305,3 +1305,233 @@ fn format_config_text_shows_strict() {
     let output = format_config_text(&config);
     assert!(output.contains("strict = true"));
 }
+
+// Baseline update command tests
+
+use crate::{get_baseline_scan_paths, run_baseline_update_impl};
+use sloc_guard::baseline::Baseline;
+use sloc_guard::cli::BaselineUpdateArgs;
+
+#[test]
+fn get_baseline_scan_paths_uses_include_override() {
+    let config = Config::default();
+    let args = BaselineUpdateArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        output: PathBuf::from(".sloc-guard-baseline.json"),
+        ext: None,
+        exclude: vec![],
+        include: vec!["src".to_string(), "lib".to_string()],
+    };
+
+    let paths = get_baseline_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("lib")]);
+}
+
+#[test]
+fn get_baseline_scan_paths_uses_cli_paths() {
+    let config = Config::default();
+    let args = BaselineUpdateArgs {
+        paths: vec![PathBuf::from("src"), PathBuf::from("tests")],
+        config: None,
+        output: PathBuf::from(".sloc-guard-baseline.json"),
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+    };
+
+    let paths = get_baseline_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("tests")]);
+}
+
+#[test]
+fn get_baseline_scan_paths_uses_config_include_paths() {
+    let mut config = Config::default();
+    config.default.include_paths = vec!["src".to_string()];
+
+    let args = BaselineUpdateArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        output: PathBuf::from(".sloc-guard-baseline.json"),
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+    };
+
+    let paths = get_baseline_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from("src")]);
+}
+
+#[test]
+fn get_baseline_scan_paths_defaults_to_current_dir() {
+    let config = Config::default();
+    let args = BaselineUpdateArgs {
+        paths: vec![PathBuf::from(".")],
+        config: None,
+        output: PathBuf::from(".sloc-guard-baseline.json"),
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+    };
+
+    let paths = get_baseline_scan_paths(&args, &config);
+    assert_eq!(paths, vec![PathBuf::from(".")]);
+}
+
+fn make_cli_for_baseline(quiet: bool, no_config: bool) -> Cli {
+    Cli {
+        command: sloc_guard::cli::Commands::Init(InitArgs {
+            output: PathBuf::from(".sloc-guard.toml"),
+            force: false,
+        }),
+        verbose: 0,
+        quiet,
+        color: ColorChoice::Never,
+        no_config,
+    }
+}
+
+#[test]
+fn run_baseline_update_creates_empty_baseline_when_no_violations() {
+    let temp_dir = TempDir::new().unwrap();
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+
+    // Create a test file that will NOT exceed the threshold
+    let test_file_path = temp_dir.path().join("small_file.rs");
+    std::fs::write(&test_file_path, "fn main() {}\n").unwrap();
+
+    let args = BaselineUpdateArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: None,
+        output: baseline_path.clone(),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+    };
+
+    let cli = make_cli_for_baseline(true, true);
+
+    let result = run_baseline_update_impl(&args, &cli);
+    assert!(result.is_ok());
+
+    assert!(baseline_path.exists());
+    let baseline = Baseline::load(&baseline_path).unwrap();
+    assert!(baseline.is_empty());
+}
+
+#[test]
+fn run_baseline_update_captures_violations() {
+    let temp_dir = TempDir::new().unwrap();
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+
+    // Create a test file that will exceed the threshold
+    let test_file_path = temp_dir.path().join("large_file.rs");
+    let large_content = "fn main() {\n".to_string() + &"let x = 1;\n".repeat(100) + "}\n";
+    std::fs::write(&test_file_path, &large_content).unwrap();
+
+    // Create a temp config with a very low threshold
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "[default]\nmax_lines = 10\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = BaselineUpdateArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: Some(config_path),
+        output: baseline_path.clone(),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+    };
+
+    let cli = make_cli_for_baseline(true, false);
+
+    let result = run_baseline_update_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 1); // 1 violation
+
+    assert!(baseline_path.exists());
+    let baseline = Baseline::load(&baseline_path).unwrap();
+    assert_eq!(baseline.len(), 1);
+}
+
+#[test]
+fn run_baseline_update_with_exclude_patterns() {
+    let temp_dir = TempDir::new().unwrap();
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+
+    // Create test directory structure
+    let src_dir = temp_dir.path().join("src");
+    let vendor_dir = temp_dir.path().join("vendor");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::create_dir_all(&vendor_dir).unwrap();
+
+    // Create test files that would exceed threshold
+    let large_content = "fn main() {\n".to_string() + &"let x = 1;\n".repeat(100) + "}\n";
+    std::fs::write(src_dir.join("main.rs"), &large_content).unwrap();
+    std::fs::write(vendor_dir.join("lib.rs"), &large_content).unwrap();
+
+    // Create config with low threshold
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "[default]\nmax_lines = 10\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = BaselineUpdateArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: Some(config_path),
+        output: baseline_path.clone(),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec!["**/vendor/**".to_string()],
+        include: vec![],
+    };
+
+    let cli = make_cli_for_baseline(true, false);
+
+    let result = run_baseline_update_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), 1); // Only 1 violation (vendor excluded)
+
+    let baseline = Baseline::load(&baseline_path).unwrap();
+    assert_eq!(baseline.len(), 1);
+    // Should only have the src file, not the vendor file
+    let files: Vec<_> = baseline.files().keys().collect();
+    assert!(files.iter().any(|f| f.contains("main.rs")));
+    assert!(!files.iter().any(|f| f.contains("vendor")));
+}
+
+#[test]
+fn baseline_file_contains_correct_hash() {
+    let temp_dir = TempDir::new().unwrap();
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+
+    // Create a test file that will exceed the threshold
+    let test_file_path = temp_dir.path().join("test.rs");
+    let content = "fn main() {\n".to_string() + &"let x = 1;\n".repeat(100) + "}\n";
+    std::fs::write(&test_file_path, &content).unwrap();
+
+    // Create config with low threshold
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "[default]\nmax_lines = 10\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = BaselineUpdateArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: Some(config_path),
+        output: baseline_path.clone(),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+    };
+
+    let cli = make_cli_for_baseline(true, false);
+
+    let result = run_baseline_update_impl(&args, &cli);
+    assert!(result.is_ok());
+
+    let baseline = Baseline::load(&baseline_path).unwrap();
+    let entry = baseline.files().values().next().unwrap();
+
+    // Verify hash is a valid SHA-256 (64 hex characters)
+    assert_eq!(entry.hash.len(), 64);
+    assert!(entry.hash.chars().all(|c| c.is_ascii_hexdigit()));
+}
+

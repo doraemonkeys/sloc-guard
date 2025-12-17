@@ -58,6 +58,9 @@ pub enum Commands {
 
     /// Configuration file utilities
     Config(ConfigArgs),
+
+    /// Baseline management for grandfathering violations
+    Baseline(BaselineArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -187,6 +190,45 @@ pub enum ConfigAction {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
+}
+
+#[derive(Parser, Debug)]
+pub struct BaselineArgs {
+    #[command(subcommand)]
+    pub action: BaselineAction,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum BaselineAction {
+    /// Generate baseline from current violations
+    Update(BaselineUpdateArgs),
+}
+
+#[derive(Parser, Debug)]
+pub struct BaselineUpdateArgs {
+    /// Paths to scan (files or directories)
+    #[arg(default_value = ".")]
+    pub paths: Vec<PathBuf>,
+
+    /// Path to configuration file
+    #[arg(short, long)]
+    pub config: Option<PathBuf>,
+
+    /// Output path for baseline file
+    #[arg(short, long, default_value = ".sloc-guard-baseline.json")]
+    pub output: PathBuf,
+
+    /// File extensions to check (comma-separated, e.g., rs,go,py)
+    #[arg(long, value_delimiter = ',')]
+    pub ext: Option<Vec<String>>,
+
+    /// Exclude patterns (glob syntax, can be specified multiple times)
+    #[arg(long, short = 'x')]
+    pub exclude: Vec<String>,
+
+    /// Include only these directories (overrides config `include_paths`)
+    #[arg(long, short = 'I')]
+    pub include: Vec<String>,
 }
 
 #[cfg(test)]

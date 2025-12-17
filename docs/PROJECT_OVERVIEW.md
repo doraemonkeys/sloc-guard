@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check`, `stats`, `init`, `config` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check`, `stats`, `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig`, `ExcludeConfig`, `FileOverride`, `PathRule` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
@@ -29,7 +29,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
+| `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
 
 ## Key Types
 
@@ -107,6 +107,21 @@ config validate:
 
 config show:
   config_path → load_config() → format_config_text() or serde_json::to_string_pretty()
+```
+
+## Data Flow (baseline update command)
+
+```
+CLI args → load_config()
+         → GlobFilter::new(extensions, excludes)
+         → DirectoryScanner::scan(paths)
+         → for each file:
+              process_file() → CheckResult
+              [if Failed] collect (path, lines)
+         → for each violation:
+              compute_file_hash(path) → SHA-256
+              Baseline::set(path, lines, hash)
+         → Baseline::save(output_path)
 ```
 
 ## Threshold Resolution (priority high→low)
