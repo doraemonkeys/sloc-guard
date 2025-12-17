@@ -19,6 +19,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct DefaultConfig {
     #[serde(default = "default_max_lines")]
     pub max_lines: usize,
@@ -40,6 +41,9 @@ pub struct DefaultConfig {
 
     #[serde(default)]
     pub strict: bool,
+
+    #[serde(default = "default_true")]
+    pub gitignore: bool,
 }
 
 impl Default for DefaultConfig {
@@ -52,6 +56,7 @@ impl Default for DefaultConfig {
             skip_blank: true,
             warn_threshold: default_warn_threshold(),
             strict: false,
+            gitignore: true,
         }
     }
 }

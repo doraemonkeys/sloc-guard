@@ -62,6 +62,7 @@ fn apply_cli_overrides_max_lines() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -90,6 +91,7 @@ fn apply_cli_overrides_no_skip_comments() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -118,6 +120,7 @@ fn apply_cli_overrides_no_skip_blank() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -144,6 +147,7 @@ fn apply_cli_overrides_warn_threshold() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -170,6 +174,7 @@ fn get_scan_paths_uses_include_override() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -196,6 +201,7 @@ fn get_scan_paths_uses_cli_paths() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -224,6 +230,7 @@ fn get_scan_paths_uses_config_include_paths() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -250,6 +257,7 @@ fn get_scan_paths_defaults_to_current_dir() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -398,6 +406,7 @@ fn get_stats_scan_paths_uses_include_override() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -418,6 +427,7 @@ fn get_stats_scan_paths_uses_cli_paths() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -440,6 +450,7 @@ fn get_stats_scan_paths_uses_config_include_paths() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -460,6 +471,7 @@ fn get_stats_scan_paths_defaults_to_current_dir() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -617,6 +629,7 @@ fn run_check_impl_with_valid_directory() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -645,6 +658,7 @@ fn run_check_impl_with_warn_only() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -674,6 +688,7 @@ fn run_check_impl_with_threshold_exceeded() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -705,6 +720,7 @@ fn run_check_impl_with_json_output() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -736,6 +752,7 @@ fn run_check_impl_with_verbose() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -763,6 +780,7 @@ fn run_check_impl_with_no_skip_flags() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -790,6 +808,7 @@ fn run_check_impl_with_include_paths() {
         strict: false,
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -813,6 +832,7 @@ fn run_stats_impl_with_valid_directory() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -838,6 +858,7 @@ fn run_stats_impl_with_json_output() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -863,6 +884,7 @@ fn run_stats_impl_with_include_paths() {
         no_cache: true,
         group_by: GroupBy::None,
         top: None,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -894,6 +916,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         strict: true, // Enable strict mode
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -924,6 +947,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         strict: false, // Strict mode disabled
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -954,6 +978,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         strict: true, // Also enable strict mode
         baseline: None,
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1001,6 +1026,7 @@ fn get_baseline_scan_paths_uses_include_override() {
         ext: None,
         exclude: vec![],
         include: vec!["src".to_string(), "lib".to_string()],
+        no_gitignore: false,
     };
 
     let paths = get_baseline_scan_paths(&args, &config);
@@ -1017,6 +1043,7 @@ fn get_baseline_scan_paths_uses_cli_paths() {
         ext: None,
         exclude: vec![],
         include: vec![],
+        no_gitignore: false,
     };
 
     let paths = get_baseline_scan_paths(&args, &config);
@@ -1035,6 +1062,7 @@ fn get_baseline_scan_paths_uses_config_include_paths() {
         ext: None,
         exclude: vec![],
         include: vec![],
+        no_gitignore: false,
     };
 
     let paths = get_baseline_scan_paths(&args, &config);
@@ -1051,6 +1079,7 @@ fn get_baseline_scan_paths_defaults_to_current_dir() {
         ext: None,
         exclude: vec![],
         include: vec![],
+        no_gitignore: false,
     };
 
     let paths = get_baseline_scan_paths(&args, &config);
@@ -1086,6 +1115,7 @@ fn run_baseline_update_creates_empty_baseline_when_no_violations() {
         ext: Some(vec!["rs".to_string()]),
         exclude: vec![],
         include: vec![],
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_baseline(true, true);
@@ -1120,6 +1150,7 @@ fn run_baseline_update_captures_violations() {
         ext: Some(vec!["rs".to_string()]),
         exclude: vec![],
         include: vec![],
+        no_gitignore: true, // Disable gitignore for temp file tests
     };
 
     let cli = make_cli_for_baseline(true, false);
@@ -1161,6 +1192,7 @@ fn run_baseline_update_with_exclude_patterns() {
         ext: Some(vec!["rs".to_string()]),
         exclude: vec!["**/vendor/**".to_string()],
         include: vec![],
+        no_gitignore: true, // Disable gitignore for temp file tests
     };
 
     let cli = make_cli_for_baseline(true, false);
@@ -1199,6 +1231,7 @@ fn baseline_file_contains_correct_hash() {
         ext: Some(vec!["rs".to_string()]),
         exclude: vec![],
         include: vec![],
+        no_gitignore: true, // Disable gitignore for temp file tests
     };
 
     let cli = make_cli_for_baseline(true, false);
@@ -1368,6 +1401,7 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
         strict: false,
         baseline: Some(baseline_path), // Use baseline
         no_cache: true,
+        no_gitignore: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1409,6 +1443,7 @@ fn run_check_impl_without_baseline_fails_on_violations() {
         strict: false,
         baseline: None, // No baseline
         no_cache: true,
+        no_gitignore: true, // Disable gitignore for temp file tests
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1455,6 +1490,7 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
         strict: false,
         baseline: Some(baseline_path), // Baseline exists but doesn't include this file
         no_cache: true,
+        no_gitignore: true, // Disable gitignore for temp file tests
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);

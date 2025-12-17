@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache), `stats` (--no-cache, --group-by, --top), `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig`, `ExcludeConfig`, `FileOverride`, `PathRule` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
@@ -22,6 +22,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directive |
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
+| `scanner/gitignore` | `scanner/gitignore.rs` | `GitAwareScanner` - gix dirwalk with .gitignore support |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline` | `baseline/types.rs` | `Baseline`, `BaselineEntry` - baseline file for grandfathering violations |
@@ -41,7 +42,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 ```rust
 // Config priority: CLI args > config file > defaults
 Config { default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride> }
-DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false }
+DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
 
 // Line counting
@@ -91,7 +92,7 @@ CLI args → load_config() → apply_cli_overrides()
          → [if --baseline] load_baseline() → Baseline
          → [if !--no-cache] load_cache(config_hash) → Cache
          → GlobFilter::new(extensions, excludes)
-         → DirectoryScanner::scan(paths)
+         → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
          → ScanProgress::new(file_count, quiet)
          → for each file (parallel with rayon):
@@ -116,7 +117,7 @@ CLI args → load_config() → apply_cli_overrides()
 CLI args → load_config()
          → [if !--no-cache] load_cache(config_hash) → Cache
          → GlobFilter::new(extensions, excludes)
-         → DirectoryScanner::scan(paths)
+         → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → ScanProgress::new(file_count, quiet)
          → for each file (parallel with rayon):
               compute_file_hash() → check cache for valid entry
@@ -152,7 +153,7 @@ config show:
 ```
 CLI args → load_config()
          → GlobFilter::new(extensions, excludes)
-         → DirectoryScanner::scan(paths)
+         → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → ScanProgress::new(file_count, quiet)
          → for each file (parallel with rayon):
               process_file() → CheckResult

@@ -139,6 +139,10 @@ pub struct CheckArgs {
     /// Disable file hash caching
     #[arg(long)]
     pub no_cache: bool,
+
+    /// Disable .gitignore filtering (scan all files)
+    #[arg(long)]
+    pub no_gitignore: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -182,6 +186,10 @@ pub struct StatsArgs {
     /// Show top N largest files by code lines
     #[arg(long)]
     pub top: Option<usize>,
+
+    /// Disable .gitignore filtering (scan all files)
+    #[arg(long)]
+    pub no_gitignore: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -259,6 +267,10 @@ pub struct BaselineUpdateArgs {
     /// Include only these directories (overrides config `include_paths`)
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
+
+    /// Disable .gitignore filtering (scan all files)
+    #[arg(long)]
+    pub no_gitignore: bool,
 }
 
 #[cfg(test)]

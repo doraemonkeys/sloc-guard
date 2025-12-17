@@ -15,7 +15,7 @@
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
 | `counter/sloc` | Done | SlocCounter with LineStats, CountResult, inline ignore-file directive |
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
-| `scanner/mod` | Done | DirectoryScanner with walkdir integration |
+| `scanner/mod` | Done | DirectoryScanner with walkdir, GitAwareScanner with gix dirwalk |
 | `checker/threshold` | Done | ThresholdChecker with override > path_rules > rule > default priority, CheckStatus: Passed/Warning/Failed/Grandfathered |
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary, grandfathered count |
 | `output/json` | Done | JsonFormatter with structured output including grandfathered count |
@@ -80,6 +80,7 @@ make ci
 | **Phase 4.7b** | Cache Integration (--no-cache flag, cache in check/stats commands) | ✅ Done |
 | **Phase 5.1a** | Language Breakdown (--group-by lang, LanguageStats, sorted by code count) | ✅ Done |
 | **Phase 5.1b** | Top-N & Metrics (--top N, top files by code lines, average code lines) | ✅ Done |
+| **Phase 3.2** | Git-Aware Exclude (gix dirwalk, --no-gitignore flag) | ✅ Done |
 
 ---
 
@@ -93,19 +94,6 @@ Location: `src/output/markdown.rs`
 - Create MarkdownFormatter struct
 - Generate table-based output
 - Include summary section
-```
-
----
-
-## Phase 3: Git Integration (P1)
-
-### Task 3.2: Git-Aware Exclude
-
-Location: `src/scanner/filter.rs`
-
-```
-- Respect .gitignore patterns via gix dirwalk
-- Make git-aware scanning optional (--no-gitignore flag)
 ```
 
 ---
@@ -277,8 +265,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 3.2 Git-Aware Exclude | ~3h |
-| | 2.3 Markdown Output | ~2h |
+| **1. Short-term** | 2.3 Markdown Output | ~2h |
 | | 4.2 Per-rule warn_threshold | ~1h |
 | | 4.4 Override Reason | ~1h |
 | **2. Medium** | 4.5 Custom Languages | ~3h |

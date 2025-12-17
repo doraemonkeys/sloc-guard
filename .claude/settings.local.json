@@ -14,7 +14,15 @@
       "Bash(cargo run:*)",
       "Skill(docs-maintenance)",
       "Bash(tree:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(perl -i -0pe:*)",
+      "Bash(TMPDIR=\"$HOME/tmp\" TMP=\"$HOME/tmp\" TEMP=\"$HOME/tmp\" cargo tarpaulin:*)",
+      "Bash(perl -i -pe:*)",
+      "Bash(perl -i -0777 -pe:*)",
+      "Bash(python3:*)",
+      "Bash(python -c:*)",
+      "Bash(make ci-verbose:*)",
+      "Bash(echo:*)"
     ]
   }
 }

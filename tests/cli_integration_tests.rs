@@ -39,6 +39,7 @@ fn check_empty_directory_exits_success() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -55,6 +56,7 @@ fn check_small_rust_file_passes() {
     // Only FAILED/WARNING files show details; PASSED files only appear in summary count
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -73,6 +75,7 @@ fn check_large_file_fails() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -91,6 +94,7 @@ fn check_warn_only_converts_failure_to_success() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--warn-only")
@@ -111,6 +115,7 @@ fn check_max_lines_override() {
     // Default 500 should pass
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -119,6 +124,7 @@ fn check_max_lines_override() {
     // Override to 50 should fail
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -138,6 +144,7 @@ fn check_extension_filter() {
     // Only check .rs files - should show 1 file checked
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--ext")
@@ -159,6 +166,7 @@ fn check_exclude_pattern() {
     // Exclude vendor - should only check 1 file (main.rs)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("-x")
@@ -175,6 +183,7 @@ fn check_json_output_format() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--format")
@@ -194,6 +203,7 @@ fn check_output_to_file() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("-o")
@@ -224,6 +234,7 @@ fn check_no_skip_comments_counts_comments() {
     // With skip_comments (default), only code lines count -> 30 lines, passes at limit 50
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -234,6 +245,7 @@ fn check_no_skip_comments_counts_comments() {
     // Without skip_comments, all 60 lines count -> fails at limit 50
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -259,6 +271,7 @@ fn check_no_skip_blank_counts_blanks() {
     // With skip_blank (default), only code lines count -> 30 lines
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -269,6 +282,7 @@ fn check_no_skip_blank_counts_blanks() {
     // Without skip_blank, all 60 lines count -> fails
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -289,6 +303,7 @@ fn check_warning_threshold() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -308,6 +323,7 @@ fn check_quiet_mode_suppresses_output() {
     cmd()
         .arg("--quiet")
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -324,6 +340,7 @@ fn check_color_never_no_ansi_codes() {
         .arg("--color")
         .arg("never")
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -346,6 +363,7 @@ fn stats_empty_directory() {
 
     cmd()
         .arg("stats")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -365,6 +383,7 @@ fn stats_counts_lines() {
 
     cmd()
         .arg("stats")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -380,6 +399,7 @@ fn stats_json_format() {
 
     cmd()
         .arg("stats")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--format")
@@ -399,6 +419,7 @@ fn stats_output_to_file() {
 
     cmd()
         .arg("stats")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--format")
@@ -422,6 +443,7 @@ fn stats_extension_filter() {
     // Only count .py files
     cmd()
         .arg("stats")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--ext")
@@ -663,6 +685,7 @@ extensions = ["rs"]
     // Should fail because config sets max_lines = 10
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -700,6 +723,7 @@ max_lines = 10
     // Should fail because Python file exceeds its rule limit (10)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -740,6 +764,7 @@ max_lines = 100
     // legacy.rs (50 lines, limit 100 due to override) -> PASSED
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -761,6 +786,7 @@ fn sarif_format_works() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--format")
@@ -778,6 +804,7 @@ fn markdown_format_not_implemented() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--format")
@@ -830,6 +857,7 @@ fn baseline_update_creates_file() {
     cmd()
         .arg("baseline")
         .arg("update")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("-o")
@@ -857,6 +885,7 @@ fn baseline_update_empty_for_passing_files() {
     cmd()
         .arg("baseline")
         .arg("update")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("-o")
@@ -892,6 +921,7 @@ extensions = ["rs"]
     cmd()
         .arg("baseline")
         .arg("update")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -920,6 +950,7 @@ fn check_with_baseline_grandfathers_violations() {
     cmd()
         .arg("baseline")
         .arg("update")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("-o")
@@ -931,6 +962,7 @@ fn check_with_baseline_grandfathers_violations() {
     // Without verbose mode, grandfathered files show in summary only
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--baseline")
@@ -943,6 +975,7 @@ fn check_with_baseline_grandfathers_violations() {
     cmd()
         .arg("-v")
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--baseline")
@@ -969,6 +1002,7 @@ fn check_with_baseline_fails_for_new_violations() {
     // Check with baseline - should fail (not grandfathered)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--baseline")
@@ -985,6 +1019,7 @@ fn check_baseline_file_not_found_error() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--baseline")
@@ -1035,6 +1070,7 @@ max_lines = 1000
     // Check - generated/types.rs should pass, main.rs should fail
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -1083,6 +1119,7 @@ warn_threshold = 1.0
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -1109,6 +1146,7 @@ fn check_strict_mode_fails_on_warning() {
     // Without strict mode - should pass with warning
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -1122,6 +1160,7 @@ fn check_strict_mode_fails_on_warning() {
     // With strict mode - should fail
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -1160,6 +1199,7 @@ strict = true
     // Should fail due to strict mode in config
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("-c")
         .arg(&config_path)
@@ -1185,6 +1225,7 @@ fn check_inline_ignore_file_skips_file() {
     // Should pass (file is ignored)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1209,6 +1250,7 @@ fn check_inline_ignore_file_in_first_10_lines() {
     // Should pass (directive within first 10 lines)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1233,6 +1275,7 @@ fn check_inline_ignore_after_line_10_not_effective() {
     // Should fail (directive beyond first 10 lines is not effective)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1255,6 +1298,7 @@ fn check_verbose_shows_passed_files() {
     // Without verbose - passed files not shown in detail
     let output = cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1270,6 +1314,7 @@ fn check_verbose_shows_passed_files() {
     cmd()
         .arg("-v")
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1290,6 +1335,7 @@ fn check_double_verbose_shows_more_detail() {
     cmd()
         .arg("-vv")
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1316,6 +1362,7 @@ fn check_multiple_languages() {
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1333,6 +1380,7 @@ fn stats_multiple_languages() {
 
     cmd()
         .arg("stats")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .assert()
@@ -1367,6 +1415,7 @@ fn main() {
     // Only code lines should count (fn main, let x, and closing braces)
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--max-lines")
@@ -1394,6 +1443,7 @@ y = 2
 
     cmd()
         .arg("check")
+        .arg("--no-gitignore")
         .arg(temp_dir.path())
         .arg("--no-config")
         .arg("--ext")

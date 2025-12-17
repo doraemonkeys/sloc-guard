@@ -1,4 +1,4 @@
-.PHONY: ci ci-verbose clippy tarpaulin sloc sloc-strict clean_tmp
+.PHONY: ci ci-verbose clippy tarpaulin sloc sloc-strict clean_tmp test
 
 # 静默模式
 ci:
@@ -28,3 +28,6 @@ sloc-strict:
 
 clean_tmp:
 	rm -rf .tmp
+
+test:
+	cargo test

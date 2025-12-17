@@ -23,7 +23,7 @@ use sloc_guard::output::{
     SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter, StatsTextFormatter,
     TextFormatter,
 };
-use sloc_guard::scanner::{DirectoryScanner, FileScanner, GlobFilter};
+use sloc_guard::scanner::{DirectoryScanner, FileScanner, GitAwareScanner, GlobFilter};
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 /// File size threshold for streaming reads (10 MB)
@@ -83,25 +83,20 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
-    // 4. Create GlobFilter
+    // 4. Prepare extensions and exclude patterns
     let extensions = args
         .ext
         .clone()
         .unwrap_or_else(|| config.default.extensions.clone());
     let mut exclude_patterns = config.exclude.patterns.clone();
     exclude_patterns.extend(args.exclude.clone());
-    let filter = GlobFilter::new(extensions, &exclude_patterns)?;
 
     // 5. Determine paths to scan
     let paths_to_scan = get_scan_paths(args, &config);
 
-    // 6. Scan directories
-    let scanner = DirectoryScanner::new(filter);
-    let mut all_files = Vec::new();
-    for path in &paths_to_scan {
-        let files = scanner.scan(path)?;
-        all_files.extend(files);
-    }
+    // 6. Scan directories (respecting .gitignore if enabled)
+    let use_gitignore = config.default.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
 
     // 6.1 Filter by git diff if --diff is specified
     let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
@@ -303,6 +298,43 @@ fn filter_by_git_diff(
     Ok(filtered)
 }
 
+/// Scan files from paths using either `GitAwareScanner` or `DirectoryScanner`.
+///
+/// Uses `GitAwareScanner` (respects .gitignore) if `use_gitignore` is true and
+/// falls back to `DirectoryScanner` if not in a git repository.
+fn scan_files(
+    paths: &[std::path::PathBuf],
+    extensions: &[String],
+    exclude_patterns: &[String],
+    use_gitignore: bool,
+) -> sloc_guard::Result<Vec<std::path::PathBuf>> {
+    let mut all_files = Vec::new();
+
+    if use_gitignore {
+        let filter = GlobFilter::new(extensions.to_vec(), exclude_patterns)?;
+        let scanner = GitAwareScanner::new(filter);
+        for path in paths {
+            match scanner.scan(path) {
+                Ok(files) => all_files.extend(files),
+                Err(sloc_guard::SlocGuardError::Git(_)) => {
+                    // Not in a git repository, fall back to regular scan
+                    return scan_files(paths, extensions, exclude_patterns, false);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    } else {
+        let filter = GlobFilter::new(extensions.to_vec(), exclude_patterns)?;
+        let scanner = DirectoryScanner::new(filter);
+        for path in paths {
+            let files = scanner.scan(path)?;
+            all_files.extend(files);
+        }
+    }
+
+    Ok(all_files)
+}
+
 fn process_file(
     file_path: &Path,
     registry: &LanguageRegistry,
@@ -457,25 +489,20 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
-    // 2. Create GlobFilter
+    // 2. Prepare extensions and exclude patterns
     let extensions = args
         .ext
         .clone()
         .unwrap_or_else(|| config.default.extensions.clone());
     let mut exclude_patterns = config.exclude.patterns.clone();
     exclude_patterns.extend(args.exclude.clone());
-    let filter = GlobFilter::new(extensions, &exclude_patterns)?;
 
     // 3. Determine paths to scan
     let paths_to_scan = get_stats_scan_paths(args, &config);
 
-    // 4. Scan directories
-    let scanner = DirectoryScanner::new(filter);
-    let mut all_files = Vec::new();
-    for path in &paths_to_scan {
-        let files = scanner.scan(path)?;
-        all_files.extend(files);
-    }
+    // 4. Scan directories (respecting .gitignore if enabled)
+    let use_gitignore = config.default.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
 
     // 5. Process each file and collect statistics (parallel with rayon)
     let registry = LanguageRegistry::default();
@@ -648,25 +675,20 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     // 1. Load configuration
     let config = load_config(args.config.as_deref(), cli.no_config)?;
 
-    // 2. Create GlobFilter
+    // 2. Prepare extensions and exclude patterns
     let extensions = args
         .ext
         .clone()
         .unwrap_or_else(|| config.default.extensions.clone());
     let mut exclude_patterns = config.exclude.patterns.clone();
     exclude_patterns.extend(args.exclude.clone());
-    let filter = GlobFilter::new(extensions, &exclude_patterns)?;
 
     // 3. Determine paths to scan
     let paths_to_scan = get_baseline_scan_paths(args, &config);
 
-    // 4. Scan directories
-    let scanner = DirectoryScanner::new(filter);
-    let mut all_files = Vec::new();
-    for path in &paths_to_scan {
-        let files = scanner.scan(path)?;
-        all_files.extend(files);
-    }
+    // 4. Scan directories (respecting .gitignore if enabled)
+    let use_gitignore = config.default.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
 
     // 5. Process each file and find violations
     let registry = LanguageRegistry::default();
@@ -677,7 +699,7 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     let skip_blank = config.default.skip_blank;
 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
-    let violations: Vec<_> = all_files
+    let violations: Vec<(std::path::PathBuf, usize)> = all_files
         .par_iter()
         .filter_map(|file_path| {
             let result = process_file(file_path, &registry, &checker, skip_comments, skip_blank);

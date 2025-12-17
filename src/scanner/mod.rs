@@ -1,6 +1,8 @@
 mod filter;
+mod gitignore;
 
 pub use filter::{FileFilter, GlobFilter};
+pub use gitignore::GitAwareScanner;
 
 use std::path::{Path, PathBuf};
 
