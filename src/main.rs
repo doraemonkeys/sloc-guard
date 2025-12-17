@@ -416,6 +416,7 @@ warn_threshold = 0.9
 # [[path_rules]]
 # pattern = "src/generated/**"
 # max_lines = 1000
+# warn_threshold = 1.0  # Disable warnings for generated code
 
 # Exclude patterns (glob syntax)
 [exclude]

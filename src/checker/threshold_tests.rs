@@ -186,3 +186,151 @@ fn check_status_equality() {
     assert_ne!(CheckStatus::Passed, CheckStatus::Failed);
     assert_ne!(CheckStatus::Warning, CheckStatus::Failed);
 }
+
+#[test]
+fn path_rule_matches_glob_pattern() {
+    let mut config = default_config();
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(800);
+
+    // File matching the glob pattern should use path_rule max_lines
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    assert!(result.is_passed());
+    assert_eq!(result.limit, 1000);
+}
+
+#[test]
+fn path_rule_does_not_match_unrelated_path() {
+    let mut config = default_config();
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(600);
+
+    // File not matching the pattern should use default
+    let result = checker.check(Path::new("src/lib.rs"), &stats);
+    assert!(result.is_failed());
+    assert_eq!(result.limit, 500);
+}
+
+#[test]
+fn path_rule_has_lower_priority_than_override() {
+    let mut config = default_config();
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+    });
+    config.overrides.push(crate::config::FileOverride {
+        path: "special.rs".to_string(),
+        max_lines: 2000,
+        reason: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(1500);
+
+    // Override should take priority over path_rule
+    let result = checker.check(Path::new("src/generated/special.rs"), &stats);
+    assert!(result.is_passed());
+    assert_eq!(result.limit, 2000);
+}
+
+#[test]
+fn path_rule_has_higher_priority_than_extension_rule() {
+    let mut config = default_config();
+    config.rules.insert(
+        "rust".to_string(),
+        crate::config::RuleConfig {
+            extensions: vec!["rs".to_string()],
+            max_lines: Some(300),
+            skip_comments: None,
+            skip_blank: None,
+        },
+    );
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "**/proto/**".to_string(),
+        max_lines: 800,
+        warn_threshold: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(400);
+
+    // path_rule should override extension rule
+    let result = checker.check(Path::new("src/proto/messages.rs"), &stats);
+    assert!(result.is_passed());
+    assert_eq!(result.limit, 800);
+
+    // Non-matching path should use extension rule
+    let result2 = checker.check(Path::new("src/lib.rs"), &stats);
+    assert!(result2.is_failed());
+    assert_eq!(result2.limit, 300);
+}
+
+#[test]
+fn path_rule_warn_threshold_overrides_default() {
+    let mut config = default_config();
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: Some(1.0), // Disable warnings
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(999); // 99.9% of limit
+
+    // With warn_threshold=1.0, should not warn
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    assert!(result.is_passed());
+}
+
+#[test]
+fn path_rule_without_warn_threshold_uses_default() {
+    let mut config = default_config();
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+    });
+
+    let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
+    let stats = stats_with_code(950); // 95% of limit, above 90%
+
+    // Without custom warn_threshold, should use default (0.9)
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    assert!(result.is_warning());
+}
+
+#[test]
+fn multiple_path_rules_first_match_wins() {
+    let mut config = default_config();
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/**".to_string(),
+        max_lines: 600,
+        warn_threshold: None,
+    });
+    config.path_rules.push(crate::config::PathRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(700);
+
+    // First matching rule should be used
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    assert!(result.is_failed()); // 700 > 600
+    assert_eq!(result.limit, 600);
+}

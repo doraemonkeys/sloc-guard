@@ -9,6 +9,9 @@ pub struct Config {
     pub rules: std::collections::HashMap<String, RuleConfig>,
 
     #[serde(default)]
+    pub path_rules: Vec<PathRule>,
+
+    #[serde(default)]
     pub exclude: ExcludeConfig,
 
     #[serde(default, rename = "override")]
@@ -75,6 +78,14 @@ pub struct FileOverride {
     pub max_lines: usize,
     #[serde(default)]
     pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PathRule {
+    pub pattern: String,
+    pub max_lines: usize,
+    #[serde(default)]
+    pub warn_threshold: Option<f64>,
 }
 
 const fn default_max_lines() -> usize {

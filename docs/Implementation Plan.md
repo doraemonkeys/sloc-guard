@@ -9,14 +9,14 @@
 | Module | Status | Description |
 |--------|--------|-------------|
 | `cli` | Done | CLI with check, stats, init, config commands + global options (verbose, quiet, color, no-config) |
-| `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride (pending: path_rules, per-rule warn_threshold) |
+| `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
 | `counter/sloc` | Done | SlocCounter with LineStats (total, code, comment, blank) |
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
 | `scanner/mod` | Done | DirectoryScanner with walkdir integration |
-| `checker/threshold` | Partial | ThresholdChecker with override > rule > default priority (pending: path_rules, per-rule skip_comments/skip_blank/warn_threshold) |
+| `checker/threshold` | Partial | ThresholdChecker with override > path_rules > rule > default priority (pending: per-rule skip_comments/skip_blank/warn_threshold) |
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary |
 | `output/json` | Done | JsonFormatter with structured output |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
@@ -145,7 +145,6 @@ Location: `src/main.rs`
 | Feature | CLI Location | Status |
 |---------|--------------|--------|
 | `--diff` | `CheckArgs.diff` | gix imported, logic not wired |
-| `path_rules` | Config template only | Model struct missing |
 
 ---
 
@@ -240,16 +239,16 @@ Location: `src/config/model.rs`, `src/checker/threshold.rs`
 - [x] Support --warn-threshold CLI override (implemented in Task 1.2)
 ```
 
-### Task 4.3: Path-Based Rules
+### Task 4.3: Path-Based Rules ✅
 
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
 ```
-- Add [[path_rules]] section support in config
-- Support path patterns (e.g., "src/generated/**")
-- Higher priority than extension-based rules, lower than override
-- Use glob matching for path patterns
-- Support warn_threshold per path rule
+- [x] Add [[path_rules]] section support in config
+- [x] Support path patterns (e.g., "src/generated/**")
+- [x] Higher priority than extension-based rules, lower than override
+- [x] Use glob matching for path patterns
+- [x] Support warn_threshold per path rule
 ```
 
 ### Task 4.4: Override with Reason
@@ -371,10 +370,10 @@ Location: `src/counter/function.rs` (new module)
    - ~~2.1 Color Support~~ ✅
    - ~~Implement `--verbose` real output~~ ✅
    - ~~Fix override path matching logic (too loose with `contains`)~~ ✅
+   - ~~4.3 Path-Based Rules~~ ✅
 3. **Short-term**:
    - 3.1 Git Diff Mode (`--diff`, gix already imported)
-   - 4.3 Path-Based Rules (config template mentions it, model missing)
-4. **Medium-term (2-3 weeks)**:
+4. **Medium-term**:
    - 2.2 SARIF Output (high CI/CD integration value)
    - 4.1 Baseline Support (essential for large projects)
    - 3.2 Git-Aware Exclude (.gitignore respect)
