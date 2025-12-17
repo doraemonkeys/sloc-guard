@@ -8,7 +8,7 @@
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache, --group-by), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
+| `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache, --group-by, --top), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
 | `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
@@ -20,7 +20,7 @@
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary, grandfathered count |
 | `output/json` | Done | JsonFormatter with structured output including grandfathered count |
 | `output/sarif` | Done | SarifFormatter with SARIF 2.1.0 output for GitHub Code Scanning |
-| `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter with language breakdown (--group-by lang), LanguageStats |
+| `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter with language breakdown (--group-by lang), top-N files (--top), average code lines |
 | `output/progress` | Done | ScanProgress with indicatif, disabled in quiet mode or non-TTY |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
@@ -79,6 +79,7 @@ make ci
 | **Phase 4.7a** | File Hash Cache (Cache, CacheEntry, compute_config_hash) | ✅ Done |
 | **Phase 4.7b** | Cache Integration (--no-cache flag, cache in check/stats commands) | ✅ Done |
 | **Phase 5.1a** | Language Breakdown (--group-by lang, LanguageStats, sorted by code count) | ✅ Done |
+| **Phase 5.1b** | Top-N & Metrics (--top N, top files by code lines, average code lines) | ✅ Done |
 
 ---
 
@@ -173,16 +174,6 @@ Location: `src/config/loader.rs`
 ---
 
 ## Phase 5: Statistics Extension (P2)
-
-### Task 5.1b: Top-N & Metrics
-
-Location: `src/output/stats.rs`
-
-```
-- Add --top N flag to stats command
-- Show top N largest files
-- Show average file size
-```
 
 ### Task 5.1c: Directory Statistics
 
@@ -286,21 +277,17 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 5.1b Top-N & Metrics | ~2h |
-| **2. Medium** | 3.2 Git-Aware Exclude | ~3h |
+| **1. Short-term** | 3.2 Git-Aware Exclude | ~3h |
 | | 2.3 Markdown Output | ~2h |
 | | 4.2 Per-rule warn_threshold | ~1h |
 | | 4.4 Override Reason | ~1h |
-| **3. Lower** | 4.5 Custom Languages | ~3h |
+| **2. Medium** | 4.5 Custom Languages | ~3h |
 | | 4.6b Inline Ignore (block/next) | ~2h |
 | | 4.8a Config Inheritance (local) | ~2h |
-| **4. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
+| **3. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
 | | 5.1c Directory Statistics | ~2h |
 | | 5.2 Trend Tracking | ~3h |
-| | 5.3a HTML Structure + Summary | ~2h |
-| | 5.3b HTML File List | ~2h |
-| | 5.3c HTML Charts (Pure CSS) | ~2h |
-| | 5.3d HTML Trend Visualization | ~2h |
+| | 5.3a-d HTML Report | ~8h |
 | | Phase 6, 7 | TBD |
 
 ---

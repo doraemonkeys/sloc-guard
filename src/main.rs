@@ -504,6 +504,11 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         GroupBy::Lang => project_stats.with_language_breakdown(),
         GroupBy::None => project_stats,
     };
+    let project_stats = if let Some(n) = args.top {
+        project_stats.with_top_files(n)
+    } else {
+        project_stats
+    };
 
     // 6. Format output
     let output = format_stats_output(args.format, &project_stats)?;

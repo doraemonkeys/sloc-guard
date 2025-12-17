@@ -33,6 +33,8 @@ pub struct ProjectStatistics {
     pub total_comment: usize,
     pub total_blank: usize,
     pub by_language: Option<Vec<LanguageStats>>,
+    pub top_files: Option<Vec<FileStatistics>>,
+    pub average_code_lines: Option<f64>,
 }
 
 impl ProjectStatistics {
@@ -57,6 +59,8 @@ impl ProjectStatistics {
             total_comment,
             total_blank,
             by_language: None,
+            top_files: None,
+            average_code_lines: None,
         }
     }
 
@@ -84,6 +88,22 @@ impl ProjectStatistics {
         self.by_language = Some(by_language);
         self
     }
+
+    /// Compute top N largest files by code lines and average code lines per file.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
+    pub fn with_top_files(mut self, n: usize) -> Self {
+        let mut sorted_files = self.files.clone();
+        sorted_files.sort_by(|a, b| b.stats.code.cmp(&a.stats.code));
+        self.top_files = Some(sorted_files.into_iter().take(n).collect());
+
+        if self.total_files > 0 {
+            self.average_code_lines =
+                Some(self.total_code as f64 / self.total_files as f64);
+        }
+
+        self
+    }
 }
 
 pub trait StatsFormatter {
@@ -99,6 +119,24 @@ pub struct StatsTextFormatter;
 impl StatsFormatter for StatsTextFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
         let mut output = Vec::new();
+
+        // Show top files if available
+        if let Some(ref top_files) = stats.top_files {
+            writeln!(output, "Top {} Largest Files:", top_files.len()).ok();
+            writeln!(output).ok();
+
+            for (i, file) in top_files.iter().enumerate() {
+                writeln!(
+                    output,
+                    "  {}. {} ({} lines)",
+                    i + 1,
+                    file.path.display(),
+                    file.stats.code
+                )
+                .ok();
+            }
+            writeln!(output).ok();
+        }
 
         // Show language breakdown if available
         if let Some(ref by_language) = stats.by_language {
@@ -144,6 +182,9 @@ impl StatsFormatter for StatsTextFormatter {
         writeln!(output, "  Code: {}", stats.total_code).ok();
         writeln!(output, "  Comments: {}", stats.total_comment).ok();
         writeln!(output, "  Blank: {}", stats.total_blank).ok();
+        if let Some(avg) = stats.average_code_lines {
+            writeln!(output, "  Average code lines: {avg:.1}").ok();
+        }
 
         Ok(String::from_utf8_lossy(&output).to_string())
     }
@@ -156,6 +197,8 @@ struct JsonStatsOutput {
     summary: JsonStatsSummary,
     #[serde(skip_serializing_if = "Option::is_none")]
     by_language: Option<Vec<LanguageStats>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_files: Option<Vec<JsonFileStats>>,
     files: Vec<JsonFileStats>,
 }
 
@@ -166,6 +209,8 @@ struct JsonStatsSummary {
     code: usize,
     comment: usize,
     blank: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    average_code_lines: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -187,8 +232,22 @@ impl StatsFormatter for StatsJsonFormatter {
                 code: stats.total_code,
                 comment: stats.total_comment,
                 blank: stats.total_blank,
+                average_code_lines: stats.average_code_lines,
             },
             by_language: stats.by_language.clone(),
+            top_files: stats.top_files.as_ref().map(|files| {
+                files
+                    .iter()
+                    .map(|f| JsonFileStats {
+                        path: f.path.display().to_string(),
+                        language: f.language.clone(),
+                        total: f.stats.total,
+                        code: f.stats.code,
+                        comment: f.stats.comment,
+                        blank: f.stats.blank,
+                    })
+                    .collect()
+            }),
             files: stats
                 .files
                 .iter()

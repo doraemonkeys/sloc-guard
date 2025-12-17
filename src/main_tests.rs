@@ -397,6 +397,7 @@ fn get_stats_scan_paths_uses_include_override() {
         output: None,
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -416,6 +417,7 @@ fn get_stats_scan_paths_uses_cli_paths() {
         output: None,
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -437,6 +439,7 @@ fn get_stats_scan_paths_uses_config_include_paths() {
         output: None,
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -456,6 +459,7 @@ fn get_stats_scan_paths_defaults_to_current_dir() {
         output: None,
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -808,6 +812,7 @@ fn run_stats_impl_with_valid_directory() {
         output: None,
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -832,6 +837,7 @@ fn run_stats_impl_with_json_output() {
         output: Some(output_path.clone()),
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -856,6 +862,7 @@ fn run_stats_impl_with_include_paths() {
         output: None,
         no_cache: true,
         group_by: GroupBy::None,
+        top: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);

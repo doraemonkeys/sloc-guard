@@ -178,6 +178,10 @@ pub struct StatsArgs {
     /// Group results by category
     #[arg(long, value_enum, default_value = "none")]
     pub group_by: GroupBy,
+
+    /// Show top N largest files by code lines
+    #[arg(long)]
+    pub top: Option<usize>,
 }
 
 #[derive(Parser, Debug)]

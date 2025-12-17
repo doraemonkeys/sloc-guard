@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache), `stats` (--no-cache, --group-by), `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache), `stats` (--no-cache, --group-by, --top), `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig`, `ExcludeConfig`, `FileOverride`, `PathRule` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
@@ -29,7 +29,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
-| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `LanguageStats` - stats command output with language breakdown |
+| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `LanguageStats` - stats output with language breakdown, top-N files, average |
 | `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
@@ -59,9 +59,10 @@ TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats, language: String }
-ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank, by_language: Option<Vec<LanguageStats>> }
+ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank, by_language, top_files, average_code_lines }
 LanguageStats { language, files, total_lines, code, comment, blank }
 GroupBy::None | Lang  // --group-by option for stats command
+ProjectStatistics::with_top_files(n) → computes top N files by code lines + average
 
 // Git integration
 GitDiff::discover(path) → GitDiff  // Finds git repo from path
@@ -130,6 +131,7 @@ CLI args → load_config()
          → [if !--no-cache] save_cache()
          → ProjectStatistics::new(file_stats)
          → [if --group-by lang] with_language_breakdown() → compute LanguageStats
+         → [if --top N] with_top_files(N) → compute top files + average
          → StatsTextFormatter/StatsJsonFormatter::format(stats)
          → write to stdout or --output file
 ```

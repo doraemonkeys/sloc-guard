@@ -308,3 +308,177 @@ fn json_formatter_with_language_breakdown() {
     let by_language = parsed.get("by_language").unwrap().as_array().unwrap();
     assert_eq!(by_language.len(), 2);
 }
+
+#[test]
+fn with_top_files_sorts_by_code_lines() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("small.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 30,
+                comment: 10,
+                blank: 10,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("large.rs"),
+            stats: LineStats {
+                total: 200,
+                code: 150,
+                comment: 30,
+                blank: 20,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("medium.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_top_files(2);
+    let top_files = stats.top_files.unwrap();
+
+    assert_eq!(top_files.len(), 2);
+    assert_eq!(top_files[0].path, PathBuf::from("large.rs"));
+    assert_eq!(top_files[0].stats.code, 150);
+    assert_eq!(top_files[1].path, PathBuf::from("medium.rs"));
+    assert_eq!(top_files[1].stats.code, 80);
+}
+
+#[test]
+fn with_top_files_fewer_than_n() {
+    let files = vec![FileStatistics {
+        path: PathBuf::from("only.rs"),
+        stats: LineStats {
+            total: 100,
+            code: 80,
+            comment: 15,
+            blank: 5,
+        },
+        language: "Rust".to_string(),
+    }];
+
+    let stats = ProjectStatistics::new(files).with_top_files(5);
+    let top_files = stats.top_files.unwrap();
+
+    assert_eq!(top_files.len(), 1);
+}
+
+#[test]
+fn with_top_files_computes_average() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("a.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("b.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_top_files(10);
+
+    assert!(stats.average_code_lines.is_some());
+    let avg = stats.average_code_lines.unwrap();
+    assert!((avg - 60.0).abs() < 0.001); // (80 + 40) / 2 = 60
+}
+
+#[test]
+fn with_top_files_empty_has_no_average() {
+    let stats = ProjectStatistics::new(vec![]).with_top_files(5);
+
+    assert!(stats.average_code_lines.is_none());
+    assert_eq!(stats.top_files.unwrap().len(), 0);
+}
+
+#[test]
+fn text_formatter_with_top_files() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("large.rs"),
+            stats: LineStats {
+                total: 200,
+                code: 150,
+                comment: 30,
+                blank: 20,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("small.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 30,
+                comment: 10,
+                blank: 10,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_top_files(5);
+    let output = StatsTextFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("Top 2 Largest Files:"));
+    assert!(output.contains("large.rs (150 lines)"));
+    assert!(output.contains("Average code lines: 90.0"));
+}
+
+#[test]
+fn json_formatter_with_top_files() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("large.rs"),
+            stats: LineStats {
+                total: 200,
+                code: 150,
+                comment: 30,
+                blank: 20,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("small.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 30,
+                comment: 10,
+                blank: 10,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_top_files(5);
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(parsed.get("top_files").is_some());
+    let top_files = parsed.get("top_files").unwrap().as_array().unwrap();
+    assert_eq!(top_files.len(), 2);
+
+    let summary = parsed.get("summary").unwrap();
+    assert!(summary.get("average_code_lines").is_some());
+}
