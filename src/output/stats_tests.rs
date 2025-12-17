@@ -25,6 +25,7 @@ fn project_statistics_single_file() {
             comment: 15,
             blank: 5,
         },
+        language: "Rust".to_string(),
     }];
 
     let stats = ProjectStatistics::new(files);
@@ -46,6 +47,7 @@ fn project_statistics_multiple_files() {
                 comment: 15,
                 blank: 5,
             },
+            language: "Rust".to_string(),
         },
         FileStatistics {
             path: PathBuf::from("b.rs"),
@@ -55,6 +57,7 @@ fn project_statistics_multiple_files() {
                 comment: 5,
                 blank: 5,
             },
+            language: "Rust".to_string(),
         },
     ];
 
@@ -86,6 +89,7 @@ fn text_formatter_with_files() {
             comment: 15,
             blank: 5,
         },
+        language: "Rust".to_string(),
     }];
 
     let stats = ProjectStatistics::new(files);
@@ -118,6 +122,7 @@ fn json_formatter_with_files() {
             comment: 15,
             blank: 5,
         },
+        language: "Rust".to_string(),
     }];
 
     let stats = ProjectStatistics::new(files);
@@ -127,6 +132,7 @@ fn json_formatter_with_files() {
     assert!(output.contains("\"total_lines\": 100"));
     assert!(output.contains("\"code\": 80"));
     assert!(output.contains("\"test.rs\""));
+    assert!(output.contains("\"language\": \"Rust\""));
 }
 
 #[test]
@@ -139,6 +145,7 @@ fn json_formatter_valid_json() {
             comment: 15,
             blank: 5,
         },
+        language: "Rust".to_string(),
     }];
 
     let stats = ProjectStatistics::new(files);
@@ -147,4 +154,157 @@ fn json_formatter_valid_json() {
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("summary").is_some());
     assert!(parsed.get("files").is_some());
+}
+
+#[test]
+fn language_breakdown_single_language() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("a.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("b.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let by_language = stats.by_language.unwrap();
+
+    assert_eq!(by_language.len(), 1);
+    assert_eq!(by_language[0].language, "Rust");
+    assert_eq!(by_language[0].files, 2);
+    assert_eq!(by_language[0].code, 120);
+    assert_eq!(by_language[0].comment, 20);
+    assert_eq!(by_language[0].blank, 10);
+}
+
+#[test]
+fn language_breakdown_multiple_languages() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("main.go"),
+            stats: LineStats {
+                total: 200,
+                code: 150,
+                comment: 30,
+                blank: 20,
+            },
+            language: "Go".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("lib.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let by_language = stats.by_language.unwrap();
+
+    assert_eq!(by_language.len(), 2);
+    // Sorted by code count descending, Go has more code
+    assert_eq!(by_language[0].language, "Go");
+    assert_eq!(by_language[0].files, 1);
+    assert_eq!(by_language[0].code, 150);
+
+    assert_eq!(by_language[1].language, "Rust");
+    assert_eq!(by_language[1].files, 2);
+    assert_eq!(by_language[1].code, 120);
+}
+
+#[test]
+fn text_formatter_with_language_breakdown() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("main.go"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5,
+            },
+            language: "Go".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let output = StatsTextFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("By Language:"));
+    assert!(output.contains("Rust (1 files):"));
+    assert!(output.contains("Go (1 files):"));
+    assert!(output.contains("Summary:"));
+}
+
+#[test]
+fn json_formatter_with_language_breakdown() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("main.go"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5,
+            },
+            language: "Go".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(parsed.get("by_language").is_some());
+    let by_language = parsed.get("by_language").unwrap().as_array().unwrap();
+    assert_eq!(by_language.len(), 2);
 }

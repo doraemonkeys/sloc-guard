@@ -7,7 +7,7 @@ mod text;
 pub use json::JsonFormatter;
 pub use progress::ScanProgress;
 pub use sarif::SarifFormatter;
-pub use stats::{FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter};
+pub use stats::{FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter};
 pub use text::{ColorMode, TextFormatter};
 
 use crate::checker::CheckResult;

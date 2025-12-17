@@ -4,6 +4,16 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::output::OutputFormat;
 
+/// Grouping mode for stats command
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum GroupBy {
+    /// No grouping (default)
+    #[default]
+    None,
+    /// Group by language
+    Lang,
+}
+
 /// Color output control
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub enum ColorChoice {
@@ -164,6 +174,10 @@ pub struct StatsArgs {
     /// Disable file hash caching
     #[arg(long)]
     pub no_cache: bool,
+
+    /// Group results by category
+    #[arg(long, value_enum, default_value = "none")]
+    pub group_by: GroupBy,
 }
 
 #[derive(Parser, Debug)]

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use sloc_guard::checker::{CheckResult, CheckStatus, ThresholdChecker};
-use sloc_guard::cli::{CheckArgs, ColorChoice, InitArgs, StatsArgs};
+use sloc_guard::cli::{CheckArgs, ColorChoice, GroupBy, InitArgs, StatsArgs};
 use sloc_guard::config::Config;
 use sloc_guard::counter::LineStats;
 use sloc_guard::language::LanguageRegistry;
@@ -396,6 +396,7 @@ fn get_stats_scan_paths_uses_include_override() {
         format: OutputFormat::Text,
         output: None,
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -414,6 +415,7 @@ fn get_stats_scan_paths_uses_cli_paths() {
         format: OutputFormat::Text,
         output: None,
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -434,6 +436,7 @@ fn get_stats_scan_paths_uses_config_include_paths() {
         format: OutputFormat::Text,
         output: None,
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -452,6 +455,7 @@ fn get_stats_scan_paths_defaults_to_current_dir() {
         format: OutputFormat::Text,
         output: None,
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -803,6 +807,7 @@ fn run_stats_impl_with_valid_directory() {
         format: OutputFormat::Text,
         output: None,
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -826,6 +831,7 @@ fn run_stats_impl_with_json_output() {
         format: OutputFormat::Json,
         output: Some(output_path.clone()),
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -849,6 +855,7 @@ fn run_stats_impl_with_include_paths() {
         format: OutputFormat::Text,
         output: None,
         no_cache: true,
+        group_by: GroupBy::None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);

@@ -11,7 +11,7 @@ use sloc_guard::cache::{compute_config_hash, Cache};
 use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{
     BaselineAction, BaselineArgs, BaselineUpdateArgs, CheckArgs, Cli, ColorChoice, Commands,
-    StatsArgs,
+    GroupBy, StatsArgs,
 };
 use sloc_guard::commands::{run_config, run_init};
 use sloc_guard::config::{Config, ConfigLoader, FileConfigLoader};
@@ -490,6 +490,10 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     }
 
     let project_stats = ProjectStatistics::new(file_stats);
+    let project_stats = match args.group_by {
+        GroupBy::Lang => project_stats.with_language_breakdown(),
+        GroupBy::None => project_stats,
+    };
 
     // 6. Format output
     let output = format_stats_output(args.format, &project_stats)?;
@@ -537,6 +541,7 @@ fn collect_file_stats(file_path: &Path, registry: &LanguageRegistry) -> Option<F
     Some(FileStatistics {
         path: file_path.to_path_buf(),
         stats,
+        language: language.name.to_string(),
     })
 }
 
@@ -577,6 +582,7 @@ fn collect_file_stats_cached(
     Some(FileStatistics {
         path: file_path.to_path_buf(),
         stats,
+        language: language.name.to_string(),
     })
 }
 

@@ -8,7 +8,7 @@
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
+| `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache, --group-by), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
 | `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
@@ -20,7 +20,7 @@
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary, grandfathered count |
 | `output/json` | Done | JsonFormatter with structured output including grandfathered count |
 | `output/sarif` | Done | SarifFormatter with SARIF 2.1.0 output for GitHub Code Scanning |
-| `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
+| `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter with language breakdown (--group-by lang), LanguageStats |
 | `output/progress` | Done | ScanProgress with indicatif, disabled in quiet mode or non-TTY |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
@@ -81,6 +81,7 @@ make ci
 | **Phase 2.4** | Progress Bar (ScanProgress with indicatif, auto-disabled in quiet/non-TTY) | ✅ Done |
 | **Phase 4.7a** | File Hash Cache (Cache, CacheEntry, compute_config_hash) | ✅ Done |
 | **Phase 4.7b** | Cache Integration (--no-cache flag, cache in check/stats commands) | ✅ Done |
+| **Phase 5.1a** | Language Breakdown (--group-by lang, LanguageStats, sorted by code count) | ✅ Done |
 
 ---
 
@@ -175,15 +176,6 @@ Location: `src/config/loader.rs`
 ---
 
 ## Phase 5: Statistics Extension (P2)
-
-### Task 5.1a: Language Breakdown
-
-Location: `src/output/stats.rs`
-
-```
-- Group SLOC by language/extension
-- Add --group-by lang option to stats command
-```
 
 ### Task 5.1b: Top-N & Metrics
 
@@ -297,8 +289,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 5.1a Language Breakdown | ~2h |
-| | 5.1b Top-N & Metrics | ~2h |
+| **1. Short-term** | 5.1b Top-N & Metrics | ~2h |
 | **2. Medium** | 3.2 Git-Aware Exclude | ~3h |
 | | 2.3 Markdown Output | ~2h |
 | | 4.2 Per-rule warn_threshold | ~1h |
