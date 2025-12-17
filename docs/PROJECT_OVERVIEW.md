@@ -62,32 +62,6 @@ CLI args → load_config() → apply_cli_overrides()
 2. `[rules.*]` - extension match
 3. `[default]` - fallback
 
-## CLI Structure
-
-```
-sloc-guard [--verbose/-v] [--quiet/-q] [--color auto|always|never] [--no-config]
-  check [paths] [-c config] [--max-lines N] [--ext rs,go] [-x exclude] [-I include]
-        [--no-skip-comments] [--no-skip-blank] [--warn-threshold 0.9]
-        [-f text|json|sarif|markdown] [-o file] [--warn-only] [--diff ref]
-  stats [paths] [-c config] [--ext] [-x] [-I] [-f] [-o]
-  init [-o path] [--force]
-  config validate [-c config]
-  config show [-c config] [-f text|json]
-```
-
-## Implementation Status
-
-| Feature | Status |
-|---------|--------|
-| `check` command | ✅ Working |
-| `stats` command | ❌ TODO stub |
-| `init` command | ❌ TODO stub |
-| `config validate/show` | ❌ TODO stub |
-| SARIF output | ❌ Pending |
-| Markdown output | ❌ Pending |
-| `--diff` git mode | ❌ Pending |
-| Color output | ❌ Pending (colored crate ready) |
-
 ## Dependencies
 
 - `clap` v4 - CLI parsing
