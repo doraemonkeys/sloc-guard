@@ -95,7 +95,7 @@ config show:
 
 ## Threshold Resolution (priority high→low)
 
-1. `[[override]]` - path exact match
+1. `[[override]]` - path suffix match (by components: `legacy.rs` matches `src/legacy.rs`)
 2. `[rules.*]` - extension match
 3. `[default]` - fallback
 

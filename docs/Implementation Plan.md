@@ -370,7 +370,7 @@ Location: `src/counter/function.rs` (new module)
 2. **Quick Wins**:
    - ~~2.1 Color Support~~ ✅
    - ~~Implement `--verbose` real output~~ ✅
-   - Fix override path matching logic (too loose with `contains`)
+   - ~~Fix override path matching logic (too loose with `contains`)~~ ✅
 3. **Short-term**:
    - 3.1 Git Diff Mode (`--diff`, gix already imported)
    - 4.3 Path-Based Rules (config template mentions it, model missing)

@@ -82,10 +82,30 @@ impl ThresholdChecker {
         index
     }
 
+    fn path_matches_override(file_path: &Path, override_path: &str) -> bool {
+        let override_components: Vec<&str> = override_path
+            .split(['/', '\\'])
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let file_components: Vec<_> = file_path.components().collect();
+
+        if override_components.is_empty() || override_components.len() > file_components.len() {
+            return false;
+        }
+
+        file_components
+            .iter()
+            .rev()
+            .zip(override_components.iter().rev())
+            .all(|(file_comp, override_comp)| {
+                file_comp.as_os_str().to_string_lossy() == *override_comp
+            })
+    }
+
     fn get_limit_for_path(&self, path: &Path) -> usize {
-        let path_str = path.to_string_lossy();
         for override_config in &self.config.overrides {
-            if path_str.ends_with(&override_config.path) {
+            if Self::path_matches_override(path, &override_config.path) {
                 return override_config.max_lines;
             }
         }
