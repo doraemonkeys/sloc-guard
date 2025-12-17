@@ -13,7 +13,7 @@ ci-verbose:
 	cargo clippy --all-targets --all-features -- -D warnings
 	mkdir -p .tmp
 	TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo tarpaulin --config tarpaulin.toml
-	cargo run -- check src
+	TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check src
 
 clippy:
 	@cargo clippy --all-targets --all-features -q -- -D warnings
