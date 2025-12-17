@@ -1,9 +1,11 @@
 mod json;
+mod progress;
 mod sarif;
 mod stats;
 mod text;
 
 pub use json::JsonFormatter;
+pub use progress::ScanProgress;
 pub use sarif::SarifFormatter;
 pub use stats::{FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter};
 pub use text::{ColorMode, TextFormatter};

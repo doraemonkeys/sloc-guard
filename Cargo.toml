@@ -23,6 +23,9 @@ globset = "0.4"
 # Parallel processing
 rayon = "1.10"
 
+# Progress bar
+indicatif = "0.18.3"
+
 gix = { version = "0.75", default-features = false, features = [
     "revision",
     "index",

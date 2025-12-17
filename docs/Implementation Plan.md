@@ -21,6 +21,7 @@
 | `output/json` | Done | JsonFormatter with structured output including grandfathered count |
 | `output/sarif` | Done | SarifFormatter with SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
+| `output/progress` | Done | ScanProgress with indicatif, disabled in quiet mode or non-TTY |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
 | `cache` | Done | Cache, CacheEntry, CachedLineStats, compute_config_hash for file hash caching |
@@ -77,6 +78,7 @@ make ci
 | **Phase 4.1b** | Baseline Update Command (`baseline update` with --output) | ✅ Done |
 | **Phase 4.1c** | Baseline Compare (`--baseline` flag, grandfathered status) | ✅ Done |
 | **Phase 2.2** | SARIF Output (SarifFormatter with 2.1.0 spec, GitHub Code Scanning) | ✅ Done |
+| **Phase 2.4** | Progress Bar (ScanProgress with indicatif, auto-disabled in quiet/non-TTY) | ✅ Done |
 | **Phase 4.7a** | File Hash Cache (Cache, CacheEntry, compute_config_hash) | ✅ Done |
 | **Phase 4.7b** | Cache Integration (--no-cache flag, cache in check/stats commands) | ✅ Done |
 
@@ -92,16 +94,6 @@ Location: `src/output/markdown.rs`
 - Create MarkdownFormatter struct
 - Generate table-based output
 - Include summary section
-```
-
-### Task 2.4: Progress Bar
-
-Location: `src/output/progress.rs`
-
-```
-- Use indicatif crate
-- Show: Scanning [████░░░░] 50% (500/1000 files)
-- Disable in quiet mode or non-TTY
 ```
 
 ---
@@ -305,8 +297,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 2.4 Progress Bar | ~2h |
-| | 5.1a Language Breakdown | ~2h |
+| **1. Short-term** | 5.1a Language Breakdown | ~2h |
 | | 5.1b Top-N & Metrics | ~2h |
 | **2. Medium** | 3.2 Git-Aware Exclude | ~3h |
 | | 2.3 Markdown Output | ~2h |

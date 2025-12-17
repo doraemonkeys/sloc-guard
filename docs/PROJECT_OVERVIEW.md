@@ -30,6 +30,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
+| `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
 | `commands/init` | `commands/init.rs` | `run_init`, `generate_config_template` |
@@ -73,6 +74,11 @@ compute_file_hash(path) → String  // SHA-256 of file content
 Cache { version: u32, config_hash: String, files: HashMap<String, CacheEntry> }  // .sloc-guard-cache.json
 CacheEntry { hash: String, stats: CachedLineStats }  // file content hash + cached stats
 compute_config_hash(config) → String  // SHA-256 of serialized config
+
+// Progress bar (disabled in quiet mode or non-TTY)
+ScanProgress::new(total, quiet) → ScanProgress  // Thread-safe with AtomicU64
+ScanProgress::inc()  // Increment counter (rayon-safe)
+ScanProgress::finish()  // Clear progress bar
 ```
 
 ## Data Flow (check command)
@@ -84,7 +90,8 @@ CLI args → load_config() → apply_cli_overrides()
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
-         → for each file:
+         → ScanProgress::new(file_count, quiet)
+         → for each file (parallel with rayon):
               compute_file_hash() → check cache for valid entry
               [if cache hit] use cached LineStats
               [if cache miss] LanguageRegistry::get_by_extension()
@@ -92,6 +99,8 @@ CLI args → load_config() → apply_cli_overrides()
                               update cache with new stats
               [if IgnoredFile] skip file (inline ignore directive)
               [if Stats] ThresholdChecker::check(path, stats) → CheckResult
+              progress.inc()
+         → progress.finish()
          → [if !--no-cache] save_cache()
          → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
          → TextFormatter/JsonFormatter/SarifFormatter::format(results)
@@ -105,7 +114,8 @@ CLI args → load_config()
          → [if !--no-cache] load_cache(config_hash) → Cache
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
-         → for each file:
+         → ScanProgress::new(file_count, quiet)
+         → for each file (parallel with rayon):
               compute_file_hash() → check cache for valid entry
               [if cache hit] use cached LineStats
               [if cache miss] LanguageRegistry::get_by_extension()
@@ -113,6 +123,8 @@ CLI args → load_config()
                               update cache with new stats
               [if IgnoredFile] skip file
               [if Stats] collect_file_stats() → FileStatistics
+              progress.inc()
+         → progress.finish()
          → [if !--no-cache] save_cache()
          → ProjectStatistics::new(file_stats)
          → StatsTextFormatter/StatsJsonFormatter::format(stats)
@@ -136,9 +148,12 @@ config show:
 CLI args → load_config()
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
-         → for each file:
+         → ScanProgress::new(file_count, quiet)
+         → for each file (parallel with rayon):
               process_file() → CheckResult
               [if Failed] collect (path, lines)
+              progress.inc()
+         → progress.finish()
          → for each violation:
               compute_file_hash(path) → SHA-256
               Baseline::set(path, lines, hash)
@@ -159,6 +174,7 @@ CLI args → load_config()
 - `walkdir` - directory traversal
 - `globset` - glob pattern matching
 - `rayon` - parallel file processing
+- `indicatif` - progress bar display
 - `gix` - git integration (--diff mode)
 - `sha2` - SHA-256 hashing (baseline, cache)
 - `thiserror` - error handling

@@ -20,7 +20,8 @@ use sloc_guard::git::{ChangedFiles, GitDiff};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
     ColorMode, FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
-    SarifFormatter, StatsFormatter, StatsJsonFormatter, StatsTextFormatter, TextFormatter,
+    SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter, StatsTextFormatter,
+    TextFormatter,
 };
 use sloc_guard::scanner::{DirectoryScanner, FileScanner, GlobFilter};
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
@@ -113,19 +114,23 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let skip_comments = config.default.skip_comments && !args.no_skip_comments;
     let skip_blank = config.default.skip_blank && !args.no_skip_blank;
 
+    let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let mut results: Vec<_> = all_files
         .par_iter()
         .filter_map(|file_path| {
-            process_file_cached(
+            let result = process_file_cached(
                 file_path,
                 &registry,
                 &checker,
                 skip_comments,
                 skip_blank,
                 &cache,
-            )
+            );
+            progress.inc();
+            result
         })
         .collect();
+    progress.finish();
 
     // 7.1 Save cache if not disabled
     #[allow(clippy::collapsible_if)]
@@ -465,10 +470,16 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     // 5. Process each file and collect statistics (parallel with rayon)
     let registry = LanguageRegistry::default();
 
+    let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files
         .par_iter()
-        .filter_map(|file_path| collect_file_stats_cached(file_path, &registry, &cache))
+        .filter_map(|file_path| {
+            let result = collect_file_stats_cached(file_path, &registry, &cache);
+            progress.inc();
+            result
+        })
         .collect();
+    progress.finish();
 
     // 5.1 Save cache if not disabled
     #[allow(clippy::collapsible_if)]
@@ -642,10 +653,13 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     let skip_comments = config.default.skip_comments;
     let skip_blank = config.default.skip_blank;
 
+    let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let violations: Vec<_> = all_files
         .par_iter()
         .filter_map(|file_path| {
-            let result = process_file(file_path, &registry, &checker, skip_comments, skip_blank)?;
+            let result = process_file(file_path, &registry, &checker, skip_comments, skip_blank);
+            progress.inc();
+            let result = result?;
             if result.is_failed() {
                 Some((file_path.clone(), result.stats.code))
             } else {
@@ -653,6 +667,7 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
             }
         })
         .collect();
+    progress.finish();
 
     // 6. Create baseline from violations
     let mut baseline = Baseline::new();
