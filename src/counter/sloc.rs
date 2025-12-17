@@ -73,6 +73,13 @@ impl<'a> SlocCounter<'a> {
         CountResult::Stats(stats)
     }
 
+    /// Count lines from byte content (converts to string with lossy UTF-8).
+    #[must_use]
+    pub fn count_from_bytes(&self, content: &[u8]) -> CountResult {
+        let source = String::from_utf8_lossy(content);
+        self.count(&source)
+    }
+
     /// Count lines from a buffered reader (streaming, memory-efficient for large files).
     ///
     /// # Errors

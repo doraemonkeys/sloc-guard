@@ -143,6 +143,28 @@ pub fn compute_file_hash(path: &Path) -> Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// Read file content and compute SHA-256 hash in a single pass.
+/// Returns (hash, content) to avoid reading the file twice.
+///
+/// # Errors
+/// Returns an error if the file cannot be read.
+pub fn read_file_with_hash(path: &Path) -> Result<(String, Vec<u8>)> {
+    let content = fs::read(path).map_err(|e| SlocGuardError::FileRead {
+        path: path.to_path_buf(),
+        source: e,
+    })?;
+    let hash = compute_hash_from_bytes(&content);
+    Ok((hash, content))
+}
+
+/// Compute SHA-256 hash from bytes.
+#[must_use]
+pub fn compute_hash_from_bytes(content: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    format!("{:x}", hasher.finalize())
+}
+
 /// Compute SHA-256 hash of a string.
 #[must_use]
 pub fn compute_content_hash(content: &str) -> String {

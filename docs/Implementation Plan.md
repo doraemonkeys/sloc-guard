@@ -52,15 +52,12 @@ make ci
 
 ## Performance Notes
 
-> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB).
+> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB), merged file read and hash computation (single read pass on cache miss).
 >
 > **Future considerations**: When adding new features, maintain these patterns:
 > - Use `par_iter()` for file processing loops
 > - Prefer O(1) lookups (HashMap/HashSet) over linear searches
 > - Use `BufReader` for large file handling
->
-> **Pending optimizations**:
-> - [ ] Merge file read and hash computation: Currently on cache miss, file is read twice (once for hash, once for line counting). Combine into single read pass.
 
 ---
 

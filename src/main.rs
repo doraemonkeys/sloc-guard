@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use clap::Parser;
 use rayon::prelude::*;
 
-use sloc_guard::baseline::{compute_file_hash, Baseline};
+use sloc_guard::baseline::{compute_file_hash, read_file_with_hash, Baseline};
 use sloc_guard::cache::{compute_config_hash, Cache};
 use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{
@@ -333,29 +333,31 @@ fn process_file_cached(
     let language = registry.get_by_extension(ext)?;
 
     let path_key = file_path.to_string_lossy().replace('\\', "/");
-    let file_hash = compute_file_hash(file_path).ok()?;
+
+    // Read file and compute hash in single pass
+    let (file_hash, content) = read_file_with_hash(file_path).ok()?;
 
     // Try to get stats from cache
-    let stats = {
+    let cached_stats = {
         let cache_guard = cache.lock().ok()?;
         cache_guard
             .get_if_valid(&path_key, &file_hash)
             .map(|entry| LineStats::from(&entry.stats))
     };
 
-    let stats = if let Some(cached_stats) = stats {
-        cached_stats
+    let stats = if let Some(stats) = cached_stats {
+        stats
     } else {
-        // Cache miss: count lines and update cache
+        // Cache miss: count lines from already-read content
         let counter = SlocCounter::new(&language.comment_syntax);
-        let stats = count_file_lines(file_path, &counter)?;
+        let result = count_lines_from_content(&content, &counter)?;
 
         // Update cache
         if let Ok(mut cache_guard) = cache.lock() {
-            cache_guard.set(&path_key, file_hash, &stats);
+            cache_guard.set(&path_key, file_hash, &result);
         }
 
-        stats
+        result
     };
 
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
@@ -376,6 +378,14 @@ fn count_file_lines(file_path: &Path, counter: &SlocCounter) -> Option<LineStats
     };
 
     match result {
+        CountResult::Stats(stats) => Some(stats),
+        CountResult::IgnoredFile => None,
+    }
+}
+
+/// Count lines from pre-read file content.
+fn count_lines_from_content(content: &[u8], counter: &SlocCounter) -> Option<LineStats> {
+    match counter.count_from_bytes(content) {
         CountResult::Stats(stats) => Some(stats),
         CountResult::IgnoredFile => None,
     }
@@ -554,29 +564,31 @@ fn collect_file_stats_cached(
     let language = registry.get_by_extension(ext)?;
 
     let path_key = file_path.to_string_lossy().replace('\\', "/");
-    let file_hash = compute_file_hash(file_path).ok()?;
+
+    // Read file and compute hash in single pass
+    let (file_hash, content) = read_file_with_hash(file_path).ok()?;
 
     // Try to get stats from cache
-    let stats = {
+    let cached_stats = {
         let cache_guard = cache.lock().ok()?;
         cache_guard
             .get_if_valid(&path_key, &file_hash)
             .map(|entry| LineStats::from(&entry.stats))
     };
 
-    let stats = if let Some(cached_stats) = stats {
-        cached_stats
+    let stats = if let Some(stats) = cached_stats {
+        stats
     } else {
-        // Cache miss: count lines and update cache
+        // Cache miss: count lines from already-read content
         let counter = SlocCounter::new(&language.comment_syntax);
-        let stats = count_file_lines(file_path, &counter)?;
+        let result = count_lines_from_content(&content, &counter)?;
 
         // Update cache
         if let Ok(mut cache_guard) = cache.lock() {
-            cache_guard.set(&path_key, file_hash, &stats);
+            cache_guard.set(&path_key, file_hash, &result);
         }
 
-        stats
+        result
     };
 
     Some(FileStatistics {
