@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
@@ -9,7 +10,7 @@ pub trait FileFilter {
 }
 
 pub struct GlobFilter {
-    extensions: Vec<String>,
+    extensions: HashSet<String>,
     exclude_patterns: GlobSet,
 }
 
@@ -35,7 +36,7 @@ impl GlobFilter {
             })?;
 
         Ok(Self {
-            extensions,
+            extensions: extensions.into_iter().collect(),
             exclude_patterns,
         })
     }
@@ -47,7 +48,7 @@ impl GlobFilter {
 
         path.extension()
             .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| self.extensions.iter().any(|e| e == ext))
+            .is_some_and(|ext| self.extensions.contains(ext))
     }
 
     fn is_excluded(&self, path: &Path) -> bool {

@@ -22,7 +22,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `LineStats{total, code, comment, blank}` |
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
-| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` → `CheckResult{status, stats, limit}` |
+| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
 | `output/text` | `output/text.rs` | `TextFormatter` - human-readable output with icons |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
@@ -90,6 +90,7 @@ CLI args → load_config()
 - `serde` + `toml` + `serde_json` - config/output serialization
 - `walkdir` - directory traversal
 - `globset` - glob pattern matching
+- `rayon` - parallel file processing
 - `gix` - git integration (unused yet)
 - `colored` - terminal colors (unused yet)
 - `thiserror` - error handling

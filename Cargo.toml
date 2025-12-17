@@ -16,6 +16,9 @@ toml = "0.9.8"
 walkdir = "2"
 globset = "0.4"
 
+# Parallel processing
+rayon = "1.10"
+
 gix = { version = "0.75", default-features = false, features = ["dirwalk"] }
 
 # Terminal output

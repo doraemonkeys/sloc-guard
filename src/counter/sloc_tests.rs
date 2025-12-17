@@ -1,4 +1,5 @@
 use super::*;
+use std::io::Cursor;
 
 fn rust_syntax() -> CommentSyntax {
     CommentSyntax::new(vec!["//", "///", "//!"], vec![("/*", "*/")])
@@ -124,4 +125,50 @@ fn main() {
     assert_eq!(stats.blank, 2);
     assert!(stats.comment >= 3);
     assert!(stats.code >= 4);
+}
+
+#[test]
+fn count_reader_produces_same_result_as_count() {
+    let syntax = rust_syntax();
+    let counter = SlocCounter::new(&syntax);
+    let source = r#"//! Module documentation
+
+use std::io;
+
+/// Main function
+fn main() {
+    /* inline comment */
+    println!("Hello");
+}
+"#;
+
+    let stats_from_str = counter.count(source);
+    let stats_from_reader = counter.count_reader(Cursor::new(source)).unwrap();
+
+    assert_eq!(stats_from_str.total, stats_from_reader.total);
+    assert_eq!(stats_from_str.code, stats_from_reader.code);
+    assert_eq!(stats_from_str.comment, stats_from_reader.comment);
+    assert_eq!(stats_from_str.blank, stats_from_reader.blank);
+}
+
+#[test]
+fn count_reader_empty_input() {
+    let syntax = rust_syntax();
+    let counter = SlocCounter::new(&syntax);
+    let stats = counter.count_reader(Cursor::new("")).unwrap();
+
+    assert_eq!(stats.total, 0);
+    assert_eq!(stats.sloc(), 0);
+}
+
+#[test]
+fn count_reader_with_multi_line_comment() {
+    let syntax = rust_syntax();
+    let counter = SlocCounter::new(&syntax);
+    let source = "/* Multi\n   line\n   comment */\nfn main() {}";
+    let stats = counter.count_reader(Cursor::new(source)).unwrap();
+
+    assert_eq!(stats.total, 4);
+    assert_eq!(stats.code, 1);
+    assert_eq!(stats.comment, 3);
 }

@@ -1,7 +1,9 @@
-use std::fs;
+use std::fs::{self, File};
+use std::io::BufReader;
 use std::path::Path;
 
 use clap::Parser;
+use rayon::prelude::*;
 
 use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{CheckArgs, Cli, Commands, ConfigAction, StatsArgs};
@@ -14,6 +16,9 @@ use sloc_guard::output::{
 };
 use sloc_guard::scanner::{DirectoryScanner, FileScanner, GlobFilter};
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
+
+/// File size threshold for streaming reads (10 MB)
+const LARGE_FILE_THRESHOLD: u64 = 10 * 1024 * 1024;
 
 fn main() {
     let cli = Cli::parse();
@@ -65,7 +70,7 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         all_files.extend(files);
     }
 
-    // 6. Process each file
+    // 6. Process each file (parallel with rayon)
     let registry = LanguageRegistry::default();
     let warn_threshold = args.warn_threshold.unwrap_or(config.default.warn_threshold);
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
@@ -73,14 +78,12 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let skip_comments = config.default.skip_comments && !args.no_skip_comments;
     let skip_blank = config.default.skip_blank && !args.no_skip_blank;
 
-    let mut results = Vec::new();
-    for file_path in &all_files {
-        if let Some(result) =
+    let results: Vec<_> = all_files
+        .par_iter()
+        .filter_map(|file_path| {
             process_file(file_path, &registry, &checker, skip_comments, skip_blank)
-        {
-            results.push(result);
-        }
-    }
+        })
+        .collect();
 
     // 7. Format output
     let output = format_output(args.format, &results)?;
@@ -162,14 +165,25 @@ fn process_file(
     let ext = file_path.extension()?.to_str()?;
     let language = registry.get_by_extension(ext)?;
 
-    let content = fs::read_to_string(file_path).ok()?;
     let counter = SlocCounter::new(&language.comment_syntax);
-    let stats = counter.count(&content);
+    let stats = count_file_lines(file_path, &counter)?;
 
-    // Compute effective stats based on skip_comments and skip_blank
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
 
     Some(checker.check(file_path, &effective_stats))
+}
+
+fn count_file_lines(file_path: &Path, counter: &SlocCounter) -> Option<LineStats> {
+    let metadata = fs::metadata(file_path).ok()?;
+
+    if metadata.len() >= LARGE_FILE_THRESHOLD {
+        let file = File::open(file_path).ok()?;
+        let reader = BufReader::new(file);
+        counter.count_reader(reader).ok()
+    } else {
+        let content = fs::read_to_string(file_path).ok()?;
+        Some(counter.count(&content))
+    }
 }
 
 fn compute_effective_stats(stats: &LineStats, skip_comments: bool, skip_blank: bool) -> LineStats {
@@ -249,15 +263,13 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         all_files.extend(files);
     }
 
-    // 5. Process each file and collect statistics
+    // 5. Process each file and collect statistics (parallel with rayon)
     let registry = LanguageRegistry::default();
-    let mut file_stats = Vec::new();
 
-    for file_path in &all_files {
-        if let Some(stats) = collect_file_stats(file_path, &registry) {
-            file_stats.push(stats);
-        }
-    }
+    let file_stats: Vec<_> = all_files
+        .par_iter()
+        .filter_map(|file_path| collect_file_stats(file_path, &registry))
+        .collect();
 
     let project_stats = ProjectStatistics::new(file_stats);
 
@@ -300,9 +312,8 @@ fn collect_file_stats(file_path: &Path, registry: &LanguageRegistry) -> Option<F
     let ext = file_path.extension()?.to_str()?;
     let language = registry.get_by_extension(ext)?;
 
-    let content = fs::read_to_string(file_path).ok()?;
     let counter = SlocCounter::new(&language.comment_syntax);
-    let stats = counter.count(&content);
+    let stats = count_file_lines(file_path, &counter)?;
 
     Some(FileStatistics {
         path: file_path.to_path_buf(),
