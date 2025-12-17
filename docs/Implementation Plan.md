@@ -57,6 +57,9 @@ make ci
 > - Use `par_iter()` for file processing loops
 > - Prefer O(1) lookups (HashMap/HashSet) over linear searches
 > - Use `BufReader` for large file handling
+>
+> **Pending optimizations**:
+> - [ ] Merge file read and hash computation: Currently on cache miss, file is read twice (once for hash, once for line counting). Combine into single read pass.
 
 ---
 
