@@ -9,7 +9,7 @@
 | Module | Status | Description |
 |--------|--------|-------------|
 | `cli` | Done | CLI with check, stats, init, config commands + global options (verbose, quiet, color, no-config) |
-| `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule (pending: per-rule warn_threshold) |
+| `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
@@ -20,9 +20,6 @@
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary |
 | `output/json` | Done | JsonFormatter with structured output |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
-| `output/sarif` | Pending | SARIF formatter for GitHub Code Scanning |
-| `output/markdown` | Pending | Markdown formatter for PR comments |
-| `output/html` | Pending | HTML report with charts and trends |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `error` | Done | SlocGuardError enum with thiserror |
 | `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
@@ -66,12 +63,13 @@ make ci
 | **Phase 2.1** | Color Support (TextFormatter with Auto/Always/Never) | ✅ Done |
 | **Phase 3.1** | Git Diff Mode (gix-based --diff) | ✅ Done |
 | **Phase 4.3** | Path-Based Rules ([[path_rules]] with glob patterns) | ✅ Done |
+| **Phase 4.9** | Strict Mode (--strict flag, config option) | ✅ Done |
 
 ---
 
 ## Phase 2: Output Enhancements (P1)
 
-### Task 2.2: Implement SARIF Output
+### Task 2.2: SARIF Output
 
 Location: `src/output/sarif.rs`
 
@@ -80,10 +78,9 @@ Location: `src/output/sarif.rs`
 - Follow SARIF 2.1.0 spec
 - Map CheckResult to SARIF result object
 - Include file location, message, level
-- Useful for GitHub Code Scanning integration
 ```
 
-### Task 2.3: Implement Markdown Output
+### Task 2.3: Markdown Output
 
 Location: `src/output/markdown.rs`
 
@@ -91,82 +88,82 @@ Location: `src/output/markdown.rs`
 - Create MarkdownFormatter struct
 - Generate table-based output
 - Include summary section
-- Suitable for PR comments
 ```
 
-### Task 2.4: Progress Bar for Large Scans
+### Task 2.4: Progress Bar
 
-Location: `src/output/progress.rs` (new module)
-
-```
-- Use indicatif crate for progress bar
-- Show: Scanning [████████░░░░] 62% (1,234/2,000 files)
-- Enable with --progress flag or auto-detect large directories
-- Disable in quiet mode or non-TTY output
-- Update progress during parallel file processing
-```
-
-### Task 2.5: Top-N Files Report
-
-Location: `src/output/text.rs`, `src/output/json.rs`
+Location: `src/output/progress.rs`
 
 ```
-- Add --top N flag to check command
-- Show only N files with highest line count (regardless of status)
-- Useful for large projects to focus on worst offenders
-- Include in JSON output as separate "top_files" array
+- Use indicatif crate
+- Show: Scanning [████░░░░] 50% (500/1000 files)
+- Disable in quiet mode or non-TTY
 ```
 
 ---
 
 ## Phase 3: Git Integration (P1)
 
-### Task 3.2: Add Git-Aware Exclude Patterns
+### Task 3.2: Git-Aware Exclude
 
 Location: `src/scanner/filter.rs`
 
 ```
-- Respect .gitignore patterns
-- Use gix dirwalk feature
-- Make git-aware scanning optional (flag or auto-detect)
+- Respect .gitignore patterns via gix dirwalk
+- Make git-aware scanning optional (--no-gitignore flag)
 ```
 
 ---
 
 ## Phase 4: Advanced Features (P2)
 
-### Task 4.1: Baseline Support
+### Task 4.1a: Baseline File Format
 
-Location: `src/baseline/mod.rs` (new module)
+Location: `src/baseline/mod.rs`
 
 ```
-- Allow existing violations to be "grandfathered"
-- Store baseline in .sloc-guard-baseline.json
-- Command: sloc-guard baseline update
-- Only fail on NEW violations
-- Track file hash to detect changes
+- Design .sloc-guard-baseline.json structure:
+  { "files": { "path": { "lines": N, "hash": "sha256" } } }
+- Implement read/write baseline functions
 ```
 
-### Task 4.2: Warning Threshold Configuration (Partial)
+### Task 4.1b: Baseline Update Command
+
+Location: `src/main.rs`, `src/cli.rs`
+
+```
+- Add `sloc-guard baseline update` command
+- Generate baseline from current violations
+- Support --output path option
+```
+
+### Task 4.1c: Baseline Compare in Check
+
+Location: `src/main.rs`
+
+```
+- Add --baseline flag to check command
+- Compare against baseline, only fail on NEW violations
+- Show "baseline: N files grandfathered" in summary
+```
+
+### Task 4.2: Per-rule warn_threshold (Partial)
 
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
 ```
 - [x] Add warn_threshold to DefaultConfig (default 0.9)
-- [ ] Allow per-rule warning thresholds (e.g., [rules.rust] warn_threshold = 0.85)
-- [ ] Update ThresholdChecker to read warn_threshold from config
+- [ ] Allow per-rule: [rules.rust] warn_threshold = 0.85
 - [x] Support --warn-threshold CLI override
 ```
 
 ### Task 4.4: Override with Reason
 
-Location: `src/config/model.rs`, `src/checker/threshold.rs`
+Location: `src/config/model.rs`
 
 ```
-- Add reason field to [[override]] section
-- Document purpose of exemption (e.g., "Legacy code, scheduled for Q2 refactor")
-- Show reason in verbose output and reports
-- Highest priority in rule matching
+- Add optional reason field to [[override]]
+- Show reason in verbose output
 ```
 
 ### Task 4.5: Custom Language Definition
@@ -175,82 +172,130 @@ Location: `src/config/model.rs`, `src/language/registry.rs`
 
 ```
 - Add [languages.<name>] section in config
-- Allow defining: extensions, single_line_comments, multi_line_comments
-- Register custom languages at config load time
-- Override built-in language definitions if same extension
+- Allow: extensions, single_line_comments, multi_line_comments
+- Override built-in if same extension
 ```
 
-### Task 4.6: Inline Ignore Comments
+### Task 4.6a: Inline Ignore (ignore-file)
 
-Location: `src/counter/sloc.rs`, `src/checker/threshold.rs`
-
-```
-- Support inline directives: // sloc-guard:ignore-file, ignore-next, ignore-start/end
-- Parse directives during line counting phase
-- More flexible than [[override]] - exemption lives with code
-- Support language-specific comment prefixes (# for Python, etc.)
-```
-
-### Task 4.7: Caching Mechanism
-
-Location: `src/cache/mod.rs` (new module)
+Location: `src/counter/sloc.rs`
 
 ```
-- Cache line counts by file hash (content-based)
-- Store in .sloc-guard-cache or configurable path
-- Skip counting for unchanged files
-- Invalidate on config change (hash config too)
-- Config option: [cache] enabled = true, path = ".sloc-guard-cache"
-- CLI flag: --no-cache to bypass
+- Support: // sloc-guard:ignore-file
+- Detect in first 10 lines of file
+- Skip entire file from check
+- Support language-specific prefixes (# for Python)
 ```
 
-### Task 4.8: Configuration Inheritance (extends)
+### Task 4.6b: Inline Ignore (block/next)
 
-Location: `src/config/loader.rs`, `src/config/model.rs`
-
-```
-- Add "extends" field to config (local paths and URLs)
-- Load base config first, then merge local overrides
-- Recursive extends (with cycle detection)
-- CLI: --no-extends to skip inheritance
-```
-
-### Task 4.9: Strict Mode
-
-Location: `src/cli.rs`, `src/main.rs`
+Location: `src/counter/sloc.rs`
 
 ```
-- Add --strict flag to check command
-- In strict mode: warnings also cause exit code 1
-- Opposite of --warn-only
-- Config option: [default] strict = true
+- Support: // sloc-guard:ignore-next N
+- Support: // sloc-guard:ignore-start / ignore-end
+- Exclude matched lines from count
+```
+
+### Task 4.7a: File Hash Cache
+
+Location: `src/cache/mod.rs`
+
+```
+- Implement content hash (xxhash or sha256)
+- Cache format: { "version": 1, "config_hash": "...", "files": {...} }
+- Store in .sloc-guard-cache
+```
+
+### Task 4.7b: Cache Integration
+
+Location: `src/main.rs`
+
+```
+- Integrate cache into check/stats commands
+- Invalidate on config change
+- Add --no-cache flag
+```
+
+### Task 4.8a: Config Inheritance (local)
+
+Location: `src/config/loader.rs`
+
+```
+- Add "extends" field to config (local paths only)
+- Load base config first, merge local overrides
+- Cycle detection for recursive extends
+```
+
+### Task 4.8b: Config Inheritance (URL)
+
+Location: `src/config/loader.rs`
+
+```
+- Support extends = "https://..."
+- Add --no-extends CLI flag
+- Cache downloaded configs
 ```
 
 ---
 
 ## Phase 5: Statistics Extension (P2)
 
-### Task 5.1: Project-Wide Statistics
+### Task 5.1a: Language Breakdown
+
+Location: `src/output/stats.rs`
 
 ```
-- Breakdown by language, Top N largest files, Average file size
-- Distribution histogram, Per-directory breakdown
-- Group output by language/directory (--group-by lang|dir)
+- Group SLOC by language/extension
+- Add --group-by lang option to stats command
+```
+
+### Task 5.1b: Top-N & Metrics
+
+Location: `src/output/stats.rs`
+
+```
+- Add --top N flag to stats command
+- Show top N largest files
+- Show average file size
+```
+
+### Task 5.1c: Directory Statistics
+
+Location: `src/output/stats.rs`
+
+```
+- Per-directory breakdown
+- Add --group-by dir option
 ```
 
 ### Task 5.2: Trend Tracking
 
+Location: `src/stats/trend.rs`
+
 ```
 - Store historical stats in .sloc-guard-history.json
-- Show change from previous run
+- Show delta from previous run
 ```
 
-### Task 5.3: HTML Report Generation
+### Task 5.3a: Basic HTML Report
+
+Location: `src/output/html.rs`
 
 ```
-- Create HtmlFormatter struct with --report flag
-- Include: dashboard, charts, top files, per-directory stats, trends
-- Use embedded CSS for standalone HTML file
+- Create HtmlFormatter with --report flag
+- Static HTML: summary table + file list
+- Embedded CSS for standalone file
+```
+
+### Task 5.3b: HTML Charts (Optional)
+
+Location: `src/output/html.rs`
+
+```
+- Add charts (pure CSS or Chart.js)
+- File size distribution, language breakdown
+- Trend visualization
 ```
 
 ---
@@ -263,14 +308,12 @@ Location: `src/cli.rs`, `src/main.rs`
 - Create reusable GitHub Action
 - Input: paths, config-path, fail-on-warning
 - Output: total-files, passed, failed, warnings
-- Annotate PR with results
 ```
 
-### Task 6.2: Pre-commit Hook Integration
+### Task 6.2: Pre-commit Hook
 
 ```
 - Document .pre-commit-config.yaml setup
-- Provide hook entry configuration
 - Support staged files only mode
 ```
 
@@ -278,32 +321,50 @@ Location: `src/cli.rs`, `src/main.rs`
 
 ## Phase 7: Future Enhancements (P3)
 
-### Task 7.1: Function-Level Analysis
+### Task 7.1a: Function Analysis (Rust)
 
 ```
-- Parse function/method boundaries (language-specific)
-- Count lines per function/method
-- Add function_max_lines to config (optional)
-- Note: Requires tree-sitter or similar
+- Use tree-sitter-rust to parse function boundaries
+- Count lines per function
+- Add function_max_lines to config
+```
+
+### Task 7.1b: Function Analysis (Other Languages)
+
+```
+- Extend to Go, Python, JS/TS as needed
+- Separate tree-sitter grammars per language
 ```
 
 ---
 
 ## Priority Order
 
-1. **MVP**: ✅ Complete
-2. **Quick Wins**: ✅ Color, verbose, override path fix, path-based rules
-3. **Short-term (High Value)**:
-   - 4.6 Inline Ignore Comments (better DX than [[override]])
-   - 4.9 Strict Mode (simple, high CI value)
-4. **Medium-term (High Value)**:
-   - 4.7 Caching Mechanism (big perf win for large projects)
-   - 2.2 SARIF Output (CI/CD integration)
-   - 4.1 Baseline Support (essential for large projects)
-   - 4.8 Configuration Inheritance (enterprise use case)
-5. **Medium Priority**: 2.4 Progress Bar, 2.5 Top-N Files, 3.2 Git-Aware Exclude
-6. **Lower Priority**: 2.3 Markdown, 4.2 Per-rule warn_threshold, 4.4 Override Reason, 4.5 Custom Languages
-7. **Deferred**: Phase 5, 6, 7
+| Priority | Tasks | Effort |
+|----------|-------|--------|
+| **1. Short-term** | 4.6a Inline Ignore (ignore-file only) | ~2h |
+| **2. Medium-term** | 4.1a Baseline File Format | ~2h |
+| | 4.1b Baseline Update Command | ~2h |
+| | 4.1c Baseline Compare | ~2h |
+| | 2.2 SARIF Output | ~3h |
+| | 4.7a File Hash Cache | ~3h |
+| | 4.7b Cache Integration | ~2h |
+| **3. Medium** | 2.4 Progress Bar | ~2h |
+| | 5.1a Language Breakdown | ~2h |
+| | 5.1b Top-N & Metrics | ~2h |
+| | 3.2 Git-Aware Exclude | ~3h |
+| **4. Lower** | 2.3 Markdown Output | ~2h |
+| | 4.2 Per-rule warn_threshold | ~1h |
+| | 4.4 Override Reason | ~1h |
+| | 4.5 Custom Languages | ~3h |
+| | 4.6b Inline Ignore (block/next) | ~2h |
+| | 4.8a Config Inheritance (local) | ~2h |
+| **5. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
+| | 5.1c Directory Statistics | ~2h |
+| | 5.2 Trend Tracking | ~3h |
+| | 5.3a Basic HTML Report | ~4h |
+| | 5.3b HTML Charts | ~4h |
+| | Phase 6, 7 | TBD |
 
 ---
 

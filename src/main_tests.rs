@@ -60,6 +60,7 @@ fn apply_cli_overrides_max_lines() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -85,6 +86,7 @@ fn apply_cli_overrides_no_skip_comments() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -110,6 +112,7 @@ fn apply_cli_overrides_no_skip_blank() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -133,6 +136,7 @@ fn apply_cli_overrides_warn_threshold() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -156,6 +160,7 @@ fn get_scan_paths_uses_include_override() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -179,6 +184,7 @@ fn get_scan_paths_uses_cli_paths() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -204,6 +210,7 @@ fn get_scan_paths_uses_config_include_paths() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -227,6 +234,7 @@ fn get_scan_paths_defaults_to_current_dir() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -909,7 +917,7 @@ fn run_check_impl_with_valid_directory() {
     let args = CheckArgs {
         paths: vec![PathBuf::from("src")],
         config: None,
-        max_lines: Some(1000),
+        max_lines: Some(2000), // Increased to accommodate growing test file
         ext: Some(vec!["rs".to_string()]),
         exclude: vec!["**/target/**".to_string()],
         include: vec![],
@@ -920,6 +928,7 @@ fn run_check_impl_with_valid_directory() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -945,6 +954,7 @@ fn run_check_impl_with_warn_only() {
         output: None,
         warn_only: true, // Enable warn-only mode
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -971,6 +981,7 @@ fn run_check_impl_with_threshold_exceeded() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -988,7 +999,7 @@ fn run_check_impl_with_json_output() {
     let args = CheckArgs {
         paths: vec![PathBuf::from("src")],
         config: None,
-        max_lines: Some(1000),
+        max_lines: Some(2000), // Increased to accommodate growing test file
         ext: Some(vec!["rs".to_string()]),
         exclude: vec![],
         include: vec![],
@@ -999,6 +1010,7 @@ fn run_check_impl_with_json_output() {
         output: Some(output_path.clone()),
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -1016,7 +1028,7 @@ fn run_check_impl_with_verbose() {
     let args = CheckArgs {
         paths: vec![PathBuf::from("src")],
         config: None,
-        max_lines: Some(1000),
+        max_lines: Some(2000), // Increased to accommodate growing test file
         ext: Some(vec!["rs".to_string()]),
         exclude: vec![],
         include: vec![],
@@ -1027,6 +1039,7 @@ fn run_check_impl_with_verbose() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -1051,6 +1064,7 @@ fn run_check_impl_with_no_skip_flags() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1064,7 +1078,7 @@ fn run_check_impl_with_include_paths() {
     let args = CheckArgs {
         paths: vec![PathBuf::from(".")],
         config: None,
-        max_lines: Some(1000),
+        max_lines: Some(2000), // Increased to accommodate growing test file
         ext: Some(vec!["rs".to_string()]),
         exclude: vec![],
         include: vec!["src".to_string()],
@@ -1075,6 +1089,7 @@ fn run_check_impl_with_include_paths() {
         output: None,
         warn_only: false,
         diff: None,
+        strict: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1165,4 +1180,128 @@ fn format_config_text_with_rule_skip_blank() {
     let output = format_config_text(&config);
     assert!(output.contains("[rules.test]"));
     assert!(output.contains("skip_blank = false"));
+}
+
+// Strict mode tests
+
+#[test]
+fn run_check_impl_strict_mode_fails_on_warnings() {
+    // Create a scenario that triggers warnings but not failures
+    // Use a threshold that causes warnings (warn_threshold) but not failures
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(10000), // High enough to pass
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: Some(0.001), // Very low threshold to trigger warnings
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: true, // Enable strict mode
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // With strict mode, warnings should cause exit code 1
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}
+
+#[test]
+fn run_check_impl_strict_mode_disabled_warnings_pass() {
+    // Same scenario but without strict mode
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(10000), // High enough to pass
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: Some(0.001), // Very low threshold to trigger warnings
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false, // Strict mode disabled
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Without strict mode, warnings should NOT cause exit code 1
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn run_check_impl_warn_only_overrides_strict() {
+    // When warn_only is set, strict mode should be ignored
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1), // Very low threshold to trigger failures
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: true, // Enable warn-only mode
+        diff: None,
+        strict: true, // Also enable strict mode
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // warn_only should take precedence, so return SUCCESS
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn config_strict_mode_from_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("strict.toml");
+    let content = r"
+[default]
+max_lines = 500
+strict = true
+";
+    std::fs::write(&config_path, content).unwrap();
+
+    let config: sloc_guard::config::Config = toml::from_str(content).unwrap();
+    assert!(config.default.strict);
+}
+
+#[test]
+fn config_strict_mode_default_false() {
+    let config = Config::default();
+    assert!(!config.default.strict);
+}
+
+#[test]
+fn generate_config_template_contains_strict() {
+    let template = generate_config_template();
+    assert!(template.contains("strict"));
+    assert!(template.contains("Strict mode"));
+}
+
+#[test]
+fn format_config_text_shows_strict() {
+    let mut config = Config::default();
+    config.default.strict = true;
+
+    let output = format_config_text(&config);
+    assert!(output.contains("strict = true"));
 }

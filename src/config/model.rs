@@ -37,6 +37,9 @@ pub struct DefaultConfig {
 
     #[serde(default = "default_warn_threshold")]
     pub warn_threshold: f64,
+
+    #[serde(default)]
+    pub strict: bool,
 }
 
 impl Default for DefaultConfig {
@@ -48,6 +51,7 @@ impl Default for DefaultConfig {
             skip_comments: true,
             skip_blank: true,
             warn_threshold: default_warn_threshold(),
+            strict: false,
         }
     }
 }

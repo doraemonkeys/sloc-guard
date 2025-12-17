@@ -35,7 +35,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 ```rust
 // Config priority: CLI args > config file > defaults
 Config { default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride> }
-DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9 }
+DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false }
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
 
 // Line counting

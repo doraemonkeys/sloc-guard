@@ -6,6 +6,7 @@ fn default_config_has_expected_values() {
     assert_eq!(config.max_lines, 500);
     assert!(config.skip_comments);
     assert!(config.skip_blank);
+    assert!(!config.strict);
 }
 
 #[test]
@@ -43,4 +44,27 @@ fn config_serialize_roundtrip() {
     let serialized = toml::to_string(&config).unwrap();
     let deserialized: Config = toml::from_str(&serialized).unwrap();
     assert_eq!(config, deserialized);
+}
+
+#[test]
+fn config_deserialize_strict_mode() {
+    let toml_str = r"
+        [default]
+        max_lines = 500
+        strict = true
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.default.strict);
+}
+
+#[test]
+fn config_deserialize_strict_mode_default_false() {
+    let toml_str = r"
+        [default]
+        max_lines = 500
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(!config.default.strict);
 }

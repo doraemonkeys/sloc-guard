@@ -61,6 +61,7 @@ pub enum Commands {
 }
 
 #[derive(Parser, Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct CheckArgs {
     /// Paths to check (files or directories)
     #[arg(default_value = ".")]
@@ -113,6 +114,10 @@ pub struct CheckArgs {
     /// Compare against a git reference (branch or commit)
     #[arg(long)]
     pub diff: Option<String>,
+
+    /// Treat warnings as failures (exit code 1)
+    #[arg(long)]
+    pub strict: bool,
 }
 
 #[derive(Parser, Debug)]

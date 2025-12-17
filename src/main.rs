@@ -108,10 +108,21 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let has_failures = results
         .iter()
         .any(sloc_guard::checker::CheckResult::is_failed);
-    if args.warn_only || !has_failures {
-        Ok(EXIT_SUCCESS)
-    } else {
+    let has_warnings = results
+        .iter()
+        .any(sloc_guard::checker::CheckResult::is_warning);
+
+    if args.warn_only {
+        return Ok(EXIT_SUCCESS);
+    }
+
+    // Strict mode: CLI flag takes precedence, otherwise use config
+    let strict = args.strict || config.default.strict;
+
+    if has_failures || (strict && has_warnings) {
         Ok(EXIT_THRESHOLD_EXCEEDED)
+    } else {
+        Ok(EXIT_SUCCESS)
     }
 }
 
@@ -438,6 +449,9 @@ skip_blank = true
 # Files exceeding this ratio but under max_lines will show warnings
 warn_threshold = 0.9
 
+# Strict mode: treat warnings as failures (default: false)
+# strict = true
+
 # Extension-based rules (override defaults for specific languages)
 # [rules.rust]
 # extensions = ["rs"]
@@ -599,6 +613,7 @@ fn format_config_text(config: &Config) -> String {
         "  warn_threshold = {}",
         config.default.warn_threshold
     );
+    let _ = writeln!(output, "  strict = {}", config.default.strict);
 
     // Rules section
     if !config.rules.is_empty() {
