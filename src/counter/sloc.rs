@@ -4,6 +4,9 @@ use crate::language::CommentSyntax;
 
 use super::CommentDetector;
 
+const IGNORE_FILE_DIRECTIVE: &str = "sloc-guard:ignore-file";
+const DIRECTIVE_SCAN_LINES: usize = 10;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LineStats {
     pub total: usize,
@@ -29,6 +32,12 @@ impl LineStats {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CountResult {
+    Stats(LineStats),
+    IgnoredFile,
+}
+
 pub struct SlocCounter<'a> {
     detector: CommentDetector<'a>,
 }
@@ -42,12 +51,17 @@ impl<'a> SlocCounter<'a> {
     }
 
     #[must_use]
-    pub fn count(&self, source: &str) -> LineStats {
+    pub fn count(&self, source: &str) -> CountResult {
         let mut stats = LineStats::new();
         let mut in_multi_line_comment = false;
         let mut multi_line_end_marker: Option<&str> = None;
 
         for line in source.lines() {
+            // Check for ignore directive in first N lines
+            if stats.total < DIRECTIVE_SCAN_LINES && self.has_ignore_file_directive(line) {
+                return CountResult::IgnoredFile;
+            }
+
             self.process_line(
                 line,
                 &mut stats,
@@ -56,20 +70,26 @@ impl<'a> SlocCounter<'a> {
             );
         }
 
-        stats
+        CountResult::Stats(stats)
     }
 
     /// Count lines from a buffered reader (streaming, memory-efficient for large files).
     ///
     /// # Errors
     /// Returns an I/O error if reading from the reader fails.
-    pub fn count_reader<R: BufRead>(&self, reader: R) -> std::io::Result<LineStats> {
+    pub fn count_reader<R: BufRead>(&self, reader: R) -> std::io::Result<CountResult> {
         let mut stats = LineStats::new();
         let mut in_multi_line_comment = false;
         let mut multi_line_end_marker: Option<&str> = None;
 
         for line_result in reader.lines() {
             let line = line_result?;
+
+            // Check for ignore directive in first N lines
+            if stats.total < DIRECTIVE_SCAN_LINES && self.has_ignore_file_directive(&line) {
+                return Ok(CountResult::IgnoredFile);
+            }
+
             self.process_line(
                 &line,
                 &mut stats,
@@ -78,7 +98,16 @@ impl<'a> SlocCounter<'a> {
             );
         }
 
-        Ok(stats)
+        Ok(CountResult::Stats(stats))
+    }
+
+    fn has_ignore_file_directive(&self, line: &str) -> bool {
+        let trimmed = line.trim();
+        if !trimmed.contains(IGNORE_FILE_DIRECTIVE) {
+            return false;
+        }
+        // Directive must be in a comment
+        self.detector.is_single_line_comment(trimmed)
     }
 
     fn process_line(

@@ -19,7 +19,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
 | `counter/comment` | `counter/comment.rs` | `CommentDetector` - detects single/multi-line comments |
-| `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `LineStats{total, code, comment, blank}` |
+| `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directive |
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
@@ -40,6 +40,7 @@ PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // 
 
 // Line counting
 LineStats { total, code, comment, blank }  // sloc() returns code count
+CountResult::Stats(LineStats) | IgnoredFile  // IgnoredFile when "// sloc-guard:ignore-file" in first 10 lines
 CommentSyntax { single_line: Vec<&str>, multi_line: Vec<(start, end)> }
 
 // Check results
@@ -68,8 +69,9 @@ CLI args → load_config() → apply_cli_overrides()
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
          → for each file:
               LanguageRegistry::get_by_extension()
-              SlocCounter::count(content) → LineStats
-              ThresholdChecker::check(path, stats) → CheckResult
+              SlocCounter::count(content) → CountResult
+              [if IgnoredFile] skip file (inline ignore directive)
+              [if Stats] ThresholdChecker::check(path, stats) → CheckResult
          → TextFormatter/JsonFormatter::format(results)
          → write to stdout or --output file
 ```
@@ -82,8 +84,9 @@ CLI args → load_config()
          → DirectoryScanner::scan(paths)
          → for each file:
               LanguageRegistry::get_by_extension()
-              SlocCounter::count(content) → LineStats
-              collect_file_stats() → FileStatistics
+              SlocCounter::count(content) → CountResult
+              [if IgnoredFile] skip file
+              [if Stats] collect_file_stats() → FileStatistics
          → ProjectStatistics::new(file_stats)
          → StatsTextFormatter/StatsJsonFormatter::format(stats)
          → write to stdout or --output file

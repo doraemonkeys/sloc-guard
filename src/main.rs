@@ -8,7 +8,7 @@ use rayon::prelude::*;
 use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{CheckArgs, Cli, ColorChoice, Commands, ConfigAction, StatsArgs};
 use sloc_guard::config::{Config, ConfigLoader, FileConfigLoader};
-use sloc_guard::counter::{LineStats, SlocCounter};
+use sloc_guard::counter::{CountResult, LineStats, SlocCounter};
 use sloc_guard::git::{ChangedFiles, GitDiff};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
@@ -231,13 +231,18 @@ fn process_file(
 fn count_file_lines(file_path: &Path, counter: &SlocCounter) -> Option<LineStats> {
     let metadata = fs::metadata(file_path).ok()?;
 
-    if metadata.len() >= LARGE_FILE_THRESHOLD {
+    let result = if metadata.len() >= LARGE_FILE_THRESHOLD {
         let file = File::open(file_path).ok()?;
         let reader = BufReader::new(file);
-        counter.count_reader(reader).ok()
+        counter.count_reader(reader).ok()?
     } else {
         let content = fs::read_to_string(file_path).ok()?;
-        Some(counter.count(&content))
+        counter.count(&content)
+    };
+
+    match result {
+        CountResult::Stats(stats) => Some(stats),
+        CountResult::IgnoredFile => None,
     }
 }
 

@@ -13,7 +13,7 @@
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
-| `counter/sloc` | Done | SlocCounter with LineStats (total, code, comment, blank) |
+| `counter/sloc` | Done | SlocCounter with LineStats, CountResult, inline ignore-file directive |
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
 | `scanner/mod` | Done | DirectoryScanner with walkdir integration |
 | `checker/threshold` | Partial | ThresholdChecker with override > path_rules > rule > default priority (pending: per-rule skip_comments/skip_blank/warn_threshold) |
@@ -63,6 +63,7 @@ make ci
 | **Phase 2.1** | Color Support (TextFormatter with Auto/Always/Never) | ✅ Done |
 | **Phase 3.1** | Git Diff Mode (gix-based --diff) | ✅ Done |
 | **Phase 4.3** | Path-Based Rules ([[path_rules]] with glob patterns) | ✅ Done |
+| **Phase 4.6a** | Inline Ignore (// sloc-guard:ignore-file in first 10 lines) | ✅ Done |
 | **Phase 4.9** | Strict Mode (--strict flag, config option) | ✅ Done |
 
 ---
@@ -174,17 +175,6 @@ Location: `src/config/model.rs`, `src/language/registry.rs`
 - Add [languages.<name>] section in config
 - Allow: extensions, single_line_comments, multi_line_comments
 - Override built-in if same extension
-```
-
-### Task 4.6a: Inline Ignore (ignore-file)
-
-Location: `src/counter/sloc.rs`
-
-```
-- Support: // sloc-guard:ignore-file
-- Detect in first 10 lines of file
-- Skip entire file from check
-- Support language-specific prefixes (# for Python)
 ```
 
 ### Task 4.6b: Inline Ignore (block/next)
@@ -342,11 +332,10 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.6a Inline Ignore (ignore-file only) | ~2h |
-| **2. Medium-term** | 4.1a Baseline File Format | ~2h |
+| **1. Short-term** | 4.1a Baseline File Format | ~2h |
 | | 4.1b Baseline Update Command | ~2h |
 | | 4.1c Baseline Compare | ~2h |
-| | 2.2 SARIF Output | ~3h |
+| **2. Medium-term** | 2.2 SARIF Output | ~3h |
 | | 4.7a File Hash Cache | ~3h |
 | | 4.7b Cache Integration | ~2h |
 | **3. Medium** | 2.4 Progress Bar | ~2h |
