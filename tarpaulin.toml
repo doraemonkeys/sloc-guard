@@ -144,7 +144,7 @@ no-fail-fast = false
 # profile = null
 
 # Fail if coverage is below the specified threshold (e.g., 80.0).
-fail-under = 80
+fail-under = 85
 
 # Metadata generated from `cargo metadata` (this field is internal and usually empty).
 # metadata = null
