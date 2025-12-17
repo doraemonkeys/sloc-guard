@@ -17,7 +17,7 @@ use sloc_guard::git::{ChangedFiles, GitDiff};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
     ColorMode, FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
-    StatsFormatter, StatsJsonFormatter, StatsTextFormatter, TextFormatter,
+    SarifFormatter, StatsFormatter, StatsJsonFormatter, StatsTextFormatter, TextFormatter,
 };
 use sloc_guard::scanner::{DirectoryScanner, FileScanner, GlobFilter};
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
@@ -314,9 +314,7 @@ fn format_output(
     match format {
         OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose).format(results),
         OutputFormat::Json => JsonFormatter.format(results),
-        OutputFormat::Sarif => Err(sloc_guard::SlocGuardError::Config(
-            "SARIF output format is not yet implemented".to_string(),
-        )),
+        OutputFormat::Sarif => SarifFormatter.format(results),
         OutputFormat::Markdown => Err(sloc_guard::SlocGuardError::Config(
             "Markdown output format is not yet implemented".to_string(),
         )),
@@ -432,7 +430,7 @@ fn format_stats_output(
         OutputFormat::Text => StatsTextFormatter.format(stats),
         OutputFormat::Json => StatsJsonFormatter.format(stats),
         OutputFormat::Sarif => Err(sloc_guard::SlocGuardError::Config(
-            "SARIF output format is not yet implemented".to_string(),
+            "SARIF output format is not supported for stats command".to_string(),
         )),
         OutputFormat::Markdown => Err(sloc_guard::SlocGuardError::Config(
             "Markdown output format is not yet implemented".to_string(),

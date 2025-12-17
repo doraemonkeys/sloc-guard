@@ -19,6 +19,7 @@
 | `checker/threshold` | Done | ThresholdChecker with override > path_rules > rule > default priority, CheckStatus: Passed/Warning/Failed/Grandfathered |
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary, grandfathered count |
 | `output/json` | Done | JsonFormatter with structured output including grandfathered count |
+| `output/sarif` | Done | SarifFormatter with SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
@@ -69,21 +70,11 @@ make ci
 | **Phase 4.1a** | Baseline File Format (Baseline, BaselineEntry, SHA-256 hash) | ✅ Done |
 | **Phase 4.1b** | Baseline Update Command (`baseline update` with --output) | ✅ Done |
 | **Phase 4.1c** | Baseline Compare (`--baseline` flag, grandfathered status) | ✅ Done |
+| **Phase 2.2** | SARIF Output (SarifFormatter with 2.1.0 spec, GitHub Code Scanning) | ✅ Done |
 
 ---
 
 ## Phase 2: Output Enhancements (P1)
-
-### Task 2.2: SARIF Output
-
-Location: `src/output/sarif.rs`
-
-```
-- Create SarifFormatter struct
-- Follow SARIF 2.1.0 spec
-- Map CheckResult to SARIF result object
-- Include file location, message, level
-```
 
 ### Task 2.3: Markdown Output
 
@@ -326,8 +317,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 2.2 SARIF Output | ~3h |
-| | 4.7a File Hash Cache | ~3h |
+| **1. Short-term** | 4.7a File Hash Cache | ~3h |
 | | 4.7b Cache Integration | ~2h |
 | **2. Medium** | 2.4 Progress Bar | ~2h |
 | | 5.1a Language Breakdown | ~2h |

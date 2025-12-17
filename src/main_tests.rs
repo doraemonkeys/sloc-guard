@@ -359,10 +359,13 @@ fn format_output_json() {
 }
 
 #[test]
-fn format_output_sarif_not_implemented() {
+fn format_output_sarif_works() {
     let results: Vec<CheckResult> = vec![];
     let result = format_output(OutputFormat::Sarif, &results, ColorMode::Never, 0);
-    assert!(result.is_err());
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output.contains("$schema"));
+    assert!(output.contains("2.1.0"));
 }
 
 #[test]

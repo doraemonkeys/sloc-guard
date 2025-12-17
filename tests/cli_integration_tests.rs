@@ -755,7 +755,7 @@ max_lines = 100
 // ============================================================================
 
 #[test]
-fn sarif_format_not_implemented() {
+fn sarif_format_works() {
     let temp_dir = TempDir::new().unwrap();
     fs::write(temp_dir.path().join("main.rs"), "fn main() {}\n").unwrap();
 
@@ -766,8 +766,9 @@ fn sarif_format_not_implemented() {
         .arg("--format")
         .arg("sarif")
         .assert()
-        .code(2)
-        .stderr(predicate::str::contains("not yet implemented"));
+        .success()
+        .stdout(predicate::str::contains("$schema"))
+        .stdout(predicate::str::contains("sarif-schema-2.1.0"));
 }
 
 #[test]

@@ -27,6 +27,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `baseline` | `baseline/types.rs` | `Baseline`, `BaselineEntry` - baseline file for grandfathering violations |
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
+| `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_init`, `run_config`, `run_baseline` |
@@ -80,7 +81,7 @@ CLI args → load_config() → apply_cli_overrides()
               [if IgnoredFile] skip file (inline ignore directive)
               [if Stats] ThresholdChecker::check(path, stats) → CheckResult
          → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
-         → TextFormatter/JsonFormatter::format(results)
+         → TextFormatter/JsonFormatter/SarifFormatter::format(results)
          → write to stdout or --output file
 ```
 
