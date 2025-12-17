@@ -27,7 +27,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize |
-| `main` | `main.rs` | Command dispatch, `run_check` and `run_stats` implemented, init/config TODO |
+| `main` | `main.rs` | Command dispatch, `run_check`, `run_stats`, `run_init` implemented, config TODO |
 
 ## Key Types
 

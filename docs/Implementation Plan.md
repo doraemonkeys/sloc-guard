@@ -24,7 +24,7 @@
 | `output/markdown` | Pending | Markdown formatter for PR comments |
 | `output/html` | Pending | HTML report with charts and trends |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Partial | Command dispatch done, `run_check` and `run_stats` implemented, init/config handlers are TODO stubs |
+| `main` | Partial | Command dispatch done, `run_check`, `run_stats`, `run_init` implemented, config handlers are TODO stubs |
 
 ---
 
@@ -98,14 +98,15 @@ Location: `src/main.rs`, `src/output/stats.rs`
 - [x] Add tests (12 tests for main, 9 tests for stats module)
 ```
 
-### Task 1.4: Implement run_init Command (Pending)
+### Task 1.4: Implement run_init Command ✅
 
 Location: `src/main.rs`
 
 ```
-- Generate default .sloc-guard.toml
-- Check if file exists (error unless --force)
-- Write template config with comments
+- [x] Generate default .sloc-guard.toml
+- [x] Check if file exists (error unless --force)
+- [x] Write template config with comments
+- [x] Add tests (8 tests for init command)
 ```
 
 ### Task 1.5: Implement run_config Commands
