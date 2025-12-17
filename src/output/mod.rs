@@ -4,7 +4,7 @@ mod text;
 
 pub use json::JsonFormatter;
 pub use stats::{FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter};
-pub use text::TextFormatter;
+pub use text::{ColorMode, TextFormatter};
 
 use crate::checker::CheckResult;
 use crate::error::Result;

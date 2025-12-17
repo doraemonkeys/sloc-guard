@@ -21,9 +21,6 @@ rayon = "1.10"
 
 gix = { version = "0.75", default-features = false, features = ["dirwalk"] }
 
-# Terminal output
-colored = "3"
-
 # Error handling
 thiserror = "2"
 

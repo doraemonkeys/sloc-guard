@@ -53,7 +53,7 @@ fn output_format_unknown() {
 
 #[test]
 fn text_formatter_produces_output() {
-    let formatter = TextFormatter::new(false);
+    let formatter = TextFormatter::new(ColorMode::Never);
     let results = sample_results();
     let output = formatter.format(&results).unwrap();
 

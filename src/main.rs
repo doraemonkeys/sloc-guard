@@ -6,12 +6,12 @@ use clap::Parser;
 use rayon::prelude::*;
 
 use sloc_guard::checker::{Checker, ThresholdChecker};
-use sloc_guard::cli::{CheckArgs, Cli, Commands, ConfigAction, StatsArgs};
+use sloc_guard::cli::{CheckArgs, Cli, ColorChoice, Commands, ConfigAction, StatsArgs};
 use sloc_guard::config::{Config, ConfigLoader, FileConfigLoader};
 use sloc_guard::counter::{LineStats, SlocCounter};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
-    FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
+    ColorMode, FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
     StatsFormatter, StatsJsonFormatter, StatsTextFormatter, TextFormatter,
 };
 use sloc_guard::scanner::{DirectoryScanner, FileScanner, GlobFilter};
@@ -19,6 +19,14 @@ use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 /// File size threshold for streaming reads (10 MB)
 const LARGE_FILE_THRESHOLD: u64 = 10 * 1024 * 1024;
+
+const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
+    match choice {
+        ColorChoice::Auto => ColorMode::Auto,
+        ColorChoice::Always => ColorMode::Always,
+        ColorChoice::Never => ColorMode::Never,
+    }
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -86,7 +94,8 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         .collect();
 
     // 7. Format output
-    let output = format_output(args.format, &results)?;
+    let color_mode = color_choice_to_mode(cli.color);
+    let output = format_output(args.format, &results, color_mode)?;
 
     // 8. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -207,9 +216,10 @@ fn compute_effective_stats(stats: &LineStats, skip_comments: bool, skip_blank: b
 fn format_output(
     format: OutputFormat,
     results: &[sloc_guard::checker::CheckResult],
+    color_mode: ColorMode,
 ) -> sloc_guard::Result<String> {
     match format {
-        OutputFormat::Text => TextFormatter.format(results),
+        OutputFormat::Text => TextFormatter::new(color_mode).format(results),
         OutputFormat::Json => JsonFormatter.format(results),
         OutputFormat::Sarif => Err(sloc_guard::SlocGuardError::Config(
             "SARIF output format is not yet implemented".to_string(),

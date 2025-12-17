@@ -5,12 +5,50 @@ use crate::error::Result;
 
 use super::OutputFormatter;
 
-pub struct TextFormatter;
+/// Color output mode for terminal display.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ColorMode {
+    /// Auto-detect: use colors if stdout is a TTY and `NO_COLOR` is not set
+    #[default]
+    Auto,
+    /// Always use colors
+    Always,
+    /// Never use colors
+    Never,
+}
+
+/// ANSI color codes
+mod ansi {
+    pub const RED: &str = "\x1b[31m";
+    pub const GREEN: &str = "\x1b[32m";
+    pub const YELLOW: &str = "\x1b[33m";
+    pub const RESET: &str = "\x1b[0m";
+}
+
+pub struct TextFormatter {
+    use_colors: bool,
+}
 
 impl TextFormatter {
     #[must_use]
-    pub const fn new(_use_colors: bool) -> Self {
-        Self
+    pub fn new(mode: ColorMode) -> Self {
+        let use_colors = Self::should_use_colors(mode);
+        Self { use_colors }
+    }
+
+    fn should_use_colors(mode: ColorMode) -> bool {
+        match mode {
+            ColorMode::Always => true,
+            ColorMode::Never => false,
+            ColorMode::Auto => {
+                // Respect NO_COLOR environment variable
+                if std::env::var("NO_COLOR").is_ok() {
+                    return false;
+                }
+                // Check if stdout is a TTY
+                std::io::IsTerminal::is_terminal(&std::io::stdout())
+            }
+        }
     }
 
     const fn status_icon(status: &CheckStatus) -> &'static str {
@@ -21,20 +59,34 @@ impl TextFormatter {
         }
     }
 
-    fn format_result(result: &CheckResult, output: &mut Vec<u8>) {
+    fn colorize(&self, text: &str, status: &CheckStatus) -> String {
+        if !self.use_colors {
+            return text.to_string();
+        }
+
+        let color = match status {
+            CheckStatus::Passed => ansi::GREEN,
+            CheckStatus::Warning => ansi::YELLOW,
+            CheckStatus::Failed => ansi::RED,
+        };
+
+        format!("{color}{text}{}", ansi::RESET)
+    }
+
+    fn colorize_number(&self, num: usize, status: &CheckStatus) -> String {
+        self.colorize(&num.to_string(), status)
+    }
+
+    fn format_result(&self, result: &CheckResult, output: &mut Vec<u8>) {
         let icon = Self::status_icon(&result.status);
         let status_str = match result.status {
             CheckStatus::Passed => "PASSED",
             CheckStatus::Warning => "WARNING",
             CheckStatus::Failed => "FAILED",
         };
+        let colored_status = self.colorize(status_str, &result.status);
 
-        writeln!(
-            output,
-            "{icon} {status_str}: {}",
-            result.path.display()
-        )
-        .ok();
+        writeln!(output, "{icon} {colored_status}: {}", result.path.display()).ok();
 
         writeln!(
             output,
@@ -51,11 +103,21 @@ impl TextFormatter {
         )
         .ok();
     }
+
+    fn format_summary(&self, total: usize, passed: usize, warnings: usize, failed: usize) -> String {
+        let passed_str = self.colorize_number(passed, &CheckStatus::Passed);
+        let warnings_str = self.colorize_number(warnings, &CheckStatus::Warning);
+        let failed_str = self.colorize_number(failed, &CheckStatus::Failed);
+
+        format!(
+            "Summary: {total} files checked, {passed_str} passed, {warnings_str} warnings, {failed_str} failed"
+        )
+    }
 }
 
 impl Default for TextFormatter {
     fn default() -> Self {
-        Self::new(true)
+        Self::new(ColorMode::Auto)
     }
 }
 
@@ -76,24 +138,17 @@ impl OutputFormatter for TextFormatter {
         );
 
         for result in &failed {
-            Self::format_result(result, &mut output);
+            self.format_result(result, &mut output);
             writeln!(output).ok();
         }
 
         for result in &warnings {
-            Self::format_result(result, &mut output);
+            self.format_result(result, &mut output);
             writeln!(output).ok();
         }
 
-        writeln!(
-            output,
-            "Summary: {} files checked, {} passed, {} warnings, {} failed",
-            results.len(),
-            passed.len(),
-            warnings.len(),
-            failed.len()
-        )
-        .ok();
+        let summary = self.format_summary(results.len(), passed.len(), warnings.len(), failed.len());
+        writeln!(output, "{summary}").ok();
 
         Ok(String::from_utf8_lossy(&output).to_string())
     }

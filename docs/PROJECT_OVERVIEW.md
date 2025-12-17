@@ -23,7 +23,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
-| `output/text` | `output/text.rs` | `TextFormatter` - human-readable output with icons |
+| `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize |
@@ -43,6 +43,9 @@ CommentSyntax { single_line: Vec<&str>, multi_line: Vec<(start, end)> }
 // Check results
 CheckStatus::Passed | Warning | Failed
 CheckResult { path, status, stats, limit }
+
+// Output formatting
+ColorMode::Auto | Always | Never  // controls ANSI color output
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats }
@@ -103,7 +106,6 @@ config show:
 - `globset` - glob pattern matching
 - `rayon` - parallel file processing
 - `gix` - git integration (unused yet)
-- `colored` - terminal colors (unused yet)
 - `thiserror` - error handling
 
 ## Test Files

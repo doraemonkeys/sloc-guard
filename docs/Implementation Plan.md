@@ -17,7 +17,7 @@
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
 | `scanner/mod` | Done | DirectoryScanner with walkdir integration |
 | `checker/threshold` | Partial | ThresholdChecker with override > rule > default priority (pending: path_rules, per-rule skip_comments/skip_blank/warn_threshold) |
-| `output/text` | Done | TextFormatter with status icons and summary |
+| `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary |
 | `output/json` | Done | JsonFormatter with structured output |
 | `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter for stats command |
 | `output/sarif` | Pending | SARIF formatter for GitHub Code Scanning |
@@ -145,7 +145,6 @@ Location: `src/main.rs`
 | Feature | CLI Location | Status |
 |---------|--------------|--------|
 | `--diff` | `CheckArgs.diff` | gix imported, logic not wired |
-| `--color` | `Cli.color` | colored imported, `TextFormatter._use_colors` ignored |
 | `--verbose` | `Cli.verbose` | Parsed but output unchanged |
 | `path_rules` | Config template only | Model struct missing |
 
@@ -153,15 +152,17 @@ Location: `src/main.rs`
 
 ## Phase 2: Output Enhancements (P1)
 
-### Task 2.1: Add Color Support to TextFormatter
+### Task 2.1: Add Color Support to TextFormatter ✅
 
 Location: `src/output/text.rs`
 
 ```
-- Use colored crate (already in dependencies)
-- Red for FAILED, yellow for WARNING, green for PASSED
-- Detect terminal capability (isatty)
-- Respect NO_COLOR environment variable
+- [x] Add ColorMode enum (Auto/Always/Never)
+- [x] Red for FAILED, yellow for WARNING, green for PASSED
+- [x] Detect terminal capability (isatty) in Auto mode
+- [x] Respect NO_COLOR environment variable
+- [x] Wire --color CLI flag to TextFormatter
+- [x] Add tests for colored/non-colored output
 ```
 
 ### Task 2.2: Implement SARIF Output
@@ -367,11 +368,11 @@ Location: `src/counter/function.rs` (new module)
 ## Priority Order
 
 1. **Immediate (MVP)**: ~~1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5~~ ✅
-2. **Quick Wins (1-2 days)**:
-   - 2.1 Color Support (colored crate already imported, minimal code)
+2. **Quick Wins**:
+   - ~~2.1 Color Support~~ ✅
    - Implement `--verbose` real output
    - Fix override path matching logic (too loose with `contains`)
-3. **Short-term (1 week)**:
+3. **Short-term**:
    - 3.1 Git Diff Mode (`--diff`, gix already imported)
    - 4.3 Path-Based Rules (config template mentions it, model missing)
 4. **Medium-term (2-3 weeks)**:
