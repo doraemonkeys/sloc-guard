@@ -9,6 +9,7 @@ use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{CheckArgs, Cli, ColorChoice, Commands, ConfigAction, StatsArgs};
 use sloc_guard::config::{Config, ConfigLoader, FileConfigLoader};
 use sloc_guard::counter::{LineStats, SlocCounter};
+use sloc_guard::git::{ChangedFiles, GitDiff};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
     ColorMode, FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
@@ -77,6 +78,9 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         let files = scanner.scan(path)?;
         all_files.extend(files);
     }
+
+    // 5.1 Filter by git diff if --diff is specified
+    let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
 
     // 6. Process each file (parallel with rayon)
     let registry = LanguageRegistry::default();
@@ -162,6 +166,37 @@ fn get_scan_paths(args: &CheckArgs, config: &Config) -> Vec<std::path::PathBuf> 
 
     // Default to current directory
     args.paths.clone()
+}
+
+fn filter_by_git_diff(
+    files: Vec<std::path::PathBuf>,
+    diff_ref: Option<&str>,
+) -> sloc_guard::Result<Vec<std::path::PathBuf>> {
+    let Some(base_ref) = diff_ref else {
+        return Ok(files);
+    };
+
+    // Discover git repository from current directory
+    let git_diff = GitDiff::discover(Path::new("."))?;
+    let changed_files = git_diff.get_changed_files(base_ref)?;
+
+    // Canonicalize paths for comparison
+    let changed_canonical: std::collections::HashSet<_> = changed_files
+        .iter()
+        .filter_map(|p| p.canonicalize().ok())
+        .collect();
+
+    // Filter to only include changed files
+    let filtered: Vec<_> = files
+        .into_iter()
+        .filter(|f| {
+            f.canonicalize()
+                .ok()
+                .is_some_and(|canon| changed_canonical.contains(&canon))
+        })
+        .collect();
+
+    Ok(filtered)
 }
 
 fn process_file(

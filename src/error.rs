@@ -29,6 +29,9 @@ pub enum SlocGuardError {
 
     #[error("JSON serialization error: {0}")]
     JsonSerialize(#[from] serde_json::Error),
+
+    #[error("Git error: {0}")]
+    Git(String),
 }
 
 pub type Result<T> = std::result::Result<T, SlocGuardError>;

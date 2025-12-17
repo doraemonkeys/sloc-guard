@@ -23,6 +23,7 @@
 | `output/sarif` | Pending | SARIF formatter for GitHub Code Scanning |
 | `output/markdown` | Pending | Markdown formatter for PR comments |
 | `output/html` | Pending | HTML report with charts and trends |
+| `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `error` | Done | SlocGuardError enum with thiserror |
 | `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
 
@@ -140,14 +141,6 @@ Location: `src/main.rs`
 
 ---
 
-### Known Gaps (CLI defined but not implemented)
-
-| Feature | CLI Location | Status |
-|---------|--------------|--------|
-| `--diff` | `CheckArgs.diff` | gix imported, logic not wired |
-
----
-
 ## Phase 2: Output Enhancements (P1)
 
 ### Task 2.1: Add Color Support to TextFormatter ✅
@@ -186,20 +179,44 @@ Location: `src/output/markdown.rs`
 - Suitable for PR comments
 ```
 
+### Task 2.4: Progress Bar for Large Scans
+
+Location: `src/output/progress.rs` (new module)
+
+```
+- Use indicatif crate for progress bar
+- Show: Scanning [████████░░░░] 62% (1,234/2,000 files)
+- Enable with --progress flag or auto-detect large directories
+- Disable in quiet mode or non-TTY output
+- Update progress during parallel file processing
+```
+
+### Task 2.5: Top-N Files Report
+
+Location: `src/output/text.rs`, `src/output/json.rs`
+
+```
+- Add --top N flag to check command
+- Show only N files with highest line count (regardless of status)
+- Useful for large projects to focus on worst offenders
+- Include in JSON output as separate "top_files" array
+```
+
 ---
 
 ## Phase 3: Git Integration (P1)
 
-### Task 3.1: Implement Diff Mode
+### Task 3.1: Implement Diff Mode ✅
 
-Location: `src/git/diff.rs` (new module)
+Location: `src/git/diff.rs`
 
 ```
-- Use gix crate (already in dependencies)
-- Parse --diff argument (branch name or commit hash)
-- Get list of changed files from diff
-- Filter scanner results to only changed files
-- Handle case where git repo not found
+- [x] Use gix crate for git operations
+- [x] Parse --diff argument (branch name or commit hash)
+- [x] Get list of changed files from diff (tree comparison)
+- [x] Filter scanner results to only changed files
+- [x] Handle case where git repo not found
+- [x] Add tests (8 tests for git module)
 ```
 
 ### Task 3.2: Add Git-Aware Exclude Patterns
@@ -276,6 +293,62 @@ Location: `src/config/model.rs`, `src/language/registry.rs`
 - Override built-in language definitions if same extension
 ```
 
+### Task 4.6: Inline Ignore Comments
+
+Location: `src/counter/sloc.rs`, `src/checker/threshold.rs`
+
+```
+- Support inline directives in source files:
+  - // sloc-guard:ignore-file   → skip entire file from check
+  - // sloc-guard:ignore-next   → exclude next N lines from count
+  - // sloc-guard:ignore-start/end → exclude block from count
+- Parse directives during line counting phase
+- More flexible than [[override]] - exemption lives with code
+- Easier for code review (reason visible in diff)
+- Support language-specific comment prefixes (# for Python, etc.)
+```
+
+### Task 4.7: Caching Mechanism
+
+Location: `src/cache/mod.rs` (new module)
+
+```
+- Cache line counts by file hash (content-based)
+- Store in .sloc-guard-cache or configurable path
+- Skip counting for unchanged files
+- Invalidate on config change (hash config too)
+- Config option: [cache] enabled = true, path = ".sloc-guard-cache"
+- CLI flag: --no-cache to bypass
+- Significant speedup for large projects on repeated runs
+```
+
+### Task 4.8: Configuration Inheritance (extends)
+
+Location: `src/config/loader.rs`, `src/config/model.rs`
+
+```
+- Add "extends" field to config:
+  extends = "../shared/.sloc-guard.toml"
+  extends = "https://company.com/configs/base.toml"
+- Load base config first, then merge local overrides
+- Support both local paths and URLs
+- Useful for enterprise: shared base config across repos
+- Recursive extends (with cycle detection)
+- CLI: --no-extends to skip inheritance
+```
+
+### Task 4.9: Strict Mode
+
+Location: `src/cli.rs`, `src/main.rs`
+
+```
+- Add --strict flag to check command
+- In strict mode: warnings also cause exit code 1
+- Opposite of --warn-only
+- Useful for CI pipelines that want zero tolerance
+- Config option: [default] strict = true
+```
+
 ---
 
 ## Phase 5: Statistics Extension (P2)
@@ -291,6 +364,7 @@ Location: `src/stats/mod.rs` (new module)
 - Average file size
 - Distribution histogram
 - Per-directory breakdown
+- Group output by language/directory (--group-by lang|dir)
 ```
 
 ### Task 5.2: Trend Tracking
@@ -371,18 +445,25 @@ Location: `src/counter/function.rs` (new module)
    - ~~Implement `--verbose` real output~~ ✅
    - ~~Fix override path matching logic (too loose with `contains`)~~ ✅
    - ~~4.3 Path-Based Rules~~ ✅
-3. **Short-term**:
-   - 3.1 Git Diff Mode (`--diff`, gix already imported)
-4. **Medium-term**:
-   - 2.2 SARIF Output (high CI/CD integration value)
+3. **Short-term (High Value)**:
+   - ~~3.1 Git Diff Mode (`--diff`, gix already imported)~~ ✅
+   - 4.6 Inline Ignore Comments (better DX than [[override]])
+   - 4.9 Strict Mode (simple, high CI value)
+4. **Medium-term (High Value)**:
+   - 4.7 Caching Mechanism (big perf win for large projects)
+   - 2.2 SARIF Output (CI/CD integration)
    - 4.1 Baseline Support (essential for large projects)
+   - 4.8 Configuration Inheritance (enterprise use case)
+5. **Medium Priority**:
+   - 2.4 Progress Bar (UX improvement)
+   - 2.5 Top-N Files Report (useful for triage)
    - 3.2 Git-Aware Exclude (.gitignore respect)
-5. **Lower Priority**:
+6. **Lower Priority**:
    - 2.3 Markdown Output
    - 4.2 Per-rule warn_threshold
    - 4.4 Override with Reason display
    - 4.5 Custom Language Definition
-6. **Deferred**:
+7. **Deferred**:
    - 5.1 -> 5.2 -> 5.3 (Statistics Extension)
    - 6.1 -> 6.2 (CI/CD Support)
    - 7.1 (Function-Level Analysis)

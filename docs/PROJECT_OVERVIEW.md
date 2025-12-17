@@ -23,10 +23,11 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
+| `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
-| `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize |
+| `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
 
 ## Key Types
@@ -52,6 +53,10 @@ TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats }
 ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank }
+
+// Git integration
+GitDiff::discover(path) → GitDiff  // Finds git repo from path
+ChangedFiles::get_changed_files(base_ref) → HashSet<PathBuf>  // Files changed since reference
 ```
 
 ## Data Flow (check command)
@@ -60,6 +65,7 @@ ProjectStatistics { files, total_files, total_lines, total_code, total_comment, 
 CLI args → load_config() → apply_cli_overrides()
          → GlobFilter::new(extensions, excludes)
          → DirectoryScanner::scan(paths)
+         → [if --diff] GitDiff::get_changed_files() → filter to changed only
          → for each file:
               LanguageRegistry::get_by_extension()
               SlocCounter::count(content) → LineStats
@@ -108,7 +114,7 @@ config show:
 - `walkdir` - directory traversal
 - `globset` - glob pattern matching
 - `rayon` - parallel file processing
-- `gix` - git integration (unused yet)
+- `gix` - git integration (--diff mode)
 - `thiserror` - error handling
 
 ## Test Files

@@ -19,7 +19,7 @@ globset = "0.4"
 # Parallel processing
 rayon = "1.10"
 
-gix = { version = "0.75", default-features = false, features = ["dirwalk"] }
+gix = { version = "0.75", default-features = false, features = ["revision", "index"] }
 
 # Error handling
 thiserror = "2"
