@@ -810,3 +810,595 @@ fn check_help_displays_options() {
         .stdout(predicate::str::contains("--exclude"))
         .stdout(predicate::str::contains("--warn-only"));
 }
+
+// ============================================================================
+// Baseline Command Integration Tests
+// ============================================================================
+
+#[test]
+fn baseline_update_creates_file() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a file that exceeds the default limit
+    let rust_file = temp_dir.path().join("large.rs");
+    let content = generate_lines(600, "let x");
+    fs::write(&rust_file, content).unwrap();
+
+    let baseline_path = temp_dir.path().join("baseline.json");
+
+    cmd()
+        .arg("baseline")
+        .arg("update")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("-o")
+        .arg(&baseline_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Baseline created with 1 file"));
+
+    assert!(baseline_path.exists());
+    let content = fs::read_to_string(&baseline_path).unwrap();
+    assert!(content.contains("\"version\": 1"));
+    assert!(content.contains("large.rs"));
+}
+
+#[test]
+fn baseline_update_empty_for_passing_files() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small file that passes
+    let rust_file = temp_dir.path().join("small.rs");
+    fs::write(&rust_file, "fn main() {}\n").unwrap();
+
+    let baseline_path = temp_dir.path().join("baseline.json");
+
+    cmd()
+        .arg("baseline")
+        .arg("update")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("-o")
+        .arg(&baseline_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Baseline created with 0 file"));
+}
+
+#[test]
+fn baseline_update_with_config() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create config with low limit
+    let config_path = temp_dir.path().join("config.toml");
+    fs::write(
+        &config_path,
+        r#"
+[default]
+max_lines = 5
+extensions = ["rs"]
+"#,
+    )
+    .unwrap();
+
+    // Create a file that exceeds the config limit but not default
+    let rust_file = temp_dir.path().join("medium.rs");
+    let content = generate_lines(10, "let x");
+    fs::write(&rust_file, content).unwrap();
+
+    let baseline_path = temp_dir.path().join("baseline.json");
+
+    cmd()
+        .arg("baseline")
+        .arg("update")
+        .arg(temp_dir.path())
+        .arg("-c")
+        .arg(&config_path)
+        .arg("-o")
+        .arg(&baseline_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Baseline created with 1 file"));
+}
+
+// ============================================================================
+// Check with Baseline Integration Tests
+// ============================================================================
+
+#[test]
+fn check_with_baseline_grandfathers_violations() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a large file that would fail
+    let rust_file = temp_dir.path().join("large.rs");
+    let content = generate_lines(600, "let x");
+    fs::write(&rust_file, &content).unwrap();
+
+    // First, create a baseline
+    let baseline_path = temp_dir.path().join("baseline.json");
+    cmd()
+        .arg("baseline")
+        .arg("update")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("-o")
+        .arg(&baseline_path)
+        .assert()
+        .success();
+
+    // Now check with baseline - should pass (grandfathered)
+    // Without verbose mode, grandfathered files show in summary only
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--baseline")
+        .arg(&baseline_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1 grandfathered"));
+
+    // With verbose mode, grandfathered files show with GRANDFATHERED status
+    cmd()
+        .arg("-v")
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--baseline")
+        .arg(&baseline_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("GRANDFATHERED"))
+        .stdout(predicate::str::contains("large.rs"));
+}
+
+#[test]
+fn check_with_baseline_fails_for_new_violations() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create an empty baseline
+    let baseline_path = temp_dir.path().join("baseline.json");
+    fs::write(&baseline_path, r#"{"version": 1, "files": {}}"#).unwrap();
+
+    // Create a large file that would fail (not in baseline)
+    let rust_file = temp_dir.path().join("large.rs");
+    let content = generate_lines(600, "let x");
+    fs::write(&rust_file, content).unwrap();
+
+    // Check with baseline - should fail (not grandfathered)
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--baseline")
+        .arg(&baseline_path)
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("FAILED"));
+}
+
+#[test]
+fn check_baseline_file_not_found_error() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(temp_dir.path().join("main.rs"), "fn main() {}\n").unwrap();
+
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--baseline")
+        .arg("nonexistent.json")
+        .assert()
+        .code(2)
+        .stderr(predicate::str::contains("not found"));
+}
+
+// ============================================================================
+// Path Rules Integration Tests
+// ============================================================================
+
+#[test]
+fn check_path_rules_override_extension_rules() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create config with path-based rule
+    let config_path = temp_dir.path().join("config.toml");
+    fs::write(
+        &config_path,
+        r#"
+[default]
+max_lines = 10
+extensions = ["rs"]
+
+[[path_rules]]
+pattern = "**/generated/**"
+max_lines = 1000
+"#,
+    )
+    .unwrap();
+
+    // Create directory structure
+    let generated_dir = temp_dir.path().join("generated");
+    fs::create_dir(&generated_dir).unwrap();
+
+    // Create a file in generated/ with 50 lines (exceeds default but under path_rule)
+    let generated_file = generated_dir.join("types.rs");
+    let content = generate_lines(50, "let x");
+    fs::write(&generated_file, content).unwrap();
+
+    // Create a file outside generated/ with same lines (should fail)
+    let normal_file = temp_dir.path().join("main.rs");
+    let content = generate_lines(50, "let y");
+    fs::write(&normal_file, content).unwrap();
+
+    // Check - generated/types.rs should pass, main.rs should fail
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("-c")
+        .arg(&config_path)
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("main.rs"))
+        .stdout(predicate::str::contains("FAILED"))
+        .stdout(predicate::str::contains("1 passed")); // generated/types.rs
+}
+
+#[test]
+fn check_path_rules_warn_threshold() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create config with path-based rule with custom warn_threshold
+    let config_path = temp_dir.path().join("config.toml");
+    fs::write(
+        &config_path,
+        r#"
+[default]
+max_lines = 100
+extensions = ["rs"]
+warn_threshold = 0.9
+
+[[path_rules]]
+pattern = "**/generated/**"
+max_lines = 100
+warn_threshold = 1.0
+"#,
+    )
+    .unwrap();
+
+    // Create directory structure
+    let generated_dir = temp_dir.path().join("generated");
+    fs::create_dir(&generated_dir).unwrap();
+
+    // Create a file at 95% capacity in generated/ (should NOT warn due to warn_threshold = 1.0)
+    let generated_file = generated_dir.join("types.rs");
+    let content = generate_lines(95, "let x");
+    fs::write(&generated_file, content).unwrap();
+
+    // Create a file at 95% capacity outside generated/ (should warn)
+    let normal_file = temp_dir.path().join("main.rs");
+    let content = generate_lines(95, "let y");
+    fs::write(&normal_file, content).unwrap();
+
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("-c")
+        .arg(&config_path)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("WARNING"))
+        .stdout(predicate::str::contains("main.rs"))
+        .stdout(predicate::str::contains("1 warning"));
+}
+
+// ============================================================================
+// Strict Mode Integration Tests
+// ============================================================================
+
+#[test]
+fn check_strict_mode_fails_on_warning() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a file at 95% of limit (triggers warning at 0.9 threshold)
+    let rust_file = temp_dir.path().join("nearmax.rs");
+    let content = generate_lines(95, "let x");
+    fs::write(&rust_file, content).unwrap();
+
+    // Without strict mode - should pass with warning
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--max-lines")
+        .arg("100")
+        .arg("--warn-threshold")
+        .arg("0.9")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("WARNING"));
+
+    // With strict mode - should fail
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--max-lines")
+        .arg("100")
+        .arg("--warn-threshold")
+        .arg("0.9")
+        .arg("--strict")
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("WARNING"));
+}
+
+#[test]
+fn check_strict_mode_from_config() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create config with strict mode enabled
+    let config_path = temp_dir.path().join("config.toml");
+    fs::write(
+        &config_path,
+        r#"
+[default]
+max_lines = 100
+extensions = ["rs"]
+warn_threshold = 0.9
+strict = true
+"#,
+    )
+    .unwrap();
+
+    // Create a file at 95% of limit
+    let rust_file = temp_dir.path().join("nearmax.rs");
+    let content = generate_lines(95, "let x");
+    fs::write(&rust_file, content).unwrap();
+
+    // Should fail due to strict mode in config
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("-c")
+        .arg(&config_path)
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("WARNING"));
+}
+
+// ============================================================================
+// Inline Ignore Directive Integration Tests
+// ============================================================================
+
+#[test]
+fn check_inline_ignore_file_skips_file() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a large file with ignore directive
+    let rust_file = temp_dir.path().join("ignored.rs");
+    let mut content = String::from("// sloc-guard:ignore-file\n");
+    content.push_str(&generate_lines(600, "let x"));
+    fs::write(&rust_file, content).unwrap();
+
+    // Should pass (file is ignored)
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 files checked"));
+}
+
+#[test]
+fn check_inline_ignore_file_in_first_10_lines() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create file with ignore directive on line 10
+    let rust_file = temp_dir.path().join("ignored.rs");
+    let mut content = String::new();
+    for i in 0..9 {
+        let _ = writeln!(content, "// header line {i}");
+    }
+    content.push_str("// sloc-guard:ignore-file\n");
+    content.push_str(&generate_lines(600, "let x"));
+    fs::write(&rust_file, content).unwrap();
+
+    // Should pass (directive within first 10 lines)
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0 files checked"));
+}
+
+#[test]
+fn check_inline_ignore_after_line_10_not_effective() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create file with ignore directive on line 11 (beyond first 10)
+    let rust_file = temp_dir.path().join("notignored.rs");
+    let mut content = String::new();
+    for i in 0..10 {
+        let _ = writeln!(content, "// header line {i}");
+    }
+    content.push_str("// sloc-guard:ignore-file\n");
+    content.push_str(&generate_lines(600, "let x"));
+    fs::write(&rust_file, content).unwrap();
+
+    // Should fail (directive beyond first 10 lines is not effective)
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("FAILED"));
+}
+
+// ============================================================================
+// Verbose Mode Integration Tests
+// ============================================================================
+
+#[test]
+fn check_verbose_shows_passed_files() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small file that passes
+    let rust_file = temp_dir.path().join("small.rs");
+    fs::write(&rust_file, "fn main() {}\n").unwrap();
+
+    // Without verbose - passed files not shown in detail
+    let output = cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let output_str = String::from_utf8_lossy(&output);
+    assert!(!output_str.contains("PASSED") || !output_str.contains("small.rs"));
+
+    // With verbose - passed files shown
+    cmd()
+        .arg("-v")
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("PASSED"))
+        .stdout(predicate::str::contains("small.rs"));
+}
+
+#[test]
+fn check_double_verbose_shows_more_detail() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small file
+    let rust_file = temp_dir.path().join("small.rs");
+    fs::write(&rust_file, "fn main() {\n    // comment\n}\n").unwrap();
+
+    // With -vv should show more detail
+    cmd()
+        .arg("-vv")
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("small.rs"));
+}
+
+// ============================================================================
+// Multi-language Integration Tests
+// ============================================================================
+
+#[test]
+fn check_multiple_languages() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create files in different languages
+    fs::write(temp_dir.path().join("main.rs"), "fn main() {}\n").unwrap();
+    fs::write(temp_dir.path().join("app.go"), "package main\n").unwrap();
+    fs::write(temp_dir.path().join("script.py"), "print('hello')\n").unwrap();
+    fs::write(temp_dir.path().join("index.js"), "console.log('hi');\n").unwrap();
+    fs::write(temp_dir.path().join("main.ts"), "const x: number = 1;\n").unwrap();
+    fs::write(temp_dir.path().join("lib.c"), "int main() { return 0; }\n").unwrap();
+    fs::write(temp_dir.path().join("lib.cpp"), "int main() { return 0; }\n").unwrap();
+
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("7 files checked"))
+        .stdout(predicate::str::contains("7 passed"));
+}
+
+#[test]
+fn stats_multiple_languages() {
+    let temp_dir = TempDir::new().unwrap();
+
+    fs::write(temp_dir.path().join("main.rs"), "fn main() {\n    let x = 1;\n}\n").unwrap();
+    fs::write(temp_dir.path().join("app.py"), "x = 1\ny = 2\n").unwrap();
+
+    cmd()
+        .arg("stats")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Files: 2"));
+}
+
+// ============================================================================
+// Comment Handling Integration Tests
+// ============================================================================
+
+#[test]
+fn check_multiline_comments_skipped() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a file with multi-line comments
+    let rust_file = temp_dir.path().join("commented.rs");
+    let content = r"
+fn main() {
+    /*
+    This is a
+    multi-line
+    comment that
+    spans many
+    lines
+    */
+    let x = 1;
+}
+";
+    fs::write(&rust_file, content).unwrap();
+
+    // Only code lines should count (fn main, let x, and closing braces)
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--max-lines")
+        .arg("5")
+        .assert()
+        .success();
+}
+
+#[test]
+fn check_python_comments_skipped() {
+    let temp_dir = TempDir::new().unwrap();
+
+    let py_file = temp_dir.path().join("script.py");
+    let content = r"
+# Single line comment
+x = 1
+'''
+This is a
+multi-line
+string/comment
+'''
+y = 2
+";
+    fs::write(&py_file, content).unwrap();
+
+    cmd()
+        .arg("check")
+        .arg(temp_dir.path())
+        .arg("--no-config")
+        .arg("--ext")
+        .arg("py")
+        .arg("--max-lines")
+        .arg("5")
+        .assert()
+        .success();
+}
