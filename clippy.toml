@@ -1,0 +1,22 @@
+# Clippy 配置文件
+# 文档: https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# 最低支持的 Rust 版本 (用于兼容性检查)
+#msrv = "1.75.0"
+
+
+# 函数认知复杂度阈值 (默认 25)
+#cognitive-complexity-threshold = 20
+
+# 函数最大参数数量 (默认 7)
+#too-many-arguments-threshold = 7
+
+# 类型复杂度阈值 (默认 250)
+#type-complexity-threshold = 250
+
+# 函数最大行数 (默认 100)
+too-many-lines-threshold = 150
+
+
+# 禁止使用的变量名
+disallowed-names = ["foo", "bar", "baz", "quux", "temp", "tmp"]

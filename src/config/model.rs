@@ -1,0 +1,94 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Config {
+    #[serde(default)]
+    pub default: DefaultConfig,
+
+    #[serde(default)]
+    pub rules: std::collections::HashMap<String, RuleConfig>,
+
+    #[serde(default)]
+    pub exclude: ExcludeConfig,
+
+    #[serde(default, rename = "override")]
+    pub overrides: Vec<FileOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DefaultConfig {
+    #[serde(default = "default_max_lines")]
+    pub max_lines: usize,
+
+    #[serde(default = "default_extensions")]
+    pub extensions: Vec<String>,
+
+    #[serde(default = "default_true")]
+    pub skip_comments: bool,
+
+    #[serde(default = "default_true")]
+    pub skip_blank: bool,
+}
+
+impl Default for DefaultConfig {
+    fn default() -> Self {
+        Self {
+            max_lines: default_max_lines(),
+            extensions: default_extensions(),
+            skip_comments: true,
+            skip_blank: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RuleConfig {
+    #[serde(default)]
+    pub extensions: Vec<String>,
+
+    pub max_lines: Option<usize>,
+
+    #[serde(default)]
+    pub skip_comments: Option<bool>,
+
+    #[serde(default)]
+    pub skip_blank: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExcludeConfig {
+    #[serde(default)]
+    pub patterns: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FileOverride {
+    pub path: String,
+    pub max_lines: usize,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+const fn default_max_lines() -> usize {
+    500
+}
+
+fn default_extensions() -> Vec<String> {
+    vec![
+        "rs".to_string(),
+        "go".to_string(),
+        "py".to_string(),
+        "js".to_string(),
+        "ts".to_string(),
+        "c".to_string(),
+        "cpp".to_string(),
+    ]
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+#[cfg(test)]
+#[path = "model_tests.rs"]
+mod tests;

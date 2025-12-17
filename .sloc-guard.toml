@@ -1,0 +1,11 @@
+[default]
+max_lines = 700
+extensions = ["rs"]
+skip_comments = true
+skip_blank = true
+
+[exclude]
+patterns = [
+    "**/target/**",
+    "**/.git/**",
+]
