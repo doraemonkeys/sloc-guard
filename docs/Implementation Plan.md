@@ -242,24 +242,44 @@ Location: `src/stats/trend.rs`
 - Show delta from previous run
 ```
 
-### Task 5.3a: Basic HTML Report
+### Task 5.3a: HTML Structure + Summary
 
 Location: `src/output/html.rs`
 
 ```
 - Create HtmlFormatter with --report flag
-- Static HTML: summary table + file list
+- HTML skeleton with summary table (total files, passed, failed, warnings)
 - Embedded CSS for standalone file
 ```
 
-### Task 5.3b: HTML Charts (Optional)
+### Task 5.3b: HTML File List
 
 Location: `src/output/html.rs`
 
 ```
-- Add charts (pure CSS or Chart.js)
-- File size distribution, language breakdown
-- Trend visualization
+- File results table (path, lines, limit, status)
+- Sortable columns (client-side JS optional)
+- Status filtering (show all/failed/warning only)
+```
+
+### Task 5.3c: HTML Charts (Pure CSS)
+
+Location: `src/output/html.rs`
+
+```
+- File size distribution bar chart (pure CSS)
+- Language/extension breakdown pie chart
+- No external dependencies
+```
+
+### Task 5.3d: HTML Trend Visualization
+
+Location: `src/output/html.rs`
+
+```
+- Integrate with .sloc-guard-history.json (if exists)
+- Line chart showing SLOC over time
+- Delta indicators (+/-) from previous run
 ```
 
 ---
@@ -322,8 +342,10 @@ Location: `src/output/html.rs`
 | **4. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
 | | 5.1c Directory Statistics | ~2h |
 | | 5.2 Trend Tracking | ~3h |
-| | 5.3a Basic HTML Report | ~4h |
-| | 5.3b HTML Charts | ~4h |
+| | 5.3a HTML Structure + Summary | ~2h |
+| | 5.3b HTML File List | ~2h |
+| | 5.3c HTML Charts (Pure CSS) | ~2h |
+| | 5.3d HTML Trend Visualization | ~2h |
 | | Phase 6, 7 | TBD |
 
 ---
