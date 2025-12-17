@@ -145,7 +145,6 @@ Location: `src/main.rs`
 | Feature | CLI Location | Status |
 |---------|--------------|--------|
 | `--diff` | `CheckArgs.diff` | gix imported, logic not wired |
-| `--verbose` | `Cli.verbose` | Parsed but output unchanged |
 | `path_rules` | Config template only | Model struct missing |
 
 ---
@@ -370,7 +369,7 @@ Location: `src/counter/function.rs` (new module)
 1. **Immediate (MVP)**: ~~1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5~~ ✅
 2. **Quick Wins**:
    - ~~2.1 Color Support~~ ✅
-   - Implement `--verbose` real output
+   - ~~Implement `--verbose` real output~~ ✅
    - Fix override path matching logic (too loose with `contains`)
 3. **Short-term**:
    - 3.1 Git Diff Mode (`--diff`, gix already imported)

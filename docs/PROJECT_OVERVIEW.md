@@ -23,7 +23,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
-| `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color support |
+| `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize |
@@ -46,6 +46,7 @@ CheckResult { path, status, stats, limit }
 
 // Output formatting
 ColorMode::Auto | Always | Never  // controls ANSI color output
+TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats }

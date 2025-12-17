@@ -95,7 +95,7 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
 
     // 7. Format output
     let color_mode = color_choice_to_mode(cli.color);
-    let output = format_output(args.format, &results, color_mode)?;
+    let output = format_output(args.format, &results, color_mode, cli.verbose)?;
 
     // 8. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -217,9 +217,10 @@ fn format_output(
     format: OutputFormat,
     results: &[sloc_guard::checker::CheckResult],
     color_mode: ColorMode,
+    verbose: u8,
 ) -> sloc_guard::Result<String> {
     match format {
-        OutputFormat::Text => TextFormatter::new(color_mode).format(results),
+        OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose).format(results),
         OutputFormat::Json => JsonFormatter.format(results),
         OutputFormat::Sarif => Err(sloc_guard::SlocGuardError::Config(
             "SARIF output format is not yet implemented".to_string(),

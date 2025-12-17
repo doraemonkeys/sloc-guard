@@ -329,28 +329,28 @@ fn process_file_valid_rust_file() {
 #[test]
 fn format_output_text() {
     let results: Vec<CheckResult> = vec![];
-    let output = format_output(OutputFormat::Text, &results, ColorMode::Never).unwrap();
+    let output = format_output(OutputFormat::Text, &results, ColorMode::Never, 0).unwrap();
     assert!(output.contains("Summary"));
 }
 
 #[test]
 fn format_output_json() {
     let results: Vec<CheckResult> = vec![];
-    let output = format_output(OutputFormat::Json, &results, ColorMode::Never).unwrap();
+    let output = format_output(OutputFormat::Json, &results, ColorMode::Never, 0).unwrap();
     assert!(output.contains("summary"));
 }
 
 #[test]
 fn format_output_sarif_not_implemented() {
     let results: Vec<CheckResult> = vec![];
-    let result = format_output(OutputFormat::Sarif, &results, ColorMode::Never);
+    let result = format_output(OutputFormat::Sarif, &results, ColorMode::Never, 0);
     assert!(result.is_err());
 }
 
 #[test]
 fn format_output_markdown_not_implemented() {
     let results: Vec<CheckResult> = vec![];
-    let result = format_output(OutputFormat::Markdown, &results, ColorMode::Never);
+    let result = format_output(OutputFormat::Markdown, &results, ColorMode::Never, 0);
     assert!(result.is_err());
 }
 

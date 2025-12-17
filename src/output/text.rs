@@ -27,13 +27,19 @@ mod ansi {
 
 pub struct TextFormatter {
     use_colors: bool,
+    verbose: u8,
 }
 
 impl TextFormatter {
     #[must_use]
     pub fn new(mode: ColorMode) -> Self {
+        Self::with_verbose(mode, 0)
+    }
+
+    #[must_use]
+    pub fn with_verbose(mode: ColorMode, verbose: u8) -> Self {
         let use_colors = Self::should_use_colors(mode);
-        Self { use_colors }
+        Self { use_colors, verbose }
     }
 
     fn should_use_colors(mode: ColorMode) -> bool {
@@ -145,6 +151,14 @@ impl OutputFormatter for TextFormatter {
         for result in &warnings {
             self.format_result(result, &mut output);
             writeln!(output).ok();
+        }
+
+        // Show passed files only in verbose mode
+        if self.verbose >= 1 {
+            for result in &passed {
+                self.format_result(result, &mut output);
+                writeln!(output).ok();
+            }
         }
 
         let summary = self.format_summary(results.len(), passed.len(), warnings.len(), failed.len());

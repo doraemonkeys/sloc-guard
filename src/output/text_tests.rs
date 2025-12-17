@@ -113,3 +113,53 @@ fn color_mode_never_produces_plain_output() {
     // Should not contain ANSI escape codes
     assert!(!output.contains("\x1b["), "Output should not contain ANSI color codes");
 }
+
+#[test]
+fn verbose_zero_hides_passed_files() {
+    let formatter = TextFormatter::with_verbose(ColorMode::Never, 0);
+    let results = vec![make_result("passed.rs", 100, 500, CheckStatus::Passed)];
+
+    let output = formatter.format(&results).unwrap();
+
+    // Passed file details should not appear (only in summary)
+    assert!(!output.contains("PASSED: passed.rs"));
+    assert!(output.contains("1 passed"));
+}
+
+#[test]
+fn verbose_one_shows_passed_files() {
+    let formatter = TextFormatter::with_verbose(ColorMode::Never, 1);
+    let results = vec![make_result("passed.rs", 100, 500, CheckStatus::Passed)];
+
+    let output = formatter.format(&results).unwrap();
+
+    // Passed file details should appear
+    assert!(output.contains("PASSED"));
+    assert!(output.contains("passed.rs"));
+    assert!(output.contains("Lines: 100"));
+}
+
+#[test]
+fn default_formatter_hides_passed_files() {
+    let formatter = TextFormatter::default();
+    let results = vec![make_result("passed.rs", 100, 500, CheckStatus::Passed)];
+
+    let output = formatter.format(&results).unwrap();
+
+    // Default formatter should hide passed file details (verbose = 0)
+    assert!(!output.contains("PASSED: passed.rs"));
+    assert!(output.contains("1 passed"));
+}
+
+#[test]
+fn color_mode_auto_produces_output() {
+    // In CI/test environment, stdout is typically not a TTY, so Auto mode should produce plain output
+    let formatter = TextFormatter::new(ColorMode::Auto);
+    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+
+    let output = formatter.format(&results).unwrap();
+
+    // Should produce valid output regardless of color detection
+    assert!(output.contains("FAILED"));
+    assert!(output.contains("test.rs"));
+}
