@@ -426,23 +426,180 @@ patterns = [
 
 fn run_config(args: &sloc_guard::cli::ConfigArgs) -> i32 {
     match &args.action {
-        ConfigAction::Validate { config } => {
-            // TODO: Implement config validation
-            println!("Validating config: {}", config.display());
+        ConfigAction::Validate { config } => run_config_validate(config),
+        ConfigAction::Show { config, format } => run_config_show(config.as_deref(), format),
+    }
+}
+
+fn run_config_validate(config_path: &Path) -> i32 {
+    match run_config_validate_impl(config_path) {
+        Ok(()) => {
+            println!("Configuration is valid: {}", config_path.display());
             EXIT_SUCCESS
         }
-        ConfigAction::Show { config, format } => {
-            // TODO: Implement config show
-            println!(
-                "Showing config: {} (format: {})",
-                config
-                    .as_ref()
-                    .map_or_else(|| "default".to_string(), |p| p.display().to_string()),
-                format
-            );
-            EXIT_SUCCESS
+        Err(e) => {
+            eprintln!("Configuration error: {e}");
+            EXIT_CONFIG_ERROR
         }
     }
+}
+
+fn run_config_validate_impl(config_path: &Path) -> sloc_guard::Result<()> {
+    // 1. Check if file exists
+    if !config_path.exists() {
+        return Err(sloc_guard::SlocGuardError::Config(format!(
+            "Configuration file not found: {}",
+            config_path.display()
+        )));
+    }
+
+    // 2. Read and parse TOML
+    let content = fs::read_to_string(config_path)?;
+    let config: Config = toml::from_str(&content)?;
+
+    // 3. Validate semantic correctness
+    validate_config_semantics(&config)?;
+
+    Ok(())
+}
+
+fn validate_config_semantics(config: &Config) -> sloc_guard::Result<()> {
+    // Validate warn_threshold is in range [0.0, 1.0]
+    if !(0.0..=1.0).contains(&config.default.warn_threshold) {
+        return Err(sloc_guard::SlocGuardError::Config(format!(
+            "warn_threshold must be between 0.0 and 1.0, got {}",
+            config.default.warn_threshold
+        )));
+    }
+
+    // Validate exclude patterns are valid globs
+    for pattern in &config.exclude.patterns {
+        globset::Glob::new(pattern).map_err(|e| sloc_guard::SlocGuardError::InvalidPattern {
+            pattern: pattern.clone(),
+            source: e,
+        })?;
+    }
+
+    // Validate override paths are not empty
+    for (i, override_cfg) in config.overrides.iter().enumerate() {
+        if override_cfg.path.is_empty() {
+            return Err(sloc_guard::SlocGuardError::Config(format!(
+                "override[{i}].path cannot be empty"
+            )));
+        }
+    }
+
+    // Validate rules have either extensions or max_lines
+    for (name, rule) in &config.rules {
+        if rule.extensions.is_empty() && rule.max_lines.is_none() {
+            return Err(sloc_guard::SlocGuardError::Config(format!(
+                "rules.{name}: must specify at least extensions or max_lines"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn run_config_show(config_path: Option<&Path>, format: &str) -> i32 {
+    match run_config_show_impl(config_path, format) {
+        Ok(output) => {
+            print!("{output}");
+            EXIT_SUCCESS
+        }
+        Err(e) => {
+            eprintln!("Error: {e}");
+            EXIT_CONFIG_ERROR
+        }
+    }
+}
+
+fn run_config_show_impl(config_path: Option<&Path>, format: &str) -> sloc_guard::Result<String> {
+    // Load configuration (from file or defaults)
+    let config = load_config(config_path, false)?;
+
+    match format {
+        "json" => {
+            let json = serde_json::to_string_pretty(&config)?;
+            Ok(format!("{json}\n"))
+        }
+        _ => Ok(format_config_text(&config)),
+    }
+}
+
+fn format_config_text(config: &Config) -> String {
+    use std::fmt::Write;
+
+    let mut output = String::new();
+
+    output.push_str("=== Effective Configuration ===\n\n");
+
+    // Default section
+    output.push_str("[default]\n");
+    let _ = writeln!(output, "  max_lines = {}", config.default.max_lines);
+    let _ = writeln!(output, "  extensions = {:?}", config.default.extensions);
+    if !config.default.include_paths.is_empty() {
+        let _ = writeln!(
+            output,
+            "  include_paths = {:?}",
+            config.default.include_paths
+        );
+    }
+    let _ = writeln!(output, "  skip_comments = {}", config.default.skip_comments);
+    let _ = writeln!(output, "  skip_blank = {}", config.default.skip_blank);
+    let _ = writeln!(
+        output,
+        "  warn_threshold = {}",
+        config.default.warn_threshold
+    );
+
+    // Rules section
+    if !config.rules.is_empty() {
+        output.push('\n');
+        let mut rule_names: Vec<_> = config.rules.keys().collect();
+        rule_names.sort();
+        for name in rule_names {
+            let rule = &config.rules[name];
+            let _ = writeln!(output, "[rules.{name}]");
+            if !rule.extensions.is_empty() {
+                let _ = writeln!(output, "  extensions = {:?}", rule.extensions);
+            }
+            if let Some(max_lines) = rule.max_lines {
+                let _ = writeln!(output, "  max_lines = {max_lines}");
+            }
+            if let Some(skip_comments) = rule.skip_comments {
+                let _ = writeln!(output, "  skip_comments = {skip_comments}");
+            }
+            if let Some(skip_blank) = rule.skip_blank {
+                let _ = writeln!(output, "  skip_blank = {skip_blank}");
+            }
+        }
+    }
+
+    // Exclude section
+    if !config.exclude.patterns.is_empty() {
+        output.push_str("\n[exclude]\n");
+        output.push_str("  patterns = [\n");
+        for pattern in &config.exclude.patterns {
+            let _ = writeln!(output, "    \"{pattern}\",");
+        }
+        output.push_str("  ]\n");
+    }
+
+    // Override section
+    if !config.overrides.is_empty() {
+        output.push('\n');
+        for override_cfg in &config.overrides {
+            output.push_str("[[override]]\n");
+            let _ = writeln!(output, "  path = \"{}\"", override_cfg.path);
+            let _ = writeln!(output, "  max_lines = {}", override_cfg.max_lines);
+            if let Some(reason) = &override_cfg.reason {
+                let _ = writeln!(output, "  reason = \"{reason}\"");
+            }
+        }
+    }
+
+    output
 }
 
 #[cfg(test)]

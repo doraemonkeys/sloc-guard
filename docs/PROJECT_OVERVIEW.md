@@ -27,7 +27,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter` - stats command output |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize |
-| `main` | `main.rs` | Command dispatch, `run_check`, `run_stats`, `run_init` implemented, config TODO |
+| `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
 
 ## Key Types
 
@@ -76,6 +76,17 @@ CLI args → load_config()
          → ProjectStatistics::new(file_stats)
          → StatsTextFormatter/StatsJsonFormatter::format(stats)
          → write to stdout or --output file
+```
+
+## Data Flow (config commands)
+
+```
+config validate:
+  config_path → read file → toml::from_str() → validate_config_semantics()
+             → check: warn_threshold range, glob patterns validity, override paths, rules validity
+
+config show:
+  config_path → load_config() → format_config_text() or serde_json::to_string_pretty()
 ```
 
 ## Threshold Resolution (priority high→low)

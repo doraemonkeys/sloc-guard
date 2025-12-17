@@ -5,4 +5,4 @@ skip_comments = true
 skip_blank = true
 
 [exclude]
-patterns = ["**/target/**", "**/.git/**"]
+patterns = ["**/target/**", "**/.git/**", "**/*_tests.rs"]

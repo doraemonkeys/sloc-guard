@@ -24,7 +24,7 @@
 | `output/markdown` | Pending | Markdown formatter for PR comments |
 | `output/html` | Pending | HTML report with charts and trends |
 | `error` | Done | SlocGuardError enum with thiserror |
-| `main` | Partial | Command dispatch done, `run_check`, `run_stats`, `run_init` implemented, config handlers are TODO stubs |
+| `main` | Done | Command dispatch, `run_check`, `run_stats`, `run_init`, `run_config` (validate/show) |
 
 ---
 
@@ -120,24 +120,34 @@ Location: `src/main.rs`
 - [x] Add tests (8 tests for init command)
 ```
 
-### Task 1.5: Implement run_config Commands
+### Task 1.5: Implement run_config Commands ✅
 
 Location: `src/main.rs`
 
 ```
-- config validate:
-  - Parse specified config file (or find default)
-  - Validate TOML syntax
-  - Validate semantic correctness (valid glob patterns, threshold in range)
-  - Output validation errors with context
-  - Return EXIT_CONFIG_ERROR on failure
-
-- config show:
-  - Load and merge configuration (file + defaults)
-  - Support --format (text/json)
-  - Show effective configuration
-  - Indicate source of each value (file/default) in verbose mode
+- [x] config validate:
+  - [x] Parse specified config file (or find default)
+  - [x] Validate TOML syntax
+  - [x] Validate semantic correctness (valid glob patterns, threshold in range, rule validity)
+  - [x] Output validation errors with context
+  - [x] Return EXIT_CONFIG_ERROR on failure
+- [x] config show:
+  - [x] Load and merge configuration (file + defaults)
+  - [x] Support --format (text/json)
+  - [x] Show effective configuration
+- [x] Add tests (18 tests for config commands, 83.68% coverage)
 ```
+
+---
+
+### Known Gaps (CLI defined but not implemented)
+
+| Feature | CLI Location | Status |
+|---------|--------------|--------|
+| `--diff` | `CheckArgs.diff` | gix imported, logic not wired |
+| `--color` | `Cli.color` | colored imported, `TextFormatter._use_colors` ignored |
+| `--verbose` | `Cli.verbose` | Parsed but output unchanged |
+| `path_rules` | Config template only | Model struct missing |
 
 ---
 
@@ -356,11 +366,27 @@ Location: `src/counter/function.rs` (new module)
 
 ## Priority Order
 
-1. **Immediate (MVP)**: ~~1.1 -> 1.2 -> 1.3 -> 1.4~~ ✅ -> 1.5
-2. **Short-term**: 2.1 -> 3.1 -> 3.2
-3. **Medium-term**: 2.2 -> 2.3 -> 4.1 -> 4.2 -> 4.3 -> 4.4
-4. **Long-term**: 4.5 -> 5.1 -> 5.2 -> 5.3 -> 6.1 -> 6.2
-5. **Future**: 7.1
+1. **Immediate (MVP)**: ~~1.1 -> 1.2 -> 1.3 -> 1.4 -> 1.5~~ ✅
+2. **Quick Wins (1-2 days)**:
+   - 2.1 Color Support (colored crate already imported, minimal code)
+   - Implement `--verbose` real output
+   - Fix override path matching logic (too loose with `contains`)
+3. **Short-term (1 week)**:
+   - 3.1 Git Diff Mode (`--diff`, gix already imported)
+   - 4.3 Path-Based Rules (config template mentions it, model missing)
+4. **Medium-term (2-3 weeks)**:
+   - 2.2 SARIF Output (high CI/CD integration value)
+   - 4.1 Baseline Support (essential for large projects)
+   - 3.2 Git-Aware Exclude (.gitignore respect)
+5. **Lower Priority**:
+   - 2.3 Markdown Output
+   - 4.2 Per-rule warn_threshold
+   - 4.4 Override with Reason display
+   - 4.5 Custom Language Definition
+6. **Deferred**:
+   - 5.1 -> 5.2 -> 5.3 (Statistics Extension)
+   - 6.1 -> 6.2 (CI/CD Support)
+   - 7.1 (Function-Level Analysis)
 
 ---
 
