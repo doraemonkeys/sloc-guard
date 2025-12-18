@@ -296,3 +296,38 @@ fn structure_config_warn_threshold_default_none() {
     let config = StructureConfig::default();
     assert!(config.warn_threshold.is_none());
 }
+
+#[test]
+fn config_version_defaults_to_none() {
+    let config = Config::default();
+    assert!(config.version.is_none());
+}
+
+#[test]
+fn config_deserialize_with_version() {
+    let toml_str = r#"
+        version = "1"
+
+        [default]
+        max_lines = 500
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.version, Some("1".to_string()));
+}
+
+#[test]
+fn config_deserialize_without_version() {
+    let toml_str = r"
+        [default]
+        max_lines = 500
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.version.is_none());
+}
+
+#[test]
+fn config_version_constant_is_one() {
+    assert_eq!(CONFIG_VERSION, "1");
+}

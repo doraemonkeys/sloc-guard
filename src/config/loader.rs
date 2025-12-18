@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, SlocGuardError};
 
-use super::Config;
+use super::model::CONFIG_VERSION;
 use super::remote::{fetch_remote_config, is_remote_url};
+use super::Config;
 
 /// Trait for loading configuration from various sources.
 pub trait ConfigLoader {
@@ -36,6 +37,19 @@ pub trait ConfigLoader {
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
 const USER_CONFIG_DIR: &str = "sloc-guard";
 const USER_CONFIG_NAME: &str = "config.toml";
+
+/// Validate config version. Returns an error if version is unsupported.
+/// Returns `true` if version is missing (caller may want to warn).
+fn validate_config_version(config: &Config) -> Result<bool> {
+    match &config.version {
+        None => Ok(true), // Missing version - caller may warn
+        Some(v) if v == CONFIG_VERSION => Ok(false),
+        Some(v) => Err(SlocGuardError::Config(format!(
+            "Unsupported config version '{v}'. Current supported version is '{CONFIG_VERSION}'. \
+             Please check for updates or adjust your config."
+        ))),
+    }
+}
 
 /// Trait for filesystem operations (for testability).
 pub trait FileSystem {
@@ -137,7 +151,10 @@ impl<F: FileSystem> FileConfigLoader<F> {
     }
 
     fn parse_config(content: &str) -> Result<Config> {
-        toml::from_str(content).map_err(SlocGuardError::from)
+        let config: Config = toml::from_str(content).map_err(SlocGuardError::from)?;
+        let _version_missing = validate_config_version(&config)?;
+        // Note: Caller may use `config.version.is_none()` to check if a warning should be printed
+        Ok(config)
     }
 
     fn load_with_extends(&self, path: &Path, visited: &mut HashSet<String>) -> Result<toml::Value> {

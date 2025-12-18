@@ -161,18 +161,17 @@ Location: `src/checker/threshold.rs`
 - Update all consumers in output formatters and commands
 ```
 
-### Task 5.5.8: Config Versioning
-> ⚠️ **Plan Mode Required**: 版本检测 + v1→v2 迁移逻辑 + 向后兼容处理。
-
+### Task 5.5.8: Config Versioning (Partial ✅)
 Location: `src/config/model.rs`, `src/config/loader.rs`
-```
-- Add `version` field to config schema (e.g., "2.0")
-- Validate on load:
-  - Missing `version` → Assume v1 (current schema), warn about deprecation
-  - `version` = "2.0" → Use new schema (scanner/content/structure separation)
-  - `version` > supported → Error with upgrade instruction
+**Completed**: Added `version` field to config schema with validation.
+- `CONFIG_VERSION` constant = "1"
+- `version` field in `Config` struct (optional, defaults to None)
+- Loader validates version on load: unsupported version → error with message
+- Missing version allowed (for backward compatibility)
+
+**Remaining** (blocked on Task 5.5.1/5.5.2):
 - Migration path: v1 config auto-converted to v2 internally
-```
+- Warn when `version` is missing (deprecation notice)
 
 ### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
 > ⚠️ **Plan Mode Required**: 规则优先级逻辑重构，跨 loader/checker 模块。
@@ -282,7 +281,7 @@ Location: `src/output/html.rs`
 | **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
 | **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
 | **3. Documentation** | ~~5.5.12 extends Examples~~ |
-| **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
+| **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, ~5.5.8 Versioning~ (partial) |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 
 ---

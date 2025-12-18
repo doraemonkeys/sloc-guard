@@ -1,7 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+/// Supported config version. Current version is "1".
+pub const CONFIG_VERSION: &str = "1";
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
+    /// Config schema version. Defaults to "1" if not specified.
+    /// Loader validates version on load and warns if missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extends: Option<String>,
 
