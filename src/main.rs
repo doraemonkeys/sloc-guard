@@ -128,11 +128,8 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     progress.finish();
 
     // 7.1 Save cache if not disabled
-    #[allow(clippy::collapsible_if)]
-    if !args.no_cache {
-        if let Ok(cache_guard) = cache.lock() {
-            save_cache(&cache_guard);
-        }
+    if !args.no_cache && let Ok(cache_guard) = cache.lock() {
+        save_cache(&cache_guard);
     }
 
     // 8. Apply baseline comparison: mark failures as grandfathered if in baseline
@@ -519,11 +516,8 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     progress.finish();
 
     // 5.1 Save cache if not disabled
-    #[allow(clippy::collapsible_if)]
-    if !args.no_cache {
-        if let Ok(cache_guard) = cache.lock() {
-            save_cache(&cache_guard);
-        }
+    if !args.no_cache && let Ok(cache_guard) = cache.lock() {
+        save_cache(&cache_guard);
     }
 
     let project_stats = ProjectStatistics::new(file_stats);
@@ -570,21 +564,6 @@ fn get_stats_scan_paths(args: &StatsArgs, config: &Config) -> Vec<std::path::Pat
 
     // Default to current directory
     args.paths.clone()
-}
-
-#[allow(dead_code)]
-fn collect_file_stats(file_path: &Path, registry: &LanguageRegistry) -> Option<FileStatistics> {
-    let ext = file_path.extension()?.to_str()?;
-    let language = registry.get_by_extension(ext)?;
-
-    let counter = SlocCounter::new(&language.comment_syntax);
-    let stats = count_file_lines(file_path, &counter)?;
-
-    Some(FileStatistics {
-        path: file_path.to_path_buf(),
-        stats,
-        language: language.name.to_string(),
-    })
 }
 
 fn collect_file_stats_cached(

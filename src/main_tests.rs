@@ -10,7 +10,7 @@ use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 use tempfile::TempDir;
 
 use crate::{
-    apply_cli_overrides, collect_file_stats, color_choice_to_mode, compute_effective_stats,
+    apply_cli_overrides, color_choice_to_mode, compute_effective_stats,
     format_output, format_stats_output, get_scan_paths, get_stats_scan_paths, load_config,
     process_file, run_check_impl, run_stats_impl, write_output,
 };
@@ -476,36 +476,6 @@ fn get_stats_scan_paths_defaults_to_current_dir() {
 
     let paths = get_stats_scan_paths(&args, &config);
     assert_eq!(paths, vec![PathBuf::from(".")]);
-}
-
-#[test]
-fn collect_file_stats_nonexistent_returns_none() {
-    let registry = LanguageRegistry::default();
-    let path = PathBuf::from("nonexistent_file.rs");
-
-    let result = collect_file_stats(&path, &registry);
-    assert!(result.is_none());
-}
-
-#[test]
-fn collect_file_stats_unknown_extension_returns_none() {
-    let registry = LanguageRegistry::default();
-    let path = PathBuf::from("Cargo.toml");
-
-    let result = collect_file_stats(&path, &registry);
-    assert!(result.is_none());
-}
-
-#[test]
-fn collect_file_stats_valid_rust_file() {
-    let registry = LanguageRegistry::default();
-    let path = PathBuf::from("src/lib.rs");
-
-    let result = collect_file_stats(&path, &registry);
-    assert!(result.is_some());
-    let file_stats = result.unwrap();
-    assert_eq!(file_stats.path, path);
-    assert!(file_stats.stats.total > 0);
 }
 
 #[test]

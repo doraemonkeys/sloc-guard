@@ -21,8 +21,12 @@ impl ScanProgress {
     /// * `quiet` - If true, progress bar is disabled
     ///
     /// The progress bar outputs to stderr to avoid interfering with stdout output.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the progress bar template is invalid.
+    /// The template is a compile-time constant, so this should never happen.
     #[must_use]
-    #[allow(clippy::missing_panics_doc)]
     pub fn new(total: u64, quiet: bool) -> Self {
         let progress_bar = if quiet || !std::io::stderr().is_terminal() {
             ProgressBar::hidden()
@@ -31,6 +35,7 @@ impl ScanProgress {
             pb.set_style(
                 ProgressStyle::default_bar()
                     .template("{spinner:.green} Scanning [{bar:40.cyan/blue}] {pos}/{len} files ({percent}%)")
+                    // SAFETY: Template is a static string with valid format specifiers
                     .expect("valid template")
                     .progress_chars("█▓░"),
             );
