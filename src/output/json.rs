@@ -29,6 +29,8 @@ struct FileResult {
     sloc: usize,
     limit: usize,
     stats: FileStats,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    override_reason: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -83,6 +85,7 @@ fn convert_result(result: &CheckResult) -> FileResult {
             comment: result.stats.comment,
             blank: result.stats.blank,
         },
+        override_reason: result.override_reason.clone(),
     }
 }
 

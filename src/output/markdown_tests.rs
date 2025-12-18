@@ -17,6 +17,7 @@ fn make_result(path: &str, status: CheckStatus, code: usize, limit: usize) -> Ch
             blank: 5,
         },
         limit,
+        override_reason: None,
     }
 }
 
@@ -49,9 +50,9 @@ fn formats_details_table() {
     let output = formatter.format(&results).unwrap();
 
     assert!(output.contains("### Details"));
-    assert!(output.contains("| Status | File | Lines | Limit | Code | Comment | Blank |"));
-    assert!(output.contains("| ❌ Failed | `src/fail.rs` | 600 | 500 | 600 | 10 | 5 |"));
-    assert!(output.contains("| ⚠️ Warning | `src/warn.rs` | 450 | 500 | 450 | 10 | 5 |"));
+    assert!(output.contains("| Status | File | Lines | Limit | Code | Comment | Blank | Reason |"));
+    assert!(output.contains("| ❌ Failed | `src/fail.rs` | 600 | 500 | 600 | 10 | 5 | - |"));
+    assert!(output.contains("| ⚠️ Warning | `src/warn.rs` | 450 | 500 | 450 | 10 | 5 | - |"));
 }
 
 #[test]
@@ -104,4 +105,26 @@ fn empty_results() {
 
     assert!(output.contains("| Total Files | 0 |"));
     assert!(!output.contains("### Details"));
+}
+
+#[test]
+fn override_reason_shown_in_table() {
+    let results = vec![CheckResult {
+        path: PathBuf::from("src/legacy.rs"),
+        status: CheckStatus::Warning,
+        stats: LineStats {
+            total: 765,
+            code: 750,
+            comment: 10,
+            blank: 5,
+        },
+        limit: 800,
+        override_reason: Some("Legacy migration code".to_string()),
+    }];
+
+    let formatter = MarkdownFormatter;
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("Legacy migration code"));
+    assert!(output.contains("| ⚠️ Warning | `src/legacy.rs` | 750 | 800 | 750 | 10 | 5 | Legacy migration code |"));
 }

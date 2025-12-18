@@ -119,6 +119,8 @@ struct ResultProperties {
     #[serde(rename = "usagePercent")]
     usage_percent: f64,
     stats: StatsProperties,
+    #[serde(rename = "overrideReason", skip_serializing_if = "Option::is_none")]
+    override_reason: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -226,6 +228,7 @@ impl SarifFormatter {
                     comment: result.stats.comment,
                     blank: result.stats.blank,
                 },
+                override_reason: result.override_reason.clone(),
             },
         })
     }

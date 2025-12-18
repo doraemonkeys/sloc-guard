@@ -14,6 +14,7 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
             blank: 5,
         },
         limit,
+        override_reason: None,
     }
 }
 
@@ -180,6 +181,7 @@ fn sarif_windows_path_converted() {
             blank: 5,
         },
         limit: 500,
+        override_reason: None,
     }];
 
     let output = formatter.format(&results).unwrap();

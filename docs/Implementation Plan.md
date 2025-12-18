@@ -98,13 +98,14 @@ Location: `src/config/model.rs`, `src/checker/threshold.rs`
 - [x] Support --warn-threshold CLI override
 ```
 
-### Task 4.4: Override with Reason
+### Task 4.4: Override with Reason (Done)
 
-Location: `src/config/model.rs`
+Location: `src/config/model.rs`, `src/checker/threshold.rs`, `src/output/*.rs`
 
 ```
-- Add optional reason field to [[override]]
-- Show reason in verbose output
+- [x] Add optional reason field to [[override]]
+- [x] Show reason in verbose output
+- [x] Include reason in JSON/SARIF/Markdown output
 ```
 
 ### Task 4.5: Custom Language Definition
@@ -253,10 +254,9 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.4 Override Reason | ~1h |
-| **2. Medium** | 4.5 Custom Languages | ~3h |
+| **1. Short-term** | 4.5 Custom Languages | ~3h |
 | | 4.6b Inline Ignore (block/next) | ~2h |
-| | 4.8a Config Inheritance (local) | ~2h |
+| **2. Medium** | 4.8a Config Inheritance (local) | ~2h |
 | **3. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
 | | 5.1c Directory Statistics | ~2h |
 | | 5.2 Trend Tracking | ~3h |

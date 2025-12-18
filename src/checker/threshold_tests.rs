@@ -86,6 +86,37 @@ fn check_uses_override_for_specific_file() {
 
     assert!(result.is_passed());
     assert_eq!(result.limit, 800);
+    assert_eq!(result.override_reason, Some("Legacy code".to_string()));
+}
+
+#[test]
+fn check_override_without_reason() {
+    let mut config = default_config();
+    config.overrides.push(crate::config::FileOverride {
+        path: "special.rs".to_string(),
+        max_lines: 800,
+        reason: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(700);
+
+    let result = checker.check(Path::new("src/special.rs"), &stats);
+
+    assert!(result.is_passed());
+    assert_eq!(result.limit, 800);
+    assert_eq!(result.override_reason, None);
+}
+
+#[test]
+fn check_no_override_reason_when_using_default() {
+    let checker = ThresholdChecker::new(default_config());
+    let stats = stats_with_code(100);
+
+    let result = checker.check(Path::new("test.rs"), &stats);
+
+    assert!(result.is_passed());
+    assert_eq!(result.override_reason, None);
 }
 
 #[test]
@@ -100,6 +131,7 @@ fn check_result_usage_percent() {
             blank: 5,
         },
         limit: 500,
+        override_reason: None,
     };
 
     assert!((result.usage_percent() - 50.0).abs() < 0.01);

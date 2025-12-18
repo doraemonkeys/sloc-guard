@@ -65,10 +65,10 @@ impl OutputFormatter for MarkdownFormatter {
             writeln!(output, "### Details\n").ok();
             writeln!(
                 output,
-                "| Status | File | Lines | Limit | Code | Comment | Blank |"
+                "| Status | File | Lines | Limit | Code | Comment | Blank | Reason |"
             )
             .ok();
-            writeln!(output, "|:------:|------|------:|------:|-----:|--------:|------:|").ok();
+            writeln!(output, "|:------:|------|------:|------:|-----:|--------:|------:|--------|").ok();
 
             for result in &non_passed {
                 let icon = Self::status_icon(&result.status);
@@ -79,10 +79,11 @@ impl OutputFormatter for MarkdownFormatter {
                 let code = result.stats.code;
                 let comment = result.stats.comment;
                 let blank = result.stats.blank;
+                let reason = result.override_reason.as_deref().unwrap_or("-");
 
                 writeln!(
                     output,
-                    "| {icon} {status} | `{path}` | {sloc} | {limit} | {code} | {comment} | {blank} |"
+                    "| {icon} {status} | `{path}` | {sloc} | {limit} | {code} | {comment} | {blank} | {reason} |"
                 )
                 .ok();
             }

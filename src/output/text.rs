@@ -113,6 +113,11 @@ impl TextFormatter {
             result.stats.code, result.stats.comment, result.stats.blank
         )
         .ok();
+
+        // Show override reason if present (in verbose mode or for any status)
+        if let Some(reason) = &result.override_reason {
+            writeln!(output, "   Reason: {reason}").ok();
+        }
     }
 
     fn format_summary(

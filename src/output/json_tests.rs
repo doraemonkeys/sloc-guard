@@ -14,6 +14,7 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
             blank: 5,
         },
         limit,
+        override_reason: None,
     }
 }
 
@@ -96,4 +97,42 @@ fn json_empty_results() {
 
     let summary = parsed.get("summary").unwrap();
     assert_eq!(summary.get("total_files").unwrap(), 0);
+}
+
+#[test]
+fn json_override_reason_included() {
+    let formatter = JsonFormatter;
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Warning,
+        stats: LineStats {
+            total: 760,
+            code: 750,
+            comment: 5,
+            blank: 5,
+        },
+        limit: 800,
+        override_reason: Some("Legacy code from migration".to_string()),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let file_result = &parsed.get("results").unwrap()[0];
+    assert_eq!(
+        file_result.get("override_reason").unwrap(),
+        "Legacy code from migration"
+    );
+}
+
+#[test]
+fn json_override_reason_excluded_when_none() {
+    let formatter = JsonFormatter;
+    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+
+    let output = formatter.format(&results).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let file_result = &parsed.get("results").unwrap()[0];
+    assert!(file_result.get("override_reason").is_none());
 }

@@ -46,6 +46,7 @@ Config { default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules:
 DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
 RuleConfig { extensions: Vec<String>, max_lines: Option<usize>, skip_comments: Option<bool>, skip_blank: Option<bool>, warn_threshold: Option<f64> }
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
+FileOverride { path: String, max_lines: usize, reason: Option<String> }  // per-file override with optional reason
 
 // Line counting
 LineStats { total, code, comment, blank }  // sloc() returns code count
@@ -54,7 +55,7 @@ CommentSyntax { single_line: Vec<&str>, multi_line: Vec<(start, end)> }
 
 // Check results
 CheckStatus::Passed | Warning | Failed | Grandfathered
-CheckResult { path, status, stats, limit }
+CheckResult { path, status, stats, limit, override_reason: Option<String> }  // override_reason set when [[override]] matches
 
 // Output formatting
 ColorMode::Auto | Always | Never  // controls ANSI color output

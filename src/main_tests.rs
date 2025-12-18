@@ -1273,6 +1273,7 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
                 blank: 0,
             },
             limit: 500,
+            override_reason: None,
         },
         CheckResult {
             path: PathBuf::from("src/other.rs"),
@@ -1284,6 +1285,7 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
                 blank: 0,
             },
             limit: 500,
+            override_reason: None,
         },
     ];
 
@@ -1308,6 +1310,7 @@ fn apply_baseline_comparison_does_not_mark_new_violations() {
             blank: 0,
         },
         limit: 500,
+        override_reason: None,
     }];
 
     let baseline = Baseline::new(); // Empty baseline
@@ -1329,6 +1332,7 @@ fn apply_baseline_comparison_handles_windows_paths() {
             blank: 0,
         },
         limit: 500,
+        override_reason: None,
     }];
 
     let mut baseline = Baseline::new();

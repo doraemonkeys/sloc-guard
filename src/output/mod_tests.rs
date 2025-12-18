@@ -16,6 +16,7 @@ fn sample_results() -> Vec<CheckResult> {
                 blank: 5,
             },
             limit: 500,
+            override_reason: None,
         },
         CheckResult {
             path: PathBuf::from("src/lib.rs"),
@@ -27,6 +28,7 @@ fn sample_results() -> Vec<CheckResult> {
                 blank: 20,
             },
             limit: 500,
+            override_reason: None,
         },
     ]
 }

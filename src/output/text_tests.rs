@@ -14,6 +14,7 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
             blank: 5,
         },
         limit,
+        override_reason: None,
     }
 }
 
@@ -170,4 +171,35 @@ fn color_mode_auto_produces_output() {
     // Should produce valid output regardless of color detection
     assert!(output.contains("FAILED"));
     assert!(output.contains("test.rs"));
+}
+
+#[test]
+fn override_reason_shown_in_output() {
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Warning,
+        stats: LineStats {
+            total: 760,
+            code: 750,
+            comment: 5,
+            blank: 5,
+        },
+        limit: 800,
+        override_reason: Some("Legacy file from migration".to_string()),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("Reason: Legacy file from migration"));
+}
+
+#[test]
+fn no_reason_line_when_override_reason_is_none() {
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(!output.contains("Reason:"));
 }

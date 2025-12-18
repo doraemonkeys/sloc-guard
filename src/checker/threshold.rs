@@ -22,6 +22,8 @@ pub struct CheckResult {
     pub status: CheckStatus,
     pub stats: LineStats,
     pub limit: usize,
+    /// Reason for override, if the limit comes from an [[override]] entry
+    pub override_reason: Option<String>,
 }
 
 impl CheckResult {
@@ -154,18 +156,19 @@ impl ThresholdChecker {
             })
     }
 
-    fn get_limit_for_path(&self, path: &Path) -> usize {
+    /// Returns (`max_lines`, `override_reason`) for a path.
+    fn get_limit_for_path(&self, path: &Path) -> (usize, Option<String>) {
         // 1. Check overrides first (highest priority)
         for override_config in &self.config.overrides {
             if Self::path_matches_override(path, &override_config.path) {
-                return override_config.max_lines;
+                return (override_config.max_lines, override_config.reason.clone());
             }
         }
 
         // 2. Check path_rules (glob patterns)
         for path_rule in &self.path_rules {
             if path_rule.matcher.is_match(path) {
-                return path_rule.max_lines;
+                return (path_rule.max_lines, None);
             }
         }
 
@@ -173,11 +176,11 @@ impl ThresholdChecker {
         if let Some(ext) = path.extension().and_then(|e| e.to_str())
             && let Some(&limit) = self.extension_limits.get(ext)
         {
-            return limit;
+            return (limit, None);
         }
 
         // 4. Fall back to default
-        self.config.default.max_lines
+        (self.config.default.max_lines, None)
     }
 
     fn get_warn_threshold_for_path(&self, path: &Path) -> f64 {
@@ -204,7 +207,7 @@ impl ThresholdChecker {
 
 impl Checker for ThresholdChecker {
     fn check(&self, path: &Path, line_stats: &LineStats) -> CheckResult {
-        let limit = self.get_limit_for_path(path);
+        let (limit, override_reason) = self.get_limit_for_path(path);
         let warn_threshold = self.get_warn_threshold_for_path(path);
         let sloc = line_stats.sloc();
 
@@ -222,6 +225,7 @@ impl Checker for ThresholdChecker {
             status: check_status,
             stats: line_stats.clone(),
             limit,
+            override_reason,
         }
     }
 }
