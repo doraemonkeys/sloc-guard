@@ -20,7 +20,8 @@
 | `output/text` | Done | TextFormatter with color support (ColorMode: Auto/Always/Never), status icons, summary, grandfathered count |
 | `output/json` | Done | JsonFormatter with structured output including grandfathered count |
 | `output/sarif` | Done | SarifFormatter with SARIF 2.1.0 output for GitHub Code Scanning |
-| `output/stats` | Done | StatsTextFormatter and StatsJsonFormatter with language breakdown (--group-by lang), top-N files (--top), average code lines |
+| `output/markdown` | Done | MarkdownFormatter and StatsMarkdownFormatter with table-based output for PR comments |
+| `output/stats` | Done | StatsTextFormatter, StatsJsonFormatter, StatsMarkdownFormatter with language breakdown (--group-by lang), top-N files (--top), average code lines |
 | `output/progress` | Done | ScanProgress with indicatif, disabled in quiet mode or non-TTY |
 | `git/diff` | Done | GitDiff with gix for --diff mode (changed files since reference) |
 | `baseline` | Done | Baseline, BaselineEntry, compute_file_hash, `baseline update` command, `--baseline` flag for check |
@@ -81,20 +82,7 @@ make ci
 | **Phase 5.1a** | Language Breakdown (--group-by lang, LanguageStats, sorted by code count) | ✅ Done |
 | **Phase 5.1b** | Top-N & Metrics (--top N, top files by code lines, average code lines) | ✅ Done |
 | **Phase 3.2** | Git-Aware Exclude (gix dirwalk, --no-gitignore flag) | ✅ Done |
-
----
-
-## Phase 2: Output Enhancements (P1)
-
-### Task 2.3: Markdown Output
-
-Location: `src/output/markdown.rs`
-
-```
-- Create MarkdownFormatter struct
-- Generate table-based output
-- Include summary section
-```
+| **Phase 2.3** | Markdown Output (MarkdownFormatter, StatsMarkdownFormatter for PR comments) | ✅ Done |
 
 ---
 
@@ -265,8 +253,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 2.3 Markdown Output | ~2h |
-| | 4.2 Per-rule warn_threshold | ~1h |
+| **1. Short-term** | 4.2 Per-rule warn_threshold | ~1h |
 | | 4.4 Override Reason | ~1h |
 | **2. Medium** | 4.5 Custom Languages | ~3h |
 | | 4.6b Inline Ignore (block/next) | ~2h |

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::path::PathBuf;
 
@@ -263,6 +264,66 @@ impl StatsFormatter for StatsJsonFormatter {
         };
 
         Ok(serde_json::to_string_pretty(&output)?)
+    }
+}
+
+pub struct StatsMarkdownFormatter;
+
+impl StatsFormatter for StatsMarkdownFormatter {
+    fn format(&self, stats: &ProjectStatistics) -> Result<String> {
+        let mut output = String::new();
+
+        writeln!(output, "## SLOC Statistics\n").ok();
+
+        // Summary section
+        writeln!(output, "### Summary\n").ok();
+        writeln!(output, "| Metric | Value |").ok();
+        writeln!(output, "|--------|------:|").ok();
+        writeln!(output, "| Total Files | {} |", stats.total_files).ok();
+        writeln!(output, "| Total Lines | {} |", stats.total_lines).ok();
+        writeln!(output, "| Code | {} |", stats.total_code).ok();
+        writeln!(output, "| Comments | {} |", stats.total_comment).ok();
+        writeln!(output, "| Blank | {} |", stats.total_blank).ok();
+        if let Some(avg) = stats.average_code_lines {
+            writeln!(output, "| Average Code Lines | {avg:.1} |").ok();
+        }
+        writeln!(output).ok();
+
+        // Top files if available
+        if let Some(ref top_files) = stats.top_files {
+            writeln!(output, "### Top {} Largest Files\n", top_files.len()).ok();
+            writeln!(output, "| # | File | Language | Code |").ok();
+            writeln!(output, "|--:|------|----------|-----:|").ok();
+            for (i, file) in top_files.iter().enumerate() {
+                writeln!(
+                    output,
+                    "| {} | `{}` | {} | {} |",
+                    i + 1,
+                    file.path.display(),
+                    file.language,
+                    file.stats.code
+                )
+                .ok();
+            }
+            writeln!(output).ok();
+        }
+
+        // Language breakdown if available
+        if let Some(ref by_language) = stats.by_language {
+            writeln!(output, "### By Language\n").ok();
+            writeln!(output, "| Language | Files | Code | Comments | Blank |").ok();
+            writeln!(output, "|----------|------:|-----:|---------:|------:|").ok();
+            for lang in by_language {
+                writeln!(
+                    output,
+                    "| {} | {} | {} | {} | {} |",
+                    lang.language, lang.files, lang.code, lang.comment, lang.blank
+                )
+                .ok();
+            }
+        }
+
+        Ok(output)
     }
 }
 

@@ -30,7 +30,8 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
-| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `LanguageStats` - stats output with language breakdown, top-N files, average |
+| `output/markdown` | `output/markdown.rs` | `MarkdownFormatter` - table-based markdown output for PR comments |
+| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `LanguageStats` - stats output with language breakdown, top-N files, average |
 | `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
@@ -107,7 +108,7 @@ CLI args → load_config() → apply_cli_overrides()
          → progress.finish()
          → [if !--no-cache] save_cache()
          → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
-         → TextFormatter/JsonFormatter/SarifFormatter::format(results)
+         → TextFormatter/JsonFormatter/SarifFormatter/MarkdownFormatter::format(results)
          → write to stdout or --output file
 ```
 
@@ -133,7 +134,7 @@ CLI args → load_config()
          → ProjectStatistics::new(file_stats)
          → [if --group-by lang] with_language_breakdown() → compute LanguageStats
          → [if --top N] with_top_files(N) → compute top files + average
-         → StatsTextFormatter/StatsJsonFormatter::format(stats)
+         → StatsTextFormatter/StatsJsonFormatter/StatsMarkdownFormatter::format(stats)
          → write to stdout or --output file
 ```
 

@@ -798,7 +798,7 @@ fn sarif_format_works() {
 }
 
 #[test]
-fn markdown_format_not_implemented() {
+fn markdown_format_works() {
     let temp_dir = TempDir::new().unwrap();
     fs::write(temp_dir.path().join("main.rs"), "fn main() {}\n").unwrap();
 
@@ -810,8 +810,10 @@ fn markdown_format_not_implemented() {
         .arg("--format")
         .arg("markdown")
         .assert()
-        .code(2)
-        .stderr(predicate::str::contains("not yet implemented"));
+        .success()
+        .stdout(predicate::str::contains("## SLOC Guard Results"))
+        .stdout(predicate::str::contains("| Total Files |"))
+        .stdout(predicate::str::contains("| ✅ Passed |"));
 }
 
 #[test]

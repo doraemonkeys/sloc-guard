@@ -1,13 +1,15 @@
 mod json;
+mod markdown;
 mod progress;
 mod sarif;
 mod stats;
 mod text;
 
 pub use json::JsonFormatter;
+pub use markdown::MarkdownFormatter;
 pub use progress::ScanProgress;
 pub use sarif::SarifFormatter;
-pub use stats::{FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter};
+pub use stats::{FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter};
 pub use text::{ColorMode, TextFormatter};
 
 use crate::checker::CheckResult;

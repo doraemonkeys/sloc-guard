@@ -384,10 +384,13 @@ fn format_output_sarif_works() {
 }
 
 #[test]
-fn format_output_markdown_not_implemented() {
+fn format_output_markdown_works() {
     let results: Vec<CheckResult> = vec![];
     let result = format_output(OutputFormat::Markdown, &results, ColorMode::Never, 0);
-    assert!(result.is_err());
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output.contains("## SLOC Guard Results"));
+    assert!(output.contains("| Total Files | 0 |"));
 }
 
 // Stats command tests
@@ -500,10 +503,13 @@ fn format_stats_output_sarif_not_implemented() {
 }
 
 #[test]
-fn format_stats_output_markdown_not_implemented() {
+fn format_stats_output_markdown_works() {
     let stats = sloc_guard::output::ProjectStatistics::new(vec![]);
     let result = format_stats_output(OutputFormat::Markdown, &stats);
-    assert!(result.is_err());
+    assert!(result.is_ok());
+    let output = result.unwrap();
+    assert!(output.contains("## SLOC Statistics"));
+    assert!(output.contains("| Total Files | 0 |"));
 }
 
 // color_choice_to_mode tests

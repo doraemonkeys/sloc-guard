@@ -19,9 +19,9 @@ use sloc_guard::counter::{CountResult, LineStats, SlocCounter};
 use sloc_guard::git::{ChangedFiles, GitDiff};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
-    ColorMode, FileStatistics, JsonFormatter, OutputFormat, OutputFormatter, ProjectStatistics,
-    SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter, StatsTextFormatter,
-    TextFormatter,
+    ColorMode, FileStatistics, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
+    ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
+    StatsMarkdownFormatter, StatsTextFormatter, TextFormatter,
 };
 use sloc_guard::scanner::{DirectoryScanner, FileScanner, GitAwareScanner, GlobFilter};
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
@@ -448,9 +448,7 @@ fn format_output(
         OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose).format(results),
         OutputFormat::Json => JsonFormatter.format(results),
         OutputFormat::Sarif => SarifFormatter.format(results),
-        OutputFormat::Markdown => Err(sloc_guard::SlocGuardError::Config(
-            "Markdown output format is not yet implemented".to_string(),
-        )),
+        OutputFormat::Markdown => MarkdownFormatter.format(results),
     }
 }
 
@@ -619,9 +617,7 @@ fn format_stats_output(
         OutputFormat::Sarif => Err(sloc_guard::SlocGuardError::Config(
             "SARIF output format is not supported for stats command".to_string(),
         )),
-        OutputFormat::Markdown => Err(sloc_guard::SlocGuardError::Config(
-            "Markdown output format is not yet implemented".to_string(),
-        )),
+        OutputFormat::Markdown => StatsMarkdownFormatter.format(stats),
     }
 }
 

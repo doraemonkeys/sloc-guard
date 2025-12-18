@@ -2,7 +2,8 @@ use std::path::PathBuf;
 
 use crate::counter::LineStats;
 use crate::output::stats::{
-    FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsTextFormatter,
+    FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsMarkdownFormatter,
+    StatsTextFormatter,
 };
 
 #[test]
@@ -481,4 +482,106 @@ fn json_formatter_with_top_files() {
 
     let summary = parsed.get("summary").unwrap();
     assert!(summary.get("average_code_lines").is_some());
+}
+
+#[test]
+fn markdown_formatter_empty() {
+    let stats = ProjectStatistics::new(vec![]);
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("## SLOC Statistics"));
+    assert!(output.contains("### Summary"));
+    assert!(output.contains("| Total Files | 0 |"));
+}
+
+#[test]
+fn markdown_formatter_with_files() {
+    let files = vec![FileStatistics {
+        path: PathBuf::from("test.rs"),
+        stats: LineStats {
+            total: 100,
+            code: 80,
+            comment: 15,
+            blank: 5,
+        },
+        language: "Rust".to_string(),
+    }];
+
+    let stats = ProjectStatistics::new(files);
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("| Total Files | 1 |"));
+    assert!(output.contains("| Total Lines | 100 |"));
+    assert!(output.contains("| Code | 80 |"));
+    assert!(output.contains("| Comments | 15 |"));
+    assert!(output.contains("| Blank | 5 |"));
+}
+
+#[test]
+fn markdown_formatter_with_top_files() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("large.rs"),
+            stats: LineStats {
+                total: 200,
+                code: 150,
+                comment: 30,
+                blank: 20,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("small.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 30,
+                comment: 10,
+                blank: 10,
+            },
+            language: "Go".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_top_files(5);
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("### Top 2 Largest Files"));
+    assert!(output.contains("| # | File | Language | Code |"));
+    assert!(output.contains("| 1 | `large.rs` | Rust | 150 |"));
+    assert!(output.contains("| 2 | `small.rs` | Go | 30 |"));
+    assert!(output.contains("| Average Code Lines | 90.0 |"));
+}
+
+#[test]
+fn markdown_formatter_with_language_breakdown() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("main.go"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5,
+            },
+            language: "Go".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("### By Language"));
+    assert!(output.contains("| Language | Files | Code | Comments | Blank |"));
+    assert!(output.contains("| Rust | 1 | 80 | 15 | 5 |"));
+    assert!(output.contains("| Go | 1 | 40 | 5 | 5 |"));
 }
