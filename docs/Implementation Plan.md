@@ -9,7 +9,7 @@
 | Module | Status | Description |
 |--------|--------|-------------|
 | `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache, --group-by, --top), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
-| `config/model` | Partial | Config, DefaultConfig, RuleConfig, ExcludeConfig, FileOverride, PathRule, strict (pending: per-rule warn_threshold) |
+| `config/model` | Done | Config, DefaultConfig, RuleConfig (with warn_threshold), ExcludeConfig, FileOverride, PathRule, strict |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
 | `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
@@ -88,13 +88,13 @@ make ci
 
 ## Phase 4: Advanced Features (P2)
 
-### Task 4.2: Per-rule warn_threshold (Partial)
+### Task 4.2: Per-rule warn_threshold (Done)
 
 Location: `src/config/model.rs`, `src/checker/threshold.rs`
 
 ```
 - [x] Add warn_threshold to DefaultConfig (default 0.9)
-- [ ] Allow per-rule: [rules.rust] warn_threshold = 0.85
+- [x] Allow per-rule: [rules.rust] warn_threshold = 0.85
 - [x] Support --warn-threshold CLI override
 ```
 
@@ -253,8 +253,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.2 Per-rule warn_threshold | ~1h |
-| | 4.4 Override Reason | ~1h |
+| **1. Short-term** | 4.4 Override Reason | ~1h |
 | **2. Medium** | 4.5 Custom Languages | ~3h |
 | | 4.6b Inline Ignore (block/next) | ~2h |
 | | 4.8a Config Inheritance (local) | ~2h |

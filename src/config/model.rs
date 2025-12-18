@@ -61,7 +61,7 @@ impl Default for DefaultConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RuleConfig {
     #[serde(default)]
     pub extensions: Vec<String>,
@@ -73,6 +73,9 @@ pub struct RuleConfig {
 
     #[serde(default)]
     pub skip_blank: Option<bool>,
+
+    #[serde(default)]
+    pub warn_threshold: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

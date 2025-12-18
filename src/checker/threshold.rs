@@ -70,18 +70,21 @@ pub struct ThresholdChecker {
     config: Config,
     warning_threshold: f64,
     extension_limits: HashMap<String, usize>,
+    extension_warn_thresholds: HashMap<String, f64>,
     path_rules: Vec<CompiledPathRule>,
 }
 
 impl ThresholdChecker {
     #[must_use]
     pub fn new(config: Config) -> Self {
-        let extension_limits = Self::build_extension_index(&config);
+        let extension_limits = Self::build_extension_limits(&config);
+        let extension_warn_thresholds = Self::build_extension_warn_thresholds(&config);
         let path_rules = Self::build_path_rules(&config);
         Self {
             config,
             warning_threshold: 0.9,
             extension_limits,
+            extension_warn_thresholds,
             path_rules,
         }
     }
@@ -92,12 +95,24 @@ impl ThresholdChecker {
         self
     }
 
-    fn build_extension_index(config: &Config) -> HashMap<String, usize> {
+    fn build_extension_limits(config: &Config) -> HashMap<String, usize> {
         let mut index = HashMap::new();
         for rule in config.rules.values() {
             if let Some(max_lines) = rule.max_lines {
                 for ext in &rule.extensions {
                     index.insert(ext.clone(), max_lines);
+                }
+            }
+        }
+        index
+    }
+
+    fn build_extension_warn_thresholds(config: &Config) -> HashMap<String, f64> {
+        let mut index = HashMap::new();
+        for rule in config.rules.values() {
+            if let Some(warn_threshold) = rule.warn_threshold {
+                for ext in &rule.extensions {
+                    index.insert(ext.clone(), warn_threshold);
                 }
             }
         }
@@ -166,7 +181,7 @@ impl ThresholdChecker {
     }
 
     fn get_warn_threshold_for_path(&self, path: &Path) -> f64 {
-        // Check path_rules for custom warn_threshold
+        // 1. Check path_rules for custom warn_threshold (higher priority)
         for path_rule in &self.path_rules {
             if path_rule.matcher.is_match(path)
                 && let Some(threshold) = path_rule.warn_threshold
@@ -174,6 +189,15 @@ impl ThresholdChecker {
                 return threshold;
             }
         }
+
+        // 2. Check extension rules
+        if let Some(ext) = path.extension().and_then(|e| e.to_str())
+            && let Some(&threshold) = self.extension_warn_thresholds.get(ext)
+        {
+            return threshold;
+        }
+
+        // 3. Fall back to default
         self.warning_threshold
     }
 }

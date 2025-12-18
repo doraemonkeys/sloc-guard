@@ -68,3 +68,37 @@ fn config_deserialize_strict_mode_default_false() {
     let config: Config = toml::from_str(toml_str).unwrap();
     assert!(!config.default.strict);
 }
+
+#[test]
+fn config_deserialize_rule_with_warn_threshold() {
+    let toml_str = r#"
+        [default]
+        max_lines = 500
+
+        [rules.rust]
+        extensions = ["rs"]
+        max_lines = 300
+        warn_threshold = 0.85
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.rules.contains_key("rust"));
+    assert_eq!(config.rules["rust"].max_lines, Some(300));
+    assert_eq!(config.rules["rust"].warn_threshold, Some(0.85));
+}
+
+#[test]
+fn config_deserialize_rule_without_warn_threshold() {
+    let toml_str = r#"
+        [default]
+        max_lines = 500
+
+        [rules.rust]
+        extensions = ["rs"]
+        max_lines = 300
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.rules.contains_key("rust"));
+    assert_eq!(config.rules["rust"].warn_threshold, None);
+}

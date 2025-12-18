@@ -130,6 +130,7 @@ fn validate_config_semantics_rule_without_extensions_or_max_lines() {
             max_lines: None,
             skip_comments: None,
             skip_blank: None,
+            warn_threshold: None,
         },
     );
 
@@ -205,6 +206,7 @@ fn format_config_text_includes_all_sections() {
             max_lines: Some(300),
             skip_comments: Some(true),
             skip_blank: None,
+            warn_threshold: None,
         },
     );
     config.exclude.patterns = vec!["**/target/**".to_string()];
@@ -245,6 +247,7 @@ fn format_config_text_with_rule_skip_blank() {
             max_lines: Some(300),
             skip_comments: None,
             skip_blank: Some(false),
+            warn_threshold: None,
         },
     );
 
