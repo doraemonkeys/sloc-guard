@@ -2,7 +2,7 @@
 
 > **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
 
-**SLOC (Source Lines of Code) enforcement tool** - enforces file size limits by counting code lines, excluding comments and blanks.
+**SLOC (Source Lines of Code) enforcement tool** - enforces file size limits by counting code lines (excluding comments and blanks) and enforces directory structure limits (file/folder counts).
 
 ## Quick Reference
 

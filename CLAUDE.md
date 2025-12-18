@@ -7,7 +7,6 @@
 * Avoid clutter. Do not write obvious comments, such as `i++ // Increment i by 1`.
 
 ### Development Process
-* First think through the problem before writing code
 * Consider the first principles and fundamental requirements
 * Plan the structure and architecture beforehand
 * Break down complex problems into smaller, manageable parts
@@ -15,7 +14,6 @@
 ### Best Practices
 * Follow language-specific conventions and style guides
 * Don't ignore errors
-* Write maintainable and scalable code
 * Consider performance implications
 
 ### Design for Testability
@@ -35,4 +33,6 @@ Follow standard Rust idioms (The "Rust way").
 * Avoid unnecessary .clone() unless required by ownership logic.
 
 ### Other Rules
-* No backward compatibility: Break old formats freely
+* Principle of Least Surprise: Design logic to be intuitive. Code implementation must behave as a developer expects, and functional design must align with the user's intuition.
+* No Backward Compatibility: Prioritize architectural correctness over legacy support. You are free to break old formats, APIs, or protocols if it results in a cleaner design.
+* Refactoring Circuit Breaker: If achieving the ideal structure requires a massive, high-risk rewrite (e.g., changing core assumptions), STOP and explain the scope and complexity first. 

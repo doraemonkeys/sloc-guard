@@ -17,6 +17,7 @@ Lint: make ci
 > - Use `par_iter()` for file processing loops
 > - Prefer O(1) lookups (HashMap/HashSet) over linear searches
 > - Use `BufReader` for large file handling
+> - **Structure Checks**: Perform directory entry counting using metadata only (no file opening).
 
 ---
 
@@ -26,26 +27,66 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering)
+- **Phase 5 (Partial)**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering)
 
 ---
 
-## Phase 5: Statistics Extension (Pending)
+## Phase 5: Directory Structure Guard (New)
 
-### Task 5.3c: HTML Charts (Pure CSS)
+Focus: Enforce file and directory count limits per directory to prevent architectural mess.
 
+### Task 5.1: Configuration Schema
+Location: `src/config/model.rs`, `src/config/loader.rs`
+```
+- Add `[structure]` section to `Config`:
+  - `max_files`: Global default limit for files per directory
+  - `max_dirs`: Global default limit for subdirectories per directory
+  - `ignore`: List of glob patterns (e.g., "*.md", ".gitkeep") not counted in structure limits
+- Add `[[structure.rules]]`:
+  - `pattern`: Glob pattern for directory matching
+  - `max_files`, `max_dirs`: Overrides for matched directories
+```
+
+### Task 5.2: Structure Analyzer
+Location: `src/checker/structure.rs` (New module), `src/scanner/mod.rs`
+```
+- Implement `StructureChecker`
+- **Key design**: Collect directory structure info during Scanner traversal (avoid second pass)
+  - Extend Scanner to return `ScanResult { files: Vec<PathBuf>, dir_stats: HashMap<PathBuf, DirEntry> }`
+  - `DirEntry { file_count: usize, dir_count: usize }` - immediate children counts
+  - Counts use metadata only (no file opening)
+- Logic:
+  1. During scan: accumulate file/dir counts per directory
+  2. Filter out items matching `structure.ignore` from counts
+  3. Match directory path against `structure.rules` (priority: rule > global default)
+  4. Return violations if count > limit
+```
+
+### Task 5.3: Integration & Output
+Location: `src/commands/check.rs`, `src/output/*`
+```
+- Update `check` command to run structure analysis
+- Define `StructureViolation` (path, actual_count, limit, type: FileCount/DirCount)
+- Update OutputFormatters to display structure errors:
+  - Text: Distinct error section or interleaved
+  - JSON/SARIF: Add structure violations to results
+  - HTML: Add "Structure" tab or section in summary
+```
+
+---
+
+## Phase 6: Statistics Extension (Pending)
+
+### Task 6.1: HTML Charts (Pure CSS)
 Location: `src/output/html.rs`
-
 ```
 - File size distribution bar chart (pure CSS)
 - Language/extension breakdown pie chart
 - No external dependencies
 ```
 
-### Task 5.3d: HTML Trend Visualization
-
+### Task 6.2: HTML Trend Visualization
 Location: `src/output/html.rs`
-
 ```
 - Integrate with .sloc-guard-history.json (if exists)
 - Line chart showing SLOC over time
@@ -54,18 +95,16 @@ Location: `src/output/html.rs`
 
 ---
 
-## Phase 6: CI/CD Support (Pending)
+## Phase 7: CI/CD Support (Pending)
 
-### Task 6.1: GitHub Action
-
+### Task 7.1: GitHub Action
 ```
 - Create reusable GitHub Action
 - Input: paths, config-path, fail-on-warning
 - Output: total-files, passed, failed, warnings
 ```
 
-### Task 6.2: Pre-commit Hook
-
+### Task 7.2: Pre-commit Hook
 ```
 - Document .pre-commit-config.yaml setup
 - Support staged files only mode
@@ -77,8 +116,9 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Deferred** | 5.3c-d HTML Report (charts, trends) |
-| | Phase 6 |
+| **1. Structure Guard** | Phase 5 (Config, Analyzer, Integration) |
+| **2. Deferred** | 6.1-6.2 HTML Charts/Trends |
+| | Phase 7 CI/CD |
 
 ---
 
@@ -95,5 +135,6 @@ main.rs (CLI parsing + dispatch)
   -> language/registry (get comment syntax)
   -> counter/sloc (count lines)
   -> checker/threshold (check limits)
+  -> checker/structure (NEW: check structure limits)
   -> output/* (format results)
 ```

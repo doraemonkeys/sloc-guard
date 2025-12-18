@@ -1,0 +1,84 @@
+# ==============================================================================
+# SlocGuard Configuration
+# Core Principles:
+# 1. [default] & [[path_rules]]: Control "File Content" (Is the code too long?)
+# 2. [structure]: Control "Project Structure" (Are there too many files? Is the directory nesting too deep?)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Code Line Count Limits (Content Guard)
+# ------------------------------------------------------------------------------
+
+[default]
+max_lines = 400                                    # Global Red Line: Any file exceeding 400 lines of code will trigger an error
+warn_threshold = 0.8                               # Warning Threshold: Show warning when reaching 320 lines (400 * 0.8)
+extensions = ["rs", "ts", "tsx", "js", "go", "py"] # Only check these code files
+skip_comments = true                               # Exclude comments from count
+skip_blank = true                                  # Exclude blank lines from count
+gitignore = true                                   # Respect .gitignore rules
+
+# Rules for specific file types
+[rules.tsx]
+max_lines = 250 # UI components should generally be shorter, strictly limited to 250 lines
+
+[rules.test]
+extensions = ["test.ts", "spec.ts"]
+max_lines = 1000                    # Test files are usually longer, relax the limit
+
+# Rules for specific paths (priority higher than default)
+[[path_rules]]
+pattern = "src/legacy/**" # Legacy code area
+max_lines = 2000          # Temporarily allow legacy code to be very long to avoid blocking CI
+warn_threshold = 0.95
+
+[[path_rules]]
+pattern = "src/generated/**" # Automatically generated code
+max_lines = 10000            # Almost no limit
+
+# ------------------------------------------------------------------------------
+# 2. Directory Structure Limits (Structure Guard) - New Feature
+# ------------------------------------------------------------------------------
+
+[structure]
+# Global fallback limits (prevent giant folders anywhere)
+max_files = 20 # Max 20 files per directory
+max_dirs = 5   # Max 5 subdirectories per directory
+# Files ignored during counting (they exist but don't count towards the quota)
+ignore = [
+    "README.md",
+    "LICENSE",
+    ".gitkeep",
+    "index.ts",  # Allow an index.ts in every folder
+    "*.test.ts", # Many test files are not considered "structural mess"
+    "*.css",     # Style files are also not counted
+]
+
+# --- Scenario-based Structure Rules ---
+
+# Scenario A: Atomic Component Library (src/components/buttons)
+# Requirement: Must be flat, no further nesting, few files
+[[structure.rules]]
+pattern = "src/components/*"
+max_files = 5                # Only 5 files allowed in component package (e.g., Component, style, types, story)
+max_dirs = 0                 # No nested subdirectories! Enforce flatness
+
+# Scenario B: Feature Module Entry (src/features)
+# Requirement: Allow containing many sub-feature modules
+[[structure.rules]]
+pattern = "src/features"
+max_files = 5            # Few files in the root directory (keep it clean)
+max_dirs = 50            # But allow many sub-module directories (feature-a, feature-b...)
+
+# Scenario C: Utility Function Library (src/utils)
+# Requirement: Allow many small utility files
+[[structure.rules]]
+pattern = "src/utils"
+max_files = 100       # Allow a large number of utility files to be flat
+max_dirs = 0          # But deep nesting is not recommended
+
+# ------------------------------------------------------------------------------
+# 3. Global Exclusions (Scanner)
+# ------------------------------------------------------------------------------
+# These files will not be scanned at all, neither for line count nor structure
+[exclude]
+patterns = ["node_modules/**", "target/**", "dist/**", "**/*.min.js"]
