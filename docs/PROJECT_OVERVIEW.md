@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | File(s) | Purpose |
 |--------|---------|---------|
 | `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore, --fix), `stats` (--no-cache, --group-by, --top, --no-gitignore, --trend), `init`, `config`, `baseline` commands; global flags: --no-config, --no-extends |
-| `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig` |
+| `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig`, `StructureConfig`, `StructureRule` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml`, supports `extends` for config inheritance (local path or remote URL) |
 | `config/remote` | `config/remote.rs` | `HttpClient` trait, `ReqwestClient`, `fetch_remote_config[_with_client]`, `is_remote_url`, `clear_cache` - remote config fetching with 1h TTL cache, DI for testability |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
@@ -50,7 +50,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ```rust
 // Config priority: CLI args > config file > defaults
-Config { extends: Option<String>, default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride>, languages: HashMap<String, CustomLanguageConfig> }
+Config { extends: Option<String>, default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride>, languages: HashMap<String, CustomLanguageConfig>, structure: StructureConfig }
 // extends: local path or remote URL (http/https) to base config, merged recursively with cycle detection
 // Remote configs cached at ~/.cache/sloc-guard/configs/ (Windows: %LOCALAPPDATA%\sloc-guard\configs\) with 1h TTL
 DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
@@ -58,6 +58,8 @@ RuleConfig { extensions: Vec<String>, max_lines: Option<usize>, skip_comments: O
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
 FileOverride { path: String, max_lines: usize, reason: Option<String> }  // per-file override with optional reason
 CustomLanguageConfig { extensions: Vec<String>, single_line_comments: Vec<String>, multi_line_comments: Vec<(String, String)> }  // custom language via [languages.<name>]
+StructureConfig { max_files: Option<usize>, max_dirs: Option<usize>, ignore: Vec<String>, rules: Vec<StructureRule> }  // [structure] section
+StructureRule { pattern: String, max_files: Option<usize>, max_dirs: Option<usize> }  // [[structure.rules]] per-directory overrides
 
 // Line counting
 LineStats { total, code, comment, blank, ignored }  // sloc() returns code count

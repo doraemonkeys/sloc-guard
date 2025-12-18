@@ -162,3 +162,91 @@ fn config_empty_languages_by_default() {
     let config = Config::default();
     assert!(config.languages.is_empty());
 }
+
+#[test]
+fn structure_config_default_values() {
+    let config = StructureConfig::default();
+    assert!(config.max_files.is_none());
+    assert!(config.max_dirs.is_none());
+    assert!(config.ignore.is_empty());
+    assert!(config.rules.is_empty());
+}
+
+#[test]
+fn config_structure_default_empty() {
+    let config = Config::default();
+    assert!(config.structure.max_files.is_none());
+    assert!(config.structure.max_dirs.is_none());
+    assert!(config.structure.ignore.is_empty());
+    assert!(config.structure.rules.is_empty());
+}
+
+#[test]
+fn config_deserialize_structure_global_limits() {
+    let toml_str = r#"
+        [default]
+        max_lines = 500
+
+        [structure]
+        max_files = 10
+        max_dirs = 5
+        ignore = ["*.md", ".gitkeep"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.max_files, Some(10));
+    assert_eq!(config.structure.max_dirs, Some(5));
+    assert_eq!(config.structure.ignore, vec!["*.md", ".gitkeep"]);
+}
+
+#[test]
+fn config_deserialize_structure_with_rules() {
+    let toml_str = r#"
+        [default]
+        max_lines = 500
+
+        [structure]
+        max_files = 10
+        max_dirs = 5
+
+        [[structure.rules]]
+        pattern = "src/generated/**"
+        max_files = 50
+
+        [[structure.rules]]
+        pattern = "tests/**"
+        max_files = 20
+        max_dirs = 10
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules.len(), 2);
+
+    let rule0 = &config.structure.rules[0];
+    assert_eq!(rule0.pattern, "src/generated/**");
+    assert_eq!(rule0.max_files, Some(50));
+    assert!(rule0.max_dirs.is_none());
+
+    let rule1 = &config.structure.rules[1];
+    assert_eq!(rule1.pattern, "tests/**");
+    assert_eq!(rule1.max_files, Some(20));
+    assert_eq!(rule1.max_dirs, Some(10));
+}
+
+#[test]
+fn config_deserialize_structure_only_rules() {
+    let toml_str = r#"
+        [default]
+        max_lines = 500
+
+        [[structure.rules]]
+        pattern = "vendor/**"
+        max_files = 100
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.structure.max_files.is_none());
+    assert!(config.structure.max_dirs.is_none());
+    assert_eq!(config.structure.rules.len(), 1);
+    assert_eq!(config.structure.rules[0].pattern, "vendor/**");
+}

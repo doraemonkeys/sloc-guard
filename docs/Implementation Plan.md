@@ -27,7 +27,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5 (Partial)**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering)
+- **Phase 5 (Partial)**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering), Structure Config Schema ([structure] + [[structure.rules]])
 
 ---
 
@@ -35,17 +35,8 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 Focus: Enforce file and directory count limits per directory to prevent architectural mess.
 
-### Task 5.1: Configuration Schema
-Location: `src/config/model.rs`, `src/config/loader.rs`
-```
-- Add `[structure]` section to `Config`:
-  - `max_files`: Global default limit for files per directory
-  - `max_dirs`: Global default limit for subdirectories per directory
-  - `ignore`: List of glob patterns (e.g., "*.md", ".gitkeep") not counted in structure limits
-- Add `[[structure.rules]]`:
-  - `pattern`: Glob pattern for directory matching
-  - `max_files`, `max_dirs`: Overrides for matched directories
-```
+### Task 5.1: Configuration Schema ✓
+Completed: `StructureConfig` and `StructureRule` in `src/config/model.rs`
 
 ### Task 5.2: Structure Analyzer
 Location: `src/checker/structure.rs` (New module), `src/scanner/mod.rs`

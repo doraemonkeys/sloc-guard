@@ -22,6 +22,9 @@ pub struct Config {
 
     #[serde(default)]
     pub languages: std::collections::HashMap<String, CustomLanguageConfig>,
+
+    #[serde(default)]
+    pub structure: StructureConfig,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -140,6 +143,41 @@ const fn default_true() -> bool {
 
 const fn default_warn_threshold() -> f64 {
     0.9
+}
+
+/// Configuration for directory structure limits.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StructureConfig {
+    /// Global default limit for files per directory.
+    #[serde(default)]
+    pub max_files: Option<usize>,
+
+    /// Global default limit for subdirectories per directory.
+    #[serde(default)]
+    pub max_dirs: Option<usize>,
+
+    /// Glob patterns for items not counted in structure limits (e.g., "*.md", ".gitkeep").
+    #[serde(default)]
+    pub ignore: Vec<String>,
+
+    /// Per-directory rules that override global limits.
+    #[serde(default)]
+    pub rules: Vec<StructureRule>,
+}
+
+/// Rule for overriding structure limits on specific directories.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StructureRule {
+    /// Glob pattern for directory matching.
+    pub pattern: String,
+
+    /// Override limit for files in matched directories.
+    #[serde(default)]
+    pub max_files: Option<usize>,
+
+    /// Override limit for subdirectories in matched directories.
+    #[serde(default)]
+    pub max_dirs: Option<usize>,
 }
 
 #[cfg(test)]

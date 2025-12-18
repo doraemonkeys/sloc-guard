@@ -21,6 +21,8 @@
 * Dependency Injection: Ensure all dependencies are provided externally via the constructor or method parameters.
 * Dependency Inversion: Define Interfaces for all external dependencies; business logic must rely on these abstractions rather than concrete implementations.
 * Avoid Global State: Ban the use of Singletons or global variables unless absolutely necessary and properly encapsulated, as they impede test isolation.
+* Use `#[allow()]` sparingly. Avoid bypassing CI lint checks unless there's a justified reason documented in a comment.
+
 
 ### Rust Specific
 Follow standard Rust idioms (The "Rust way").
