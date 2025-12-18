@@ -26,7 +26,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit, suggestions}` |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline` | `baseline/types.rs` | `Baseline`, `BaselineEntry` - baseline file for grandfathering violations |
-| `cache` | `cache/types.rs` | `Cache`, `CacheEntry`, `CachedLineStats`, `compute_config_hash` - file hash caching |
+| `cache` | `cache/types.rs` | `Cache`, `CacheEntry`, `CachedLineStats`, `compute_config_hash` - file hash caching with mtime+size validation |
 | `output/text` | `output/text.rs` | `TextFormatter`, `ColorMode` - human-readable output with color and verbose support |
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
@@ -85,9 +85,9 @@ Baseline { version: u32, files: HashMap<String, BaselineEntry> }  // .sloc-guard
 BaselineEntry { lines: usize, hash: String }  // SHA-256 content hash
 compute_file_hash(path) → String  // SHA-256 of file content
 
-// Cache (file hash caching)
+// Cache (file hash caching with metadata validation)
 Cache { version: u32, config_hash: String, files: HashMap<String, CacheEntry> }  // .sloc-guard-cache.json
-CacheEntry { hash: String, stats: CachedLineStats }  // file content hash + cached stats
+CacheEntry { hash: String, stats: CachedLineStats, mtime: u64, size: u64 }  // mtime+size for fast validation
 compute_config_hash(config) → String  // SHA-256 of serialized config
 
 // Progress bar (disabled in quiet mode or non-TTY)
@@ -115,11 +115,12 @@ CLI args → load_config() → [if extends] resolve extends chain (cycle detecti
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
          → ScanProgress::new(file_count, quiet)
          → for each file (parallel with rayon):
-              compute_file_hash() → check cache for valid entry
-              [if cache hit] use cached LineStats
-              [if cache miss] LanguageRegistry::get_by_extension()
+              get_file_metadata(mtime, size) → check cache by metadata
+              [if cache hit] use cached LineStats (no file read)
+              [if cache miss] read_file_with_hash()
+                              LanguageRegistry::get_by_extension()
                               SlocCounter::count(content) → CountResult
-                              update cache with new stats
+                              update cache with stats + metadata
               [if IgnoredFile] skip file (inline ignore directive)
               [if Stats] ThresholdChecker::check(path, stats) → CheckResult
               progress.inc()
@@ -141,11 +142,12 @@ CLI args → load_config()
          → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → ScanProgress::new(file_count, quiet)
          → for each file (parallel with rayon):
-              compute_file_hash() → check cache for valid entry
-              [if cache hit] use cached LineStats
-              [if cache miss] LanguageRegistry::get_by_extension()
+              get_file_metadata(mtime, size) → check cache by metadata
+              [if cache hit] use cached LineStats (no file read)
+              [if cache miss] read_file_with_hash()
+                              LanguageRegistry::get_by_extension()
                               SlocCounter::count(content) → CountResult
-                              update cache with new stats
+                              update cache with stats + metadata
               [if IgnoredFile] skip file
               [if Stats] collect_file_stats() → FileStatistics { path, stats, language }
               progress.inc()

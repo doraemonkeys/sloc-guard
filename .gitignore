@@ -5,3 +5,4 @@ TODO
 *gitignore_*
 *_gitignore*
 .sloc-guard-cache.json
+*local.json

@@ -11,7 +11,7 @@ Lint: make ci
 
 ## Performance Notes
 
-> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB), merged file read and hash computation (single read pass on cache miss).
+> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB), metadata-based cache validation (mtime + size check avoids file read on cache hit).
 >
 > **Future considerations**: When adding new features, maintain these patterns:
 > - Use `par_iter()` for file processing loops

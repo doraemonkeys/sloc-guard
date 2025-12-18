@@ -10,13 +10,15 @@ fn test_cache_entry_new() {
         comment: 15,
         blank: 5, ignored: 0,
     };
-    let entry = CacheEntry::new("abc123".to_string(), &stats);
+    let entry = CacheEntry::new("abc123".to_string(), &stats, 1000, 512);
 
     assert_eq!(entry.hash, "abc123");
     assert_eq!(entry.stats.total, 100);
     assert_eq!(entry.stats.code, 80);
     assert_eq!(entry.stats.comment, 15);
     assert_eq!(entry.stats.blank, 5);
+    assert_eq!(entry.mtime, 1000);
+    assert_eq!(entry.size, 512);
 }
 
 #[test]
@@ -55,7 +57,7 @@ fn test_line_stats_from_cached() {
 fn test_cache_new() {
     let cache = Cache::new("config_hash_123".to_string());
 
-    assert_eq!(cache.version(), 2);
+    assert_eq!(cache.version(), 3);
     assert_eq!(cache.config_hash(), "config_hash_123");
     assert!(cache.is_empty());
 }
@@ -64,7 +66,7 @@ fn test_cache_new() {
 fn test_cache_default() {
     let cache = Cache::default();
 
-    assert_eq!(cache.version(), 2);
+    assert_eq!(cache.version(), 3);
     assert_eq!(cache.config_hash(), "");
     assert!(cache.is_empty());
 }
@@ -79,7 +81,7 @@ fn test_cache_set_and_get() {
         blank: 5, ignored: 0,
     };
 
-    cache.set("src/main.rs", "file_hash".to_string(), &stats);
+    cache.set("src/main.rs", "file_hash".to_string(), &stats, 1000, 512);
 
     assert_eq!(cache.len(), 1);
     assert!(!cache.is_empty());
@@ -99,7 +101,7 @@ fn test_cache_get_if_valid() {
         blank: 5, ignored: 0,
     };
 
-    cache.set("src/main.rs", "file_hash".to_string(), &stats);
+    cache.set("src/main.rs", "file_hash".to_string(), &stats, 1000, 512);
 
     // Valid hash
     let entry = cache.get_if_valid("src/main.rs", "file_hash");
@@ -119,7 +121,7 @@ fn test_cache_remove() {
     let mut cache = Cache::new("hash".to_string());
     let stats = LineStats::default();
 
-    cache.set("src/main.rs", "hash1".to_string(), &stats);
+    cache.set("src/main.rs", "hash1".to_string(), &stats, 1000, 512);
     assert_eq!(cache.len(), 1);
 
     let removed = cache.remove("src/main.rs");
@@ -147,7 +149,7 @@ fn test_cache_save_and_load() {
         comment: 15,
         blank: 5, ignored: 0,
     };
-    cache.set("src/main.rs", "file_hash_xyz".to_string(), &stats);
+    cache.set("src/main.rs", "file_hash_xyz".to_string(), &stats, 2000, 1024);
 
     let temp_file = NamedTempFile::new().unwrap();
     let path = temp_file.path().to_path_buf();
@@ -215,11 +217,47 @@ fn test_cache_files() {
     let mut cache = Cache::new("hash".to_string());
     let stats = LineStats::default();
 
-    cache.set("file1.rs", "h1".to_string(), &stats);
-    cache.set("file2.rs", "h2".to_string(), &stats);
+    cache.set("file1.rs", "h1".to_string(), &stats, 1000, 100);
+    cache.set("file2.rs", "h2".to_string(), &stats, 2000, 200);
 
     let files = cache.files();
     assert_eq!(files.len(), 2);
     assert!(files.contains_key("file1.rs"));
     assert!(files.contains_key("file2.rs"));
+}
+
+#[test]
+fn test_cache_entry_metadata_matches() {
+    let stats = LineStats::default();
+    let entry = CacheEntry::new("hash".to_string(), &stats, 1000, 512);
+
+    assert!(entry.metadata_matches(1000, 512));
+    assert!(!entry.metadata_matches(1001, 512));
+    assert!(!entry.metadata_matches(1000, 513));
+    assert!(!entry.metadata_matches(0, 0));
+}
+
+#[test]
+fn test_cache_get_if_metadata_matches() {
+    let mut cache = Cache::new("hash".to_string());
+    let stats = LineStats::default();
+
+    cache.set("src/main.rs", "file_hash".to_string(), &stats, 1000, 512);
+
+    // Matching metadata
+    let entry = cache.get_if_metadata_matches("src/main.rs", 1000, 512);
+    assert!(entry.is_some());
+    assert_eq!(entry.unwrap().hash, "file_hash");
+
+    // Different mtime
+    let entry = cache.get_if_metadata_matches("src/main.rs", 1001, 512);
+    assert!(entry.is_none());
+
+    // Different size
+    let entry = cache.get_if_metadata_matches("src/main.rs", 1000, 513);
+    assert!(entry.is_none());
+
+    // Non-existent file
+    let entry = cache.get_if_metadata_matches("src/other.rs", 1000, 512);
+    assert!(entry.is_none());
 }

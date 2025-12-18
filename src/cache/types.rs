@@ -10,22 +10,36 @@ use crate::config::Config;
 use crate::counter::LineStats;
 use crate::{Result, SlocGuardError};
 
-const CACHE_VERSION: u32 = 2;
+const CACHE_VERSION: u32 = 3;
 
 /// Cached line statistics for a single file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CacheEntry {
     pub hash: String,
     pub stats: CachedLineStats,
+    /// File modification time (seconds since epoch)
+    #[serde(default)]
+    pub mtime: u64,
+    /// File size in bytes
+    #[serde(default)]
+    pub size: u64,
 }
 
 impl CacheEntry {
     #[must_use]
-    pub fn new(hash: String, stats: &LineStats) -> Self {
+    pub fn new(hash: String, stats: &LineStats, mtime: u64, size: u64) -> Self {
         Self {
             hash,
             stats: CachedLineStats::from(stats),
+            mtime,
+            size,
         }
+    }
+
+    /// Check if metadata (mtime + size) matches.
+    #[must_use]
+    pub const fn metadata_matches(&self, mtime: u64, size: u64) -> bool {
+        self.mtime == mtime && self.size == size
     }
 }
 
@@ -139,6 +153,15 @@ impl Cache {
         self.files.get(path)
     }
 
+    /// Get cached entry if metadata (mtime + size) matches.
+    /// This is a fast check that avoids reading file content.
+    #[must_use]
+    pub fn get_if_metadata_matches(&self, path: &str, mtime: u64, size: u64) -> Option<&CacheEntry> {
+        self.files
+            .get(path)
+            .filter(|entry| entry.metadata_matches(mtime, size))
+    }
+
     /// Get cached entry if hash matches.
     #[must_use]
     pub fn get_if_valid(&self, path: &str, file_hash: &str) -> Option<&CacheEntry> {
@@ -148,9 +171,9 @@ impl Cache {
     }
 
     /// Add or update a cached entry.
-    pub fn set(&mut self, path: &str, hash: String, stats: &LineStats) {
+    pub fn set(&mut self, path: &str, hash: String, stats: &LineStats, mtime: u64, size: u64) {
         self.files
-            .insert(path.to_string(), CacheEntry::new(hash, stats));
+            .insert(path.to_string(), CacheEntry::new(hash, stats, mtime, size));
     }
 
     /// Remove a cached entry.

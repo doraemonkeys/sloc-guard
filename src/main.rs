@@ -33,6 +33,19 @@ const LARGE_FILE_THRESHOLD: u64 = 10 * 1024 * 1024;
 /// Default cache file path
 const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
 
+/// Get file metadata (mtime, size) for cache validation.
+fn get_file_metadata(path: &Path) -> Option<(u64, u64)> {
+    let metadata = fs::metadata(path).ok()?;
+    let mtime = metadata
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+    let size = metadata.len();
+    Some((mtime, size))
+}
+
 const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
     match choice {
         ColorChoice::Auto => ColorMode::Auto,
@@ -369,27 +382,28 @@ fn process_file_cached(
 
     let path_key = file_path.to_string_lossy().replace('\\', "/");
 
-    // Read file and compute hash in single pass
-    let (file_hash, content) = read_file_with_hash(file_path).ok()?;
+    // Get file metadata for fast cache validation
+    let (mtime, size) = get_file_metadata(file_path)?;
 
-    // Try to get stats from cache
+    // Try to get stats from cache using metadata (no file read needed)
     let cached_stats = {
         let cache_guard = cache.lock().ok()?;
         cache_guard
-            .get_if_valid(&path_key, &file_hash)
+            .get_if_metadata_matches(&path_key, mtime, size)
             .map(|entry| LineStats::from(&entry.stats))
     };
 
     let stats = if let Some(stats) = cached_stats {
         stats
     } else {
-        // Cache miss: count lines from already-read content
+        // Cache miss: read file, compute hash, and count lines
+        let (file_hash, content) = read_file_with_hash(file_path).ok()?;
         let counter = SlocCounter::new(&language.comment_syntax);
         let result = count_lines_from_content(&content, &counter)?;
 
-        // Update cache
+        // Update cache with metadata
         if let Ok(mut cache_guard) = cache.lock() {
-            cache_guard.set(&path_key, file_hash, &result);
+            cache_guard.set(&path_key, file_hash, &result, mtime, size);
         }
 
         result
@@ -583,27 +597,28 @@ fn collect_file_stats_cached(
 
     let path_key = file_path.to_string_lossy().replace('\\', "/");
 
-    // Read file and compute hash in single pass
-    let (file_hash, content) = read_file_with_hash(file_path).ok()?;
+    // Get file metadata for fast cache validation
+    let (mtime, size) = get_file_metadata(file_path)?;
 
-    // Try to get stats from cache
+    // Try to get stats from cache using metadata (no file read needed)
     let cached_stats = {
         let cache_guard = cache.lock().ok()?;
         cache_guard
-            .get_if_valid(&path_key, &file_hash)
+            .get_if_metadata_matches(&path_key, mtime, size)
             .map(|entry| LineStats::from(&entry.stats))
     };
 
     let stats = if let Some(stats) = cached_stats {
         stats
     } else {
-        // Cache miss: count lines from already-read content
+        // Cache miss: read file, compute hash, and count lines
+        let (file_hash, content) = read_file_with_hash(file_path).ok()?;
         let counter = SlocCounter::new(&language.comment_syntax);
         let result = count_lines_from_content(&content, &counter)?;
 
-        // Update cache
+        // Update cache with metadata
         if let Ok(mut cache_guard) = cache.lock() {
-            cache_guard.set(&path_key, file_hash, &result);
+            cache_guard.set(&path_key, file_hash, &result, mtime, size);
         }
 
         result
