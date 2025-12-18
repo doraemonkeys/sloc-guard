@@ -17,7 +17,7 @@ pub fn run_init(args: &crate::cli::InitArgs) -> i32 {
 ///
 /// # Errors
 /// Returns an error if the file already exists (without --force) or cannot be written.
-pub fn run_init_impl(args: &crate::cli::InitArgs) -> Result<()> {
+pub(crate) fn run_init_impl(args: &crate::cli::InitArgs) -> Result<()> {
     let output_path = &args.output;
 
     if output_path.exists() && !args.force {
@@ -36,7 +36,7 @@ pub fn run_init_impl(args: &crate::cli::InitArgs) -> Result<()> {
 }
 
 #[must_use]
-pub fn generate_config_template() -> String {
+pub(crate) fn generate_config_template() -> String {
     r#"# sloc-guard configuration file
 # See: https://github.com/doraemonkeys/sloc-guard for documentation
 

@@ -889,8 +889,8 @@ fn json_formatter_with_trend() {
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("trend").is_some());
     let trend = parsed.get("trend").unwrap();
-    assert_eq!(trend.get("files_delta").unwrap().as_i64().unwrap(), 5);
-    assert_eq!(trend.get("code_delta").unwrap().as_i64().unwrap(), 50);
+    assert_eq!(trend.get("files").unwrap().as_i64().unwrap(), 5);
+    assert_eq!(trend.get("code").unwrap().as_i64().unwrap(), 50);
 }
 
 #[test]

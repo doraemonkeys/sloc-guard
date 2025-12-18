@@ -1,10 +1,13 @@
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::error::{Result, SlocGuardError};
 
 use super::*;
+
+static FS_LOCK: Mutex<()> = Mutex::new(());
 
 // Mock HTTP client for testing
 struct MockHttpClient {
@@ -161,12 +164,14 @@ fn cache_file_path_includes_url_hash() {
 
 #[test]
 fn clear_cache_returns_zero_when_no_cache() {
+    let _lock = FS_LOCK.lock().unwrap();
     // Just verify it doesn't panic when called
     let _ = clear_cache();
 }
 
 #[test]
 fn clear_cache_removes_cached_files() {
+    let _lock = FS_LOCK.lock().unwrap();
     if cache_dir().is_none() {
         return;
     }
@@ -224,6 +229,7 @@ fn read_from_cache_returns_none_when_no_cache_dir() {
 
 #[test]
 fn write_to_cache_and_read_back() {
+    let _lock = FS_LOCK.lock().unwrap();
     if cache_dir().is_none() {
         // Skip test if cache_dir is not available
         return;
@@ -267,6 +273,7 @@ fn cache_file_path_different_urls_produce_different_paths() {
 
 #[test]
 fn fetch_with_mock_client_success() {
+    let _lock = FS_LOCK.lock().unwrap();
     let content = "[default]\nmax_lines = 200\n";
     let client = MockHttpClient::success(content);
 
@@ -294,6 +301,7 @@ fn fetch_with_mock_client_success() {
 
 #[test]
 fn fetch_with_mock_client_error() {
+    let _lock = FS_LOCK.lock().unwrap();
     let client = MockHttpClient::error("Connection refused");
 
     let url = format!(
@@ -319,6 +327,7 @@ fn fetch_with_mock_client_error() {
 
 #[test]
 fn fetch_with_mock_client_uses_cache_on_second_call() {
+    let _lock = FS_LOCK.lock().unwrap();
     let content = "[default]\nmax_lines = 300\n";
     let client = MockHttpClient::success(content);
 
@@ -386,6 +395,7 @@ fn fetch_with_mock_client_ftp_url_never_calls_client() {
 
 #[test]
 fn fetch_with_mock_client_http_url_accepted() {
+    let _lock = FS_LOCK.lock().unwrap();
     let content = "[default]\nmax_lines = 400\n";
     let client = MockHttpClient::success(content);
 
@@ -411,6 +421,7 @@ fn fetch_with_mock_client_http_url_accepted() {
 
 #[test]
 fn fetch_with_mock_client_timeout_error() {
+    let _lock = FS_LOCK.lock().unwrap();
     let client = MockHttpClient::error("Request timeout fetching remote config");
 
     let url = format!(
@@ -429,6 +440,7 @@ fn fetch_with_mock_client_timeout_error() {
 
 #[test]
 fn fetch_with_mock_client_http_404_error() {
+    let _lock = FS_LOCK.lock().unwrap();
     let client = MockHttpClient::error("Failed to fetch remote config: HTTP 404 Not Found");
 
     let url = format!(
@@ -447,6 +459,7 @@ fn fetch_with_mock_client_http_404_error() {
 
 #[test]
 fn fetch_with_mock_client_http_500_error() {
+    let _lock = FS_LOCK.lock().unwrap();
     let client =
         MockHttpClient::error("Failed to fetch remote config: HTTP 500 Internal Server Error");
 
@@ -466,6 +479,7 @@ fn fetch_with_mock_client_http_500_error() {
 
 #[test]
 fn fetch_with_mock_client_network_error() {
+    let _lock = FS_LOCK.lock().unwrap();
     let client = MockHttpClient::error("Failed to connect to remote config URL");
 
     let url = format!(

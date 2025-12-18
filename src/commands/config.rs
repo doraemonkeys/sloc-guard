@@ -30,7 +30,7 @@ fn run_config_validate(config_path: &Path) -> i32 {
 ///
 /// # Errors
 /// Returns an error if the file doesn't exist, contains invalid TOML, or has semantic errors.
-pub fn run_config_validate_impl(config_path: &Path) -> Result<()> {
+pub(crate) fn run_config_validate_impl(config_path: &Path) -> Result<()> {
     if !config_path.exists() {
         return Err(SlocGuardError::Config(format!(
             "Configuration file not found: {}",
@@ -51,7 +51,7 @@ pub fn run_config_validate_impl(config_path: &Path) -> Result<()> {
 /// # Errors
 /// Returns an error if `warn_threshold` is out of range, glob patterns are invalid,
 /// override paths are empty, or rules are misconfigured.
-pub fn validate_config_semantics(config: &Config) -> Result<()> {
+pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
     if !(0.0..=1.0).contains(&config.default.warn_threshold) {
         return Err(SlocGuardError::Config(format!(
             "warn_threshold must be between 0.0 and 1.0, got {}",
@@ -102,7 +102,7 @@ fn run_config_show(config_path: Option<&Path>, format: &str) -> i32 {
 ///
 /// # Errors
 /// Returns an error if the configuration file cannot be loaded or serialization fails.
-pub fn run_config_show_impl(config_path: Option<&Path>, format: &str) -> Result<String> {
+pub(crate) fn run_config_show_impl(config_path: Option<&Path>, format: &str) -> Result<String> {
     let config = load_config(config_path)?;
 
     match format {
@@ -120,7 +120,7 @@ fn load_config(config_path: Option<&Path>) -> Result<Config> {
 }
 
 #[must_use]
-pub fn format_config_text(config: &Config) -> String {
+pub(crate) fn format_config_text(config: &Config) -> String {
     use std::fmt::Write;
 
     let mut output = String::new();

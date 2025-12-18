@@ -87,9 +87,9 @@ Location: `src/output/html.rs`
 ### Dependency Flow
 
 ```
-main.rs
-  -> cli (parse args)
-  -> commands/* (init, config)
+main.rs (CLI parsing + dispatch)
+  -> commands/check | stats | baseline_cmd | init | config
+  -> commands/common (shared: load_config, cache, scan paths)
   -> config/loader (load config)
   -> scanner (find files)
   -> language/registry (get comment syntax)

@@ -36,11 +36,15 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `LanguageStats`, `DirectoryStats` - stats output with language/directory breakdown, top-N files, average |
 | `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
+| `commands/common` | `commands/common.rs` | Shared utilities: `load_config`, `load_cache`, `save_cache`, `resolve_scan_paths`, `write_output`, `process_file_with_cache`, `get_file_metadata` |
+| `commands/check` | `commands/check.rs` | `run_check` - check command execution, baseline loading/comparison, git diff filtering, output formatting |
+| `commands/stats` | `commands/stats.rs` | `run_stats` - stats command execution, file stats collection, trend tracking |
+| `commands/baseline` | `commands/baseline_cmd.rs` | `run_baseline` - baseline update command execution |
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
 | `commands/init` | `commands/init.rs` | `run_init`, `generate_config_template` |
 | `analyzer` | `analyzer/*.rs` | `SplitAnalyzer`, `FunctionParser` - parses functions for multi-language split suggestions (--fix mode) |
 | `stats` | `stats/trend.rs` | `TrendHistory`, `TrendEntry`, `TrendDelta` - historical stats storage (.sloc-guard-history.json), delta computation |
-| `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_baseline` |
+| `main` | `main.rs` | CLI parsing, command dispatch to `commands/*` |
 
 ## Key Types
 

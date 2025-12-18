@@ -297,23 +297,23 @@ struct JsonStatsSummary {
 }
 
 #[derive(Serialize)]
-#[allow(clippy::struct_field_names)]
+
 struct JsonTrendDelta {
-    files_delta: i64,
-    lines_delta: i64,
-    code_delta: i64,
-    comment_delta: i64,
-    blank_delta: i64,
+    files: i64,
+    lines: i64,
+    code: i64,
+    comment: i64,
+    blank: i64,
 }
 
 impl From<&TrendDelta> for JsonTrendDelta {
     fn from(trend: &TrendDelta) -> Self {
         Self {
-            files_delta: trend.files_delta,
-            lines_delta: trend.lines_delta,
-            code_delta: trend.code_delta,
-            comment_delta: trend.comment_delta,
-            blank_delta: trend.blank_delta,
+            files: trend.files_delta,
+            lines: trend.lines_delta,
+            code: trend.code_delta,
+            comment: trend.comment_delta,
+            blank: trend.blank_delta,
         }
     }
 }

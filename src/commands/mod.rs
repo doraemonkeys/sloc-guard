@@ -1,8 +1,12 @@
+pub mod baseline_cmd;
+pub mod check;
+pub mod common;
 pub mod config;
 pub mod init;
+pub mod stats;
 
-pub use config::{
-    format_config_text, run_config, run_config_show_impl, run_config_validate_impl,
-    validate_config_semantics,
-};
-pub use init::{generate_config_template, run_init, run_init_impl};
+pub use baseline_cmd::run_baseline;
+pub use check::run_check;
+pub use config::run_config;
+pub use init::run_init;
+pub use stats::run_stats;

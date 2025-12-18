@@ -1,9 +1,7 @@
 use crate::config::{Config, FileOverride, RuleConfig};
 use tempfile::TempDir;
 
-use super::{
-    format_config_text, run_config_show_impl, run_config_validate_impl, validate_config_semantics,
-};
+use super::*;
 
 #[test]
 fn validate_config_nonexistent_file_returns_error() {
