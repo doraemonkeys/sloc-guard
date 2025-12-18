@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore, --fix), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml`, supports `extends` for config inheritance |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
@@ -23,7 +23,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `scanner/gitignore` | `scanner/gitignore.rs` | `GitAwareScanner` - gix dirwalk with .gitignore support |
-| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit}` |
+| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit, suggestions}` |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline` | `baseline/types.rs` | `Baseline`, `BaselineEntry` - baseline file for grandfathering violations |
 | `cache` | `cache/types.rs` | `Cache`, `CacheEntry`, `CachedLineStats`, `compute_config_hash` - file hash caching |
@@ -36,6 +36,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
 | `commands/init` | `commands/init.rs` | `run_init`, `generate_config_template` |
+| `analyzer` | `analyzer/*.rs` | `SplitAnalyzer`, `FunctionParser` - parses functions for multi-language split suggestions (--fix mode) |
 | `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_baseline` |
 
 ## Key Types
@@ -62,7 +63,7 @@ LanguageRegistry::with_custom_languages(&config.languages) // builds registry wi
 
 // Check results
 CheckStatus::Passed | Warning | Failed | Grandfathered
-CheckResult { path, status, stats, limit, override_reason: Option<String> }  // override_reason set when [[override]] matches
+CheckResult { path, status, stats, limit, override_reason: Option<String>, suggestions: Option<SplitSuggestion> }
 
 // Output formatting
 ColorMode::Auto | Always | Never  // controls ANSI color output
@@ -93,6 +94,12 @@ compute_config_hash(config) → String  // SHA-256 of serialized config
 ScanProgress::new(total, quiet) → ScanProgress  // Thread-safe with AtomicU64
 ScanProgress::inc()  // Increment counter (rayon-safe)
 ScanProgress::finish()  // Clear progress bar
+
+// Split suggestions (--fix mode)
+FunctionInfo { name, start_line, end_line, line_count }  // Parsed function boundaries
+SplitChunk { name, functions, start_line, end_line, line_count }  // Suggested file chunk
+SplitSuggestion { original_path, total_lines, limit, functions, chunks }  // Full split recommendation
+FunctionParser trait + get_parser(language) → Box<dyn FunctionParser>  // Rust, Go, Python, JS/TS, C/C++
 ```
 
 ## Data Flow (check command)
@@ -119,6 +126,7 @@ CLI args → load_config() → [if extends] resolve extends chain (cycle detecti
          → progress.finish()
          → [if !--no-cache] save_cache()
          → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
+         → [if --fix] generate_split_suggestions(results, registry) → add SplitSuggestion to failed CheckResults
          → TextFormatter/JsonFormatter/SarifFormatter/MarkdownFormatter::format(results)
          → write to stdout or --output file
 ```
@@ -197,6 +205,7 @@ CLI args → load_config()
 - `indicatif` - progress bar display
 - `gix` - git integration (--diff mode)
 - `sha2` - SHA-256 hashing (baseline, cache)
+- `regex` - function pattern matching (split suggestions)
 - `thiserror` - error handling
 
 ## Test Files

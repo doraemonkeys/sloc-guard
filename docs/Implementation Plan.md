@@ -25,59 +25,23 @@ Lint: make ci
 All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional completed features:
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
-- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends)
+- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix)
 - **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output
 
 ---
 
 ## Phase 4: Advanced Features (Pending)
 
-### Task 4.8b-1: Remote Config Fetch
+### Task 4.8b: Remote Config Support
 
-Location: `src/config/loader.rs`, `Cargo.toml`
+Location: `src/config/loader.rs`, `src/config/cache.rs` (new), `src/cli.rs`
 
 ```
 - Add reqwest dependency (blocking feature)
 - Implement fetch_remote_config(url) → Result<String>
 - Error handling: timeout, 404, invalid URL
-```
-
-### Task 4.8b-2: Remote Config Cache
-
-Location: `src/config/cache.rs` (new)
-
-```
-- Cache path: ~/.cache/sloc-guard/configs/
-- Hash URL as filename
-- Check cache freshness (e.g., 1 hour TTL)
-- Integrate with fetch_remote_config
-```
-
-### Task 4.8b-3: --no-extends Flag
-
-Location: `src/cli.rs`, `src/config/loader.rs`
-
-```
-- Add --no-extends global CLI flag
-- Skip extends resolution when flag set
-- Update config loading logic
-```
-
-### Task 4.10: Split Suggestions (--fix)
-
-Location: `src/analyzer/` (new), `src/cli.rs`, `src/output/*.rs`
-
-```
-- Add --fix flag to check command
-- Analyze code structure to identify function/class boundaries
-- When file exceeds threshold, suggest split points:
-  - Detect function definitions (fn, def, function, etc.)
-  - Group consecutive functions by logical cohesion
-  - Estimate line count per split chunk
-- Output format: function name, line range, suggested new file
-- Language-specific parsers: Rust, Go, Python, JS/TS, C/C++
-- Text output: show suggestions inline with failed files
-- JSON/SARIF: include "suggestions" array in results
+- Cache remote configs: ~/.cache/sloc-guard/configs/, hash URL as filename, 1 hour TTL
+- Add --no-extends CLI flag to skip extends resolution
 ```
 
 ---
@@ -167,10 +131,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Short-term** | 4.10 Split Suggestions (--fix) |
-| **2. Deferred** | 4.8b-1 Remote Config Fetch |
-| | 4.8b-2 Remote Config Cache |
-| | 4.8b-3 --no-extends Flag |
+| **1. Deferred** | 4.8b Remote Config Support |
 | | 5.1c Directory Statistics |
 | | 5.2 Trend Tracking |
 | | 5.3a-d HTML Report |
