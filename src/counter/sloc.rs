@@ -5,6 +5,9 @@ use crate::language::CommentSyntax;
 use super::CommentDetector;
 
 const IGNORE_FILE_DIRECTIVE: &str = "sloc-guard:ignore-file";
+const IGNORE_NEXT_PREFIX: &str = "sloc-guard:ignore-next";
+const IGNORE_START_DIRECTIVE: &str = "sloc-guard:ignore-start";
+const IGNORE_END_DIRECTIVE: &str = "sloc-guard:ignore-end";
 const DIRECTIVE_SCAN_LINES: usize = 10;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -13,6 +16,7 @@ pub struct LineStats {
     pub code: usize,
     pub comment: usize,
     pub blank: usize,
+    pub ignored: usize,
 }
 
 impl LineStats {
@@ -23,6 +27,7 @@ impl LineStats {
             code: 0,
             comment: 0,
             blank: 0,
+            ignored: 0,
         }
     }
 
@@ -55,6 +60,8 @@ impl<'a> SlocCounter<'a> {
         let mut stats = LineStats::new();
         let mut in_multi_line_comment = false;
         let mut multi_line_end_marker: Option<&'a str> = None;
+        let mut ignore_remaining: usize = 0;
+        let mut in_ignore_block = false;
 
         for line in source.lines() {
             // Check for ignore directive in first N lines
@@ -67,6 +74,8 @@ impl<'a> SlocCounter<'a> {
                 &mut stats,
                 &mut in_multi_line_comment,
                 &mut multi_line_end_marker,
+                &mut ignore_remaining,
+                &mut in_ignore_block,
             );
         }
 
@@ -88,6 +97,8 @@ impl<'a> SlocCounter<'a> {
         let mut stats = LineStats::new();
         let mut in_multi_line_comment = false;
         let mut multi_line_end_marker: Option<&'a str> = None;
+        let mut ignore_remaining: usize = 0;
+        let mut in_ignore_block = false;
 
         for line_result in reader.lines() {
             let line = line_result?;
@@ -102,6 +113,8 @@ impl<'a> SlocCounter<'a> {
                 &mut stats,
                 &mut in_multi_line_comment,
                 &mut multi_line_end_marker,
+                &mut ignore_remaining,
+                &mut in_ignore_block,
             );
         }
 
@@ -117,15 +130,79 @@ impl<'a> SlocCounter<'a> {
         self.detector.is_single_line_comment(trimmed)
     }
 
+    fn parse_ignore_next(&self, trimmed: &str) -> Option<usize> {
+        if !trimmed.contains(IGNORE_NEXT_PREFIX) {
+            return None;
+        }
+        if !self.detector.is_single_line_comment(trimmed) {
+            return None;
+        }
+        // Find the directive and parse the number
+        let pos = trimmed.find(IGNORE_NEXT_PREFIX)?;
+        let after = &trimmed[pos + IGNORE_NEXT_PREFIX.len()..];
+        let num_str = after.split_whitespace().next()?;
+        num_str.parse().ok()
+    }
+
+    fn has_ignore_start(&self, trimmed: &str) -> bool {
+        trimmed.contains(IGNORE_START_DIRECTIVE) && self.detector.is_single_line_comment(trimmed)
+    }
+
+    fn has_ignore_end(&self, trimmed: &str) -> bool {
+        trimmed.contains(IGNORE_END_DIRECTIVE) && self.detector.is_single_line_comment(trimmed)
+    }
+
     fn process_line(
         &self,
         line: &str,
         stats: &mut LineStats,
         in_multi_line_comment: &mut bool,
         multi_line_end_marker: &mut Option<&'a str>,
+        ignore_remaining: &mut usize,
+        in_ignore_block: &mut bool,
     ) {
         stats.total += 1;
+        let trimmed = line.trim();
 
+        // Check for ignore directives (only in single-line comments)
+        if self.detector.is_single_line_comment(trimmed) {
+            // Check for ignore-end first (to exit ignore block)
+            if self.has_ignore_end(trimmed) {
+                *in_ignore_block = false;
+                stats.comment += 1;
+                return;
+            }
+            // Check for ignore-start
+            if self.has_ignore_start(trimmed) {
+                *in_ignore_block = true;
+                stats.comment += 1;
+                return;
+            }
+            // Check for ignore-next N
+            if let Some(n) = self.parse_ignore_next(trimmed) {
+                *ignore_remaining = n;
+                stats.comment += 1;
+                return;
+            }
+        }
+
+        // If we're in an ignore block or have remaining ignore lines, mark as ignored
+        if *in_ignore_block {
+            stats.ignored += 1;
+            // Still need to track multi-line comment state for proper parsing after ignore block
+            self.track_multi_line_comment_state(line, in_multi_line_comment, multi_line_end_marker);
+            return;
+        }
+
+        if *ignore_remaining > 0 {
+            *ignore_remaining -= 1;
+            stats.ignored += 1;
+            // Still need to track multi-line comment state
+            self.track_multi_line_comment_state(line, in_multi_line_comment, multi_line_end_marker);
+            return;
+        }
+
+        // Normal line classification
         if *in_multi_line_comment {
             stats.comment += 1;
             if let Some(end_marker) = *multi_line_end_marker
@@ -136,8 +213,6 @@ impl<'a> SlocCounter<'a> {
             }
             return;
         }
-
-        let trimmed = line.trim();
 
         if trimmed.is_empty() {
             stats.blank += 1;
@@ -159,6 +234,27 @@ impl<'a> SlocCounter<'a> {
         }
 
         stats.code += 1;
+    }
+
+    fn track_multi_line_comment_state(
+        &self,
+        line: &str,
+        in_multi_line_comment: &mut bool,
+        multi_line_end_marker: &mut Option<&'a str>,
+    ) {
+        if *in_multi_line_comment {
+            if let Some(end_marker) = *multi_line_end_marker
+                && self.detector.contains_multi_line_end(line, end_marker)
+            {
+                *in_multi_line_comment = false;
+                *multi_line_end_marker = None;
+            }
+        } else if let Some((_, end)) = self.detector.find_multi_line_start(line)
+            && !self.detector.contains_multi_line_end(line, end)
+        {
+            *in_multi_line_comment = true;
+            *multi_line_end_marker = Some(end);
+        }
     }
 }
 

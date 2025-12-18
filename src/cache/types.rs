@@ -10,7 +10,7 @@ use crate::config::Config;
 use crate::counter::LineStats;
 use crate::{Result, SlocGuardError};
 
-const CACHE_VERSION: u32 = 1;
+const CACHE_VERSION: u32 = 2;
 
 /// Cached line statistics for a single file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -36,6 +36,8 @@ pub struct CachedLineStats {
     pub code: usize,
     pub comment: usize,
     pub blank: usize,
+    #[serde(default)]
+    pub ignored: usize,
 }
 
 impl From<&LineStats> for CachedLineStats {
@@ -45,6 +47,7 @@ impl From<&LineStats> for CachedLineStats {
             code: stats.code,
             comment: stats.comment,
             blank: stats.blank,
+            ignored: stats.ignored,
         }
     }
 }
@@ -56,6 +59,7 @@ impl From<&CachedLineStats> for LineStats {
             code: cached.code,
             comment: cached.comment,
             blank: cached.blank,
+            ignored: cached.ignored,
         }
     }
 }

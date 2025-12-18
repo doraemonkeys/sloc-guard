@@ -8,7 +8,7 @@ fn test_cache_entry_new() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
     let entry = CacheEntry::new("abc123".to_string(), &stats);
 
@@ -25,7 +25,7 @@ fn test_cached_line_stats_from() {
         total: 50,
         code: 40,
         comment: 5,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
     let cached = CachedLineStats::from(&stats);
 
@@ -41,7 +41,7 @@ fn test_line_stats_from_cached() {
         total: 50,
         code: 40,
         comment: 5,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
     let stats = LineStats::from(&cached);
 
@@ -55,7 +55,7 @@ fn test_line_stats_from_cached() {
 fn test_cache_new() {
     let cache = Cache::new("config_hash_123".to_string());
 
-    assert_eq!(cache.version(), 1);
+    assert_eq!(cache.version(), 2);
     assert_eq!(cache.config_hash(), "config_hash_123");
     assert!(cache.is_empty());
 }
@@ -64,7 +64,7 @@ fn test_cache_new() {
 fn test_cache_default() {
     let cache = Cache::default();
 
-    assert_eq!(cache.version(), 1);
+    assert_eq!(cache.version(), 2);
     assert_eq!(cache.config_hash(), "");
     assert!(cache.is_empty());
 }
@@ -76,7 +76,7 @@ fn test_cache_set_and_get() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
 
     cache.set("src/main.rs", "file_hash".to_string(), &stats);
@@ -96,7 +96,7 @@ fn test_cache_get_if_valid() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
 
     cache.set("src/main.rs", "file_hash".to_string(), &stats);
@@ -145,7 +145,7 @@ fn test_cache_save_and_load() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
     cache.set("src/main.rs", "file_hash_xyz".to_string(), &stats);
 

@@ -23,7 +23,7 @@ fn check_result_is_failed() {
             total: 600,
             code: 550,
             comment: 30,
-            blank: 20,
+            blank: 20, ignored: 0,
         },
         limit: 500,
         override_reason: None,

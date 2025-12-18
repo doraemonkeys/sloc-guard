@@ -270,7 +270,7 @@ fn compute_effective_stats_skip_both() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
 
     let effective = compute_effective_stats(&stats, true, true);
@@ -285,7 +285,7 @@ fn compute_effective_stats_include_comments() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
 
     let effective = compute_effective_stats(&stats, false, true);
@@ -300,7 +300,7 @@ fn compute_effective_stats_include_blanks() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
 
     let effective = compute_effective_stats(&stats, true, false);
@@ -315,7 +315,7 @@ fn compute_effective_stats_include_both() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5,
+        blank: 5, ignored: 0,
     };
 
     let effective = compute_effective_stats(&stats, false, false);
@@ -1270,7 +1270,7 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
                 total: 600,
                 code: 600,
                 comment: 0,
-                blank: 0,
+                blank: 0, ignored: 0,
             },
             limit: 500,
             override_reason: None,
@@ -1282,7 +1282,7 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
                 total: 100,
                 code: 100,
                 comment: 0,
-                blank: 0,
+                blank: 0, ignored: 0,
             },
             limit: 500,
             override_reason: None,
@@ -1307,7 +1307,7 @@ fn apply_baseline_comparison_does_not_mark_new_violations() {
             total: 600,
             code: 600,
             comment: 0,
-            blank: 0,
+            blank: 0, ignored: 0,
         },
         limit: 500,
         override_reason: None,
@@ -1329,7 +1329,7 @@ fn apply_baseline_comparison_handles_windows_paths() {
             total: 600,
             code: 600,
             comment: 0,
-            blank: 0,
+            blank: 0, ignored: 0,
         },
         limit: 500,
         override_reason: None,

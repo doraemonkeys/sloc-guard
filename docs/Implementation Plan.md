@@ -84,6 +84,7 @@ make ci
 | **Phase 3.2** | Git-Aware Exclude (gix dirwalk, --no-gitignore flag) | ✅ Done |
 | **Phase 2.3** | Markdown Output (MarkdownFormatter, StatsMarkdownFormatter for PR comments) | ✅ Done |
 | **Phase 4.5** | Custom Language Definition ([languages.<name>] config section) | ✅ Done |
+| **Phase 4.6b** | Inline Ignore block/next (ignore-next N, ignore-start/end, LineStats.ignored) | ✅ Done |
 
 ---
 
@@ -119,14 +120,14 @@ Location: `src/config/model.rs`, `src/language/registry.rs`
 - [x] Override built-in if same extension
 ```
 
-### Task 4.6b: Inline Ignore (block/next)
+### Task 4.6b: Inline Ignore (block/next) (Done)
 
 Location: `src/counter/sloc.rs`
 
 ```
-- Support: // sloc-guard:ignore-next N
-- Support: // sloc-guard:ignore-start / ignore-end
-- Exclude matched lines from count
+- [x] Support: // sloc-guard:ignore-next N
+- [x] Support: // sloc-guard:ignore-start / ignore-end
+- [x] Exclude matched lines from count (tracked via LineStats.ignored)
 ```
 
 ### Task 4.8a: Config Inheritance (local)
@@ -274,8 +275,8 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Short-term** | 4.6b Inline Ignore (block/next) |
-| **2. Medium** | 4.8a Config Inheritance (local), 4.10 Split Suggestions (--fix) |
+| **1. Short-term** | 4.8a Config Inheritance (local) |
+| **2. Medium** | 4.10 Split Suggestions (--fix) |
 | **3. Deferred** | 4.8b-1 Remote Config Fetch |
 | | 4.8b-2 Remote Config Cache |
 | | 4.8b-3 --no-extends Flag |

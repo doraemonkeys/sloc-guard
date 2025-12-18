@@ -13,6 +13,7 @@ fn stats_with_code(code: usize) -> LineStats {
         code,
         comment: 5,
         blank: 5,
+        ignored: 0,
     }
 }
 
@@ -128,7 +129,7 @@ fn check_result_usage_percent() {
             total: 260,
             code: 250,
             comment: 5,
-            blank: 5,
+            blank: 5, ignored: 0,
         },
         limit: 500,
         override_reason: None,

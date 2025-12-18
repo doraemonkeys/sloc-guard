@@ -19,7 +19,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/comment` | `counter/comment.rs` | `CommentDetector` - detects single/multi-line comments |
-| `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directive |
+| `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directives (file/next/block) |
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
 | `scanner/mod` | `scanner/mod.rs` | `DirectoryScanner` - walkdir-based file discovery |
 | `scanner/gitignore` | `scanner/gitignore.rs` | `GitAwareScanner` - gix dirwalk with .gitignore support |
@@ -50,8 +50,12 @@ FileOverride { path: String, max_lines: usize, reason: Option<String> }  // per-
 CustomLanguageConfig { extensions: Vec<String>, single_line_comments: Vec<String>, multi_line_comments: Vec<(String, String)> }  // custom language via [languages.<name>]
 
 // Line counting
-LineStats { total, code, comment, blank }  // sloc() returns code count
+LineStats { total, code, comment, blank, ignored }  // sloc() returns code count
 CountResult::Stats(LineStats) | IgnoredFile  // IgnoredFile when "// sloc-guard:ignore-file" in first 10 lines
+// Inline ignore directives (in single-line comments only):
+//   // sloc-guard:ignore-file - ignores entire file (first 10 lines only)
+//   // sloc-guard:ignore-next N - ignores next N lines (counts as ignored)
+//   // sloc-guard:ignore-start / ignore-end - ignores block (counts as ignored)
 CommentSyntax { single_line: Vec<String>, multi_line: Vec<(String, String)> }
 LanguageRegistry::with_custom_languages(&config.languages) // builds registry with custom languages (override built-in if same extension)
 
