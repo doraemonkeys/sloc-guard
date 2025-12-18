@@ -63,6 +63,7 @@ fn apply_cli_overrides_max_lines() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -92,6 +93,7 @@ fn apply_cli_overrides_no_skip_comments() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -121,6 +123,7 @@ fn apply_cli_overrides_no_skip_blank() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -148,6 +151,7 @@ fn apply_cli_overrides_warn_threshold() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -175,6 +179,7 @@ fn get_scan_paths_uses_include_override() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -202,6 +207,7 @@ fn get_scan_paths_uses_cli_paths() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -231,6 +237,7 @@ fn get_scan_paths_uses_config_include_paths() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -258,6 +265,7 @@ fn get_scan_paths_defaults_to_current_dir() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let paths = get_scan_paths(&args, &config);
@@ -362,21 +370,21 @@ fn process_file_valid_rust_file() {
 #[test]
 fn format_output_text() {
     let results: Vec<CheckResult> = vec![];
-    let output = format_output(OutputFormat::Text, &results, ColorMode::Never, 0).unwrap();
+    let output = format_output(OutputFormat::Text, &results, ColorMode::Never, 0, false).unwrap();
     assert!(output.contains("Summary"));
 }
 
 #[test]
 fn format_output_json() {
     let results: Vec<CheckResult> = vec![];
-    let output = format_output(OutputFormat::Json, &results, ColorMode::Never, 0).unwrap();
+    let output = format_output(OutputFormat::Json, &results, ColorMode::Never, 0, false).unwrap();
     assert!(output.contains("summary"));
 }
 
 #[test]
 fn format_output_sarif_works() {
     let results: Vec<CheckResult> = vec![];
-    let result = format_output(OutputFormat::Sarif, &results, ColorMode::Never, 0);
+    let result = format_output(OutputFormat::Sarif, &results, ColorMode::Never, 0, false);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("$schema"));
@@ -386,7 +394,7 @@ fn format_output_sarif_works() {
 #[test]
 fn format_output_markdown_works() {
     let results: Vec<CheckResult> = vec![];
-    let result = format_output(OutputFormat::Markdown, &results, ColorMode::Never, 0);
+    let result = format_output(OutputFormat::Markdown, &results, ColorMode::Never, 0, false);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("## SLOC Guard Results"));
@@ -606,6 +614,7 @@ fn run_check_impl_with_valid_directory() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -635,6 +644,7 @@ fn run_check_impl_with_warn_only() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -665,6 +675,7 @@ fn run_check_impl_with_threshold_exceeded() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -697,6 +708,7 @@ fn run_check_impl_with_json_output() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -729,6 +741,7 @@ fn run_check_impl_with_verbose() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -757,6 +770,7 @@ fn run_check_impl_with_no_skip_flags() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -785,6 +799,7 @@ fn run_check_impl_with_include_paths() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -893,6 +908,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -924,6 +940,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -955,6 +972,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         baseline: None,
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -1274,6 +1292,7 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
             },
             limit: 500,
             override_reason: None,
+            suggestions: None,
         },
         CheckResult {
             path: PathBuf::from("src/other.rs"),
@@ -1286,6 +1305,7 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
             },
             limit: 500,
             override_reason: None,
+            suggestions: None,
         },
     ];
 
@@ -1311,6 +1331,7 @@ fn apply_baseline_comparison_does_not_mark_new_violations() {
         },
         limit: 500,
         override_reason: None,
+        suggestions: None,
     }];
 
     let baseline = Baseline::new(); // Empty baseline
@@ -1333,6 +1354,7 @@ fn apply_baseline_comparison_handles_windows_paths() {
         },
         limit: 500,
         override_reason: None,
+        suggestions: None,
     }];
 
     let mut baseline = Baseline::new();
@@ -1382,6 +1404,7 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
         baseline: Some(baseline_path), // Use baseline
         no_cache: true,
         no_gitignore: false,
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1424,6 +1447,7 @@ fn run_check_impl_without_baseline_fails_on_violations() {
         baseline: None, // No baseline
         no_cache: true,
         no_gitignore: true, // Disable gitignore for temp file tests
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1471,6 +1495,7 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
         baseline: Some(baseline_path), // Baseline exists but doesn't include this file
         no_cache: true,
         no_gitignore: true, // Disable gitignore for temp file tests
+        fix: false,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);

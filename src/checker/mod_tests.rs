@@ -10,6 +10,7 @@ fn check_result_is_passed() {
         stats: LineStats::default(),
         limit: 500,
         override_reason: None,
+        suggestions: None,
     };
     assert!(matches!(result.status, CheckStatus::Passed));
 }
@@ -27,6 +28,7 @@ fn check_result_is_failed() {
         },
         limit: 500,
         override_reason: None,
+        suggestions: None,
     };
     assert!(matches!(result.status, CheckStatus::Failed));
 }

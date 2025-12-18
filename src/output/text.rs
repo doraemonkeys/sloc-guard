@@ -30,6 +30,7 @@ mod ansi {
 pub struct TextFormatter {
     use_colors: bool,
     verbose: u8,
+    show_suggestions: bool,
 }
 
 impl TextFormatter {
@@ -41,7 +42,13 @@ impl TextFormatter {
     #[must_use]
     pub fn with_verbose(mode: ColorMode, verbose: u8) -> Self {
         let use_colors = Self::should_use_colors(mode);
-        Self { use_colors, verbose }
+        Self { use_colors, verbose, show_suggestions: false }
+    }
+
+    #[must_use]
+    pub const fn with_suggestions(mut self, show: bool) -> Self {
+        self.show_suggestions = show;
+        self
     }
 
     fn should_use_colors(mode: ColorMode) -> bool {
@@ -117,6 +124,33 @@ impl TextFormatter {
         // Show override reason if present (in verbose mode or for any status)
         if let Some(reason) = &result.override_reason {
             writeln!(output, "   Reason: {reason}").ok();
+        }
+
+        // Show split suggestions if enabled and available
+        if self.show_suggestions
+            && let Some(ref suggestion) = result.suggestions
+            && suggestion.has_suggestions()
+        {
+            Self::format_suggestions(suggestion, output);
+        }
+    }
+
+    fn format_suggestions(
+        suggestion: &crate::analyzer::SplitSuggestion,
+        output: &mut Vec<u8>,
+    ) {
+        writeln!(output, "   Split suggestions:").ok();
+        for chunk in &suggestion.chunks {
+            writeln!(
+                output,
+                "     → {}.* (lines {}-{}, ~{} lines)",
+                chunk.suggested_name, chunk.start_line, chunk.end_line, chunk.line_count
+            )
+            .ok();
+            if !chunk.functions.is_empty() {
+                let funcs = chunk.functions.join(", ");
+                writeln!(output, "       Functions: {funcs}").ok();
+            }
         }
     }
 

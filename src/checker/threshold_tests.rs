@@ -133,6 +133,7 @@ fn check_result_usage_percent() {
         },
         limit: 500,
         override_reason: None,
+        suggestions: None,
     };
 
     assert!((result.usage_percent() - 50.0).abs() < 0.01);

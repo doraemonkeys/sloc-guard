@@ -16,12 +16,13 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
         },
         limit,
         override_reason: None,
+        suggestions: None,
     }
 }
 
 #[test]
 fn sarif_output_is_valid_json() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
 
     let output = formatter.format(&results).unwrap();
@@ -34,7 +35,7 @@ fn sarif_output_is_valid_json() {
 
 #[test]
 fn sarif_has_correct_schema() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
 
     let output = formatter.format(&results).unwrap();
@@ -48,7 +49,7 @@ fn sarif_has_correct_schema() {
 
 #[test]
 fn sarif_tool_info() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
 
     let output = formatter.format(&results).unwrap();
@@ -62,7 +63,7 @@ fn sarif_tool_info() {
 
 #[test]
 fn sarif_rules_defined() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results: Vec<CheckResult> = vec![];
 
     let output = formatter.format(&results).unwrap();
@@ -78,7 +79,7 @@ fn sarif_rules_defined() {
 
 #[test]
 fn sarif_failed_result() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("src/big_file.rs", 600, 500, CheckStatus::Failed)];
 
     let output = formatter.format(&results).unwrap();
@@ -95,7 +96,7 @@ fn sarif_failed_result() {
 
 #[test]
 fn sarif_warning_result() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("src/medium_file.rs", 460, 500, CheckStatus::Warning)];
 
     let output = formatter.format(&results).unwrap();
@@ -109,7 +110,7 @@ fn sarif_warning_result() {
 
 #[test]
 fn sarif_grandfathered_result_has_suppression() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("src/legacy.rs", 700, 500, CheckStatus::Grandfathered)];
 
     let output = formatter.format(&results).unwrap();
@@ -125,7 +126,7 @@ fn sarif_grandfathered_result_has_suppression() {
 
 #[test]
 fn sarif_passed_results_excluded() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![
         make_result("pass.rs", 100, 500, CheckStatus::Passed),
         make_result("fail.rs", 600, 500, CheckStatus::Failed),
@@ -144,7 +145,7 @@ fn sarif_passed_results_excluded() {
 
 #[test]
 fn sarif_empty_results() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results: Vec<CheckResult> = vec![];
 
     let output = formatter.format(&results).unwrap();
@@ -156,7 +157,7 @@ fn sarif_empty_results() {
 
 #[test]
 fn sarif_result_properties() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
 
     let output = formatter.format(&results).unwrap();
@@ -171,7 +172,7 @@ fn sarif_result_properties() {
 
 #[test]
 fn sarif_windows_path_converted() {
-    let formatter = SarifFormatter;
+    let formatter = SarifFormatter::new();
     let results = vec![CheckResult {
         path: PathBuf::from("src\\subdir\\file.rs"),
         status: CheckStatus::Failed,
@@ -183,6 +184,7 @@ fn sarif_windows_path_converted() {
         },
         limit: 500,
         override_reason: None,
+        suggestions: None,
     }];
 
     let output = formatter.format(&results).unwrap();

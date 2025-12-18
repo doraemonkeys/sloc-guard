@@ -5,9 +5,22 @@ use crate::error::Result;
 
 use super::OutputFormatter;
 
-pub struct MarkdownFormatter;
+pub struct MarkdownFormatter {
+    show_suggestions: bool,
+}
 
 impl MarkdownFormatter {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { show_suggestions: false }
+    }
+
+    #[must_use]
+    pub const fn with_suggestions(mut self, show: bool) -> Self {
+        self.show_suggestions = show;
+        self
+    }
+
     const fn status_icon(status: &CheckStatus) -> &'static str {
         match status {
             CheckStatus::Passed => "✅",
@@ -24,6 +37,12 @@ impl MarkdownFormatter {
             CheckStatus::Failed => "Failed",
             CheckStatus::Grandfathered => "Grandfathered",
         }
+    }
+}
+
+impl Default for MarkdownFormatter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -86,6 +105,42 @@ impl OutputFormatter for MarkdownFormatter {
                     "| {icon} {status} | `{path}` | {sloc} | {limit} | {code} | {comment} | {blank} | {reason} |"
                 )
                 .ok();
+            }
+
+            // Show split suggestions if enabled
+            if self.show_suggestions {
+                let with_suggestions: Vec<_> = non_passed
+                    .iter()
+                    .filter(|r| r.suggestions.as_ref().is_some_and(crate::analyzer::SplitSuggestion::has_suggestions))
+                    .collect();
+
+                if !with_suggestions.is_empty() {
+                    writeln!(output).ok();
+                    writeln!(output, "### Split Suggestions\n").ok();
+
+                    for result in with_suggestions {
+                        if let Some(ref suggestion) = result.suggestions {
+                            writeln!(output, "#### `{}`\n", result.path.display()).ok();
+                            writeln!(output, "| Suggested File | Lines | Functions |").ok();
+                            writeln!(output, "|----------------|------:|-----------|").ok();
+
+                            for chunk in &suggestion.chunks {
+                                let funcs = if chunk.functions.is_empty() {
+                                    "-".to_string()
+                                } else {
+                                    chunk.functions.join(", ")
+                                };
+                                writeln!(
+                                    output,
+                                    "| `{}.*` | ~{} | {} |",
+                                    chunk.suggested_name, chunk.line_count, funcs
+                                )
+                                .ok();
+                            }
+                            writeln!(output).ok();
+                        }
+                    }
+                }
             }
         }
 

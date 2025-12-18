@@ -16,6 +16,7 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
         },
         limit,
         override_reason: None,
+        suggestions: None,
     }
 }
 
@@ -188,6 +189,7 @@ fn override_reason_shown_in_output() {
         },
         limit: 800,
         override_reason: Some("Legacy file from migration".to_string()),
+        suggestions: None,
     }];
 
     let output = formatter.format(&results).unwrap();
@@ -203,4 +205,58 @@ fn no_reason_line_when_override_reason_is_none() {
     let output = formatter.format(&results).unwrap();
 
     assert!(!output.contains("Reason:"));
+}
+
+#[test]
+fn with_suggestions_shows_split_suggestions() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
+        .with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec!["func1".to_string(), "func2".to_string()],
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+            SplitChunk {
+                suggested_name: "big_file_part2".to_string(),
+                functions: vec!["func3".to_string()],
+                start_line: 301,
+                end_line: 600,
+                line_count: 300,
+            },
+        ]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = TextFormatter::new(ColorMode::Never).with_suggestions(true);
+    let output = formatter.format(&[result]).unwrap();
+
+    assert!(output.contains("Split suggestions:"));
+    assert!(output.contains("big_file_part1"));
+    assert!(output.contains("big_file_part2"));
+    assert!(output.contains("func1, func2"));
+}
+
+#[test]
+fn without_suggestions_flag_hides_split_suggestions() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
+        .with_chunks(vec![SplitChunk {
+            suggested_name: "big_file_part1".to_string(),
+            functions: vec!["func1".to_string()],
+            start_line: 1,
+            end_line: 300,
+            line_count: 300,
+        }]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = TextFormatter::new(ColorMode::Never).with_suggestions(false);
+    let output = formatter.format(&[result]).unwrap();
+
+    assert!(!output.contains("Split suggestions:"));
 }

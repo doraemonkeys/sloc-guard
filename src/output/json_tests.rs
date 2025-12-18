@@ -16,12 +16,13 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
         },
         limit,
         override_reason: None,
+        suggestions: None,
     }
 }
 
 #[test]
 fn json_output_is_valid() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
 
     let output = formatter.format(&results).unwrap();
@@ -33,7 +34,7 @@ fn json_output_is_valid() {
 
 #[test]
 fn json_summary_counts() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = vec![
         make_result("pass.rs", 100, 500, CheckStatus::Passed),
         make_result("warn.rs", 460, 500, CheckStatus::Warning),
@@ -52,7 +53,7 @@ fn json_summary_counts() {
 
 #[test]
 fn json_result_fields() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
 
     let output = formatter.format(&results).unwrap();
@@ -72,7 +73,7 @@ fn json_result_fields() {
 
 #[test]
 fn json_status_values() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = vec![
         make_result("pass.rs", 100, 500, CheckStatus::Passed),
         make_result("warn.rs", 460, 500, CheckStatus::Warning),
@@ -90,7 +91,7 @@ fn json_status_values() {
 
 #[test]
 fn json_empty_results() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results: Vec<CheckResult> = vec![];
 
     let output = formatter.format(&results).unwrap();
@@ -102,7 +103,7 @@ fn json_empty_results() {
 
 #[test]
 fn json_override_reason_included() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = vec![CheckResult {
         path: PathBuf::from("legacy.rs"),
         status: CheckStatus::Warning,
@@ -114,6 +115,7 @@ fn json_override_reason_included() {
         },
         limit: 800,
         override_reason: Some("Legacy code from migration".to_string()),
+        suggestions: None,
     }];
 
     let output = formatter.format(&results).unwrap();
@@ -128,7 +130,7 @@ fn json_override_reason_included() {
 
 #[test]
 fn json_override_reason_excluded_when_none() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
 
     let output = formatter.format(&results).unwrap();

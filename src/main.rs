@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use clap::Parser;
 use rayon::prelude::*;
 
+use sloc_guard::analyzer::generate_split_suggestions;
 use sloc_guard::baseline::{compute_file_hash, read_file_with_hash, Baseline};
 use sloc_guard::cache::{compute_config_hash, Cache};
 use sloc_guard::checker::{Checker, ThresholdChecker};
@@ -137,9 +138,14 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
         apply_baseline_comparison(&mut results, baseline);
     }
 
+    // 8.1 Generate split suggestions for failed files if --fix is enabled
+    if args.fix {
+        generate_split_suggestions(&mut results, &registry);
+    }
+
     // 9. Format output
     let color_mode = color_choice_to_mode(cli.color);
-    let output = format_output(args.format, &results, color_mode, cli.verbose)?;
+    let output = format_output(args.format, &results, color_mode, cli.verbose, args.fix)?;
 
     // 10. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -443,12 +449,15 @@ fn format_output(
     results: &[sloc_guard::checker::CheckResult],
     color_mode: ColorMode,
     verbose: u8,
+    show_suggestions: bool,
 ) -> sloc_guard::Result<String> {
     match format {
-        OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose).format(results),
-        OutputFormat::Json => JsonFormatter.format(results),
-        OutputFormat::Sarif => SarifFormatter.format(results),
-        OutputFormat::Markdown => MarkdownFormatter.format(results),
+        OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose)
+            .with_suggestions(show_suggestions)
+            .format(results),
+        OutputFormat::Json => JsonFormatter::new().with_suggestions(show_suggestions).format(results),
+        OutputFormat::Sarif => SarifFormatter::new().with_suggestions(show_suggestions).format(results),
+        OutputFormat::Markdown => MarkdownFormatter::new().with_suggestions(show_suggestions).format(results),
     }
 }
 

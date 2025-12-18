@@ -38,6 +38,9 @@ thiserror = "2"
 # Cryptography
 sha2 = "0.10"
 
+# Regex for function parsing
+regex = "1"
+
 [dev-dependencies]
 # Testing utilities
 tempfile = "3"

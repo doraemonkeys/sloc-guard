@@ -1,11 +1,33 @@
 use serde::Serialize;
 
+use crate::analyzer::SplitSuggestion;
 use crate::checker::{CheckResult, CheckStatus};
 use crate::error::Result;
 
 use super::OutputFormatter;
 
-pub struct JsonFormatter;
+pub struct JsonFormatter {
+    show_suggestions: bool,
+}
+
+impl JsonFormatter {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { show_suggestions: false }
+    }
+
+    #[must_use]
+    pub const fn with_suggestions(mut self, show: bool) -> Self {
+        self.show_suggestions = show;
+        self
+    }
+}
+
+impl Default for JsonFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Serialize)]
 struct JsonOutput {
@@ -31,6 +53,8 @@ struct FileResult {
     stats: FileStats,
     #[serde(skip_serializing_if = "Option::is_none")]
     override_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suggestions: Option<SplitSuggestion>,
 }
 
 #[derive(Serialize)]
@@ -61,14 +85,20 @@ impl OutputFormatter for JsonFormatter {
                 failed,
                 grandfathered,
             },
-            results: results.iter().map(convert_result).collect(),
+            results: results.iter().map(|r| convert_result(r, self.show_suggestions)).collect(),
         };
 
         Ok(serde_json::to_string_pretty(&output)?)
     }
 }
 
-fn convert_result(result: &CheckResult) -> FileResult {
+fn convert_result(result: &CheckResult, show_suggestions: bool) -> FileResult {
+    let suggestions = if show_suggestions {
+        result.suggestions.clone()
+    } else {
+        None
+    };
+
     FileResult {
         path: result.path.display().to_string(),
         status: match result.status {
@@ -86,6 +116,7 @@ fn convert_result(result: &CheckResult) -> FileResult {
             blank: result.stats.blank,
         },
         override_reason: result.override_reason.clone(),
+        suggestions,
     }
 }
 

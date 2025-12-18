@@ -17,6 +17,7 @@ fn sample_results() -> Vec<CheckResult> {
             },
             limit: 500,
             override_reason: None,
+            suggestions: None,
         },
         CheckResult {
             path: PathBuf::from("src/lib.rs"),
@@ -29,6 +30,7 @@ fn sample_results() -> Vec<CheckResult> {
             },
             limit: 500,
             override_reason: None,
+            suggestions: None,
         },
     ]
 }
@@ -65,7 +67,7 @@ fn text_formatter_produces_output() {
 
 #[test]
 fn json_formatter_produces_valid_json() {
-    let formatter = JsonFormatter;
+    let formatter = JsonFormatter::new();
     let results = sample_results();
     let output = formatter.format(&results).unwrap();
 

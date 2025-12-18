@@ -1,12 +1,34 @@
 use serde::Serialize;
 
+use crate::analyzer::SplitSuggestion;
 use crate::checker::{CheckResult, CheckStatus};
 use crate::error::Result;
 
 use super::OutputFormatter;
 
 /// SARIF 2.1.0 output formatter for GitHub Code Scanning and other CI/CD tools.
-pub struct SarifFormatter;
+pub struct SarifFormatter {
+    show_suggestions: bool,
+}
+
+impl SarifFormatter {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { show_suggestions: false }
+    }
+
+    #[must_use]
+    pub const fn with_suggestions(mut self, show: bool) -> Self {
+        self.show_suggestions = show;
+        self
+    }
+}
+
+impl Default for SarifFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 const SARIF_SCHEMA: &str =
     "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
@@ -121,6 +143,8 @@ struct ResultProperties {
     stats: StatsProperties,
     #[serde(rename = "overrideReason", skip_serializing_if = "Option::is_none")]
     override_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suggestions: Option<SplitSuggestion>,
 }
 
 #[derive(Serialize)]
@@ -159,7 +183,7 @@ impl SarifFormatter {
         ]
     }
 
-    fn convert_result(result: &CheckResult) -> Option<SarifResult> {
+    fn convert_result(result: &CheckResult, show_suggestions: bool) -> Option<SarifResult> {
         if result.status == CheckStatus::Passed {
             return None;
         }
@@ -204,6 +228,12 @@ impl SarifFormatter {
         // Convert path to URI format (forward slashes)
         let uri = result.path.display().to_string().replace('\\', "/");
 
+        let suggestions = if show_suggestions {
+            result.suggestions.clone()
+        } else {
+            None
+        };
+
         Some(SarifResult {
             rule_id,
             rule_index,
@@ -229,6 +259,7 @@ impl SarifFormatter {
                     blank: result.stats.blank,
                 },
                 override_reason: result.override_reason.clone(),
+                suggestions,
             },
         })
     }
@@ -237,7 +268,7 @@ impl SarifFormatter {
 impl OutputFormatter for SarifFormatter {
     fn format(&self, results: &[CheckResult]) -> Result<String> {
         let sarif_results: Vec<SarifResult> =
-            results.iter().filter_map(Self::convert_result).collect();
+            results.iter().filter_map(|r| Self::convert_result(r, self.show_suggestions)).collect();
 
         let log = SarifLog {
             schema: SARIF_SCHEMA,

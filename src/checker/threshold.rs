@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobMatcher};
 
+use crate::analyzer::SplitSuggestion;
 use crate::config::Config;
 use crate::counter::LineStats;
 
@@ -24,6 +25,8 @@ pub struct CheckResult {
     pub limit: usize,
     /// Reason for override, if the limit comes from an [[override]] entry
     pub override_reason: Option<String>,
+    /// Split suggestions for files exceeding thresholds (populated when --fix is used)
+    pub suggestions: Option<SplitSuggestion>,
 }
 
 impl CheckResult {
@@ -50,6 +53,11 @@ impl CheckResult {
     /// Set the status to grandfathered (used for baseline comparison).
     pub const fn set_grandfathered(&mut self) {
         self.status = CheckStatus::Grandfathered;
+    }
+
+    /// Set split suggestions for this result.
+    pub fn set_suggestions(&mut self, suggestions: SplitSuggestion) {
+        self.suggestions = Some(suggestions);
     }
 
     #[must_use]
@@ -226,6 +234,7 @@ impl Checker for ThresholdChecker {
             stats: line_stats.clone(),
             limit,
             override_reason,
+            suggestions: None,
         }
     }
 }

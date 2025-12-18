@@ -143,6 +143,10 @@ pub struct CheckArgs {
     /// Disable .gitignore filtering (scan all files)
     #[arg(long)]
     pub no_gitignore: bool,
+
+    /// Show split suggestions for files exceeding thresholds
+    #[arg(long)]
+    pub fix: bool,
 }
 
 #[derive(Parser, Debug)]
