@@ -14,7 +14,7 @@ use crate::scanner::scan_files;
 use crate::stats::TrendHistory;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
-use super::common::{
+use super::context::{
     DEFAULT_HISTORY_PATH, load_cache, load_config, process_file_with_cache, resolve_scan_paths,
     save_cache, write_output,
 };

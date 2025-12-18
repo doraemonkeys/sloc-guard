@@ -21,7 +21,7 @@ use crate::output::{
 use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
-use super::common::{
+use super::context::{
     color_choice_to_mode, load_cache, load_config, process_file_with_cache, resolve_scan_paths,
     save_cache, write_output,
 };

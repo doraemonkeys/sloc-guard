@@ -16,6 +16,23 @@
 version = "2.0" # Schema version
 
 # ------------------------------------------------------------------------------
+# Config Inheritance (extends)
+# ------------------------------------------------------------------------------
+# Inherit from a base configuration file (local or remote).
+# Child config values override parent values (merge strategy).
+# Use `--no-extends` CLI flag to disable inheritance.
+
+# Local inheritance (relative or absolute path):
+# extends = "../shared/.sloc-guard.toml"
+
+# Remote inheritance (HTTP/HTTPS, cached for 1 hour):
+# extends = "https://company.com/standards/sloc-guard-base.toml"
+
+# After extends, override specific values as needed:
+# [content]
+# max_lines = 500  # Overrides base config's max_lines
+
+# ------------------------------------------------------------------------------
 # 1. Scanner Configuration (Physical Discovery)
 # ------------------------------------------------------------------------------
 # Scanner finds ALL files - no extension filtering here.

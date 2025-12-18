@@ -146,14 +146,9 @@ Location: `src/config/model.rs`, `docs/sloc-guard.example.toml`
   - "exclude patterns are ADDITIVE to .gitignore rules (union, not override)"
 ```
 
-### Task 5.5.6: Rename `common.rs` Module
-Location: `src/commands/common.rs`
-```
-- Violates CLAUDE.md: "Don't name modules util, common, or misc"
-- Rename to `src/commands/context.rs` or `src/app_context.rs`
-  - Contains: Config loading, Cache integration, shared command utilities
-- Update all imports in commands/*.rs
-```
+### Task 5.5.6: Rename `common.rs` Module ✅
+Location: `src/commands/context.rs` (renamed from `common.rs`)
+**Completed**: Renamed to `context.rs`, updated all imports.
 
 ### Task 5.5.7: Refactor `CheckResult` to Enum
 Location: `src/checker/threshold.rs`
@@ -251,26 +246,9 @@ max_dirs = -1  # Unlimited subdirs (no check)
 - Loader validates: negative values only allowed as `-1`
 - Document in example TOML with clear comments
 
-### Task 5.5.12: Add `extends` Examples to Documentation
+### Task 5.5.12: Add `extends` Examples to Documentation ✅
 Location: `docs/sloc-guard.example.toml`
-**Problem**: `extends` is an important feature (local/remote config inheritance) but example TOML has no usage examples.
-
-**Solution**: Add extends examples to sloc-guard.example.toml.
-```toml
-# Local inheritance
-extends = "../shared/.sloc-guard.toml"
-
-# Remote inheritance (cached 1h)
-extends = "https://company.com/standards/sloc-guard-base.toml"
-
-# Override inherited values
-[content]
-max_lines = 500  # Overrides base config's max_lines
-```
-- Show local file path example
-- Show remote URL example
-- Show how to override inherited values
-- Note: `--no-extends` flag to disable inheritance
+**Completed**: Added extends examples (local/remote inheritance, override values, `--no-extends` flag).
 
 ---
 
@@ -317,8 +295,8 @@ Location: `src/output/html.rs`
 |----------|-------|
 | **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
 | **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, 5.5.5 Naming, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
-| **3. Documentation** | 5.5.12 extends Examples |
-| **4. Code Quality** | 5.5.6 Rename common.rs, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
+| **3. Documentation** | ~~5.5.12 extends Examples~~ |
+| **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 
 ---
@@ -330,7 +308,7 @@ Location: `src/output/html.rs`
 ```
 main.rs (CLI parsing + dispatch)
   -> commands/check | stats | baseline_cmd | init | config
-  -> context (was common) (shared: load_config, cache)
+  -> context (shared: load_config, cache)
   -> config/loader (load config)
   -> scanner (find files)
   -> language/registry (get comment syntax)

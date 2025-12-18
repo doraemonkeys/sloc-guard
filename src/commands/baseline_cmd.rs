@@ -13,7 +13,7 @@ use crate::output::ScanProgress;
 use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
-use super::common::{load_config, process_file_with_cache, resolve_scan_paths};
+use super::context::{load_config, process_file_with_cache, resolve_scan_paths};
 
 #[must_use]
 pub fn run_baseline(args: &BaselineArgs, cli: &Cli) -> i32 {

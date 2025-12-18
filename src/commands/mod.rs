@@ -1,6 +1,6 @@
 pub mod baseline_cmd;
 pub mod check;
-pub mod common;
+pub mod context;
 pub mod config;
 pub mod init;
 pub mod stats;
