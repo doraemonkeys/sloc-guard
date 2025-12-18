@@ -7,8 +7,7 @@ use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
 use crate::checker::{
-    CheckResult, CheckStatus, Checker, StructureChecker, StructureViolation, ThresholdChecker,
-    ViolationType,
+    CheckResult, Checker, StructureChecker, StructureViolation, ThresholdChecker, ViolationType,
 };
 use crate::cli::{CheckArgs, Cli};
 use crate::counter::LineStats;
@@ -183,9 +182,19 @@ pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &
             continue;
         }
 
-        let path_str = result.path.to_string_lossy().replace('\\', "/");
+        let path_str = result.path().to_string_lossy().replace('\\', "/");
         if baseline.contains(&path_str) {
-            result.set_grandfathered();
+            // Replace the result with its grandfathered version
+            let owned = std::mem::replace(
+                result,
+                CheckResult::Passed {
+                    path: std::path::PathBuf::new(),
+                    stats: LineStats::default(),
+                    limit: 0,
+                    override_reason: None,
+                },
+            );
+            *result = owned.into_grandfathered();
         }
     }
 }
@@ -292,9 +301,8 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
         ViolationType::DirCount => "subdirs",
     };
 
-    CheckResult {
+    CheckResult::Failed {
         path: violation.path.clone(),
-        status: CheckStatus::Failed,
         stats,
         limit: violation.limit,
         override_reason: Some(format!("structure: {violation_label} count exceeded")),

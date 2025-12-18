@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -174,30 +174,30 @@ impl HtmlFormatter {
         self
     }
 
-    const fn status_class(status: &CheckStatus) -> &'static str {
-        match status {
-            CheckStatus::Passed => "passed",
-            CheckStatus::Warning => "warning",
-            CheckStatus::Failed => "failed",
-            CheckStatus::Grandfathered => "grandfathered",
+    const fn status_class(result: &CheckResult) -> &'static str {
+        match result {
+            CheckResult::Passed { .. } => "passed",
+            CheckResult::Warning { .. } => "warning",
+            CheckResult::Failed { .. } => "failed",
+            CheckResult::Grandfathered { .. } => "grandfathered",
         }
     }
 
-    const fn status_icon(status: &CheckStatus) -> &'static str {
-        match status {
-            CheckStatus::Passed => "&#x2713;",        // ✓
-            CheckStatus::Warning => "&#x26A0;",       // ⚠
-            CheckStatus::Failed => "&#x2717;",        // ✗
-            CheckStatus::Grandfathered => "&#x25C9;", // ◉
+    const fn status_icon(result: &CheckResult) -> &'static str {
+        match result {
+            CheckResult::Passed { .. } => "&#x2713;",        // ✓
+            CheckResult::Warning { .. } => "&#x26A0;",       // ⚠
+            CheckResult::Failed { .. } => "&#x2717;",        // ✗
+            CheckResult::Grandfathered { .. } => "&#x25C9;", // ◉
         }
     }
 
-    const fn status_text(status: &CheckStatus) -> &'static str {
-        match status {
-            CheckStatus::Passed => "Passed",
-            CheckStatus::Warning => "Warning",
-            CheckStatus::Failed => "Failed",
-            CheckStatus::Grandfathered => "Grandfathered",
+    const fn status_text(result: &CheckResult) -> &'static str {
+        match result {
+            CheckResult::Passed { .. } => "Passed",
+            CheckResult::Warning { .. } => "Warning",
+            CheckResult::Failed { .. } => "Failed",
+            CheckResult::Grandfathered { .. } => "Grandfathered",
         }
     }
 
@@ -339,10 +339,10 @@ impl HtmlFormatter {
     }
 
     fn write_file_row(&self, output: &mut String, result: &CheckResult) {
-        let class = Self::status_class(&result.status);
-        let icon = Self::status_icon(&result.status);
-        let text = Self::status_text(&result.status);
-        let path = html_escape(&result.path.display().to_string());
+        let class = Self::status_class(result);
+        let icon = Self::status_icon(result);
+        let text = Self::status_text(result);
+        let path = html_escape(&result.path().display().to_string());
 
         // Add data-status for filtering
         writeln!(output, "                <tr data-status=\"{class}\">").ok();
@@ -363,7 +363,7 @@ impl HtmlFormatter {
         .ok();
 
         // Optional reason
-        if let Some(reason) = &result.override_reason {
+        if let Some(reason) = result.override_reason() {
             let escaped_reason = html_escape(reason);
             writeln!(
                 output,
@@ -374,7 +374,7 @@ impl HtmlFormatter {
 
         // Optional split suggestions
         if self.show_suggestions
-            && let Some(ref suggestion) = result.suggestions
+            && let Some(suggestion) = result.suggestions()
             && suggestion.has_suggestions()
         {
             output.push_str("                        <div class=\"suggestions\">\n");
@@ -402,31 +402,31 @@ impl HtmlFormatter {
         output.push_str("                    </td>\n");
 
         // Numeric cells with data-value for sorting
-        let sloc = result.stats.sloc();
+        let sloc = result.stats().sloc();
         writeln!(
             output,
             r#"                    <td class="number" data-value="{sloc}">{sloc}</td>"#
         )
         .ok();
-        let limit = result.limit;
+        let limit = result.limit();
         writeln!(
             output,
             r#"                    <td class="number" data-value="{limit}">{limit}</td>"#
         )
         .ok();
-        let code = result.stats.code;
+        let code = result.stats().code;
         writeln!(
             output,
             r#"                    <td class="number" data-value="{code}">{code}</td>"#
         )
         .ok();
-        let comment = result.stats.comment;
+        let comment = result.stats().comment;
         writeln!(
             output,
             r#"                    <td class="number" data-value="{comment}">{comment}</td>"#
         )
         .ok();
-        let blank = result.stats.blank;
+        let blank = result.stats().blank;
         writeln!(
             output,
             r#"                    <td class="number" data-value="{blank}">{blank}</td>"#
@@ -451,11 +451,11 @@ impl OutputFormatter for HtmlFormatter {
         let (passed, warnings, failed, grandfathered) =
             results
                 .iter()
-                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r.status {
-                    CheckStatus::Passed => (p + 1, w, f, g),
-                    CheckStatus::Warning => (p, w + 1, f, g),
-                    CheckStatus::Failed => (p, w, f + 1, g),
-                    CheckStatus::Grandfathered => (p, w, f, g + 1),
+                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r {
+                    CheckResult::Passed { .. } => (p + 1, w, f, g),
+                    CheckResult::Warning { .. } => (p, w + 1, f, g),
+                    CheckResult::Failed { .. } => (p, w, f + 1, g),
+                    CheckResult::Grandfathered { .. } => (p, w, f, g + 1),
                 });
 
         Self::write_html_header(&mut output);

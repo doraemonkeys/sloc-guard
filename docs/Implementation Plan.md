@@ -144,22 +144,21 @@ Documentation for `scanner.exclude` vs `structure.count_exclude`:
 Location: `src/commands/context.rs` (renamed from `common.rs`)
 **Completed**: Renamed to `context.rs`, updated all imports.
 
-### Task 5.5.7: Refactor `CheckResult` to Enum
-> ⚠️ **Plan Mode Required**: 修改核心数据结构，需更新所有 output formatters 和 commands。
-
+### Task 5.5.7: Refactor `CheckResult` to Enum ✅
 Location: `src/checker/threshold.rs`
+**Completed**: Refactored `CheckResult` from struct to enum with associated data.
+```rust
+pub enum CheckResult {
+    Passed { path, stats, limit, override_reason },
+    Warning { path, stats, limit, override_reason, suggestions },
+    Failed { path, stats, limit, override_reason, suggestions },
+    Grandfathered { path, stats, limit, override_reason },
+}
 ```
-- Violates CLAUDE.md: "Use Enums with associated data... rather than Structs with many optional fields"
-- Current: struct with optional `override_reason`, `suggestions` fields
-- Refactor to:
-  enum CheckResult {
-      Passed { path, stats, limit },
-      Warning { path, stats, limit },
-      Failed { path, stats, limit, suggestions: Option<SplitSuggestion> },
-      Grandfathered { path, stats, limit, reason: String },
-  }
-- Update all consumers in output formatters and commands
-```
+- Removed `CheckStatus` enum (redundant with variant)
+- Added accessor methods: `path()`, `stats()`, `limit()`, `override_reason()`, `suggestions()`
+- Consuming transformations: `into_grandfathered()`, `with_suggestions()`
+- Updated all output formatters and commands
 
 ### Task 5.5.8: Config Versioning (Partial ✅)
 Location: `src/config/model.rs`, `src/config/loader.rs`
@@ -281,7 +280,7 @@ Location: `src/output/html.rs`
 | **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
 | **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
 | **3. Documentation** | ~~5.5.12 extends Examples~~ |
-| **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, ~5.5.8 Versioning~ (partial) |
+| **4. Code Quality** | ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~5.5.8 Versioning~ (partial) |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 
 ---

@@ -25,7 +25,7 @@ fn check_passes_under_threshold() {
     let result = checker.check(Path::new("test.rs"), &stats);
 
     assert!(result.is_passed());
-    assert_eq!(result.limit, 500);
+    assert_eq!(result.limit(), 500);
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn check_uses_rule_specific_limit() {
     let result = checker.check(Path::new("test.rs"), &stats);
 
     assert!(result.is_failed());
-    assert_eq!(result.limit, 300);
+    assert_eq!(result.limit(), 300);
 }
 
 #[test]
@@ -86,8 +86,8 @@ fn check_uses_override_for_specific_file() {
     let result = checker.check(Path::new("src/legacy.rs"), &stats);
 
     assert!(result.is_passed());
-    assert_eq!(result.limit, 800);
-    assert_eq!(result.override_reason, Some("Legacy code".to_string()));
+    assert_eq!(result.limit(), 800);
+    assert_eq!(result.override_reason(), Some("Legacy code"));
 }
 
 #[test]
@@ -105,8 +105,8 @@ fn check_override_without_reason() {
     let result = checker.check(Path::new("src/special.rs"), &stats);
 
     assert!(result.is_passed());
-    assert_eq!(result.limit, 800);
-    assert_eq!(result.override_reason, None);
+    assert_eq!(result.limit(), 800);
+    assert_eq!(result.override_reason(), None);
 }
 
 #[test]
@@ -117,14 +117,13 @@ fn check_no_override_reason_when_using_default() {
     let result = checker.check(Path::new("test.rs"), &stats);
 
     assert!(result.is_passed());
-    assert_eq!(result.override_reason, None);
+    assert_eq!(result.override_reason(), None);
 }
 
 #[test]
 fn check_result_usage_percent() {
-    let result = CheckResult {
+    let result = CheckResult::Passed {
         path: PathBuf::from("test.rs"),
-        status: CheckStatus::Passed,
         stats: LineStats {
             total: 260,
             code: 250,
@@ -134,7 +133,6 @@ fn check_result_usage_percent() {
         },
         limit: 500,
         override_reason: None,
-        suggestions: None,
     };
 
     assert!((result.usage_percent() - 50.0).abs() < 0.01);
@@ -166,7 +164,7 @@ fn override_does_not_match_partial_filename() {
     let result = checker.check(Path::new("src/my_parser.rs"), &stats);
 
     assert!(result.is_failed());
-    assert_eq!(result.limit, 500); // default limit, not override
+    assert_eq!(result.limit(), 500); // default limit, not override
 }
 
 #[test]
@@ -185,7 +183,7 @@ fn override_matches_exact_filename() {
     let result = checker.check(Path::new("src/parser.rs"), &stats);
 
     assert!(result.is_passed());
-    assert_eq!(result.limit, 800);
+    assert_eq!(result.limit(), 800);
 }
 
 #[test]
@@ -203,24 +201,48 @@ fn override_matches_full_path() {
     // "src/legacy/parser.rs" should match
     let result = checker.check(Path::new("src/legacy/parser.rs"), &stats);
     assert!(result.is_passed());
-    assert_eq!(result.limit, 800);
+    assert_eq!(result.limit(), 800);
 
     // "other/src/legacy/parser.rs" should also match (ends with)
     let result2 = checker.check(Path::new("other/src/legacy/parser.rs"), &stats);
     assert!(result2.is_passed());
-    assert_eq!(result2.limit, 800);
+    assert_eq!(result2.limit(), 800);
 
     // "legacy/parser.rs" should NOT match (missing "src" component)
     let result3 = checker.check(Path::new("legacy/parser.rs"), &stats);
     assert!(result3.is_failed());
-    assert_eq!(result3.limit, 500);
+    assert_eq!(result3.limit(), 500);
 }
 
 #[test]
-fn check_status_equality() {
-    assert_eq!(CheckStatus::Passed, CheckStatus::Passed);
-    assert_ne!(CheckStatus::Passed, CheckStatus::Failed);
-    assert_ne!(CheckStatus::Warning, CheckStatus::Failed);
+fn check_result_is_methods() {
+    let passed = CheckResult::Passed {
+        path: PathBuf::from("test.rs"),
+        stats: stats_with_code(100),
+        limit: 500,
+        override_reason: None,
+    };
+    let failed = CheckResult::Failed {
+        path: PathBuf::from("test.rs"),
+        stats: stats_with_code(600),
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    };
+    let warning = CheckResult::Warning {
+        path: PathBuf::from("test.rs"),
+        stats: stats_with_code(450),
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    };
+
+    assert!(passed.is_passed());
+    assert!(!passed.is_failed());
+    assert!(failed.is_failed());
+    assert!(!failed.is_passed());
+    assert!(warning.is_warning());
+    assert!(!warning.is_failed());
 }
 
 #[test]
@@ -238,7 +260,7 @@ fn path_rule_matches_glob_pattern() {
     // File matching the glob pattern should use path_rule max_lines
     let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
     assert!(result.is_passed());
-    assert_eq!(result.limit, 1000);
+    assert_eq!(result.limit(), 1000);
 }
 
 #[test]
@@ -256,7 +278,7 @@ fn path_rule_does_not_match_unrelated_path() {
     // File not matching the pattern should use default
     let result = checker.check(Path::new("src/lib.rs"), &stats);
     assert!(result.is_failed());
-    assert_eq!(result.limit, 500);
+    assert_eq!(result.limit(), 500);
 }
 
 #[test]
@@ -279,7 +301,7 @@ fn path_rule_has_lower_priority_than_override() {
     // Override should take priority over path_rule
     let result = checker.check(Path::new("src/generated/special.rs"), &stats);
     assert!(result.is_passed());
-    assert_eq!(result.limit, 2000);
+    assert_eq!(result.limit(), 2000);
 }
 
 #[test]
@@ -307,12 +329,12 @@ fn path_rule_has_higher_priority_than_extension_rule() {
     // path_rule should override extension rule
     let result = checker.check(Path::new("src/proto/messages.rs"), &stats);
     assert!(result.is_passed());
-    assert_eq!(result.limit, 800);
+    assert_eq!(result.limit(), 800);
 
     // Non-matching path should use extension rule
     let result2 = checker.check(Path::new("src/lib.rs"), &stats);
     assert!(result2.is_failed());
-    assert_eq!(result2.limit, 300);
+    assert_eq!(result2.limit(), 300);
 }
 
 #[test]
@@ -369,7 +391,7 @@ fn multiple_path_rules_first_match_wins() {
     // First matching rule should be used
     let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
     assert!(result.is_failed()); // 700 > 600
-    assert_eq!(result.limit, 600);
+    assert_eq!(result.limit(), 600);
 }
 
 #[test]

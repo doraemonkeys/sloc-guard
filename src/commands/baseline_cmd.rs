@@ -92,7 +92,7 @@ pub(crate) fn run_baseline_update_impl(
             progress.inc();
             result
                 .filter(CheckResult::is_failed)
-                .map(|r| (file_path.clone(), r.stats.code))
+                .map(|r| (file_path.clone(), r.stats().code))
         })
         .collect();
     progress.finish();

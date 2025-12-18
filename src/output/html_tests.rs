@@ -1,15 +1,29 @@
 use std::path::PathBuf;
 
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::counter::LineStats;
 use crate::output::OutputFormatter;
 
 use super::{HtmlFormatter, html_escape};
 
-fn make_result(path: &str, status: CheckStatus, code: usize, limit: usize) -> CheckResult {
-    CheckResult {
+fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Passed {
         path: PathBuf::from(path),
-        status,
+        stats: LineStats {
+            total: code + 10 + 5,
+            code,
+            comment: 10,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
+fn make_warning_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Warning {
+        path: PathBuf::from(path),
         stats: LineStats {
             total: code + 10 + 5,
             code,
@@ -23,9 +37,40 @@ fn make_result(path: &str, status: CheckStatus, code: usize, limit: usize) -> Ch
     }
 }
 
+fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Failed {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10 + 5,
+            code,
+            comment: 10,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+        suggestions: None,
+    }
+}
+
+fn make_grandfathered_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Grandfathered {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10 + 5,
+            code,
+            comment: 10,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
 #[test]
 fn generates_valid_html_structure() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -44,9 +89,9 @@ fn generates_valid_html_structure() {
 #[test]
 fn formats_summary_correctly() {
     let results = vec![
-        make_result("src/pass.rs", CheckStatus::Passed, 100, 500),
-        make_result("src/warn.rs", CheckStatus::Warning, 450, 500),
-        make_result("src/fail.rs", CheckStatus::Failed, 600, 500),
+        make_passed_result("src/pass.rs", 100, 500),
+        make_warning_result("src/warn.rs", 450, 500),
+        make_failed_result("src/fail.rs", 600, 500),
     ];
 
     let formatter = HtmlFormatter::new();
@@ -61,7 +106,7 @@ fn formats_summary_correctly() {
 
 #[test]
 fn shows_passed_card() {
-    let results = vec![make_result("src/pass.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/pass.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -72,7 +117,7 @@ fn shows_passed_card() {
 
 #[test]
 fn shows_warning_card() {
-    let results = vec![make_result("src/warn.rs", CheckStatus::Warning, 450, 500)];
+    let results = vec![make_warning_result("src/warn.rs", 450, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -83,7 +128,7 @@ fn shows_warning_card() {
 
 #[test]
 fn shows_failed_card() {
-    let results = vec![make_result("src/fail.rs", CheckStatus::Failed, 600, 500)];
+    let results = vec![make_failed_result("src/fail.rs", 600, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -94,12 +139,7 @@ fn shows_failed_card() {
 
 #[test]
 fn shows_grandfathered_card_when_present() {
-    let results = vec![make_result(
-        "src/legacy.rs",
-        CheckStatus::Grandfathered,
-        800,
-        500,
-    )];
+    let results = vec![make_grandfathered_result("src/legacy.rs", 800, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -110,7 +150,7 @@ fn shows_grandfathered_card_when_present() {
 
 #[test]
 fn hides_grandfathered_card_when_zero() {
-    let results = vec![make_result("src/pass.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/pass.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -121,8 +161,8 @@ fn hides_grandfathered_card_when_zero() {
 #[test]
 fn formats_file_table() {
     let results = vec![
-        make_result("src/fail.rs", CheckStatus::Failed, 600, 500),
-        make_result("src/warn.rs", CheckStatus::Warning, 450, 500),
+        make_failed_result("src/fail.rs", 600, 500),
+        make_warning_result("src/warn.rs", 450, 500),
     ];
 
     let formatter = HtmlFormatter::new();
@@ -142,8 +182,8 @@ fn formats_file_table() {
 #[test]
 fn shows_all_files_including_passed() {
     let results = vec![
-        make_result("src/pass.rs", CheckStatus::Passed, 100, 500),
-        make_result("src/fail.rs", CheckStatus::Failed, 600, 500),
+        make_passed_result("src/pass.rs", 100, 500),
+        make_failed_result("src/fail.rs", 600, 500),
     ];
 
     let formatter = HtmlFormatter::new();
@@ -160,8 +200,8 @@ fn shows_all_files_including_passed() {
 #[test]
 fn shows_all_passed_files() {
     let results = vec![
-        make_result("src/a.rs", CheckStatus::Passed, 100, 500),
-        make_result("src/b.rs", CheckStatus::Passed, 200, 500),
+        make_passed_result("src/a.rs", 100, 500),
+        make_passed_result("src/b.rs", 200, 500),
     ];
 
     let formatter = HtmlFormatter::new();
@@ -186,9 +226,8 @@ fn empty_results() {
 
 #[test]
 fn shows_override_reason() {
-    let results = vec![CheckResult {
+    let results = vec![CheckResult::Warning {
         path: PathBuf::from("src/legacy.rs"),
-        status: CheckStatus::Warning,
         stats: LineStats {
             total: 765,
             code: 750,
@@ -212,7 +251,7 @@ fn shows_override_reason() {
 fn shows_split_suggestions_when_enabled() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("src/big_file.rs", CheckStatus::Failed, 600, 500);
+    let result = make_failed_result("src/big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -230,7 +269,7 @@ fn shows_split_suggestions_when_enabled() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = HtmlFormatter::new().with_suggestions(true);
     let output = formatter.format(&[result]).unwrap();
@@ -246,7 +285,7 @@ fn shows_split_suggestions_when_enabled() {
 fn hides_suggestions_when_disabled() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("src/big_file.rs", CheckStatus::Failed, 600, 500);
+    let result = make_failed_result("src/big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -257,7 +296,7 @@ fn hides_suggestions_when_disabled() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = HtmlFormatter::new().with_suggestions(false);
     let output = formatter.format(&[result]).unwrap();
@@ -275,9 +314,8 @@ fn html_escape_special_characters() {
 
 #[test]
 fn escapes_file_paths() {
-    let results = vec![CheckResult {
+    let results = vec![CheckResult::Failed {
         path: PathBuf::from("src/<script>.rs"),
-        status: CheckStatus::Failed,
         stats: LineStats {
             total: 600,
             code: 600,
@@ -302,7 +340,7 @@ fn escapes_file_paths() {
 #[test]
 fn default_formatter() {
     let formatter = HtmlFormatter::default();
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
     assert!(output.contains("<!DOCTYPE html>"));
@@ -310,7 +348,7 @@ fn default_formatter() {
 
 #[test]
 fn has_embedded_css() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -328,7 +366,7 @@ fn has_embedded_css() {
 
 #[test]
 fn has_footer() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -340,9 +378,9 @@ fn has_footer() {
 #[test]
 fn status_icons_are_html_entities() {
     let results = vec![
-        make_result("src/fail.rs", CheckStatus::Failed, 600, 500),
-        make_result("src/warn.rs", CheckStatus::Warning, 450, 500),
-        make_result("src/grandfather.rs", CheckStatus::Grandfathered, 800, 500),
+        make_failed_result("src/fail.rs", 600, 500),
+        make_warning_result("src/warn.rs", 450, 500),
+        make_grandfathered_result("src/grandfather.rs", 800, 500),
     ];
 
     let formatter = HtmlFormatter::new();
@@ -356,7 +394,7 @@ fn status_icons_are_html_entities() {
 
 #[test]
 fn numeric_columns_have_number_class() {
-    let results = vec![make_result("src/fail.rs", CheckStatus::Failed, 600, 500)];
+    let results = vec![make_failed_result("src/fail.rs", 600, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -367,7 +405,7 @@ fn numeric_columns_have_number_class() {
 
 #[test]
 fn has_filter_controls() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -383,7 +421,7 @@ fn has_filter_controls() {
 
 #[test]
 fn has_sortable_column_headers() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -397,10 +435,10 @@ fn has_sortable_column_headers() {
 #[test]
 fn rows_have_data_status_attribute() {
     let results = vec![
-        make_result("src/pass.rs", CheckStatus::Passed, 100, 500),
-        make_result("src/fail.rs", CheckStatus::Failed, 600, 500),
-        make_result("src/warn.rs", CheckStatus::Warning, 450, 500),
-        make_result("src/legacy.rs", CheckStatus::Grandfathered, 800, 500),
+        make_passed_result("src/pass.rs", 100, 500),
+        make_failed_result("src/fail.rs", 600, 500),
+        make_warning_result("src/warn.rs", 450, 500),
+        make_grandfathered_result("src/legacy.rs", 800, 500),
     ];
 
     let formatter = HtmlFormatter::new();
@@ -414,7 +452,7 @@ fn rows_have_data_status_attribute() {
 
 #[test]
 fn numeric_cells_have_data_value_attribute() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Failed, 600, 500)];
+    let results = vec![make_failed_result("src/test.rs", 600, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -426,7 +464,7 @@ fn numeric_cells_have_data_value_attribute() {
 
 #[test]
 fn has_client_side_javascript() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -443,7 +481,7 @@ fn has_client_side_javascript() {
 
 #[test]
 fn table_has_id_for_js() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -453,7 +491,7 @@ fn table_has_id_for_js() {
 
 #[test]
 fn has_table_container() {
-    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+    let results = vec![make_passed_result("src/test.rs", 100, 500)];
 
     let formatter = HtmlFormatter::new();
     let output = formatter.format(&results).unwrap();

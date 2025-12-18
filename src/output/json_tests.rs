@@ -3,10 +3,24 @@ use std::path::PathBuf;
 use super::*;
 use crate::counter::LineStats;
 
-fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> CheckResult {
-    CheckResult {
+fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Passed {
         path: PathBuf::from(path),
-        status,
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
+fn make_warning_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Warning {
+        path: PathBuf::from(path),
         stats: LineStats {
             total: code + 10,
             code,
@@ -20,10 +34,41 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
     }
 }
 
+fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Failed {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+        suggestions: None,
+    }
+}
+
+fn make_grandfathered_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Grandfathered {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
 #[test]
 fn json_output_is_valid() {
     let formatter = JsonFormatter::new();
-    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -36,9 +81,9 @@ fn json_output_is_valid() {
 fn json_summary_counts() {
     let formatter = JsonFormatter::new();
     let results = vec![
-        make_result("pass.rs", 100, 500, CheckStatus::Passed),
-        make_result("warn.rs", 460, 500, CheckStatus::Warning),
-        make_result("fail.rs", 600, 500, CheckStatus::Failed),
+        make_passed_result("pass.rs", 100, 500),
+        make_warning_result("warn.rs", 460, 500),
+        make_failed_result("fail.rs", 600, 500),
     ];
 
     let output = formatter.format(&results).unwrap();
@@ -54,7 +99,7 @@ fn json_summary_counts() {
 #[test]
 fn json_result_fields() {
     let formatter = JsonFormatter::new();
-    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -75,9 +120,9 @@ fn json_result_fields() {
 fn json_status_values() {
     let formatter = JsonFormatter::new();
     let results = vec![
-        make_result("pass.rs", 100, 500, CheckStatus::Passed),
-        make_result("warn.rs", 460, 500, CheckStatus::Warning),
-        make_result("fail.rs", 600, 500, CheckStatus::Failed),
+        make_passed_result("pass.rs", 100, 500),
+        make_warning_result("warn.rs", 460, 500),
+        make_failed_result("fail.rs", 600, 500),
     ];
 
     let output = formatter.format(&results).unwrap();
@@ -104,9 +149,8 @@ fn json_empty_results() {
 #[test]
 fn json_override_reason_included() {
     let formatter = JsonFormatter::new();
-    let results = vec![CheckResult {
+    let results = vec![CheckResult::Warning {
         path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Warning,
         stats: LineStats {
             total: 760,
             code: 750,
@@ -132,7 +176,7 @@ fn json_override_reason_included() {
 #[test]
 fn json_override_reason_excluded_when_none() {
     let formatter = JsonFormatter::new();
-    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -144,20 +188,7 @@ fn json_override_reason_excluded_when_none() {
 #[test]
 fn json_grandfathered_status() {
     let formatter = JsonFormatter::new();
-    let results = vec![CheckResult {
-        path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Grandfathered,
-        stats: LineStats {
-            total: 610,
-            code: 600,
-            comment: 5,
-            blank: 5,
-            ignored: 0,
-        },
-        limit: 500,
-        override_reason: None,
-        suggestions: None,
-    }];
+    let results = vec![make_grandfathered_result("legacy.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -173,7 +204,7 @@ fn json_grandfathered_status() {
 fn json_with_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let result = make_failed_result("big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -184,7 +215,7 @@ fn json_with_suggestions() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = JsonFormatter::new().with_suggestions(true);
     let output = formatter.format(&[result]).unwrap();
@@ -198,7 +229,7 @@ fn json_with_suggestions() {
 fn json_without_suggestions_flag_excludes_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let result = make_failed_result("big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -209,7 +240,7 @@ fn json_without_suggestions_flag_excludes_suggestions() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = JsonFormatter::new().with_suggestions(false);
     let output = formatter.format(&[result]).unwrap();
@@ -222,7 +253,7 @@ fn json_without_suggestions_flag_excludes_suggestions() {
 #[test]
 fn json_default_formatter() {
     let formatter = JsonFormatter::default();
-    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
     assert!(output.contains("summary"));

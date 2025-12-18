@@ -9,64 +9,183 @@ use crate::counter::LineStats;
 
 use super::Checker;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CheckStatus {
-    Passed,
-    Warning,
-    Failed,
-    Grandfathered,
-}
-
+/// Result of checking a file against configured thresholds.
+///
+/// Each variant represents a distinct check outcome. The `suggestions` field is only
+/// available on `Warning` and `Failed` variants, making it impossible to have suggestions
+/// on passed or grandfathered results.
 #[derive(Debug, Clone)]
-pub struct CheckResult {
-    pub path: PathBuf,
-    pub status: CheckStatus,
-    pub stats: LineStats,
-    pub limit: usize,
-    /// Reason for override, if the limit comes from an [[override]] entry
-    pub override_reason: Option<String>,
-    /// Split suggestions for files exceeding thresholds (populated when --fix is used)
-    pub suggestions: Option<SplitSuggestion>,
+pub enum CheckResult {
+    Passed {
+        path: PathBuf,
+        stats: LineStats,
+        limit: usize,
+        override_reason: Option<String>,
+    },
+    Warning {
+        path: PathBuf,
+        stats: LineStats,
+        limit: usize,
+        override_reason: Option<String>,
+        suggestions: Option<SplitSuggestion>,
+    },
+    Failed {
+        path: PathBuf,
+        stats: LineStats,
+        limit: usize,
+        override_reason: Option<String>,
+        suggestions: Option<SplitSuggestion>,
+    },
+    Grandfathered {
+        path: PathBuf,
+        stats: LineStats,
+        limit: usize,
+        override_reason: Option<String>,
+    },
 }
 
 impl CheckResult {
+    // Accessor methods
+
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        match self {
+            Self::Passed { path, .. }
+            | Self::Warning { path, .. }
+            | Self::Failed { path, .. }
+            | Self::Grandfathered { path, .. } => path,
+        }
+    }
+
+    #[must_use]
+    pub const fn stats(&self) -> &LineStats {
+        match self {
+            Self::Passed { stats, .. }
+            | Self::Warning { stats, .. }
+            | Self::Failed { stats, .. }
+            | Self::Grandfathered { stats, .. } => stats,
+        }
+    }
+
+    #[must_use]
+    pub const fn limit(&self) -> usize {
+        match self {
+            Self::Passed { limit, .. }
+            | Self::Warning { limit, .. }
+            | Self::Failed { limit, .. }
+            | Self::Grandfathered { limit, .. } => *limit,
+        }
+    }
+
+    #[must_use]
+    pub fn override_reason(&self) -> Option<&str> {
+        match self {
+            Self::Passed { override_reason, .. }
+            | Self::Warning { override_reason, .. }
+            | Self::Failed { override_reason, .. }
+            | Self::Grandfathered { override_reason, .. } => override_reason.as_deref(),
+        }
+    }
+
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn suggestions(&self) -> Option<&SplitSuggestion> {
+        match self {
+            Self::Warning { suggestions, .. } | Self::Failed { suggestions, .. } => {
+                suggestions.as_ref()
+            }
+            Self::Passed { .. } | Self::Grandfathered { .. } => None,
+        }
+    }
+
+    // Predicate methods
+
     #[must_use]
     pub const fn is_passed(&self) -> bool {
-        matches!(self.status, CheckStatus::Passed)
+        matches!(self, Self::Passed { .. })
     }
 
     #[must_use]
     pub const fn is_failed(&self) -> bool {
-        matches!(self.status, CheckStatus::Failed)
+        matches!(self, Self::Failed { .. })
     }
 
     #[must_use]
     pub const fn is_warning(&self) -> bool {
-        matches!(self.status, CheckStatus::Warning)
+        matches!(self, Self::Warning { .. })
     }
 
     #[must_use]
     pub const fn is_grandfathered(&self) -> bool {
-        matches!(self.status, CheckStatus::Grandfathered)
+        matches!(self, Self::Grandfathered { .. })
     }
 
-    /// Set the status to grandfathered (used for baseline comparison).
-    pub const fn set_grandfathered(&mut self) {
-        self.status = CheckStatus::Grandfathered;
+    // Transformation methods
+
+    /// Convert a Failed result to Grandfathered (used for baseline comparison).
+    /// Returns self unchanged if not Failed.
+    #[must_use]
+    pub fn into_grandfathered(self) -> Self {
+        match self {
+            Self::Failed {
+                path,
+                stats,
+                limit,
+                override_reason,
+                ..
+            } => Self::Grandfathered {
+                path,
+                stats,
+                limit,
+                override_reason,
+            },
+            other => other,
+        }
     }
 
-    /// Set split suggestions for this result.
-    pub fn set_suggestions(&mut self, suggestions: SplitSuggestion) {
-        self.suggestions = Some(suggestions);
+    /// Add split suggestions to a Warning or Failed result.
+    /// Returns self unchanged if Passed or Grandfathered.
+    #[must_use]
+    pub fn with_suggestions(self, new_suggestions: SplitSuggestion) -> Self {
+        match self {
+            Self::Warning {
+                path,
+                stats,
+                limit,
+                override_reason,
+                ..
+            } => Self::Warning {
+                path,
+                stats,
+                limit,
+                override_reason,
+                suggestions: Some(new_suggestions),
+            },
+            Self::Failed {
+                path,
+                stats,
+                limit,
+                override_reason,
+                ..
+            } => Self::Failed {
+                path,
+                stats,
+                limit,
+                override_reason,
+                suggestions: Some(new_suggestions),
+            },
+            other => other,
+        }
     }
 
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn usage_percent(&self) -> f64 {
-        if self.limit == 0 {
+        let limit = self.limit();
+        if limit == 0 {
             return 0.0;
         }
-        (self.stats.sloc() as f64 / self.limit as f64) * 100.0
+        (self.stats().sloc() as f64 / limit as f64) * 100.0
     }
 }
 
@@ -218,23 +337,33 @@ impl Checker for ThresholdChecker {
         let (limit, override_reason) = self.get_limit_for_path(path);
         let warn_threshold = self.get_warn_threshold_for_path(path);
         let sloc = line_stats.sloc();
+        let path = path.to_path_buf();
+        let stats = line_stats.clone();
 
         #[allow(clippy::cast_precision_loss)]
-        let check_status = if sloc > limit {
-            CheckStatus::Failed
+        if sloc > limit {
+            CheckResult::Failed {
+                path,
+                stats,
+                limit,
+                override_reason,
+                suggestions: None,
+            }
         } else if sloc as f64 >= limit as f64 * warn_threshold {
-            CheckStatus::Warning
+            CheckResult::Warning {
+                path,
+                stats,
+                limit,
+                override_reason,
+                suggestions: None,
+            }
         } else {
-            CheckStatus::Passed
-        };
-
-        CheckResult {
-            path: path.to_path_buf(),
-            status: check_status,
-            stats: line_stats.clone(),
-            limit,
-            override_reason,
-            suggestions: None,
+            CheckResult::Passed {
+                path,
+                stats,
+                limit,
+                override_reason,
+            }
         }
     }
 }

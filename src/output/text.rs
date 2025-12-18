@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use std::io::Write as IoWrite;
 
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -70,69 +70,65 @@ impl TextFormatter {
         }
     }
 
-    const fn status_icon(status: &CheckStatus) -> &'static str {
-        match status {
-            CheckStatus::Passed => "✓",
-            CheckStatus::Warning => "⚠",
-            CheckStatus::Failed => "✗",
-            CheckStatus::Grandfathered => "◉",
+    const fn status_icon(result: &CheckResult) -> &'static str {
+        match result {
+            CheckResult::Passed { .. } => "✓",
+            CheckResult::Warning { .. } => "⚠",
+            CheckResult::Failed { .. } => "✗",
+            CheckResult::Grandfathered { .. } => "◉",
         }
     }
 
-    fn colorize(&self, text: &str, status: &CheckStatus) -> String {
+    fn colorize(&self, text: &str, result: &CheckResult) -> String {
         if !self.use_colors {
             return text.to_string();
         }
 
-        let color = match status {
-            CheckStatus::Passed => ansi::GREEN,
-            CheckStatus::Warning => ansi::YELLOW,
-            CheckStatus::Failed => ansi::RED,
-            CheckStatus::Grandfathered => ansi::CYAN,
+        let color = match result {
+            CheckResult::Passed { .. } => ansi::GREEN,
+            CheckResult::Warning { .. } => ansi::YELLOW,
+            CheckResult::Failed { .. } => ansi::RED,
+            CheckResult::Grandfathered { .. } => ansi::CYAN,
         };
 
         format!("{color}{text}{}", ansi::RESET)
     }
 
-    fn colorize_number(&self, num: usize, status: &CheckStatus) -> String {
-        self.colorize(&num.to_string(), status)
-    }
-
     fn format_result(&self, result: &CheckResult, output: &mut Vec<u8>) {
-        let icon = Self::status_icon(&result.status);
-        let status_str = match result.status {
-            CheckStatus::Passed => "PASSED",
-            CheckStatus::Warning => "WARNING",
-            CheckStatus::Failed => "FAILED",
-            CheckStatus::Grandfathered => "GRANDFATHERED",
+        let icon = Self::status_icon(result);
+        let status_str = match result {
+            CheckResult::Passed { .. } => "PASSED",
+            CheckResult::Warning { .. } => "WARNING",
+            CheckResult::Failed { .. } => "FAILED",
+            CheckResult::Grandfathered { .. } => "GRANDFATHERED",
         };
-        let colored_status = self.colorize(status_str, &result.status);
+        let colored_status = self.colorize(status_str, result);
 
-        writeln!(output, "{icon} {colored_status}: {}", result.path.display()).ok();
+        writeln!(output, "{icon} {colored_status}: {}", result.path().display()).ok();
 
         writeln!(
             output,
             "   Lines: {} (limit: {})",
-            result.stats.sloc(),
-            result.limit
+            result.stats().sloc(),
+            result.limit()
         )
         .ok();
 
         writeln!(
             output,
             "   Breakdown: code={}, comment={}, blank={}",
-            result.stats.code, result.stats.comment, result.stats.blank
+            result.stats().code, result.stats().comment, result.stats().blank
         )
         .ok();
 
         // Show override reason if present (in verbose mode or for any status)
-        if let Some(reason) = &result.override_reason {
+        if let Some(reason) = result.override_reason() {
             writeln!(output, "   Reason: {reason}").ok();
         }
 
         // Show split suggestions if enabled and available
         if self.show_suggestions
-            && let Some(ref suggestion) = result.suggestions
+            && let Some(suggestion) = result.suggestions()
             && suggestion.has_suggestions()
         {
             Self::format_suggestions(suggestion, output);
@@ -163,9 +159,9 @@ impl TextFormatter {
         failed: usize,
         grandfathered: usize,
     ) -> String {
-        let passed_str = self.colorize_number(passed, &CheckStatus::Passed);
-        let warnings_str = self.colorize_number(warnings, &CheckStatus::Warning);
-        let failed_str = self.colorize_number(failed, &CheckStatus::Failed);
+        let passed_str = self.colorize_with_color(&passed.to_string(), ansi::GREEN);
+        let warnings_str = self.colorize_with_color(&warnings.to_string(), ansi::YELLOW);
+        let failed_str = self.colorize_with_color(&failed.to_string(), ansi::RED);
 
         let mut summary = format!(
             "Summary: {total} files checked, {passed_str} passed, {warnings_str} warnings, {failed_str} failed"
@@ -173,11 +169,18 @@ impl TextFormatter {
 
         if grandfathered > 0 {
             let grandfathered_str =
-                self.colorize_number(grandfathered, &CheckStatus::Grandfathered);
+                self.colorize_with_color(&grandfathered.to_string(), ansi::CYAN);
             let _ = write!(summary, " (baseline: {grandfathered_str} grandfathered)");
         }
 
         summary
+    }
+
+    fn colorize_with_color(&self, text: &str, color: &str) -> String {
+        if !self.use_colors {
+            return text.to_string();
+        }
+        format!("{color}{text}{}", ansi::RESET)
     }
 }
 
@@ -195,11 +198,11 @@ impl OutputFormatter for TextFormatter {
             results.iter().fold(
                 (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                 |(mut p, mut w, mut f, mut g), r| {
-                    match r.status {
-                        CheckStatus::Passed => p.push(r),
-                        CheckStatus::Warning => w.push(r),
-                        CheckStatus::Failed => f.push(r),
-                        CheckStatus::Grandfathered => g.push(r),
+                    match r {
+                        CheckResult::Passed { .. } => p.push(r),
+                        CheckResult::Warning { .. } => w.push(r),
+                        CheckResult::Failed { .. } => f.push(r),
+                        CheckResult::Grandfathered { .. } => g.push(r),
                     }
                     (p, w, f, g)
                 },

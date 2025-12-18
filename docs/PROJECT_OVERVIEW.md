@@ -19,7 +19,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `scanner/*.rs` | `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore) |
-| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult{status, stats, limit, suggestions}` |
+| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
 | `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir count limits with glob-based rules |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline`/`cache` | `*/types.rs` | `Baseline` (grandfathering), `Cache` (mtime+size validation) |
@@ -50,9 +50,13 @@ LineStats { total, code, comment, blank, ignored }
 CountResult::Stats(LineStats) | IgnoredFile
 CommentSyntax { single_line, multi_line }
 
-// Check results
-CheckStatus::Passed | Warning | Failed | Grandfathered
-CheckResult { path, status, stats, limit, override_reason, suggestions }
+// Check results (enum with associated data)
+CheckResult::Passed { path, stats, limit, override_reason }
+          | Warning { ..., suggestions }
+          | Failed { ..., suggestions }
+          | Grandfathered { ... }
+// Accessor methods: path(), stats(), limit(), override_reason(), suggestions()
+// Consuming: into_grandfathered(), with_suggestions()
 
 // Structure checking
 DirStats { file_count, dir_count }  // immediate children counts

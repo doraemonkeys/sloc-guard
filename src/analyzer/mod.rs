@@ -7,6 +7,7 @@ pub use split::SplitAnalyzer;
 pub use types::{FunctionInfo, SplitChunk, SplitSuggestion};
 
 use crate::checker::CheckResult;
+use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 
 /// Generate split suggestions for failed or warning results.
@@ -18,7 +19,7 @@ pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &Langua
             continue;
         }
 
-        let Some(ext) = result.path.extension().and_then(|e| e.to_str()) else {
+        let Some(ext) = result.path().extension().and_then(|e| e.to_str()) else {
             continue;
         };
 
@@ -26,15 +27,24 @@ pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &Langua
             continue;
         };
 
-        let Ok(content) = std::fs::read_to_string(&result.path) else {
+        let Ok(content) = std::fs::read_to_string(result.path()) else {
             continue;
         };
 
-        if let Some(suggestion) =
-            analyzer.analyze(&result.path, &content, &language.name, result.limit)
+        if let Some(suggestion) = analyzer.analyze(result.path(), &content, &language.name, result.limit())
             && suggestion.has_suggestions()
         {
-            result.set_suggestions(suggestion);
+            // Replace the result with its version containing suggestions
+            let owned = std::mem::replace(
+                result,
+                CheckResult::Passed {
+                    path: std::path::PathBuf::new(),
+                    stats: LineStats::default(),
+                    limit: 0,
+                    override_reason: None,
+                },
+            );
+            *result = owned.with_suggestions(suggestion);
         }
     }
 }

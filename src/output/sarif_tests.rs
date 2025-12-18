@@ -3,10 +3,24 @@ use std::path::PathBuf;
 use super::*;
 use crate::counter::LineStats;
 
-fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> CheckResult {
-    CheckResult {
+fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Passed {
         path: PathBuf::from(path),
-        status,
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
+fn make_warning_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Warning {
+        path: PathBuf::from(path),
         stats: LineStats {
             total: code + 10,
             code,
@@ -20,10 +34,41 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
     }
 }
 
+fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Failed {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+        suggestions: None,
+    }
+}
+
+fn make_grandfathered_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Grandfathered {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
 #[test]
 fn sarif_output_is_valid_json() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -36,7 +81,7 @@ fn sarif_output_is_valid_json() {
 #[test]
 fn sarif_has_correct_schema() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -50,7 +95,7 @@ fn sarif_has_correct_schema() {
 #[test]
 fn sarif_tool_info() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -80,12 +125,7 @@ fn sarif_rules_defined() {
 #[test]
 fn sarif_failed_result() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result(
-        "src/big_file.rs",
-        600,
-        500,
-        CheckStatus::Failed,
-    )];
+    let results = vec![make_failed_result("src/big_file.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -102,12 +142,7 @@ fn sarif_failed_result() {
 #[test]
 fn sarif_warning_result() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result(
-        "src/medium_file.rs",
-        460,
-        500,
-        CheckStatus::Warning,
-    )];
+    let results = vec![make_warning_result("src/medium_file.rs", 460, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -121,12 +156,7 @@ fn sarif_warning_result() {
 #[test]
 fn sarif_grandfathered_result_has_suppression() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result(
-        "src/legacy.rs",
-        700,
-        500,
-        CheckStatus::Grandfathered,
-    )];
+    let results = vec![make_grandfathered_result("src/legacy.rs", 700, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -143,8 +173,8 @@ fn sarif_grandfathered_result_has_suppression() {
 fn sarif_passed_results_excluded() {
     let formatter = SarifFormatter::new();
     let results = vec![
-        make_result("pass.rs", 100, 500, CheckStatus::Passed),
-        make_result("fail.rs", 600, 500, CheckStatus::Failed),
+        make_passed_result("pass.rs", 100, 500),
+        make_failed_result("fail.rs", 600, 500),
     ];
 
     let output = formatter.format(&results).unwrap();
@@ -173,7 +203,7 @@ fn sarif_empty_results() {
 #[test]
 fn sarif_result_properties() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -188,9 +218,8 @@ fn sarif_result_properties() {
 #[test]
 fn sarif_windows_path_converted() {
     let formatter = SarifFormatter::new();
-    let results = vec![CheckResult {
+    let results = vec![CheckResult::Failed {
         path: PathBuf::from("src\\subdir\\file.rs"),
-        status: CheckStatus::Failed,
         stats: LineStats {
             total: 610,
             code: 600,
@@ -215,7 +244,7 @@ fn sarif_windows_path_converted() {
 fn sarif_with_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let result = make_failed_result("big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -226,7 +255,7 @@ fn sarif_with_suggestions() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = SarifFormatter::new().with_suggestions(true);
     let output = formatter.format(&[result]).unwrap();
@@ -240,7 +269,7 @@ fn sarif_with_suggestions() {
 fn sarif_without_suggestions_flag_excludes_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let result = make_failed_result("big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -251,7 +280,7 @@ fn sarif_without_suggestions_flag_excludes_suggestions() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = SarifFormatter::new().with_suggestions(false);
     let output = formatter.format(&[result]).unwrap();
@@ -264,7 +293,7 @@ fn sarif_without_suggestions_flag_excludes_suggestions() {
 #[test]
 fn sarif_default_formatter() {
     let formatter = SarifFormatter::default();
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
     assert!(output.contains("$schema"));
@@ -272,9 +301,8 @@ fn sarif_default_formatter() {
 
 #[test]
 fn sarif_override_reason_included() {
-    let results = vec![CheckResult {
+    let results = vec![CheckResult::Warning {
         path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Warning,
         stats: LineStats {
             total: 460,
             code: 450,

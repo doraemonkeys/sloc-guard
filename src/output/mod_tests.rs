@@ -1,14 +1,12 @@
 use std::path::PathBuf;
 
 use super::*;
-use crate::checker::CheckStatus;
 use crate::counter::LineStats;
 
 fn sample_results() -> Vec<CheckResult> {
     vec![
-        CheckResult {
+        CheckResult::Passed {
             path: PathBuf::from("src/main.rs"),
-            status: CheckStatus::Passed,
             stats: LineStats {
                 total: 110,
                 code: 100,
@@ -18,11 +16,9 @@ fn sample_results() -> Vec<CheckResult> {
             },
             limit: 500,
             override_reason: None,
-            suggestions: None,
         },
-        CheckResult {
+        CheckResult::Failed {
             path: PathBuf::from("src/lib.rs"),
-            status: CheckStatus::Failed,
             stats: LineStats {
                 total: 600,
                 code: 550,

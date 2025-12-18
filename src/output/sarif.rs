@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::analyzer::SplitSuggestion;
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -185,18 +185,18 @@ impl SarifFormatter {
     }
 
     fn convert_result(result: &CheckResult, show_suggestions: bool) -> Option<SarifResult> {
-        if result.status == CheckStatus::Passed {
+        if result.is_passed() {
             return None;
         }
 
-        let (rule_id, rule_index, level) = match result.status {
-            CheckStatus::Failed => (RULE_LINE_LIMIT_EXCEEDED, 0, "error"),
-            CheckStatus::Warning => (RULE_LINE_LIMIT_WARNING, 1, "warning"),
-            CheckStatus::Grandfathered => (RULE_LINE_LIMIT_EXCEEDED, 0, "note"),
-            CheckStatus::Passed => unreachable!(),
+        let (rule_id, rule_index, level) = match result {
+            CheckResult::Failed { .. } => (RULE_LINE_LIMIT_EXCEEDED, 0, "error"),
+            CheckResult::Warning { .. } => (RULE_LINE_LIMIT_WARNING, 1, "warning"),
+            CheckResult::Grandfathered { .. } => (RULE_LINE_LIMIT_EXCEEDED, 0, "note"),
+            CheckResult::Passed { .. } => unreachable!(),
         };
 
-        let suppressions = if result.status == CheckStatus::Grandfathered {
+        let suppressions = if result.is_grandfathered() {
             Some(vec![Suppression {
                 kind: "external",
                 justification: "File is in baseline (grandfathered)",
@@ -205,32 +205,32 @@ impl SarifFormatter {
             None
         };
 
-        let message_text = match result.status {
-            CheckStatus::Failed => format!(
+        let message_text = match result {
+            CheckResult::Failed { .. } => format!(
                 "File has {} SLOC, exceeding limit of {} by {} lines",
-                result.stats.sloc(),
-                result.limit,
-                result.stats.sloc() - result.limit
+                result.stats().sloc(),
+                result.limit(),
+                result.stats().sloc() - result.limit()
             ),
-            CheckStatus::Warning => format!(
+            CheckResult::Warning { .. } => format!(
                 "File has {} SLOC ({:.1}% of {} limit)",
-                result.stats.sloc(),
+                result.stats().sloc(),
                 result.usage_percent(),
-                result.limit
+                result.limit()
             ),
-            CheckStatus::Grandfathered => format!(
+            CheckResult::Grandfathered { .. } => format!(
                 "File has {} SLOC, exceeding limit of {} (grandfathered)",
-                result.stats.sloc(),
-                result.limit
+                result.stats().sloc(),
+                result.limit()
             ),
-            CheckStatus::Passed => unreachable!(),
+            CheckResult::Passed { .. } => unreachable!(),
         };
 
         // Convert path to URI format (forward slashes)
-        let uri = result.path.display().to_string().replace('\\', "/");
+        let uri = result.path().display().to_string().replace('\\', "/");
 
         let suggestions = if show_suggestions {
-            result.suggestions.clone()
+            result.suggestions().cloned()
         } else {
             None
         };
@@ -250,16 +250,16 @@ impl SarifFormatter {
             }],
             suppressions,
             properties: ResultProperties {
-                sloc: result.stats.sloc(),
-                limit: result.limit,
+                sloc: result.stats().sloc(),
+                limit: result.limit(),
                 usage_percent: result.usage_percent(),
                 stats: StatsProperties {
-                    total: result.stats.total,
-                    code: result.stats.code,
-                    comment: result.stats.comment,
-                    blank: result.stats.blank,
+                    total: result.stats().total,
+                    code: result.stats().code,
+                    comment: result.stats().comment,
+                    blank: result.stats().blank,
                 },
-                override_reason: result.override_reason.clone(),
+                override_reason: result.override_reason().map(String::from),
                 suggestions,
             },
         })

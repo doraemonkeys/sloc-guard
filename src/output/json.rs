@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::analyzer::SplitSuggestion;
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -72,11 +72,11 @@ impl OutputFormatter for JsonFormatter {
         let (passed, warnings, failed, grandfathered) =
             results
                 .iter()
-                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r.status {
-                    CheckStatus::Passed => (p + 1, w, f, g),
-                    CheckStatus::Warning => (p, w + 1, f, g),
-                    CheckStatus::Failed => (p, w, f + 1, g),
-                    CheckStatus::Grandfathered => (p, w, f, g + 1),
+                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r {
+                    CheckResult::Passed { .. } => (p + 1, w, f, g),
+                    CheckResult::Warning { .. } => (p, w + 1, f, g),
+                    CheckResult::Failed { .. } => (p, w, f + 1, g),
+                    CheckResult::Grandfathered { .. } => (p, w, f, g + 1),
                 });
 
         let output = JsonOutput {
@@ -99,28 +99,28 @@ impl OutputFormatter for JsonFormatter {
 
 fn convert_result(result: &CheckResult, show_suggestions: bool) -> FileResult {
     let suggestions = if show_suggestions {
-        result.suggestions.clone()
+        result.suggestions().cloned()
     } else {
         None
     };
 
     FileResult {
-        path: result.path.display().to_string(),
-        status: match result.status {
-            CheckStatus::Passed => "passed".to_string(),
-            CheckStatus::Warning => "warning".to_string(),
-            CheckStatus::Failed => "failed".to_string(),
-            CheckStatus::Grandfathered => "grandfathered".to_string(),
+        path: result.path().display().to_string(),
+        status: match result {
+            CheckResult::Passed { .. } => "passed".to_string(),
+            CheckResult::Warning { .. } => "warning".to_string(),
+            CheckResult::Failed { .. } => "failed".to_string(),
+            CheckResult::Grandfathered { .. } => "grandfathered".to_string(),
         },
-        sloc: result.stats.sloc(),
-        limit: result.limit,
+        sloc: result.stats().sloc(),
+        limit: result.limit(),
         stats: FileStats {
-            total: result.stats.total,
-            code: result.stats.code,
-            comment: result.stats.comment,
-            blank: result.stats.blank,
+            total: result.stats().total,
+            code: result.stats().code,
+            comment: result.stats().comment,
+            blank: result.stats().blank,
         },
-        override_reason: result.override_reason.clone(),
+        override_reason: result.override_reason().map(String::from),
         suggestions,
     }
 }

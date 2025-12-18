@@ -3,10 +3,24 @@ use std::path::PathBuf;
 use super::*;
 use crate::counter::LineStats;
 
-fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> CheckResult {
-    CheckResult {
+fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Passed {
         path: PathBuf::from(path),
-        status,
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
+fn make_warning_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Warning {
+        path: PathBuf::from(path),
         stats: LineStats {
             total: code + 10,
             code,
@@ -20,10 +34,41 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
     }
 }
 
+fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Failed {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+        suggestions: None,
+    }
+}
+
+fn make_grandfathered_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Grandfathered {
+        path: PathBuf::from(path),
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
 #[test]
 fn format_passed_result() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -34,7 +79,7 @@ fn format_passed_result() {
 #[test]
 fn format_failed_result() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -46,7 +91,7 @@ fn format_failed_result() {
 #[test]
 fn format_warning_result() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![make_result("test.rs", 460, 500, CheckStatus::Warning)];
+    let results = vec![make_warning_result("test.rs", 460, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -57,9 +102,9 @@ fn format_warning_result() {
 fn format_mixed_results() {
     let formatter = TextFormatter::new(ColorMode::Never);
     let results = vec![
-        make_result("passed.rs", 100, 500, CheckStatus::Passed),
-        make_result("warning.rs", 460, 500, CheckStatus::Warning),
-        make_result("failed.rs", 600, 500, CheckStatus::Failed),
+        make_passed_result("passed.rs", 100, 500),
+        make_warning_result("warning.rs", 460, 500),
+        make_failed_result("failed.rs", 600, 500),
     ];
 
     let output = formatter.format(&results).unwrap();
@@ -73,8 +118,8 @@ fn format_mixed_results() {
 fn failed_results_shown_first() {
     let formatter = TextFormatter::new(ColorMode::Never);
     let results = vec![
-        make_result("passed.rs", 100, 500, CheckStatus::Passed),
-        make_result("failed.rs", 600, 500, CheckStatus::Failed),
+        make_passed_result("passed.rs", 100, 500),
+        make_failed_result("failed.rs", 600, 500),
     ];
 
     let output = formatter.format(&results).unwrap();
@@ -87,7 +132,7 @@ fn failed_results_shown_first() {
 #[test]
 fn summary_line_included() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("test.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -98,7 +143,7 @@ fn summary_line_included() {
 #[test]
 fn color_mode_always_produces_colored_output() {
     let formatter = TextFormatter::new(ColorMode::Always);
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -112,7 +157,7 @@ fn color_mode_always_produces_colored_output() {
 #[test]
 fn color_mode_never_produces_plain_output() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -126,7 +171,7 @@ fn color_mode_never_produces_plain_output() {
 #[test]
 fn verbose_zero_hides_passed_files() {
     let formatter = TextFormatter::with_verbose(ColorMode::Never, 0);
-    let results = vec![make_result("passed.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("passed.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -138,7 +183,7 @@ fn verbose_zero_hides_passed_files() {
 #[test]
 fn verbose_one_shows_passed_files() {
     let formatter = TextFormatter::with_verbose(ColorMode::Never, 1);
-    let results = vec![make_result("passed.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("passed.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -151,7 +196,7 @@ fn verbose_one_shows_passed_files() {
 #[test]
 fn default_formatter_hides_passed_files() {
     let formatter = TextFormatter::default();
-    let results = vec![make_result("passed.rs", 100, 500, CheckStatus::Passed)];
+    let results = vec![make_passed_result("passed.rs", 100, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -166,7 +211,7 @@ fn default_formatter_hides_passed_files() {
 fn color_mode_auto_produces_output() {
     // In CI/test environment, stdout is typically not a TTY, so Auto mode should produce plain output
     let formatter = TextFormatter::new(ColorMode::Auto);
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -178,9 +223,8 @@ fn color_mode_auto_produces_output() {
 #[test]
 fn override_reason_shown_in_output() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![CheckResult {
+    let results = vec![CheckResult::Warning {
         path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Warning,
         stats: LineStats {
             total: 760,
             code: 750,
@@ -201,7 +245,7 @@ fn override_reason_shown_in_output() {
 #[test]
 fn no_reason_line_when_override_reason_is_none() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_failed_result("test.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -212,7 +256,7 @@ fn no_reason_line_when_override_reason_is_none() {
 fn with_suggestions_shows_split_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let result = make_failed_result("big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -230,7 +274,7 @@ fn with_suggestions_shows_split_suggestions() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = TextFormatter::new(ColorMode::Never).with_suggestions(true);
     let output = formatter.format(&[result]).unwrap();
@@ -245,7 +289,7 @@ fn with_suggestions_shows_split_suggestions() {
 fn without_suggestions_flag_hides_split_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
-    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let result = make_failed_result("big_file.rs", 600, 500);
     let suggestion =
         SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
@@ -256,7 +300,7 @@ fn without_suggestions_flag_hides_split_suggestions() {
                 line_count: 300,
             },
         ]);
-    result.suggestions = Some(suggestion);
+    let result = result.with_suggestions(suggestion);
 
     let formatter = TextFormatter::new(ColorMode::Never).with_suggestions(false);
     let output = formatter.format(&[result]).unwrap();
@@ -267,20 +311,7 @@ fn without_suggestions_flag_hides_split_suggestions() {
 #[test]
 fn grandfathered_status_shown_in_summary() {
     let formatter = TextFormatter::new(ColorMode::Never);
-    let results = vec![CheckResult {
-        path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Grandfathered,
-        stats: LineStats {
-            total: 610,
-            code: 600,
-            comment: 5,
-            blank: 5,
-            ignored: 0,
-        },
-        limit: 500,
-        override_reason: None,
-        suggestions: None,
-    }];
+    let results = vec![make_grandfathered_result("legacy.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -291,20 +322,7 @@ fn grandfathered_status_shown_in_summary() {
 #[test]
 fn verbose_one_shows_grandfathered_files() {
     let formatter = TextFormatter::with_verbose(ColorMode::Never, 1);
-    let results = vec![CheckResult {
-        path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Grandfathered,
-        stats: LineStats {
-            total: 610,
-            code: 600,
-            comment: 5,
-            blank: 5,
-            ignored: 0,
-        },
-        limit: 500,
-        override_reason: None,
-        suggestions: None,
-    }];
+    let results = vec![make_grandfathered_result("legacy.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -315,20 +333,7 @@ fn verbose_one_shows_grandfathered_files() {
 #[test]
 fn verbose_zero_hides_grandfathered_files() {
     let formatter = TextFormatter::with_verbose(ColorMode::Never, 0);
-    let results = vec![CheckResult {
-        path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Grandfathered,
-        stats: LineStats {
-            total: 610,
-            code: 600,
-            comment: 5,
-            blank: 5,
-            ignored: 0,
-        },
-        limit: 500,
-        override_reason: None,
-        suggestions: None,
-    }];
+    let results = vec![make_grandfathered_result("legacy.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 
@@ -340,20 +345,7 @@ fn verbose_zero_hides_grandfathered_files() {
 #[test]
 fn grandfathered_colored_output() {
     let formatter = TextFormatter::new(ColorMode::Always);
-    let results = vec![CheckResult {
-        path: PathBuf::from("legacy.rs"),
-        status: CheckStatus::Grandfathered,
-        stats: LineStats {
-            total: 610,
-            code: 600,
-            comment: 5,
-            blank: 5,
-            ignored: 0,
-        },
-        limit: 500,
-        override_reason: None,
-        suggestions: None,
-    }];
+    let results = vec![make_grandfathered_result("legacy.rs", 600, 500)];
 
     let output = formatter.format(&results).unwrap();
 

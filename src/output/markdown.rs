@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -23,21 +23,21 @@ impl MarkdownFormatter {
         self
     }
 
-    const fn status_icon(status: &CheckStatus) -> &'static str {
-        match status {
-            CheckStatus::Passed => "✅",
-            CheckStatus::Warning => "⚠️",
-            CheckStatus::Failed => "❌",
-            CheckStatus::Grandfathered => "🔵",
+    const fn status_icon(result: &CheckResult) -> &'static str {
+        match result {
+            CheckResult::Passed { .. } => "✅",
+            CheckResult::Warning { .. } => "⚠️",
+            CheckResult::Failed { .. } => "❌",
+            CheckResult::Grandfathered { .. } => "🔵",
         }
     }
 
-    const fn status_text(status: &CheckStatus) -> &'static str {
-        match status {
-            CheckStatus::Passed => "Passed",
-            CheckStatus::Warning => "Warning",
-            CheckStatus::Failed => "Failed",
-            CheckStatus::Grandfathered => "Grandfathered",
+    const fn status_text(result: &CheckResult) -> &'static str {
+        match result {
+            CheckResult::Passed { .. } => "Passed",
+            CheckResult::Warning { .. } => "Warning",
+            CheckResult::Failed { .. } => "Failed",
+            CheckResult::Grandfathered { .. } => "Grandfathered",
         }
     }
 }
@@ -56,11 +56,11 @@ impl OutputFormatter for MarkdownFormatter {
         let (passed, warnings, failed, grandfathered) =
             results
                 .iter()
-                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r.status {
-                    CheckStatus::Passed => (p + 1, w, f, g),
-                    CheckStatus::Warning => (p, w + 1, f, g),
-                    CheckStatus::Failed => (p, w, f + 1, g),
-                    CheckStatus::Grandfathered => (p, w, f, g + 1),
+                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r {
+                    CheckResult::Passed { .. } => (p + 1, w, f, g),
+                    CheckResult::Warning { .. } => (p, w + 1, f, g),
+                    CheckResult::Failed { .. } => (p, w, f + 1, g),
+                    CheckResult::Grandfathered { .. } => (p, w, f, g + 1),
                 });
 
         // Summary section
@@ -77,10 +77,7 @@ impl OutputFormatter for MarkdownFormatter {
         writeln!(output).ok();
 
         // Only show detailed table if there are non-passed results
-        let non_passed: Vec<_> = results
-            .iter()
-            .filter(|r| !matches!(r.status, CheckStatus::Passed))
-            .collect();
+        let non_passed: Vec<_> = results.iter().filter(|r| !r.is_passed()).collect();
 
         if !non_passed.is_empty() {
             writeln!(output, "### Details\n").ok();
@@ -96,15 +93,15 @@ impl OutputFormatter for MarkdownFormatter {
             .ok();
 
             for result in &non_passed {
-                let icon = Self::status_icon(&result.status);
-                let status = Self::status_text(&result.status);
-                let path = result.path.display();
-                let sloc = result.stats.sloc();
-                let limit = result.limit;
-                let code = result.stats.code;
-                let comment = result.stats.comment;
-                let blank = result.stats.blank;
-                let reason = result.override_reason.as_deref().unwrap_or("-");
+                let icon = Self::status_icon(result);
+                let status = Self::status_text(result);
+                let path = result.path().display();
+                let sloc = result.stats().sloc();
+                let limit = result.limit();
+                let code = result.stats().code;
+                let comment = result.stats().comment;
+                let blank = result.stats().blank;
+                let reason = result.override_reason().unwrap_or("-");
 
                 writeln!(
                     output,
@@ -118,8 +115,7 @@ impl OutputFormatter for MarkdownFormatter {
                 let with_suggestions: Vec<_> = non_passed
                     .iter()
                     .filter(|r| {
-                        r.suggestions
-                            .as_ref()
+                        r.suggestions()
                             .is_some_and(crate::analyzer::SplitSuggestion::has_suggestions)
                     })
                     .collect();
@@ -129,8 +125,8 @@ impl OutputFormatter for MarkdownFormatter {
                     writeln!(output, "### Split Suggestions\n").ok();
 
                     for result in with_suggestions {
-                        if let Some(ref suggestion) = result.suggestions {
-                            writeln!(output, "#### `{}`\n", result.path.display()).ok();
+                        if let Some(suggestion) = result.suggestions() {
+                            writeln!(output, "#### `{}`\n", result.path().display()).ok();
                             writeln!(output, "| Suggested File | Lines | Functions |").ok();
                             writeln!(output, "|----------------|------:|-----------|").ok();
 

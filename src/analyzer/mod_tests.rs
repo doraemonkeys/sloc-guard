@@ -1,14 +1,28 @@
 use std::path::PathBuf;
 
 use super::*;
-use crate::checker::{CheckResult, CheckStatus};
+use crate::checker::CheckResult;
 use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 
-fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> CheckResult {
-    CheckResult {
+fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Passed {
         path: PathBuf::from(path),
-        status,
+        stats: LineStats {
+            total: code + 10,
+            code,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit,
+        override_reason: None,
+    }
+}
+
+fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
+    CheckResult::Failed {
+        path: PathBuf::from(path),
         stats: LineStats {
             total: code + 10,
             code,
@@ -25,34 +39,29 @@ fn make_result(path: &str, code: usize, limit: usize, status: CheckStatus) -> Ch
 #[test]
 fn generate_split_suggestions_skips_passed() {
     let registry = LanguageRegistry::default();
-    let mut results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+    let mut results = vec![make_passed_result("test.rs", 100, 500)];
 
     generate_split_suggestions(&mut results, &registry);
 
-    assert!(results[0].suggestions.is_none());
+    assert!(results[0].suggestions().is_none());
 }
 
 #[test]
 fn generate_split_suggestions_skips_unknown_extension() {
     let registry = LanguageRegistry::default();
-    let mut results = vec![make_result("test.xyz", 600, 500, CheckStatus::Failed)];
+    let mut results = vec![make_failed_result("test.xyz", 600, 500)];
 
     generate_split_suggestions(&mut results, &registry);
 
-    assert!(results[0].suggestions.is_none());
+    assert!(results[0].suggestions().is_none());
 }
 
 #[test]
 fn generate_split_suggestions_skips_missing_file() {
     let registry = LanguageRegistry::default();
-    let mut results = vec![make_result(
-        "nonexistent_file.rs",
-        600,
-        500,
-        CheckStatus::Failed,
-    )];
+    let mut results = vec![make_failed_result("nonexistent_file.rs", 600, 500)];
 
     generate_split_suggestions(&mut results, &registry);
 
-    assert!(results[0].suggestions.is_none());
+    assert!(results[0].suggestions().is_none());
 }

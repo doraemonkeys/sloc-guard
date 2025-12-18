@@ -4,7 +4,7 @@ use tempfile::TempDir;
 
 use crate::baseline::Baseline;
 use crate::cache::Cache;
-use crate::checker::{CheckResult, CheckStatus, ThresholdChecker};
+use crate::checker::{CheckResult, ThresholdChecker};
 use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, InitArgs};
 use crate::config::Config;
 use crate::counter::LineStats;
@@ -113,7 +113,7 @@ fn process_file_valid_rust_file() {
     let result = process_file_for_check(&path, &registry, &checker, true, true, &cache);
     assert!(result.is_some());
     let check_result = result.unwrap();
-    assert_eq!(check_result.status, CheckStatus::Passed);
+    assert!(check_result.is_passed());
 }
 
 #[test]
@@ -726,9 +726,8 @@ fn load_baseline_valid_file_returns_baseline() {
 #[test]
 fn apply_baseline_comparison_marks_failed_as_grandfathered() {
     let mut results = vec![
-        CheckResult {
+        CheckResult::Failed {
             path: PathBuf::from("src/file.rs"),
-            status: CheckStatus::Failed,
             stats: LineStats {
                 total: 600,
                 code: 600,
@@ -740,9 +739,8 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
             override_reason: None,
             suggestions: None,
         },
-        CheckResult {
+        CheckResult::Passed {
             path: PathBuf::from("src/other.rs"),
-            status: CheckStatus::Passed,
             stats: LineStats {
                 total: 100,
                 code: 100,
@@ -752,7 +750,6 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
             },
             limit: 500,
             override_reason: None,
-            suggestions: None,
         },
     ];
 
@@ -767,9 +764,8 @@ fn apply_baseline_comparison_marks_failed_as_grandfathered() {
 
 #[test]
 fn apply_baseline_comparison_does_not_mark_new_violations() {
-    let mut results = vec![CheckResult {
+    let mut results = vec![CheckResult::Failed {
         path: PathBuf::from("src/new_file.rs"),
-        status: CheckStatus::Failed,
         stats: LineStats {
             total: 600,
             code: 600,
@@ -791,9 +787,8 @@ fn apply_baseline_comparison_does_not_mark_new_violations() {
 
 #[test]
 fn apply_baseline_comparison_handles_windows_paths() {
-    let mut results = vec![CheckResult {
+    let mut results = vec![CheckResult::Failed {
         path: PathBuf::from("src\\file.rs"),
-        status: CheckStatus::Failed,
         stats: LineStats {
             total: 600,
             code: 600,
