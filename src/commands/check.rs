@@ -6,7 +6,10 @@ use rayon::prelude::*;
 use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
-use crate::checker::{CheckResult, Checker, ThresholdChecker};
+use crate::checker::{
+    CheckResult, CheckStatus, Checker, StructureChecker, StructureViolation, ThresholdChecker,
+    ViolationType,
+};
 use crate::cli::{CheckArgs, Cli};
 use crate::counter::LineStats;
 use crate::git::{ChangedFiles, GitDiff};
@@ -102,7 +105,22 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
         .collect();
     progress.finish();
 
-    // 7.1 Save cache if not disabled
+    // 7.2 Run structure checks if enabled
+    let structure_checker = StructureChecker::new(&config.structure)?;
+    if structure_checker.is_enabled() {
+        for path in &paths_to_scan {
+            if path.is_dir() {
+                let violations = structure_checker.check_directory(path)?;
+                let structure_results: Vec<_> = violations
+                    .iter()
+                    .map(structure_violation_to_check_result)
+                    .collect();
+                results.extend(structure_results);
+            }
+        }
+    }
+
+    // 7.3 Save cache if not disabled
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
@@ -255,6 +273,33 @@ pub(crate) fn compute_effective_stats(
     }
 
     effective
+}
+
+/// Convert a structure violation to a check result for unified output.
+fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckResult {
+    // Create synthetic LineStats representing the violation
+    // We use 'code' to represent the actual count for display purposes
+    let stats = LineStats {
+        total: violation.actual,
+        code: violation.actual,
+        comment: 0,
+        blank: 0,
+        ignored: 0,
+    };
+
+    let violation_label = match violation.violation_type {
+        ViolationType::FileCount => "files",
+        ViolationType::DirCount => "subdirs",
+    };
+
+    CheckResult {
+        path: violation.path.clone(),
+        status: CheckStatus::Failed,
+        stats,
+        limit: violation.limit,
+        override_reason: Some(format!("structure: {violation_label} count exceeded")),
+        suggestions: None,
+    }
 }
 
 pub(crate) fn format_output(

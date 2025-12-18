@@ -27,34 +27,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5 (Partial)**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering), Structure Config Schema ([structure] + [[structure.rules]])
-
----
-
-## Phase 5: Directory Structure Guard (New)
-
-Focus: Enforce file and directory count limits per directory to prevent architectural mess.
-
-### Task 5.1: Configuration Schema ✓
-Completed: `StructureConfig` and `StructureRule` in `src/config/model.rs`
-
-### Task 5.2: Structure Analyzer ✓
-Completed: `src/checker/structure.rs`
-- `StructureChecker` with glob-based ignore patterns and per-directory rules
-- `DirStats { file_count, dir_count }` - immediate children counts
-- `StructureViolation { path, violation_type, actual, limit }`
-- `ViolationType::FileCount | DirCount`
-- `Recursive directory scanning using metadata only (no file opening)`
-
-### Task 5.3: Integration & Output
-Location: `src/commands/check.rs`, `src/output/*`
-```
-- Update `check` command to run structure analysis
-- Update OutputFormatters to display structure errors:
-  - Text: Distinct error section or interleaved
-  - JSON/SARIF: Add structure violations to results
-  - HTML: Add "Structure" tab or section in summary
-```
+- **Phase 5 (Partial)**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering), Structure Guard (config schema + analyzer + check integration)
 
 ---
 
@@ -342,12 +315,11 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Structure Guard** | Phase 5 (Config ✓, Analyzer ✓, Integration) |
-| **2. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
-| **3. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, 5.5.5 Naming, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
-| **4. Documentation** | 5.5.12 extends Examples |
-| **5. Code Quality** | 5.5.6 Rename common.rs, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
-| **6. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
+| **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
+| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, 5.5.5 Naming, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
+| **3. Documentation** | 5.5.12 extends Examples |
+| **4. Code Quality** | 5.5.6 Rename common.rs, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
+| **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 
 ---
 

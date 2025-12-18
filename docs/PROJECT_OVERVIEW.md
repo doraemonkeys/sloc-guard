@@ -101,7 +101,8 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 
 ```
 → [if --baseline] load_baseline() | [if --diff] filter changed files
-→ ThresholdChecker::check() → CheckResult
+→ ThresholdChecker::check() → CheckResult (parallel, per-file)
+→ StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
 → [if baseline] mark Grandfathered | [if --fix] generate_split_suggestions()
 → format (Text/Json/Sarif/Markdown/Html) → output
 ```
