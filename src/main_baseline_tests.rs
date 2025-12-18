@@ -3,16 +3,12 @@ use std::path::PathBuf;
 use sloc_guard::baseline::Baseline;
 use sloc_guard::checker::{CheckResult, CheckStatus};
 use sloc_guard::cli::{BaselineUpdateArgs, CheckArgs, Cli, ColorChoice, Commands, InitArgs};
-use sloc_guard::config::Config;
 use sloc_guard::counter::LineStats;
 use sloc_guard::output::OutputFormat;
 use sloc_guard::{EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 use tempfile::TempDir;
 
-use crate::{
-    apply_baseline_comparison, get_baseline_scan_paths, load_baseline, run_baseline_update_impl,
-    run_check_impl,
-};
+use crate::{apply_baseline_comparison, load_baseline, run_baseline_update_impl, run_check_impl};
 
 fn make_cli_for_baseline(quiet: bool, no_config: bool) -> Cli {
     Cli {
@@ -40,76 +36,6 @@ fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         no_config,
         no_extends: false,
     }
-}
-
-#[test]
-fn get_baseline_scan_paths_uses_include_override() {
-    let config = Config::default();
-    let args = BaselineUpdateArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        output: PathBuf::from(".sloc-guard-baseline.json"),
-        ext: None,
-        exclude: vec![],
-        include: vec!["src".to_string(), "lib".to_string()],
-        no_gitignore: false,
-    };
-
-    let paths = get_baseline_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("lib")]);
-}
-
-#[test]
-fn get_baseline_scan_paths_uses_cli_paths() {
-    let config = Config::default();
-    let args = BaselineUpdateArgs {
-        paths: vec![PathBuf::from("src"), PathBuf::from("tests")],
-        config: None,
-        output: PathBuf::from(".sloc-guard-baseline.json"),
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        no_gitignore: false,
-    };
-
-    let paths = get_baseline_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("tests")]);
-}
-
-#[test]
-fn get_baseline_scan_paths_uses_config_include_paths() {
-    let mut config = Config::default();
-    config.default.include_paths = vec!["src".to_string()];
-
-    let args = BaselineUpdateArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        output: PathBuf::from(".sloc-guard-baseline.json"),
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        no_gitignore: false,
-    };
-
-    let paths = get_baseline_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src")]);
-}
-
-#[test]
-fn get_baseline_scan_paths_defaults_to_current_dir() {
-    let config = Config::default();
-    let args = BaselineUpdateArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        output: PathBuf::from(".sloc-guard-baseline.json"),
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        no_gitignore: false,
-    };
-
-    let paths = get_baseline_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from(".")]);
 }
 
 #[test]

@@ -26,21 +26,11 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json)
+- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list)
 
 ---
 
 ## Phase 5: Statistics Extension (Pending)
-
-### Task 5.3a: HTML Structure + Summary
-
-Location: `src/output/html.rs`
-
-```
-- Create HtmlFormatter with --report flag
-- HTML skeleton with summary table (total files, passed, failed, warnings)
-- Embedded CSS for standalone file
-```
 
 ### Task 5.3b: HTML File List
 
@@ -97,7 +87,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Deferred** | 5.3a-d HTML Report |
+| **1. Deferred** | 5.3b-d HTML Report (file list, charts, trends) |
 | | Phase 6 |
 
 ---

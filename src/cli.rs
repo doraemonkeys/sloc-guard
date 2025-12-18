@@ -124,7 +124,7 @@ pub struct CheckArgs {
     #[arg(long)]
     pub warn_threshold: Option<f64>,
 
-    /// Output format [possible values: text, json, sarif, markdown]
+    /// Output format [possible values: text, json, sarif, markdown, html]
     #[arg(short, long, default_value = "text")]
     pub format: OutputFormat,
 
@@ -183,7 +183,7 @@ pub struct StatsArgs {
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 
-    /// Output format [possible values: text, json, sarif, markdown]
+    /// Output format [possible values: text, json, sarif, markdown, html]
     #[arg(short, long, default_value = "text")]
     pub format: OutputFormat,
 

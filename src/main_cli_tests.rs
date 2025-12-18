@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
-use sloc_guard::cli::{CheckArgs, ColorChoice, GroupBy, StatsArgs};
+use sloc_guard::cli::{CheckArgs, ColorChoice};
 use sloc_guard::config::Config;
 use sloc_guard::output::{ColorMode, OutputFormat};
 
-use crate::{apply_cli_overrides, color_choice_to_mode, get_scan_paths, get_stats_scan_paths};
+use crate::{apply_cli_overrides, color_choice_to_mode, resolve_scan_paths};
 
 #[test]
 fn apply_cli_overrides_max_lines() {
@@ -123,207 +123,45 @@ fn apply_cli_overrides_warn_threshold() {
 }
 
 #[test]
-fn get_scan_paths_uses_include_override() {
+fn resolve_scan_paths_uses_include_override() {
     let config = Config::default();
-    let args = CheckArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        max_lines: None,
-        ext: None,
-        exclude: vec![],
-        include: vec!["src".to_string(), "lib".to_string()],
-        no_skip_comments: false,
-        no_skip_blank: false,
-        warn_threshold: None,
-        format: OutputFormat::Text,
-        output: None,
-        warn_only: false,
-        diff: None,
-        strict: false,
-        baseline: None,
-        no_cache: true,
-        no_gitignore: false,
-        fix: false,
-    };
+    let paths = vec![PathBuf::from(".")];
+    let include = vec!["src".to_string(), "lib".to_string()];
 
-    let paths = get_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("lib")]);
+    let result = resolve_scan_paths(&paths, &include, &config);
+    assert_eq!(result, vec![PathBuf::from("src"), PathBuf::from("lib")]);
 }
 
 #[test]
-fn get_scan_paths_uses_cli_paths() {
+fn resolve_scan_paths_uses_cli_paths() {
     let config = Config::default();
-    let args = CheckArgs {
-        paths: vec![PathBuf::from("src"), PathBuf::from("tests")],
-        config: None,
-        max_lines: None,
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        no_skip_comments: false,
-        no_skip_blank: false,
-        warn_threshold: None,
-        format: OutputFormat::Text,
-        output: None,
-        warn_only: false,
-        diff: None,
-        strict: false,
-        baseline: None,
-        no_cache: true,
-        no_gitignore: false,
-        fix: false,
-    };
+    let paths = vec![PathBuf::from("src"), PathBuf::from("tests")];
+    let include: Vec<String> = vec![];
 
-    let paths = get_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("tests")]);
+    let result = resolve_scan_paths(&paths, &include, &config);
+    assert_eq!(result, vec![PathBuf::from("src"), PathBuf::from("tests")]);
 }
 
 #[test]
-fn get_scan_paths_uses_config_include_paths() {
+fn resolve_scan_paths_uses_config_include_paths() {
     let mut config = Config::default();
     config.default.include_paths = vec!["src".to_string()];
 
-    let args = CheckArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        max_lines: None,
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        no_skip_comments: false,
-        no_skip_blank: false,
-        warn_threshold: None,
-        format: OutputFormat::Text,
-        output: None,
-        warn_only: false,
-        diff: None,
-        strict: false,
-        baseline: None,
-        no_cache: true,
-        no_gitignore: false,
-        fix: false,
-    };
+    let paths = vec![PathBuf::from(".")];
+    let include: Vec<String> = vec![];
 
-    let paths = get_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src")]);
+    let result = resolve_scan_paths(&paths, &include, &config);
+    assert_eq!(result, vec![PathBuf::from("src")]);
 }
 
 #[test]
-fn get_scan_paths_defaults_to_current_dir() {
+fn resolve_scan_paths_defaults_to_current_dir() {
     let config = Config::default();
-    let args = CheckArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        max_lines: None,
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        no_skip_comments: false,
-        no_skip_blank: false,
-        warn_threshold: None,
-        format: OutputFormat::Text,
-        output: None,
-        warn_only: false,
-        diff: None,
-        strict: false,
-        baseline: None,
-        no_cache: true,
-        no_gitignore: false,
-        fix: false,
-    };
+    let paths = vec![PathBuf::from(".")];
+    let include: Vec<String> = vec![];
 
-    let paths = get_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from(".")]);
-}
-
-#[test]
-fn get_stats_scan_paths_uses_include_override() {
-    let config = Config::default();
-    let args = StatsArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        ext: None,
-        exclude: vec![],
-        include: vec!["src".to_string(), "lib".to_string()],
-        format: OutputFormat::Text,
-        output: None,
-        no_cache: true,
-        group_by: GroupBy::None,
-        top: None,
-        no_gitignore: false,
-        trend: false,
-    };
-
-    let paths = get_stats_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("lib")]);
-}
-
-#[test]
-fn get_stats_scan_paths_uses_cli_paths() {
-    let config = Config::default();
-    let args = StatsArgs {
-        paths: vec![PathBuf::from("src"), PathBuf::from("tests")],
-        config: None,
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        format: OutputFormat::Text,
-        output: None,
-        no_cache: true,
-        group_by: GroupBy::None,
-        top: None,
-        no_gitignore: false,
-        trend: false,
-    };
-
-    let paths = get_stats_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src"), PathBuf::from("tests")]);
-}
-
-#[test]
-fn get_stats_scan_paths_uses_config_include_paths() {
-    let mut config = Config::default();
-    config.default.include_paths = vec!["src".to_string()];
-
-    let args = StatsArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        format: OutputFormat::Text,
-        output: None,
-        no_cache: true,
-        group_by: GroupBy::None,
-        top: None,
-        no_gitignore: false,
-        trend: false,
-    };
-
-    let paths = get_stats_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from("src")]);
-}
-
-#[test]
-fn get_stats_scan_paths_defaults_to_current_dir() {
-    let config = Config::default();
-    let args = StatsArgs {
-        paths: vec![PathBuf::from(".")],
-        config: None,
-        ext: None,
-        exclude: vec![],
-        include: vec![],
-        format: OutputFormat::Text,
-        output: None,
-        no_cache: true,
-        group_by: GroupBy::None,
-        top: None,
-        no_gitignore: false,
-        trend: false,
-    };
-
-    let paths = get_stats_scan_paths(&args, &config);
-    assert_eq!(paths, vec![PathBuf::from(".")]);
+    let result = resolve_scan_paths(&paths, &include, &config);
+    assert_eq!(result, vec![PathBuf::from(".")]);
 }
 
 #[test]

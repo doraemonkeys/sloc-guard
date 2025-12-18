@@ -32,6 +32,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/markdown` | `output/markdown.rs` | `MarkdownFormatter` - table-based markdown output for PR comments |
+| `output/html` | `output/html.rs` | `HtmlFormatter` - standalone HTML report with embedded CSS, summary cards, file details table |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `LanguageStats`, `DirectoryStats` - stats output with language/directory breakdown, top-N files, average |
 | `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
@@ -69,8 +70,10 @@ CheckStatus::Passed | Warning | Failed | Grandfathered
 CheckResult { path, status, stats, limit, override_reason: Option<String>, suggestions: Option<SplitSuggestion> }
 
 // Output formatting
+OutputFormat::Text | Json | Sarif | Markdown | Html  // --format flag
 ColorMode::Auto | Always | Never  // controls ANSI color output
 TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
+HtmlFormatter::new().with_suggestions(show)  // standalone HTML report with embedded CSS
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats, language: String }
@@ -143,7 +146,7 @@ CLI args → load_config() → [if extends && !--no-extends] resolve extends cha
          → [if !--no-cache] save_cache()
          → [if baseline] apply_baseline_comparison() → mark Failed as Grandfathered
          → [if --fix] generate_split_suggestions(results, registry) → add SplitSuggestion to failed CheckResults
-         → TextFormatter/JsonFormatter/SarifFormatter/MarkdownFormatter::format(results)
+         → TextFormatter/JsonFormatter/SarifFormatter/MarkdownFormatter/HtmlFormatter::format(results)
          → write to stdout or --output file
 ```
 

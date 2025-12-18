@@ -20,9 +20,9 @@ use sloc_guard::counter::{CountResult, LineStats, SlocCounter};
 use sloc_guard::git::{ChangedFiles, GitDiff};
 use sloc_guard::language::LanguageRegistry;
 use sloc_guard::output::{
-    ColorMode, FileStatistics, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
-    ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
-    StatsMarkdownFormatter, StatsTextFormatter, TextFormatter,
+    ColorMode, FileStatistics, HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat,
+    OutputFormatter, ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter,
+    StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter, TextFormatter,
 };
 use sloc_guard::scanner::scan_files;
 use sloc_guard::stats::TrendHistory;
@@ -110,7 +110,7 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     exclude_patterns.extend(args.exclude.clone());
 
     // 5. Determine paths to scan
-    let paths_to_scan = get_scan_paths(args, &config);
+    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
 
     // 6. Scan directories (respecting .gitignore if enabled)
     let use_gitignore = config.default.gitignore && !args.no_gitignore;
@@ -282,16 +282,20 @@ const fn apply_cli_overrides(config: &mut Config, args: &CheckArgs) {
     }
 }
 
-fn get_scan_paths(args: &CheckArgs, config: &Config) -> Vec<std::path::PathBuf> {
+fn resolve_scan_paths(
+    paths: &[std::path::PathBuf],
+    include: &[String],
+    config: &Config,
+) -> Vec<std::path::PathBuf> {
     // CLI --include overrides config include_paths
-    if !args.include.is_empty() {
-        return args.include.iter().map(std::path::PathBuf::from).collect();
+    if !include.is_empty() {
+        return include.iter().map(std::path::PathBuf::from).collect();
     }
 
     // If CLI paths provided (other than default "."), use them
     let default_path = std::path::PathBuf::from(".");
-    if args.paths.len() != 1 || args.paths[0] != default_path {
-        return args.paths.clone();
+    if paths.len() != 1 || paths[0] != default_path {
+        return paths.to_vec();
     }
 
     // Use config include_paths if available
@@ -305,7 +309,7 @@ fn get_scan_paths(args: &CheckArgs, config: &Config) -> Vec<std::path::PathBuf> 
     }
 
     // Default to current directory
-    args.paths.clone()
+    paths.to_vec()
 }
 
 fn filter_by_git_diff(
@@ -466,6 +470,9 @@ fn format_output(
         OutputFormat::Markdown => MarkdownFormatter::new()
             .with_suggestions(show_suggestions)
             .format(results),
+        OutputFormat::Html => HtmlFormatter::new()
+            .with_suggestions(show_suggestions)
+            .format(results),
     }
 }
 
@@ -510,7 +517,7 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     exclude_patterns.extend(args.exclude.clone());
 
     // 3. Determine paths to scan
-    let paths_to_scan = get_stats_scan_paths(args, &config);
+    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
 
     // 4. Scan directories (respecting .gitignore if enabled)
     let use_gitignore = config.default.gitignore && !args.no_gitignore;
@@ -580,32 +587,6 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     Ok(EXIT_SUCCESS)
 }
 
-fn get_stats_scan_paths(args: &StatsArgs, config: &Config) -> Vec<std::path::PathBuf> {
-    // CLI --include overrides config include_paths
-    if !args.include.is_empty() {
-        return args.include.iter().map(std::path::PathBuf::from).collect();
-    }
-
-    // If CLI paths provided (other than default "."), use them
-    let default_path = std::path::PathBuf::from(".");
-    if args.paths.len() != 1 || args.paths[0] != default_path {
-        return args.paths.clone();
-    }
-
-    // Use config include_paths if available
-    if !config.default.include_paths.is_empty() {
-        return config
-            .default
-            .include_paths
-            .iter()
-            .map(std::path::PathBuf::from)
-            .collect();
-    }
-
-    // Default to current directory
-    args.paths.clone()
-}
-
 fn collect_file_stats_cached(
     file_path: &Path,
     registry: &LanguageRegistry,
@@ -661,6 +642,9 @@ fn format_stats_output(
             "SARIF output format is not supported for stats command".to_string(),
         )),
         OutputFormat::Markdown => StatsMarkdownFormatter.format(stats),
+        OutputFormat::Html => Err(sloc_guard::SlocGuardError::Config(
+            "HTML output format is not yet supported for stats command".to_string(),
+        )),
     }
 }
 
@@ -702,7 +686,7 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     exclude_patterns.extend(args.exclude.clone());
 
     // 3. Determine paths to scan
-    let paths_to_scan = get_baseline_scan_paths(args, &config);
+    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
 
     // 4. Scan directories (respecting .gitignore if enabled)
     let use_gitignore = config.default.gitignore && !args.no_gitignore;
@@ -749,32 +733,6 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     baseline.save(&args.output)?;
 
     Ok(violations.len())
-}
-
-fn get_baseline_scan_paths(args: &BaselineUpdateArgs, config: &Config) -> Vec<std::path::PathBuf> {
-    // CLI --include overrides config include_paths
-    if !args.include.is_empty() {
-        return args.include.iter().map(std::path::PathBuf::from).collect();
-    }
-
-    // If CLI paths provided (other than default "."), use them
-    let default_path = std::path::PathBuf::from(".");
-    if args.paths.len() != 1 || args.paths[0] != default_path {
-        return args.paths.clone();
-    }
-
-    // Use config include_paths if available
-    if !config.default.include_paths.is_empty() {
-        return config
-            .default
-            .include_paths
-            .iter()
-            .map(std::path::PathBuf::from)
-            .collect();
-    }
-
-    // Default to current directory
-    args.paths.clone()
 }
 
 #[cfg(test)]

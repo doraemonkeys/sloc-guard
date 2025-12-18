@@ -1,3 +1,4 @@
+mod html;
 mod json;
 mod markdown;
 mod progress;
@@ -5,6 +6,7 @@ mod sarif;
 mod stats;
 mod text;
 
+pub use html::HtmlFormatter;
 pub use json::JsonFormatter;
 pub use markdown::MarkdownFormatter;
 pub use progress::ScanProgress;
@@ -34,6 +36,7 @@ pub enum OutputFormat {
     Json,
     Sarif,
     Markdown,
+    Html,
 }
 
 impl std::str::FromStr for OutputFormat {
@@ -45,6 +48,7 @@ impl std::str::FromStr for OutputFormat {
             "json" => Ok(Self::Json),
             "sarif" => Ok(Self::Sarif),
             "markdown" | "md" => Ok(Self::Markdown),
+            "html" => Ok(Self::Html),
             _ => Err(format!("Unknown output format: {s}")),
         }
     }
