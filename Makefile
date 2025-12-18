@@ -6,9 +6,9 @@ ci:
 	@mkdir -p .tmp
 	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo tarpaulin --config tarpaulin.toml 2>&1 | tail -n 30
 	@mkdir -p .tmp
-	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check --strict src 
+	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check src 
 
-# 详细模式
+# 正常模式
 ci-verbose: clippy tarpaulin sloc-strict
 
 clippy:

@@ -3,12 +3,12 @@ max_lines = 700
 extensions = ["rs"]
 skip_comments = true
 skip_blank = false
-warn_threshold = 1
+warn_threshold = 0.9
 
 [[path_rules]]
 pattern = "**/*_tests.rs"
 max_lines = 1500
-warn_threshold = 1
+warn_threshold = 0.9
 
 [exclude]
 patterns = ["**/target/**", "**/.git/**"]

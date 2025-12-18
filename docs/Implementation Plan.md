@@ -26,21 +26,11 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list)
+- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering)
 
 ---
 
 ## Phase 5: Statistics Extension (Pending)
-
-### Task 5.3b: HTML File List
-
-Location: `src/output/html.rs`
-
-```
-- File results table (path, lines, limit, status)
-- Sortable columns (client-side JS optional)
-- Status filtering (show all/failed/warning only)
-```
 
 ### Task 5.3c: HTML Charts (Pure CSS)
 
@@ -87,7 +77,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Deferred** | 5.3b-d HTML Report (file list, charts, trends) |
+| **1. Deferred** | 5.3c-d HTML Report (charts, trends) |
 | | Phase 6 |
 
 ---

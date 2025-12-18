@@ -32,7 +32,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/markdown` | `output/markdown.rs` | `MarkdownFormatter` - table-based markdown output for PR comments |
-| `output/html` | `output/html.rs` | `HtmlFormatter` - standalone HTML report with embedded CSS, summary cards, file details table |
+| `output/html` | `output/html.rs` | `HtmlFormatter` - standalone HTML report with embedded CSS, summary cards, all files table with sortable columns and status filtering |
 | `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `LanguageStats`, `DirectoryStats` - stats output with language/directory breakdown, top-N files, average |
 | `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
@@ -73,7 +73,7 @@ CheckResult { path, status, stats, limit, override_reason: Option<String>, sugge
 OutputFormat::Text | Json | Sarif | Markdown | Html  // --format flag
 ColorMode::Auto | Always | Never  // controls ANSI color output
 TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
-HtmlFormatter::new().with_suggestions(show)  // standalone HTML report with embedded CSS
+HtmlFormatter::new().with_suggestions(show)  // standalone HTML report with embedded CSS, sortable columns, status filtering
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats, language: String }
