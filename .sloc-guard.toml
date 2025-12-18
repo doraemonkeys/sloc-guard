@@ -11,4 +11,4 @@ max_lines = 1400
 warn_threshold = 0.9
 
 [exclude]
-patterns = ["**/target/**", "**/.git/**"]
+patterns = ["**/target/**", "**/.git/**", ".tmp/**"]

@@ -185,9 +185,9 @@ impl HtmlFormatter {
 
     const fn status_icon(status: &CheckStatus) -> &'static str {
         match status {
-            CheckStatus::Passed => "&#x2713;",      // ✓
-            CheckStatus::Warning => "&#x26A0;",     // ⚠
-            CheckStatus::Failed => "&#x2717;",      // ✗
+            CheckStatus::Passed => "&#x2713;",        // ✓
+            CheckStatus::Warning => "&#x26A0;",       // ⚠
+            CheckStatus::Failed => "&#x2717;",        // ✗
             CheckStatus::Grandfathered => "&#x25C9;", // ◉
         }
     }
@@ -308,9 +308,8 @@ impl HtmlFormatter {
         output.push_str(
             "                    <th class=\"sortable\" data-sort=\"status\">Status</th>\n",
         );
-        output.push_str(
-            "                    <th class=\"sortable\" data-sort=\"text\">File</th>\n",
-        );
+        output
+            .push_str("                    <th class=\"sortable\" data-sort=\"text\">File</th>\n");
         output.push_str(
             "                    <th class=\"sortable\" data-sort=\"number\">Lines</th>\n",
         );
@@ -357,7 +356,11 @@ impl HtmlFormatter {
 
         // File path cell
         output.push_str("                    <td>\n");
-        writeln!(output, r#"                        <div class="file-path">{path}</div>"#).ok();
+        writeln!(
+            output,
+            r#"                        <div class="file-path">{path}</div>"#
+        )
+        .ok();
 
         // Optional reason
         if let Some(reason) = &result.override_reason {

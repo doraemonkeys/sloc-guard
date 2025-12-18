@@ -4,7 +4,7 @@ use crate::checker::{CheckResult, CheckStatus};
 use crate::counter::LineStats;
 use crate::output::OutputFormatter;
 
-use super::{html_escape, HtmlFormatter};
+use super::{HtmlFormatter, html_escape};
 
 fn make_result(path: &str, status: CheckStatus, code: usize, limit: usize) -> CheckResult {
     CheckResult {
