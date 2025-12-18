@@ -344,12 +344,7 @@ fn violation_type_equality() {
 
 #[test]
 fn structure_violation_new() {
-    let violation = StructureViolation::new(
-        PathBuf::from("src"),
-        ViolationType::FileCount,
-        15,
-        10,
-    );
+    let violation = StructureViolation::new(PathBuf::from("src"), ViolationType::FileCount, 15, 10);
 
     assert_eq!(violation.path, PathBuf::from("src"));
     assert_eq!(violation.violation_type, ViolationType::FileCount);

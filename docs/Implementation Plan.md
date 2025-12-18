@@ -44,7 +44,7 @@ Completed: `src/checker/structure.rs`
 - `DirStats { file_count, dir_count }` - immediate children counts
 - `StructureViolation { path, violation_type, actual, limit }`
 - `ViolationType::FileCount | DirCount`
-- Recursive directory scanning using metadata only (no file opening)
+- `Recursive directory scanning using metadata only (no file opening)`
 
 ### Task 5.3: Integration & Output
 Location: `src/commands/check.rs`, `src/output/*`
@@ -55,6 +55,249 @@ Location: `src/commands/check.rs`, `src/output/*`
   - JSON/SARIF: Add structure violations to results
   - HTML: Add "Structure" tab or section in summary
 ```
+
+---
+
+## Phase 5.5: Code Quality & Architecture Refactoring (Pending)
+
+Focus: Address architecture flaws, Scanner/Structure visibility conflict, UX ambiguities, and CLAUDE.md violations.
+
+### Task 5.5.1: Scanner vs Structure Visibility Conflict (Critical)
+Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/structure.rs`
+**Problem**: `[scanner].extensions` filters files globally → Structure checker "blind" to non-code files.
+- Scenario: Dir has 100 `.txt` files, scanner only sees `.rs` → Structure reports 0 files → false pass.
+
+**Solution**: Decouple file discovery from content filtering.
+```
+[scanner]          # Physical discovery - NO extension filter
+  gitignore = true
+  exclude = [...]  # Global excludes (node_modules, target, etc.)
+
+[content]          # SLOC analysis scope
+  extensions = ["rs", "ts", ...]  # Only these for line counting
+  max_lines = 400
+  ...
+```
+- `Scanner` returns ALL files (respecting gitignore + exclude only).
+- `ThresholdChecker` filters by `content.extensions` before counting.
+- `StructureChecker` sees full directory contents (uses its own `count_exclude`).
+
+### Task 5.5.2: Override Separation (Content vs Structure)
+Location: `src/config/model.rs`, `src/checker/*.rs`
+**Problem**: `[[override]]` mixing file limits and directory limits causes semantic confusion.
+- Same array contains two different concepts (file SLOC vs directory counts)
+- Only way to distinguish is by field presence (`max_lines` vs `max_files/max_dirs`)
+- Edge case: user sets `max_files` on a file path, or `max_lines` on a directory → undefined behavior
+- `[[content.rules]]` vs `[[content.override]]` 语义重叠 - 用户不知道该用哪个
+
+**Solution**: Split into `[[content.override]]` and `[[structure.override]]` with clear semantics.
+```toml
+# Content override (file SLOC limits)
+[[content.override]]
+path = "src/legacy/god_object.rs"
+max_lines = 5000
+reason = "Legacy core"  # reason REQUIRED
+
+# Structure override (directory limits)
+[[structure.override]]
+path = "src/legacy_module"
+max_files = 500
+max_dirs = 100
+reason = "Legacy monolith, gradual migration in progress"  # reason REQUIRED
+```
+- `ContentOverride { path, max_lines, reason }` - file-only
+- `StructureOverride { path, max_files, max_dirs, reason }` - directory-only
+- Type safety: loader validates path type matches override type
+- **Semantic distinction**:
+  - `[[content/structure.override]]` = **豁免** (只能放宽限制, reason 必填)
+  - `[[content/structure.rules]]` = **规则** (可严可宽, 用于批量 glob 匹配)
+- Loader validates: override.max_lines >= effective rule limit (error if stricter)
+
+### Task 5.5.3: Extension-Based Rule Syntax Sugar
+Location: `src/config/model.rs`, `src/config/loader.rs`
+**Problem**: Removing `[rules.<ext>]` in favor of `[[content.rules]]` pattern degrades UX for common case.
+- Old: `[rules.rs] max_lines = 1000` (simple, intuitive)
+- New: `[[content.rules]] pattern = "**/*.rs"` (verbose, error-prone glob)
+
+**Solution**: Support both syntaxes with full field parity.
+```toml
+# Shorthand (extension-based, implicit **/*.ext)
+[content.languages.rs]
+max_lines = 1000
+warn_threshold = 0.9   # Must support ALL fields that [[content.rules]] supports
+skip_comments = true
+skip_blank = true
+
+# Full pattern (for complex cases like *.test.ts)
+[[content.rules]]
+pattern = "**/*.test.ts"
+max_lines = 1500
+```
+- Priority: `[[content.rules]]` > `[content.languages.<ext>]` > `[content]` defaults.
+- Loader expands `[content.languages.rs]` into internal `PathRule { pattern: "**/*.rs", ... }`.
+- **Field parity**: `[content.languages.X]` MUST support all fields that `[[content.rules]]` supports.
+
+### Task 5.5.4: Structure Pattern Semantics Clarification
+Location: `src/checker/structure.rs`, `docs/sloc-guard.example.toml`
+**Problem**: `[[structure.rules]]` pattern ambiguity:
+- Does `src/components/*` match `src/components/Button/`? `src/components/Button/Icon/`?
+- How to express "apply rule to all nested levels"?
+- Difference between `*` and `**` unclear.
+
+**Solution**: Enforce directory-only matching with clear glob semantics.
+```
+- `structure.rules` patterns ONLY match directories (files silently ignored).
+- Glob behavior:
+  - `src/components/*` → matches DIRECT children only (Button/, Icon/)
+  - `src/components/**` → matches ALL descendants recursively
+  - `src/features` → exact match only
+- Document explicitly with examples in sloc-guard.example.toml
+```
+Implementation:
+- In `StructureChecker::check()`, filter matched paths: `if !path.is_dir() { continue; }`
+- Add doc comments in example TOML clarifying `*` vs `**` behavior
+
+### Task 5.5.5: Naming & Semantics Polish
+Location: `src/config/model.rs`, `docs/sloc-guard.example.toml`
+```
+- Keep `structure.count_exclude` (NOT `ignored_files`)
+  - "ignored" implies "invisible/not scanned" which is misleading
+  - `count_exclude` = "exists but doesn't count toward quota" (accurate)
+  - Alternative: `exempt_files` or `uncounted_files`
+- Document `scanner.exclude` vs `structure.count_exclude` difference:
+  | Config                       | Effect                                      |
+  |------------------------------|---------------------------------------------|
+  | `scanner.exclude = ["*.svg"]`| Completely invisible to ALL checkers        |
+  | `structure.count_exclude`    | Visible but doesn't count toward dir quota  |
+- Document `scanner.exclude` + `gitignore` relationship:
+  - "exclude patterns are ADDITIVE to .gitignore rules (union, not override)"
+```
+
+### Task 5.5.6: Rename `common.rs` Module
+Location: `src/commands/common.rs`
+```
+- Violates CLAUDE.md: "Don't name modules util, common, or misc"
+- Rename to `src/commands/context.rs` or `src/app_context.rs`
+  - Contains: Config loading, Cache integration, shared command utilities
+- Update all imports in commands/*.rs
+```
+
+### Task 5.5.7: Refactor `CheckResult` to Enum
+Location: `src/checker/threshold.rs`
+```
+- Violates CLAUDE.md: "Use Enums with associated data... rather than Structs with many optional fields"
+- Current: struct with optional `override_reason`, `suggestions` fields
+- Refactor to:
+  enum CheckResult {
+      Passed { path, stats, limit },
+      Warning { path, stats, limit },
+      Failed { path, stats, limit, suggestions: Option<SplitSuggestion> },
+      Grandfathered { path, stats, limit, reason: String },
+  }
+- Update all consumers in output formatters and commands
+```
+
+### Task 5.5.8: Config Versioning
+Location: `src/config/model.rs`, `src/config/loader.rs`
+```
+- Add `version` field to config schema (e.g., "2.0")
+- Validate on load:
+  - Missing `version` → Assume v1 (current schema), warn about deprecation
+  - `version` = "2.0" → Use new schema (scanner/content/structure separation)
+  - `version` > supported → Error with upgrade instruction
+- Migration path: v1 config auto-converted to v2 internally
+```
+
+### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
+Location: `src/checker/threshold.rs`, `src/config/loader.rs`, `docs/sloc-guard.example.toml`
+**Problem**: Multiple rules can match same file, priority unclear.
+- `[[content.rules]] pattern = "tests/**"` vs `[[content.rules]] pattern = "**/*.test.ts"`
+- Which wins for `tests/foo.test.ts`?
+- `[content.languages.rs]` 和 `[[content.rules]] pattern = "**/*.rs"` 本质相同却可能有不同结果
+
+**Solution**: Define and enforce explicit priority chain.
+```
+Content Rule Priority (high → low):
+1. [[content.override]] - exact path match
+2. [[content.rules]] - LAST declared match wins (later rules override earlier)
+3. [content.languages.<ext>] - extension shorthand
+4. [content] defaults
+
+Structure Rule Priority (high → low):
+1. [[structure.override]] - exact path match
+2. [[structure.rules]] - LAST declared match wins
+3. [structure] defaults
+```
+- **Implementation**: Loader expands `[content.languages.X]` into internal rules and **inserts at HEAD** of rule chain
+  - This ensures explicit `[[content.rules]]` always override language shorthand
+  - User writes: `[content.languages.rs]` + `[[content.rules]] pattern="**/*.rs"`
+  - Internal: rules list = `[expanded_rs_rule, explicit_rs_rule]` → explicit wins (LAST match)
+- Add comments in example TOML documenting priority chain
+- Consider: warn on overlapping rules at config load time (optional strict mode)
+
+### Task 5.5.10: Structure warn_threshold Symmetry
+Location: `src/config/model.rs`, `src/checker/structure.rs`
+**Problem**: Content has `warn_threshold` for gradual warnings, Structure lacks this symmetry.
+- Content: `max_lines = 400, warn_threshold = 0.8` → warns at 320
+- Structure: `max_files = 50` → direct fail at 50, no warning at 45
+
+**Solution**: Add `warn_threshold` to Structure config.
+```toml
+[structure]
+max_files = 50
+max_dirs = 10
+warn_threshold = 0.9  # Warn at 45 files / 9 dirs
+
+[[structure.rules]]
+pattern = "src/components/*"
+max_files = 5
+warn_threshold = 0.8  # Override threshold per rule
+```
+- `StructureConfig { warn_threshold: Option<f32> }`
+- `StructureRule { warn_threshold: Option<f32> }`
+- `StructureViolation` adds `Warning` variant alongside `FileCount`/`DirCount`
+
+### Task 5.5.11: "Unlimited" Special Value Semantics
+Location: `src/config/model.rs`, `src/checker/*.rs`, `docs/sloc-guard.example.toml`
+**Problem**: No way to express "no limit" for a specific field.
+- `max_dirs = 0` means "prohibited" (zero allowed)
+- What if user wants `max_files = 5` but unlimited `max_dirs`?
+- Omitting field → uses default (10), not "unlimited"
+
+**Solution**: Use `-1` or explicit `null` for "unlimited".
+```toml
+[[structure.rules]]
+pattern = "src/components/*"
+max_files = 5
+max_dirs = -1  # Unlimited subdirs (no check)
+
+# Alternative: explicit null (TOML doesn't support, use sentinel)
+# max_dirs = 999999  # Effectively unlimited
+```
+- Convention: `-1` = unlimited (skip check for this field)
+- Loader validates: negative values only allowed as `-1`
+- Document in example TOML with clear comments
+
+### Task 5.5.12: Add `extends` Examples to Documentation
+Location: `docs/sloc-guard.example.toml`
+**Problem**: `extends` is an important feature (local/remote config inheritance) but example TOML has no usage examples.
+
+**Solution**: Add extends examples to sloc-guard.example.toml.
+```toml
+# Local inheritance
+extends = "../shared/.sloc-guard.toml"
+
+# Remote inheritance (cached 1h)
+extends = "https://company.com/standards/sloc-guard-base.toml"
+
+# Override inherited values
+[content]
+max_lines = 500  # Overrides base config's max_lines
+```
+- Show local file path example
+- Show remote URL example
+- Show how to override inherited values
+- Note: `--no-extends` flag to disable inheritance
 
 ---
 
@@ -99,9 +342,12 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Structure Guard** | Phase 5 (Config, Analyzer, Integration) |
-| **2. Deferred** | 6.1-6.2 HTML Charts/Trends |
-| | Phase 7 CI/CD |
+| **1. Structure Guard** | Phase 5 (Config ✓, Analyzer ✓, Integration) |
+| **2. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
+| **3. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, 5.5.5 Naming, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
+| **4. Documentation** | 5.5.12 extends Examples |
+| **5. Code Quality** | 5.5.6 Rename common.rs, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
+| **6. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 
 ---
 
@@ -112,12 +358,12 @@ Location: `src/output/html.rs`
 ```
 main.rs (CLI parsing + dispatch)
   -> commands/check | stats | baseline_cmd | init | config
-  -> commands/common (shared: load_config, cache, scan paths)
+  -> context (was common) (shared: load_config, cache)
   -> config/loader (load config)
   -> scanner (find files)
   -> language/registry (get comment syntax)
   -> counter/sloc (count lines)
   -> checker/threshold (check limits)
-  -> checker/structure (NEW: check structure limits)
+  -> checker/structure (check structure limits)
   -> output/* (format results)
 ```

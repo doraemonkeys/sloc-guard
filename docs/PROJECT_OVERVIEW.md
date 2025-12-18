@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | File(s) | Purpose |
 |--------|---------|---------|
 | `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init`, `config`, `baseline` commands |
-| `config/*` | `config/*.rs` | `Config`, `DefaultConfig`, `RuleConfig`, `PathRule`, `FileOverride`, `StructureConfig`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
+| `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `scanner/*.rs` | `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore) |
@@ -34,13 +34,16 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ```rust
 // Config (priority: CLI > file > defaults; extends: local/remote with 1h TTL cache)
-Config { extends, default, rules, path_rules, exclude, overrides, languages, structure }
-DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
-RuleConfig { extensions, max_lines, skip_comments, skip_blank, warn_threshold }
-PathRule { pattern, max_lines, warn_threshold }  // glob: "src/generated/**"
-FileOverride { path, max_lines, reason }
+// V2 schema separates scanner/content/structure concerns
+Config { version, scanner, content, structure }
+ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
+ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
+ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
+ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
+StructureConfig { max_files, max_dirs, count_exclude, rules, overrides }
+StructureRule { pattern, max_files, max_dirs }  // [[structure.rules]]
+StructureOverride { path, max_files, max_dirs, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
-StructureConfig { max_files, max_dirs, ignore, rules: Vec<StructureRule> }
 
 // Line counting (ignore directives: ignore-file, ignore-next N, ignore-start/end)
 LineStats { total, code, comment, blank, ignored }
@@ -125,12 +128,18 @@ validate: toml::from_str() → validate_config_semantics()
 show: load_config() → format_config_text() or JSON
 ```
 
-## Threshold Resolution (priority high→low)
+## Rule Priority (high→low)
 
-1. `[[override]]` - path suffix match (by components: `legacy.rs` matches `src/legacy.rs`)
-2. `[[path_rules]]` - glob pattern match (e.g., `src/generated/**`)
-3. `[rules.*]` - extension match
-4. `[default]` - fallback
+**Content (SLOC limits):**
+1. `[[content.override]]` - exact path match (file only)
+2. `[[content.rules]]` - glob pattern, LAST declared match wins
+3. `[content.languages.<ext>]` - extension shorthand
+4. `[content]` defaults
+
+**Structure (directory limits):**
+1. `[[structure.override]]` - exact path match (dir only)
+2. `[[structure.rules]]` - glob pattern, LAST declared match wins
+3. `[structure]` defaults
 
 ## Dependencies
 

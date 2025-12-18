@@ -31,7 +31,12 @@ pub struct StructureViolation {
 
 impl StructureViolation {
     #[must_use]
-    pub const fn new(path: PathBuf, violation_type: ViolationType, actual: usize, limit: usize) -> Self {
+    pub const fn new(
+        path: PathBuf,
+        violation_type: ViolationType,
+        actual: usize,
+        limit: usize,
+    ) -> Self {
         Self {
             path,
             violation_type,
@@ -87,24 +92,21 @@ impl StructureChecker {
             })?;
             builder.add(glob);
         }
-        builder
-            .build()
-            .map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: "combined ignore patterns".to_string(),
-                source: e,
-            })
+        builder.build().map_err(|e| SlocGuardError::InvalidPattern {
+            pattern: "combined ignore patterns".to_string(),
+            source: e,
+        })
     }
 
-    fn build_rules(
-        rules: &[crate::config::StructureRule],
-    ) -> Result<Vec<CompiledStructureRule>> {
+    fn build_rules(rules: &[crate::config::StructureRule]) -> Result<Vec<CompiledStructureRule>> {
         rules
             .iter()
             .map(|rule| {
-                let glob = Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                    pattern: rule.pattern.clone(),
-                    source: e,
-                })?;
+                let glob =
+                    Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
+                        pattern: rule.pattern.clone(),
+                        source: e,
+                    })?;
                 Ok(CompiledStructureRule {
                     matcher: glob.compile_matcher(),
                     max_files: rule.max_files,
@@ -142,9 +144,7 @@ impl StructureChecker {
             let file_name = path.file_name().unwrap_or_default();
 
             // Check if this entry should be ignored
-            if self.ignore_patterns.is_match(file_name)
-                || self.ignore_patterns.is_match(&path)
-            {
+            if self.ignore_patterns.is_match(file_name) || self.ignore_patterns.is_match(&path) {
                 continue;
             }
 
