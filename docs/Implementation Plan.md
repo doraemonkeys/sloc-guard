@@ -38,26 +38,18 @@ Focus: Enforce file and directory count limits per directory to prevent architec
 ### Task 5.1: Configuration Schema ✓
 Completed: `StructureConfig` and `StructureRule` in `src/config/model.rs`
 
-### Task 5.2: Structure Analyzer
-Location: `src/checker/structure.rs` (New module), `src/scanner/mod.rs`
-```
-- Implement `StructureChecker`
-- **Key design**: Collect directory structure info during Scanner traversal (avoid second pass)
-  - Extend Scanner to return `ScanResult { files: Vec<PathBuf>, dir_stats: HashMap<PathBuf, DirEntry> }`
-  - `DirEntry { file_count: usize, dir_count: usize }` - immediate children counts
-  - Counts use metadata only (no file opening)
-- Logic:
-  1. During scan: accumulate file/dir counts per directory
-  2. Filter out items matching `structure.ignore` from counts
-  3. Match directory path against `structure.rules` (priority: rule > global default)
-  4. Return violations if count > limit
-```
+### Task 5.2: Structure Analyzer ✓
+Completed: `src/checker/structure.rs`
+- `StructureChecker` with glob-based ignore patterns and per-directory rules
+- `DirStats { file_count, dir_count }` - immediate children counts
+- `StructureViolation { path, violation_type, actual, limit }`
+- `ViolationType::FileCount | DirCount`
+- Recursive directory scanning using metadata only (no file opening)
 
 ### Task 5.3: Integration & Output
 Location: `src/commands/check.rs`, `src/output/*`
 ```
 - Update `check` command to run structure analysis
-- Define `StructureViolation` (path, actual_count, limit, type: FileCount/DirCount)
 - Update OutputFormatters to display structure errors:
   - Text: Distinct error section or interleaved
   - JSON/SARIF: Add structure violations to results

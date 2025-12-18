@@ -21,7 +21,6 @@
 * Dependency Injection: Ensure all dependencies are provided externally via the constructor or method parameters.
 * Dependency Inversion: Define Interfaces for all external dependencies; business logic must rely on these abstractions rather than concrete implementations.
 * Avoid Global State: Ban the use of Singletons or global variables unless absolutely necessary and properly encapsulated, as they impede test isolation.
-* Use `#[allow()]` sparingly. Avoid bypassing CI lint checks unless there's a justified reason documented in a comment.
 
 
 ### Rust Specific
@@ -33,6 +32,7 @@ Follow standard Rust idioms (The "Rust way").
 * Prefer Generics and Trait Bounds (Static Dispatch) over Trait Objects (`Box<dyn Trait>`) unless dynamic dispatch is required.
 * Accept Traits, Return Concrete Types: Accept arguments as Generics or impl Trait (consumer defines requirements), but return concrete structs/enums (producer defines implementation).
 * Avoid unnecessary .clone() unless required by ownership logic.
+* Use `#[allow()]` sparingly. Avoid bypassing CI lint checks unless there's a justified reason documented in a comment.
 
 ### Other Rules
 * Principle of Least Surprise: Design logic to be intuitive. Code implementation must behave as a developer expects, and functional design must align with the user's intuition.

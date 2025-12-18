@@ -1,5 +1,7 @@
+mod structure;
 mod threshold;
 
+pub use structure::{DirStats, StructureChecker, StructureViolation, ViolationType};
 pub use threshold::{CheckResult, CheckStatus, ThresholdChecker};
 
 use std::path::Path;
