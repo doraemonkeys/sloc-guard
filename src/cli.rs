@@ -200,6 +200,10 @@ pub struct StatsArgs {
     /// Disable .gitignore filtering (scan all files)
     #[arg(long)]
     pub no_gitignore: bool,
+
+    /// Track and display trend (delta from previous run)
+    #[arg(long)]
+    pub trend: bool,
 }
 
 #[derive(Parser, Debug)]

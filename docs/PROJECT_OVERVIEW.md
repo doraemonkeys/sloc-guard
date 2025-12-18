@@ -14,7 +14,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore, --fix), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands; global flags: --no-config, --no-extends |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore, --fix), `stats` (--no-cache, --group-by, --top, --no-gitignore, --trend), `init`, `config`, `baseline` commands; global flags: --no-config, --no-extends |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml`, supports `extends` for config inheritance (local path or remote URL) |
 | `config/remote` | `config/remote.rs` | `HttpClient` trait, `ReqwestClient`, `fetch_remote_config[_with_client]`, `is_remote_url`, `clear_cache` - remote config fetching with 1h TTL cache, DI for testability |
@@ -38,6 +38,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
 | `commands/init` | `commands/init.rs` | `run_init`, `generate_config_template` |
 | `analyzer` | `analyzer/*.rs` | `SplitAnalyzer`, `FunctionParser` - parses functions for multi-language split suggestions (--fix mode) |
+| `stats` | `stats/trend.rs` | `TrendHistory`, `TrendEntry`, `TrendDelta` - historical stats storage (.sloc-guard-history.json), delta computation |
 | `main` | `main.rs` | Command dispatch: `run_check`, `run_stats`, `run_baseline` |
 
 ## Key Types
@@ -73,13 +74,21 @@ TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats, language: String }
-ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank, by_language, by_directory, top_files, average_code_lines }
+ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank, by_language, by_directory, top_files, average_code_lines, trend }
 LanguageStats { language, files, total_lines, code, comment, blank }
 DirectoryStats { directory, files, total_lines, code, comment, blank }
 GroupBy::None | Lang | Dir  // --group-by option for stats command
 ProjectStatistics::with_language_breakdown() → computes per-language stats
 ProjectStatistics::with_directory_breakdown() → computes per-directory stats
 ProjectStatistics::with_top_files(n) → computes top N files by code lines + average
+ProjectStatistics::with_trend(delta) → adds trend delta from previous run
+
+// Trend tracking (--trend flag)
+TrendEntry { timestamp, total_files, total_lines, code, comment, blank }  // historical snapshot
+TrendDelta { files_delta, lines_delta, code_delta, comment_delta, blank_delta, previous_timestamp }  // delta from previous
+TrendHistory { version, entries: Vec<TrendEntry> }  // .sloc-guard-history.json
+TrendHistory::load_or_default(path) → TrendHistory  // loads or creates empty
+TrendHistory::compute_delta(stats) → Option<TrendDelta>  // compares with latest entry
 
 // Git integration
 GitDiff::discover(path) → GitDiff  // Finds git repo from path
@@ -161,7 +170,9 @@ CLI args → load_config()
          → [if !--no-cache] save_cache()
          → ProjectStatistics::new(file_stats)
          → [if --group-by lang] with_language_breakdown() → compute LanguageStats
+         → [if --group-by dir] with_directory_breakdown() → compute DirectoryStats
          → [if --top N] with_top_files(N) → compute top files + average
+         → [if --trend] TrendHistory::load_or_default() → compute_delta() → with_trend() → save history
          → StatsTextFormatter/StatsJsonFormatter/StatsMarkdownFormatter::format(stats)
          → write to stdout or --output file
 ```

@@ -25,6 +25,7 @@ use sloc_guard::output::{
     StatsMarkdownFormatter, StatsTextFormatter, TextFormatter,
 };
 use sloc_guard::scanner::scan_files;
+use sloc_guard::stats::TrendHistory;
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 /// File size threshold for streaming reads (10 MB)
@@ -32,6 +33,9 @@ const LARGE_FILE_THRESHOLD: u64 = 10 * 1024 * 1024;
 
 /// Default cache file path
 const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
+
+/// Default history file path for trend tracking
+const DEFAULT_HISTORY_PATH: &str = ".sloc-guard-history.json";
 
 /// Get file metadata (mtime, size) for cache validation.
 fn get_file_metadata(path: &Path) -> Option<(u64, u64)> {
@@ -516,6 +520,23 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     };
     let project_stats = if let Some(n) = args.top {
         project_stats.with_top_files(n)
+    } else {
+        project_stats
+    };
+
+    // 5.2 Trend tracking if enabled
+    let project_stats = if args.trend {
+        let history_path = Path::new(DEFAULT_HISTORY_PATH);
+        let mut history = TrendHistory::load_or_default(history_path);
+        let trend = history.compute_delta(&project_stats);
+        history.add(&project_stats);
+        // Save history (silently ignore errors)
+        let _ = history.save(history_path);
+        if let Some(delta) = trend {
+            project_stats.with_trend(delta)
+        } else {
+            project_stats
+        }
     } else {
         project_stats
     };

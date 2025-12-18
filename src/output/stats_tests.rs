@@ -5,6 +5,7 @@ use crate::output::stats::{
     FileStatistics, ProjectStatistics, StatsFormatter, StatsJsonFormatter, StatsMarkdownFormatter,
     StatsTextFormatter,
 };
+use crate::stats::TrendDelta;
 
 #[test]
 fn project_statistics_empty() {
@@ -771,4 +772,110 @@ fn markdown_formatter_with_directory_breakdown() {
     assert!(output.contains("| Directory | Files | Code | Comments | Blank |"));
     assert!(output.contains("| `src` | 1 | 80 | 15 | 5 |"));
     assert!(output.contains("| `tests` | 1 | 40 | 5 | 5 |"));
+}
+
+// Trend tests
+
+fn sample_trend_delta() -> TrendDelta {
+    TrendDelta {
+        files_delta: 5,
+        lines_delta: 100,
+        code_delta: 50,
+        comment_delta: 30,
+        blank_delta: 20,
+        previous_timestamp: Some(12345),
+    }
+}
+
+#[test]
+fn project_statistics_with_trend() {
+    let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
+    assert!(stats.trend.is_some());
+    let trend = stats.trend.unwrap();
+    assert_eq!(trend.files_delta, 5);
+    assert_eq!(trend.code_delta, 50);
+}
+
+#[test]
+fn text_formatter_with_trend() {
+    let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
+    let output = StatsTextFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("Changes from previous run:"));
+    assert!(output.contains("Files: +5"));
+    assert!(output.contains("Code: +50"));
+}
+
+#[test]
+fn text_formatter_with_negative_trend() {
+    let trend = TrendDelta {
+        files_delta: -3,
+        lines_delta: -50,
+        code_delta: -30,
+        comment_delta: -10,
+        blank_delta: -10,
+        previous_timestamp: Some(12345),
+    };
+    let stats = ProjectStatistics::new(vec![]).with_trend(trend);
+    let output = StatsTextFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("Files: -3"));
+    assert!(output.contains("Code: -30"));
+}
+
+#[test]
+fn text_formatter_with_zero_trend() {
+    let trend = TrendDelta {
+        files_delta: 0,
+        lines_delta: 0,
+        code_delta: 0,
+        comment_delta: 0,
+        blank_delta: 0,
+        previous_timestamp: Some(12345),
+    };
+    let stats = ProjectStatistics::new(vec![]).with_trend(trend);
+    let output = StatsTextFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("Files: 0"));
+    assert!(output.contains("Code: 0"));
+}
+
+#[test]
+fn json_formatter_with_trend() {
+    let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(parsed.get("trend").is_some());
+    let trend = parsed.get("trend").unwrap();
+    assert_eq!(trend.get("files_delta").unwrap().as_i64().unwrap(), 5);
+    assert_eq!(trend.get("code_delta").unwrap().as_i64().unwrap(), 50);
+}
+
+#[test]
+fn json_formatter_without_trend() {
+    let stats = ProjectStatistics::new(vec![]);
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(parsed.get("trend").is_none());
+}
+
+#[test]
+fn markdown_formatter_with_trend() {
+    let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("### Changes from Previous Run"));
+    assert!(output.contains("| Metric | Delta |"));
+    assert!(output.contains("| Files | +5 |"));
+    assert!(output.contains("| Code | +50 |"));
+}
+
+#[test]
+fn markdown_formatter_without_trend() {
+    let stats = ProjectStatistics::new(vec![]);
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(!output.contains("### Changes from Previous Run"));
 }

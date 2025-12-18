@@ -253,6 +253,7 @@ fn get_stats_scan_paths_uses_include_override() {
         group_by: GroupBy::None,
         top: None,
         no_gitignore: false,
+        trend: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -274,6 +275,7 @@ fn get_stats_scan_paths_uses_cli_paths() {
         group_by: GroupBy::None,
         top: None,
         no_gitignore: false,
+        trend: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -297,6 +299,7 @@ fn get_stats_scan_paths_uses_config_include_paths() {
         group_by: GroupBy::None,
         top: None,
         no_gitignore: false,
+        trend: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);
@@ -318,6 +321,7 @@ fn get_stats_scan_paths_defaults_to_current_dir() {
         group_by: GroupBy::None,
         top: None,
         no_gitignore: false,
+        trend: false,
     };
 
     let paths = get_stats_scan_paths(&args, &config);

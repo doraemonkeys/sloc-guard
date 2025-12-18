@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::counter::LineStats;
 use crate::error::Result;
+use crate::stats::TrendDelta;
 
 #[derive(Debug, Clone)]
 pub struct FileStatistics {
@@ -47,6 +48,7 @@ pub struct ProjectStatistics {
     pub by_directory: Option<Vec<DirectoryStats>>,
     pub top_files: Option<Vec<FileStatistics>>,
     pub average_code_lines: Option<f64>,
+    pub trend: Option<TrendDelta>,
 }
 
 impl ProjectStatistics {
@@ -74,6 +76,7 @@ impl ProjectStatistics {
             by_directory: None,
             top_files: None,
             average_code_lines: None,
+            trend: None,
         }
     }
 
@@ -145,6 +148,23 @@ impl ProjectStatistics {
         }
 
         self
+    }
+
+    /// Set trend delta from previous run.
+    #[must_use]
+    pub const fn with_trend(mut self, trend: TrendDelta) -> Self {
+        self.trend = Some(trend);
+        self
+    }
+}
+
+/// Format a delta value with +/- sign.
+fn format_delta(value: i64) -> String {
+    use std::cmp::Ordering;
+    match value.cmp(&0) {
+        Ordering::Greater => format!("+{value}"),
+        Ordering::Less => format!("{value}"),
+        Ordering::Equal => "0".to_string(),
     }
 }
 
@@ -245,6 +265,17 @@ impl StatsFormatter for StatsTextFormatter {
             writeln!(output, "  Average code lines: {avg:.1}").ok();
         }
 
+        // Show trend delta if available
+        if let Some(ref trend) = stats.trend {
+            writeln!(output).ok();
+            writeln!(output, "Changes from previous run:").ok();
+            writeln!(output, "  Files: {}", format_delta(trend.files_delta)).ok();
+            writeln!(output, "  Total lines: {}", format_delta(trend.lines_delta)).ok();
+            writeln!(output, "  Code: {}", format_delta(trend.code_delta)).ok();
+            writeln!(output, "  Comments: {}", format_delta(trend.comment_delta)).ok();
+            writeln!(output, "  Blank: {}", format_delta(trend.blank_delta)).ok();
+        }
+
         Ok(String::from_utf8_lossy(&output).to_string())
     }
 }
@@ -254,6 +285,8 @@ pub struct StatsJsonFormatter;
 #[derive(Serialize)]
 struct JsonStatsOutput {
     summary: JsonStatsSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    trend: Option<JsonTrendDelta>,
     #[serde(skip_serializing_if = "Option::is_none")]
     by_language: Option<Vec<LanguageStats>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -272,6 +305,28 @@ struct JsonStatsSummary {
     blank: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     average_code_lines: Option<f64>,
+}
+
+#[derive(Serialize)]
+#[allow(clippy::struct_field_names)]
+struct JsonTrendDelta {
+    files_delta: i64,
+    lines_delta: i64,
+    code_delta: i64,
+    comment_delta: i64,
+    blank_delta: i64,
+}
+
+impl From<&TrendDelta> for JsonTrendDelta {
+    fn from(trend: &TrendDelta) -> Self {
+        Self {
+            files_delta: trend.files_delta,
+            lines_delta: trend.lines_delta,
+            code_delta: trend.code_delta,
+            comment_delta: trend.comment_delta,
+            blank_delta: trend.blank_delta,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -295,6 +350,7 @@ impl StatsFormatter for StatsJsonFormatter {
                 blank: stats.total_blank,
                 average_code_lines: stats.average_code_lines,
             },
+            trend: stats.trend.as_ref().map(JsonTrendDelta::from),
             by_language: stats.by_language.clone(),
             by_directory: stats.by_directory.clone(),
             top_files: stats.top_files.as_ref().map(|files| {
@@ -349,6 +405,19 @@ impl StatsFormatter for StatsMarkdownFormatter {
             writeln!(output, "| Average Code Lines | {avg:.1} |").ok();
         }
         writeln!(output).ok();
+
+        // Trend section if available
+        if let Some(ref trend) = stats.trend {
+            writeln!(output, "### Changes from Previous Run\n").ok();
+            writeln!(output, "| Metric | Delta |").ok();
+            writeln!(output, "|--------|------:|").ok();
+            writeln!(output, "| Files | {} |", format_delta(trend.files_delta)).ok();
+            writeln!(output, "| Total Lines | {} |", format_delta(trend.lines_delta)).ok();
+            writeln!(output, "| Code | {} |", format_delta(trend.code_delta)).ok();
+            writeln!(output, "| Comments | {} |", format_delta(trend.comment_delta)).ok();
+            writeln!(output, "| Blank | {} |", format_delta(trend.blank_delta)).ok();
+            writeln!(output).ok();
+        }
 
         // Top files if available
         if let Some(ref top_files) = stats.top_files {
