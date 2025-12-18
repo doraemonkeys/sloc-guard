@@ -1,5 +1,5 @@
 [default]
-max_lines = 700
+max_lines = 600
 extensions = ["rs"]
 skip_comments = true
 skip_blank = false
@@ -7,7 +7,7 @@ warn_threshold = 0.9
 
 [[path_rules]]
 pattern = "**/*_tests.rs"
-max_lines = 1500
+max_lines = 1400
 warn_threshold = 0.9
 
 [exclude]
