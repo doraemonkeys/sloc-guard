@@ -231,25 +231,6 @@ Location: `src/output/html.rs`
 
 ---
 
-## Phase 7: Future Enhancements (P3)
-
-### Task 7.1a: Function Analysis (Rust)
-
-```
-- Use tree-sitter-rust to parse function boundaries
-- Count lines per function
-- Add function_max_lines to config
-```
-
-### Task 7.1b: Function Analysis (Other Languages)
-
-```
-- Extend to Go, Python, JS/TS as needed
-- Separate tree-sitter grammars per language
-```
-
----
-
 ## Priority Order
 
 | Priority | Tasks | Effort |
@@ -261,7 +242,7 @@ Location: `src/output/html.rs`
 | | 5.1c Directory Statistics | ~2h |
 | | 5.2 Trend Tracking | ~3h |
 | | 5.3a-d HTML Report | ~8h |
-| | Phase 6, 7 | TBD |
+| | Phase 6 | TBD |
 
 ---
 
