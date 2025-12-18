@@ -2,7 +2,7 @@
 
 ### Code Readability
 * Use meaningful variable and function names.
-* Comments must be added only when necessary
+* Comments must be added only when necessary.
 * Use comments to explain "why," not "what." Good code is self-documenting and explains what it does. Comments should be reserved for explaining design decisions or complex logic.
 * Avoid clutter. Do not write obvious comments, such as `i++ // Increment i by 1`.
 
