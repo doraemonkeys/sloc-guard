@@ -139,14 +139,52 @@ Location: `src/config/loader.rs`
 - Cycle detection for recursive extends
 ```
 
-### Task 4.8b: Config Inheritance (URL)
+### Task 4.8b-1: Remote Config Fetch
 
-Location: `src/config/loader.rs`
+Location: `src/config/loader.rs`, `Cargo.toml`
 
 ```
-- Support extends = "https://..."
-- Add --no-extends CLI flag
-- Cache downloaded configs
+- Add reqwest dependency (blocking feature)
+- Implement fetch_remote_config(url) → Result<String>
+- Error handling: timeout, 404, invalid URL
+```
+
+### Task 4.8b-2: Remote Config Cache
+
+Location: `src/config/cache.rs` (new)
+
+```
+- Cache path: ~/.cache/sloc-guard/configs/
+- Hash URL as filename
+- Check cache freshness (e.g., 1 hour TTL)
+- Integrate with fetch_remote_config
+```
+
+### Task 4.8b-3: --no-extends Flag
+
+Location: `src/cli.rs`, `src/config/loader.rs`
+
+```
+- Add --no-extends global CLI flag
+- Skip extends resolution when flag set
+- Update config loading logic
+```
+
+### Task 4.10: Split Suggestions (--fix)
+
+Location: `src/analyzer/` (new), `src/cli.rs`, `src/output/*.rs`
+
+```
+- Add --fix flag to check command
+- Analyze code structure to identify function/class boundaries
+- When file exceeds threshold, suggest split points:
+  - Detect function definitions (fn, def, function, etc.)
+  - Group consecutive functions by logical cohesion
+  - Estimate line count per split chunk
+- Output format: function name, line range, suggested new file
+- Language-specific parsers: Rust, Go, Python, JS/TS, C/C++
+- Text output: show suggestions inline with failed files
+- JSON/SARIF: include "suggestions" array in results
 ```
 
 ---
@@ -234,15 +272,17 @@ Location: `src/output/html.rs`
 
 ## Priority Order
 
-| Priority | Tasks | Effort |
-|----------|-------|--------|
-| **1. Short-term** | 4.6b Inline Ignore (block/next) | ~2h |
-| **2. Medium** | 4.8a Config Inheritance (local) | ~2h |
-| **3. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
-| | 5.1c Directory Statistics | ~2h |
-| | 5.2 Trend Tracking | ~3h |
-| | 5.3a-d HTML Report | ~8h |
-| | Phase 6 | TBD |
+| Priority | Tasks |
+|----------|-------|
+| **1. Short-term** | 4.6b Inline Ignore (block/next) |
+| **2. Medium** | 4.8a Config Inheritance (local), 4.10 Split Suggestions (--fix) |
+| **3. Deferred** | 4.8b-1 Remote Config Fetch |
+| | 4.8b-2 Remote Config Cache |
+| | 4.8b-3 --no-extends Flag |
+| | 5.1c Directory Statistics |
+| | 5.2 Trend Tracking |
+| | 5.3a-d HTML Report |
+| | Phase 6 |
 
 ---
 
