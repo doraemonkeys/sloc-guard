@@ -1,5 +1,4 @@
-use std::fs::{self, File};
-use std::io::BufReader;
+use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -27,9 +26,6 @@ use sloc_guard::output::{
 use sloc_guard::scanner::scan_files;
 use sloc_guard::stats::TrendHistory;
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
-
-/// File size threshold for streaming reads (10 MB)
-const LARGE_FILE_THRESHOLD: u64 = 10 * 1024 * 1024;
 
 /// Default cache file path
 const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
@@ -343,24 +339,6 @@ fn filter_by_git_diff(
     Ok(filtered)
 }
 
-fn process_file(
-    file_path: &Path,
-    registry: &LanguageRegistry,
-    checker: &ThresholdChecker,
-    skip_comments: bool,
-    skip_blank: bool,
-) -> Option<sloc_guard::checker::CheckResult> {
-    let ext = file_path.extension()?.to_str()?;
-    let language = registry.get_by_extension(ext)?;
-
-    let counter = SlocCounter::new(&language.comment_syntax);
-    let stats = count_file_lines(file_path, &counter)?;
-
-    let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
-
-    Some(checker.check(file_path, &effective_stats))
-}
-
 fn process_file_cached(
     file_path: &Path,
     registry: &LanguageRegistry,
@@ -404,24 +382,6 @@ fn process_file_cached(
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
 
     Some(checker.check(file_path, &effective_stats))
-}
-
-fn count_file_lines(file_path: &Path, counter: &SlocCounter) -> Option<LineStats> {
-    let metadata = fs::metadata(file_path).ok()?;
-
-    let result = if metadata.len() >= LARGE_FILE_THRESHOLD {
-        let file = File::open(file_path).ok()?;
-        let reader = BufReader::new(file);
-        counter.count_reader(reader).ok()?
-    } else {
-        let content = fs::read_to_string(file_path).ok()?;
-        counter.count(&content)
-    };
-
-    match result {
-        CountResult::Stats(stats) => Some(stats),
-        CountResult::IgnoredFile => None,
-    }
 }
 
 /// Count lines from pre-read file content.
@@ -699,24 +659,26 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
 
     // 5. Process each file and find violations
     let registry = LanguageRegistry::with_custom_languages(&config.languages);
-    let warn_threshold = config.default.warn_threshold;
-    let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
-
-    let skip_comments = config.default.skip_comments;
-    let skip_blank = config.default.skip_blank;
+    let checker = ThresholdChecker::new(config.clone())
+        .with_warning_threshold(config.default.warn_threshold);
+    let cache = Mutex::new(Cache::new(compute_config_hash(&config)));
 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
-    let violations: Vec<(std::path::PathBuf, usize)> = all_files
+    let violations: Vec<_> = all_files
         .par_iter()
         .filter_map(|file_path| {
-            let result = process_file(file_path, &registry, &checker, skip_comments, skip_blank);
+            let result = process_file_cached(
+                file_path,
+                &registry,
+                &checker,
+                config.default.skip_comments,
+                config.default.skip_blank,
+                &cache,
+            );
             progress.inc();
-            let result = result?;
-            if result.is_failed() {
-                Some((file_path.clone(), result.stats.code))
-            } else {
-                None
-            }
+            result
+                .filter(sloc_guard::checker::CheckResult::is_failed)
+                .map(|r| (file_path.clone(), r.stats.code))
         })
         .collect();
     progress.finish();

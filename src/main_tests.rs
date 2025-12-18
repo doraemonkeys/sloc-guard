@@ -1,5 +1,7 @@
 use std::path::PathBuf;
+use std::sync::Mutex;
 
+use sloc_guard::cache::Cache;
 use sloc_guard::checker::{CheckStatus, ThresholdChecker};
 use sloc_guard::config::Config;
 use sloc_guard::counter::LineStats;
@@ -9,7 +11,7 @@ use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 use tempfile::TempDir;
 
 use crate::{
-    compute_effective_stats, format_output, format_stats_output, load_config, process_file,
+    compute_effective_stats, format_output, format_stats_output, load_config, process_file_cached,
     write_output,
 };
 
@@ -107,9 +109,10 @@ fn process_file_nonexistent_returns_none() {
     let registry = LanguageRegistry::default();
     let config = Config::default();
     let checker = ThresholdChecker::new(config);
+    let cache = Mutex::new(Cache::new(String::new()));
     let path = PathBuf::from("nonexistent_file.rs");
 
-    let result = process_file(&path, &registry, &checker, true, true);
+    let result = process_file_cached(&path, &registry, &checker, true, true, &cache);
     assert!(result.is_none());
 }
 
@@ -118,9 +121,10 @@ fn process_file_unknown_extension_returns_none() {
     let registry = LanguageRegistry::default();
     let config = Config::default();
     let checker = ThresholdChecker::new(config);
+    let cache = Mutex::new(Cache::new(String::new()));
     let path = PathBuf::from("Cargo.toml");
 
-    let result = process_file(&path, &registry, &checker, true, true);
+    let result = process_file_cached(&path, &registry, &checker, true, true, &cache);
     assert!(result.is_none());
 }
 
@@ -129,9 +133,10 @@ fn process_file_valid_rust_file() {
     let registry = LanguageRegistry::default();
     let config = Config::default();
     let checker = ThresholdChecker::new(config);
+    let cache = Mutex::new(Cache::new(String::new()));
     let path = PathBuf::from("src/lib.rs");
 
-    let result = process_file(&path, &registry, &checker, true, true);
+    let result = process_file_cached(&path, &registry, &checker, true, true, &cache);
     assert!(result.is_some());
     let check_result = result.unwrap();
     assert_eq!(check_result.status, CheckStatus::Passed);
