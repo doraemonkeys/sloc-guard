@@ -234,7 +234,7 @@ fn collect_dir_stats_ignores_patterns() {
     std::fs::write(root.join(".gitkeep"), "").unwrap();
 
     let config = StructureConfig {
-        ignore: vec!["*.md".to_string(), ".gitkeep".to_string()],
+        count_exclude: vec!["*.md".to_string(), ".gitkeep".to_string()],
         ..Default::default()
     };
     let checker = StructureChecker::new(&config).unwrap();
@@ -355,7 +355,7 @@ fn structure_violation_new() {
 #[test]
 fn invalid_ignore_pattern_returns_error() {
     let config = StructureConfig {
-        ignore: vec!["[invalid".to_string()],
+        count_exclude: vec!["[invalid".to_string()],
         ..Default::default()
     };
 

@@ -130,20 +130,17 @@ Implementation:
 - In `StructureChecker::check()`, filter matched paths: `if !path.is_dir() { continue; }`
 - Add doc comments in example TOML clarifying `*` vs `**` behavior
 
-### Task 5.5.5: Naming & Semantics Polish
+### Task 5.5.5: Naming & Semantics Polish ✅
 Location: `src/config/model.rs`, `docs/sloc-guard.example.toml`
+**Completed**: Renamed `structure.ignore` → `structure.count_exclude` for semantic clarity.
+- "ignored" implies "invisible/not scanned" which is misleading
+- `count_exclude` = "exists but doesn't count toward quota" (accurate)
 ```
-- Keep `structure.count_exclude` (NOT `ignored_files`)
-  - "ignored" implies "invisible/not scanned" which is misleading
-  - `count_exclude` = "exists but doesn't count toward quota" (accurate)
-  - Alternative: `exempt_files` or `uncounted_files`
-- Document `scanner.exclude` vs `structure.count_exclude` difference:
+Documentation for `scanner.exclude` vs `structure.count_exclude`:
   | Config                       | Effect                                      |
   |------------------------------|---------------------------------------------|
   | `scanner.exclude = ["*.svg"]`| Completely invisible to ALL checkers        |
   | `structure.count_exclude`    | Visible but doesn't count toward dir quota  |
-- Document `scanner.exclude` + `gitignore` relationship:
-  - "exclude patterns are ADDITIVE to .gitignore rules (union, not override)"
 ```
 
 ### Task 5.5.6: Rename `common.rs` Module ✅
@@ -294,7 +291,7 @@ Location: `src/output/html.rs`
 | Priority | Tasks |
 |----------|-------|
 | **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
-| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, 5.5.5 Naming, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
+| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
 | **3. Documentation** | ~~5.5.12 extends Examples~~ |
 | **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |

@@ -168,7 +168,7 @@ fn structure_config_default_values() {
     let config = StructureConfig::default();
     assert!(config.max_files.is_none());
     assert!(config.max_dirs.is_none());
-    assert!(config.ignore.is_empty());
+    assert!(config.count_exclude.is_empty());
     assert!(config.rules.is_empty());
 }
 
@@ -177,7 +177,7 @@ fn config_structure_default_empty() {
     let config = Config::default();
     assert!(config.structure.max_files.is_none());
     assert!(config.structure.max_dirs.is_none());
-    assert!(config.structure.ignore.is_empty());
+    assert!(config.structure.count_exclude.is_empty());
     assert!(config.structure.rules.is_empty());
 }
 
@@ -190,13 +190,13 @@ fn config_deserialize_structure_global_limits() {
         [structure]
         max_files = 10
         max_dirs = 5
-        ignore = ["*.md", ".gitkeep"]
+        count_exclude = ["*.md", ".gitkeep"]
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
     assert_eq!(config.structure.max_files, Some(10));
     assert_eq!(config.structure.max_dirs, Some(5));
-    assert_eq!(config.structure.ignore, vec!["*.md", ".gitkeep"]);
+    assert_eq!(config.structure.count_exclude, vec!["*.md", ".gitkeep"]);
 }
 
 #[test]

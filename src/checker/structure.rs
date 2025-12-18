@@ -66,7 +66,7 @@ impl StructureChecker {
     /// # Errors
     /// Returns an error if any ignore or rule pattern is invalid.
     pub fn new(config: &StructureConfig) -> Result<Self> {
-        let ignore_patterns = Self::build_ignore_patterns(&config.ignore)?;
+        let ignore_patterns = Self::build_ignore_patterns(&config.count_exclude)?;
         let rules = Self::build_rules(&config.rules)?;
 
         Ok(Self {

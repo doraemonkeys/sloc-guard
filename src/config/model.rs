@@ -157,8 +157,9 @@ pub struct StructureConfig {
     pub max_dirs: Option<usize>,
 
     /// Glob patterns for items not counted in structure limits (e.g., "*.md", ".gitkeep").
+    /// These items are still visible but don't count toward file/dir quotas.
     #[serde(default)]
-    pub ignore: Vec<String>,
+    pub count_exclude: Vec<String>,
 
     /// Per-directory rules that override global limits.
     #[serde(default)]
