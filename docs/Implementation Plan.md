@@ -200,13 +200,11 @@ Structure Rule Priority (high → low):
 - Add comments in example TOML documenting priority chain
 - Consider: warn on overlapping rules at config load time (optional strict mode)
 
-### Task 5.5.10: Structure warn_threshold Symmetry
+### Task 5.5.10: Structure warn_threshold Symmetry ✅
 Location: `src/config/model.rs`, `src/checker/structure.rs`
-**Problem**: Content has `warn_threshold` for gradual warnings, Structure lacks this symmetry.
+**Completed**: Added `warn_threshold` to `StructureConfig` and `StructureRule`.
 - Content: `max_lines = 400, warn_threshold = 0.8` → warns at 320
-- Structure: `max_files = 50` → direct fail at 50, no warning at 45
-
-**Solution**: Add `warn_threshold` to Structure config.
+- Structure: `max_files = 50, warn_threshold = 0.9` → warns at 45
 ```toml
 [structure]
 max_files = 50
@@ -218,30 +216,18 @@ pattern = "src/components/*"
 max_files = 5
 warn_threshold = 0.8  # Override threshold per rule
 ```
-- `StructureConfig { warn_threshold: Option<f32> }`
-- `StructureRule { warn_threshold: Option<f32> }`
-- `StructureViolation` adds `Warning` variant alongside `FileCount`/`DirCount`
+- `StructureConfig { warn_threshold: Option<f64> }`
+- `StructureRule { warn_threshold: Option<f64> }`
+- `StructureViolation { is_warning: bool }` - distinguishes warnings from failures
 
-### Task 5.5.11: "Unlimited" Special Value Semantics
-Location: `src/config/model.rs`, `src/checker/*.rs`, `docs/sloc-guard.example.toml`
-**Problem**: No way to express "no limit" for a specific field.
-- `max_dirs = 0` means "prohibited" (zero allowed)
-- What if user wants `max_files = 5` but unlimited `max_dirs`?
-- Omitting field → uses default (10), not "unlimited"
-
-**Solution**: Use `-1` or explicit `null` for "unlimited".
-```toml
-[[structure.rules]]
-pattern = "src/components/*"
-max_files = 5
-max_dirs = -1  # Unlimited subdirs (no check)
-
-# Alternative: explicit null (TOML doesn't support, use sentinel)
-# max_dirs = 999999  # Effectively unlimited
-```
-- Convention: `-1` = unlimited (skip check for this field)
-- Loader validates: negative values only allowed as `-1`
-- Document in example TOML with clear comments
+### Task 5.5.11: "Unlimited" Special Value Semantics ✅
+Location: `src/config/model.rs`, `src/checker/structure.rs`, `docs/sloc-guard.example.toml`
+**Completed**: Use `-1` (UNLIMITED) to express "no limit" for a specific field.
+- `max_dirs = -1` means unlimited (skip check for this field)
+- Changed `max_files`/`max_dirs` from `Option<usize>` to `Option<i64>`
+- Added `UNLIMITED` constant (`-1`)
+- Validation rejects values < `-1`
+- Documentation updated in example TOML
 
 ### Task 5.5.12: Add `extends` Examples to Documentation ✅
 Location: `docs/sloc-guard.example.toml`
@@ -291,7 +277,7 @@ Location: `src/output/html.rs`
 | Priority | Tasks |
 |----------|-------|
 | **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
-| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, 5.5.10 Structure warn_threshold, 5.5.11 Unlimited Value |
+| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
 | **3. Documentation** | ~~5.5.12 extends Examples~~ |
 | **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |

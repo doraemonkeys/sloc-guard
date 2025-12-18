@@ -145,16 +145,27 @@ const fn default_warn_threshold() -> f64 {
     0.9
 }
 
+/// Sentinel value representing unlimited (no check).
+/// Use `-1` in TOML to indicate no limit should be applied.
+pub const UNLIMITED: i64 = -1;
+
 /// Configuration for directory structure limits.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct StructureConfig {
     /// Global default limit for files per directory.
+    /// Use `-1` for unlimited (no check), `0` for prohibited, `>0` for limit.
     #[serde(default)]
-    pub max_files: Option<usize>,
+    pub max_files: Option<i64>,
 
     /// Global default limit for subdirectories per directory.
+    /// Use `-1` for unlimited (no check), `0` for prohibited, `>0` for limit.
     #[serde(default)]
-    pub max_dirs: Option<usize>,
+    pub max_dirs: Option<i64>,
+
+    /// Threshold (0.0-1.0) at which warnings are issued before hitting hard limits.
+    /// Example: `max_files=50`, `warn_threshold=0.9` → warns at 45 files.
+    #[serde(default)]
+    pub warn_threshold: Option<f64>,
 
     /// Glob patterns for items not counted in structure limits (e.g., "*.md", ".gitkeep").
     /// These items are still visible but don't count toward file/dir quotas.
@@ -167,18 +178,24 @@ pub struct StructureConfig {
 }
 
 /// Rule for overriding structure limits on specific directories.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StructureRule {
     /// Glob pattern for directory matching.
     pub pattern: String,
 
     /// Override limit for files in matched directories.
+    /// Use `-1` for unlimited (no check), `0` for prohibited, `>0` for limit.
     #[serde(default)]
-    pub max_files: Option<usize>,
+    pub max_files: Option<i64>,
 
     /// Override limit for subdirectories in matched directories.
+    /// Use `-1` for unlimited (no check), `0` for prohibited, `>0` for limit.
     #[serde(default)]
-    pub max_dirs: Option<usize>,
+    pub max_dirs: Option<i64>,
+
+    /// Override threshold for warnings in matched directories.
+    #[serde(default)]
+    pub warn_threshold: Option<f64>,
 }
 
 #[cfg(test)]

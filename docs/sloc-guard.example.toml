@@ -104,10 +104,15 @@ max_lines = 800
 # ------------------------------------------------------------------------------
 # 3. Structure Guard (Directory Limits)
 # ------------------------------------------------------------------------------
+# Limits use i64 values:
+#   - `-1` = Unlimited (no check, explicitly skip)
+#   - `0`  = Prohibited (zero allowed)
+#   - `>0` = The limit
 [structure]
 # Fallback limits (applied to directories without specific rules)
 max_files = 50
 max_dirs = 10
+warn_threshold = 0.9  # Warn at 45 files / 9 dirs
 
 # Files that exist but don't count towards the quota.
 # Use for auxiliary files that don't contribute to complexity.
@@ -134,6 +139,12 @@ max_dirs = 0                 # No nesting allowed
 pattern = "src/features"
 max_files = 5
 max_dirs = 50
+
+# Generated code: Limit files but allow unlimited subdirs
+[[structure.rules]]
+pattern = "src/generated/**"
+max_files = 100
+max_dirs = -1   # Unlimited subdirectories (no check)
 
 # ------------------------------------------------------------------------------
 # 4. Grandfathering / Overrides

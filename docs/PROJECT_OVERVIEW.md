@@ -40,8 +40,8 @@ ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
-StructureConfig { max_files, max_dirs, count_exclude, rules, overrides }
-StructureRule { pattern, max_files, max_dirs }  // [[structure.rules]]
+StructureConfig { max_files, max_dirs, warn_threshold, count_exclude, rules, overrides }
+StructureRule { pattern, max_files, max_dirs, warn_threshold }  // [[structure.rules]]
 StructureOverride { path, max_files, max_dirs, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
@@ -57,7 +57,7 @@ CheckResult { path, status, stats, limit, override_reason, suggestions }
 // Structure checking
 DirStats { file_count, dir_count }  // immediate children counts
 ViolationType::FileCount | DirCount
-StructureViolation { path, violation_type, actual, limit }
+StructureViolation { path, violation_type, actual, limit, is_warning }
 
 // Output
 OutputFormat::Text | Json | Sarif | Markdown | Html

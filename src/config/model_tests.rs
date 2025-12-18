@@ -250,3 +250,49 @@ fn config_deserialize_structure_only_rules() {
     assert_eq!(config.structure.rules.len(), 1);
     assert_eq!(config.structure.rules[0].pattern, "vendor/**");
 }
+
+#[test]
+fn config_deserialize_structure_warn_threshold() {
+    let toml_str = r"
+        [default]
+        max_lines = 500
+
+        [structure]
+        max_files = 50
+        max_dirs = 10
+        warn_threshold = 0.9
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.max_files, Some(50));
+    assert_eq!(config.structure.max_dirs, Some(10));
+    assert_eq!(config.structure.warn_threshold, Some(0.9));
+}
+
+#[test]
+fn config_deserialize_structure_rule_warn_threshold() {
+    let toml_str = r"
+        [default]
+        max_lines = 500
+
+        [structure]
+        max_files = 50
+        warn_threshold = 0.9
+
+        [[structure.rules]]
+        pattern = 'src/generated/**'
+        max_files = 100
+        warn_threshold = 0.8
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.warn_threshold, Some(0.9));
+    assert_eq!(config.structure.rules.len(), 1);
+    assert_eq!(config.structure.rules[0].warn_threshold, Some(0.8));
+}
+
+#[test]
+fn structure_config_warn_threshold_default_none() {
+    let config = StructureConfig::default();
+    assert!(config.warn_threshold.is_none());
+}
