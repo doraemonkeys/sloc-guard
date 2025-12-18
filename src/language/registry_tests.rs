@@ -4,7 +4,10 @@ use super::*;
 fn comment_syntax_construction() {
     let syntax = CommentSyntax::new(vec!["//"], vec![("/*", "*/")]);
     assert_eq!(syntax.single_line, vec!["//"]);
-    assert_eq!(syntax.multi_line, vec![("/*".to_string(), "*/".to_string())]);
+    assert_eq!(
+        syntax.multi_line,
+        vec![("/*".to_string(), "*/".to_string())]
+    );
 }
 
 #[test]

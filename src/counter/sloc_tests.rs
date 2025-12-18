@@ -119,7 +119,8 @@ fn sloc_returns_code_count() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
     assert_eq!(stats.sloc(), 80);
 }

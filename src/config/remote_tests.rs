@@ -54,7 +54,9 @@ impl HttpClient for MockHttpClient {
 #[test]
 fn is_remote_url_detects_https() {
     assert!(is_remote_url("https://example.com/config.toml"));
-    assert!(is_remote_url("https://github.com/user/repo/raw/main/.sloc-guard.toml"));
+    assert!(is_remote_url(
+        "https://github.com/user/repo/raw/main/.sloc-guard.toml"
+    ));
 }
 
 #[test]
@@ -227,7 +229,10 @@ fn write_to_cache_and_read_back() {
         return;
     }
 
-    let test_url = format!("https://test-{}.example.com/config.toml", std::process::id());
+    let test_url = format!(
+        "https://test-{}.example.com/config.toml",
+        std::process::id()
+    );
     let test_content = "[default]\nmax_lines = 100\n";
 
     // Write to cache
@@ -303,7 +308,12 @@ fn fetch_with_mock_client_error() {
 
     let result = fetch_remote_config_with_client(&url, &client);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Connection refused"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Connection refused")
+    );
     assert_eq!(client.call_count(), 1);
 }
 
@@ -356,10 +366,12 @@ fn fetch_with_mock_client_invalid_url_never_calls_client() {
 
     let result = fetch_remote_config_with_client("/local/path", &client);
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("Invalid remote config URL"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid remote config URL")
+    );
     assert_eq!(client.call_count(), 0); // Client should never be called
 }
 
@@ -435,7 +447,8 @@ fn fetch_with_mock_client_http_404_error() {
 
 #[test]
 fn fetch_with_mock_client_http_500_error() {
-    let client = MockHttpClient::error("Failed to fetch remote config: HTTP 500 Internal Server Error");
+    let client =
+        MockHttpClient::error("Failed to fetch remote config: HTTP 500 Internal Server Error");
 
     let url = format!(
         "https://mock-test-{}-500.example.com/config.toml",

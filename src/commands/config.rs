@@ -3,7 +3,7 @@ use std::path::Path;
 
 use crate::cli::ConfigAction;
 use crate::config::{Config, ConfigLoader, FileConfigLoader};
-use crate::{Result, SlocGuardError, EXIT_CONFIG_ERROR, EXIT_SUCCESS};
+use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
 #[must_use]
 pub fn run_config(args: &crate::cli::ConfigArgs) -> i32 {

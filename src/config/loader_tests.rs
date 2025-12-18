@@ -259,10 +259,7 @@ reason = "Legacy code"
     assert_eq!(config.overrides.len(), 1);
     assert_eq!(config.overrides[0].path, "src/legacy.rs");
     assert_eq!(config.overrides[0].max_lines, 800);
-    assert_eq!(
-        config.overrides[0].reason,
-        Some("Legacy code".to_string())
-    );
+    assert_eq!(config.overrides[0].reason, Some("Legacy code".to_string()));
 }
 
 #[test]
@@ -461,7 +458,10 @@ max_lines = 100
     let result = loader.load_from_path(Path::new("/child.toml"));
 
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), SlocGuardError::FileRead { .. }));
+    assert!(matches!(
+        result.unwrap_err(),
+        SlocGuardError::FileRead { .. }
+    ));
 }
 
 #[test]
@@ -517,7 +517,10 @@ max_lines = 300
     // Should have only child's max_lines, not merged
     assert_eq!(config.default.max_lines, 300);
     // Extensions should be default (not from base)
-    assert_eq!(config.default.extensions, Config::default().default.extensions);
+    assert_eq!(
+        config.default.extensions,
+        Config::default().default.extensions
+    );
     // Extends field should be preserved
     assert_eq!(config.extends, Some("/base.toml".to_string()));
 }
@@ -539,5 +542,8 @@ max_lines = 400
     let config = loader.load_without_extends().unwrap();
 
     assert_eq!(config.default.max_lines, 400);
-    assert_eq!(config.extends, Some("https://example.com/base.toml".to_string()));
+    assert_eq!(
+        config.extends,
+        Some("https://example.com/base.toml".to_string())
+    );
 }

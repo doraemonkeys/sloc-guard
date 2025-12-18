@@ -73,9 +73,12 @@ fn excludes_passed_from_details() {
 
 #[test]
 fn shows_grandfathered_count() {
-    let results = vec![
-        make_result("src/legacy.rs", CheckStatus::Grandfathered, 800, 500),
-    ];
+    let results = vec![make_result(
+        "src/legacy.rs",
+        CheckStatus::Grandfathered,
+        800,
+        500,
+    )];
 
     let formatter = MarkdownFormatter::new();
     let output = formatter.format(&results).unwrap();
@@ -118,7 +121,8 @@ fn override_reason_shown_in_table() {
             total: 765,
             code: 750,
             comment: 10,
-            blank: 5, ignored: 0,
+            blank: 5,
+            ignored: 0,
         },
         limit: 800,
         override_reason: Some("Legacy migration code".to_string()),
@@ -129,7 +133,9 @@ fn override_reason_shown_in_table() {
     let output = formatter.format(&results).unwrap();
 
     assert!(output.contains("Legacy migration code"));
-    assert!(output.contains("| ⚠️ Warning | `src/legacy.rs` | 750 | 800 | 750 | 10 | 5 | Legacy migration code |"));
+    assert!(output.contains(
+        "| ⚠️ Warning | `src/legacy.rs` | 750 | 800 | 750 | 10 | 5 | Legacy migration code |"
+    ));
 }
 
 #[test]
@@ -137,8 +143,8 @@ fn with_suggestions_shows_split_suggestions_section() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("src/big_file.rs", CheckStatus::Failed, 600, 500);
-    let suggestion = SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500)
-        .with_chunks(vec![
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500).with_chunks(vec![
             SplitChunk {
                 suggested_name: "big_file_part1".to_string(),
                 functions: vec!["func1".to_string(), "func2".to_string()],
@@ -170,14 +176,16 @@ fn without_suggestions_flag_hides_split_suggestions_section() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("src/big_file.rs", CheckStatus::Failed, 600, 500);
-    let suggestion = SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500)
-        .with_chunks(vec![SplitChunk {
-            suggested_name: "big_file_part1".to_string(),
-            functions: vec!["func1".to_string()],
-            start_line: 1,
-            end_line: 300,
-            line_count: 300,
-        }]);
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500).with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec!["func1".to_string()],
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+        ]);
     result.suggestions = Some(suggestion);
 
     let formatter = MarkdownFormatter::new().with_suggestions(false);
@@ -191,14 +199,16 @@ fn empty_functions_shows_dash() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("src/big_file.rs", CheckStatus::Failed, 600, 500);
-    let suggestion = SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500)
-        .with_chunks(vec![SplitChunk {
-            suggested_name: "big_file_part1".to_string(),
-            functions: vec![], // Empty functions
-            start_line: 1,
-            end_line: 300,
-            line_count: 300,
-        }]);
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500).with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec![], // Empty functions
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+        ]);
     result.suggestions = Some(suggestion);
 
     let formatter = MarkdownFormatter::new().with_suggestions(true);
@@ -219,9 +229,7 @@ fn default_formatter() {
 
 #[test]
 fn no_grandfathered_row_when_count_is_zero() {
-    let results = vec![
-        make_result("src/pass.rs", CheckStatus::Passed, 100, 500),
-    ];
+    let results = vec![make_result("src/pass.rs", CheckStatus::Passed, 100, 500)];
 
     let formatter = MarkdownFormatter::new();
     let output = formatter.format(&results).unwrap();

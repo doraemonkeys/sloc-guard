@@ -14,7 +14,9 @@ pub struct SarifFormatter {
 impl SarifFormatter {
     #[must_use]
     pub const fn new() -> Self {
-        Self { show_suggestions: false }
+        Self {
+            show_suggestions: false,
+        }
     }
 
     #[must_use]
@@ -30,8 +32,7 @@ impl Default for SarifFormatter {
     }
 }
 
-const SARIF_SCHEMA: &str =
-    "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
+const SARIF_SCHEMA: &str = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json";
 const SARIF_VERSION: &str = "2.1.0";
 const TOOL_NAME: &str = "sloc-guard";
 const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -267,8 +268,10 @@ impl SarifFormatter {
 
 impl OutputFormatter for SarifFormatter {
     fn format(&self, results: &[CheckResult]) -> Result<String> {
-        let sarif_results: Vec<SarifResult> =
-            results.iter().filter_map(|r| Self::convert_result(r, self.show_suggestions)).collect();
+        let sarif_results: Vec<SarifResult> = results
+            .iter()
+            .filter_map(|r| Self::convert_result(r, self.show_suggestions))
+            .collect();
 
         let log = SarifLog {
             schema: SARIF_SCHEMA,

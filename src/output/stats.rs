@@ -85,12 +85,12 @@ impl ProjectStatistics {
         let mut lang_map: HashMap<String, LanguageStats> = HashMap::new();
 
         for file in &self.files {
-            let entry = lang_map.entry(file.language.clone()).or_insert_with(|| {
-                LanguageStats {
+            let entry = lang_map
+                .entry(file.language.clone())
+                .or_insert_with(|| LanguageStats {
                     language: file.language.clone(),
                     ..Default::default()
-                }
-            });
+                });
             entry.files += 1;
             entry.total_lines += file.stats.total;
             entry.code += file.stats.code;
@@ -114,12 +114,12 @@ impl ProjectStatistics {
                 .path
                 .parent()
                 .map_or_else(|| ".".to_string(), |p| p.display().to_string());
-            let entry = dir_map.entry(dir_name.clone()).or_insert_with(|| {
-                DirectoryStats {
+            let entry = dir_map
+                .entry(dir_name.clone())
+                .or_insert_with(|| DirectoryStats {
                     directory: dir_name,
                     ..Default::default()
-                }
-            });
+                });
             entry.files += 1;
             entry.total_lines += file.stats.total;
             entry.code += file.stats.code;
@@ -143,8 +143,7 @@ impl ProjectStatistics {
         self.top_files = Some(sorted_files.into_iter().take(n).collect());
 
         if self.total_files > 0 {
-            self.average_code_lines =
-                Some(self.total_code as f64 / self.total_files as f64);
+            self.average_code_lines = Some(self.total_code as f64 / self.total_files as f64);
         }
 
         self
@@ -206,12 +205,7 @@ impl StatsFormatter for StatsTextFormatter {
             writeln!(output).ok();
 
             for lang in by_language {
-                writeln!(
-                    output,
-                    "{} ({} files):",
-                    lang.language, lang.files
-                )
-                .ok();
+                writeln!(output, "{} ({} files):", lang.language, lang.files).ok();
                 writeln!(output, "  Total lines: {}", lang.total_lines).ok();
                 writeln!(output, "  Code: {}", lang.code).ok();
                 writeln!(output, "  Comments: {}", lang.comment).ok();
@@ -223,12 +217,7 @@ impl StatsFormatter for StatsTextFormatter {
             writeln!(output).ok();
 
             for dir in by_directory {
-                writeln!(
-                    output,
-                    "{} ({} files):",
-                    dir.directory, dir.files
-                )
-                .ok();
+                writeln!(output, "{} ({} files):", dir.directory, dir.files).ok();
                 writeln!(output, "  Total lines: {}", dir.total_lines).ok();
                 writeln!(output, "  Code: {}", dir.code).ok();
                 writeln!(output, "  Comments: {}", dir.comment).ok();
@@ -412,9 +401,19 @@ impl StatsFormatter for StatsMarkdownFormatter {
             writeln!(output, "| Metric | Delta |").ok();
             writeln!(output, "|--------|------:|").ok();
             writeln!(output, "| Files | {} |", format_delta(trend.files_delta)).ok();
-            writeln!(output, "| Total Lines | {} |", format_delta(trend.lines_delta)).ok();
+            writeln!(
+                output,
+                "| Total Lines | {} |",
+                format_delta(trend.lines_delta)
+            )
+            .ok();
             writeln!(output, "| Code | {} |", format_delta(trend.code_delta)).ok();
-            writeln!(output, "| Comments | {} |", format_delta(trend.comment_delta)).ok();
+            writeln!(
+                output,
+                "| Comments | {} |",
+                format_delta(trend.comment_delta)
+            )
+            .ok();
             writeln!(output, "| Blank | {} |", format_delta(trend.blank_delta)).ok();
             writeln!(output).ok();
         }

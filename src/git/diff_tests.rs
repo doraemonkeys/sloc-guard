@@ -91,7 +91,11 @@ fn changed_files_detects_added_file() {
     let changed = git_diff.get_changed_files("HEAD~1").unwrap();
 
     let new_file_path = dir.path().join("new_file.rs").canonicalize().unwrap();
-    assert!(changed.iter().any(|p| p.canonicalize().ok() == Some(new_file_path.clone())));
+    assert!(
+        changed
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(new_file_path.clone()))
+    );
 }
 
 #[test]
@@ -112,7 +116,11 @@ fn changed_files_detects_modified_file() {
     let changed = git_diff.get_changed_files("HEAD~1").unwrap();
 
     let main_path = dir.path().join("main.rs").canonicalize().unwrap();
-    assert!(changed.iter().any(|p| p.canonicalize().ok() == Some(main_path.clone())));
+    assert!(
+        changed
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(main_path.clone()))
+    );
 }
 
 #[test]
@@ -174,5 +182,9 @@ fn changed_files_handles_subdirectory() {
     let changed = git_diff.get_changed_files("HEAD~1").unwrap();
 
     let lib_path = dir.path().join("src/lib.rs").canonicalize().unwrap();
-    assert!(changed.iter().any(|p| p.canonicalize().ok() == Some(lib_path.clone())));
+    assert!(
+        changed
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(lib_path.clone()))
+    );
 }

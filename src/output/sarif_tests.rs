@@ -80,7 +80,12 @@ fn sarif_rules_defined() {
 #[test]
 fn sarif_failed_result() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("src/big_file.rs", 600, 500, CheckStatus::Failed)];
+    let results = vec![make_result(
+        "src/big_file.rs",
+        600,
+        500,
+        CheckStatus::Failed,
+    )];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -97,7 +102,12 @@ fn sarif_failed_result() {
 #[test]
 fn sarif_warning_result() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("src/medium_file.rs", 460, 500, CheckStatus::Warning)];
+    let results = vec![make_result(
+        "src/medium_file.rs",
+        460,
+        500,
+        CheckStatus::Warning,
+    )];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -111,7 +121,12 @@ fn sarif_warning_result() {
 #[test]
 fn sarif_grandfathered_result_has_suppression() {
     let formatter = SarifFormatter::new();
-    let results = vec![make_result("src/legacy.rs", 700, 500, CheckStatus::Grandfathered)];
+    let results = vec![make_result(
+        "src/legacy.rs",
+        700,
+        500,
+        CheckStatus::Grandfathered,
+    )];
 
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
@@ -180,7 +195,8 @@ fn sarif_windows_path_converted() {
             total: 610,
             code: 600,
             comment: 5,
-            blank: 5, ignored: 0,
+            blank: 5,
+            ignored: 0,
         },
         limit: 500,
         override_reason: None,
@@ -190,9 +206,8 @@ fn sarif_windows_path_converted() {
     let output = formatter.format(&results).unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
 
-    let uri =
-        &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]
-            ["uri"];
+    let uri = &parsed["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]
+        ["uri"];
     assert_eq!(uri, "src/subdir/file.rs");
 }
 
@@ -201,14 +216,16 @@ fn sarif_with_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
-    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
-        .with_chunks(vec![SplitChunk {
-            suggested_name: "big_file_part1".to_string(),
-            functions: vec!["func1".to_string()],
-            start_line: 1,
-            end_line: 300,
-            line_count: 300,
-        }]);
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec!["func1".to_string()],
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+        ]);
     result.suggestions = Some(suggestion);
 
     let formatter = SarifFormatter::new().with_suggestions(true);
@@ -224,14 +241,16 @@ fn sarif_without_suggestions_flag_excludes_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
-    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
-        .with_chunks(vec![SplitChunk {
-            suggested_name: "big_file_part1".to_string(),
-            functions: vec!["func1".to_string()],
-            start_line: 1,
-            end_line: 300,
-            line_count: 300,
-        }]);
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec!["func1".to_string()],
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+        ]);
     result.suggestions = Some(suggestion);
 
     let formatter = SarifFormatter::new().with_suggestions(false);

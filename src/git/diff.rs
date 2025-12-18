@@ -24,9 +24,8 @@ impl GitDiff {
     /// # Errors
     /// Returns an error if no git repository is found.
     pub fn discover(path: &Path) -> Result<Self> {
-        let repo = gix::discover(path).map_err(|e| {
-            SlocGuardError::Git(format!("Failed to discover git repository: {e}"))
-        })?;
+        let repo = gix::discover(path)
+            .map_err(|e| SlocGuardError::Git(format!("Failed to discover git repository: {e}")))?;
         let workdir = repo
             .workdir()
             .ok_or_else(|| SlocGuardError::Git("Repository has no working directory".into()))?
@@ -63,8 +62,8 @@ impl GitDiff {
         paths: &mut HashSet<(PathBuf, gix::ObjectId)>,
     ) -> Result<()> {
         for entry in tree.iter() {
-            let entry =
-                entry.map_err(|e| SlocGuardError::Git(format!("Failed to read tree entry: {e}")))?;
+            let entry = entry
+                .map_err(|e| SlocGuardError::Git(format!("Failed to read tree entry: {e}")))?;
             let name = std::str::from_utf8(entry.filename())
                 .map_err(|e| SlocGuardError::Git(format!("Invalid filename encoding: {e}")))?;
             let path = prefix.join(name);

@@ -7,8 +7,8 @@ use clap::Parser;
 use rayon::prelude::*;
 
 use sloc_guard::analyzer::generate_split_suggestions;
-use sloc_guard::baseline::{compute_file_hash, read_file_with_hash, Baseline};
-use sloc_guard::cache::{compute_config_hash, Cache};
+use sloc_guard::baseline::{Baseline, compute_file_hash, read_file_with_hash};
+use sloc_guard::cache::{Cache, compute_config_hash};
 use sloc_guard::checker::{Checker, ThresholdChecker};
 use sloc_guard::cli::{
     BaselineAction, BaselineArgs, BaselineUpdateArgs, CheckArgs, Cli, ColorChoice, Commands,
@@ -114,7 +114,12 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
 
     // 6. Scan directories (respecting .gitignore if enabled)
     let use_gitignore = config.default.gitignore && !args.no_gitignore;
-    let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
+    let all_files = scan_files(
+        &paths_to_scan,
+        &extensions,
+        &exclude_patterns,
+        use_gitignore,
+    )?;
 
     // 6.1 Filter by git diff if --diff is specified
     let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
@@ -146,7 +151,9 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     progress.finish();
 
     // 7.1 Save cache if not disabled
-    if !args.no_cache && let Ok(cache_guard) = cache.lock() {
+    if !args.no_cache
+        && let Ok(cache_guard) = cache.lock()
+    {
         save_cache(&cache_guard);
     }
 
@@ -189,14 +196,21 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     }
 }
 
-fn load_config(config_path: Option<&Path>, no_config: bool, no_extends: bool) -> sloc_guard::Result<Config> {
+fn load_config(
+    config_path: Option<&Path>,
+    no_config: bool,
+    no_extends: bool,
+) -> sloc_guard::Result<Config> {
     if no_config {
         return Ok(Config::default());
     }
 
     let loader = FileConfigLoader::new();
     if no_extends {
-        config_path.map_or_else(|| loader.load_without_extends(), |path| loader.load_from_path_without_extends(path))
+        config_path.map_or_else(
+            || loader.load_without_extends(),
+            |path| loader.load_from_path_without_extends(path),
+        )
     } else {
         config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
     }
@@ -234,7 +248,10 @@ fn save_cache(cache: &Cache) {
     let _ = cache.save(cache_path);
 }
 
-fn apply_baseline_comparison(results: &mut [sloc_guard::checker::CheckResult], baseline: &Baseline) {
+fn apply_baseline_comparison(
+    results: &mut [sloc_guard::checker::CheckResult],
+    baseline: &Baseline,
+) {
     for result in results.iter_mut() {
         if !result.is_failed() {
             continue;
@@ -440,9 +457,15 @@ fn format_output(
         OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose)
             .with_suggestions(show_suggestions)
             .format(results),
-        OutputFormat::Json => JsonFormatter::new().with_suggestions(show_suggestions).format(results),
-        OutputFormat::Sarif => SarifFormatter::new().with_suggestions(show_suggestions).format(results),
-        OutputFormat::Markdown => MarkdownFormatter::new().with_suggestions(show_suggestions).format(results),
+        OutputFormat::Json => JsonFormatter::new()
+            .with_suggestions(show_suggestions)
+            .format(results),
+        OutputFormat::Sarif => SarifFormatter::new()
+            .with_suggestions(show_suggestions)
+            .format(results),
+        OutputFormat::Markdown => MarkdownFormatter::new()
+            .with_suggestions(show_suggestions)
+            .format(results),
     }
 }
 
@@ -491,7 +514,12 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
 
     // 4. Scan directories (respecting .gitignore if enabled)
     let use_gitignore = config.default.gitignore && !args.no_gitignore;
-    let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
+    let all_files = scan_files(
+        &paths_to_scan,
+        &extensions,
+        &exclude_patterns,
+        use_gitignore,
+    )?;
 
     // 5. Process each file and collect statistics (parallel with rayon)
     let registry = LanguageRegistry::with_custom_languages(&config.languages);
@@ -508,7 +536,9 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     progress.finish();
 
     // 5.1 Save cache if not disabled
-    if !args.no_cache && let Ok(cache_guard) = cache.lock() {
+    if !args.no_cache
+        && let Ok(cache_guard) = cache.lock()
+    {
         save_cache(&cache_guard);
     }
 
@@ -676,7 +706,12 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
 
     // 4. Scan directories (respecting .gitignore if enabled)
     let use_gitignore = config.default.gitignore && !args.no_gitignore;
-    let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
+    let all_files = scan_files(
+        &paths_to_scan,
+        &extensions,
+        &exclude_patterns,
+        use_gitignore,
+    )?;
 
     // 5. Process each file and find violations
     let registry = LanguageRegistry::with_custom_languages(&config.languages);
@@ -716,10 +751,7 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     Ok(violations.len())
 }
 
-fn get_baseline_scan_paths(
-    args: &BaselineUpdateArgs,
-    config: &Config,
-) -> Vec<std::path::PathBuf> {
+fn get_baseline_scan_paths(args: &BaselineUpdateArgs, config: &Config) -> Vec<std::path::PathBuf> {
     // CLI --include overrides config include_paths
     if !args.include.is_empty() {
         return args.include.iter().map(std::path::PathBuf::from).collect();

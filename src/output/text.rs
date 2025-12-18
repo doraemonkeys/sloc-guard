@@ -42,7 +42,11 @@ impl TextFormatter {
     #[must_use]
     pub fn with_verbose(mode: ColorMode, verbose: u8) -> Self {
         let use_colors = Self::should_use_colors(mode);
-        Self { use_colors, verbose, show_suggestions: false }
+        Self {
+            use_colors,
+            verbose,
+            show_suggestions: false,
+        }
     }
 
     #[must_use]
@@ -135,10 +139,7 @@ impl TextFormatter {
         }
     }
 
-    fn format_suggestions(
-        suggestion: &crate::analyzer::SplitSuggestion,
-        output: &mut Vec<u8>,
-    ) {
+    fn format_suggestions(suggestion: &crate::analyzer::SplitSuggestion, output: &mut Vec<u8>) {
         writeln!(output, "   Split suggestions:").ok();
         for chunk in &suggestion.chunks {
             writeln!(
@@ -171,7 +172,8 @@ impl TextFormatter {
         );
 
         if grandfathered > 0 {
-            let grandfathered_str = self.colorize_number(grandfathered, &CheckStatus::Grandfathered);
+            let grandfathered_str =
+                self.colorize_number(grandfathered, &CheckStatus::Grandfathered);
             let _ = write!(summary, " (baseline: {grandfathered_str} grandfathered)");
         }
 

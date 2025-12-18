@@ -31,3 +31,6 @@ clean_tmp:
 
 test:
 	cargo test
+
+fmt:
+	cargo fmt --all -- --check

@@ -4,9 +4,7 @@ use sloc_guard::cli::{CheckArgs, ColorChoice, GroupBy, StatsArgs};
 use sloc_guard::config::Config;
 use sloc_guard::output::{ColorMode, OutputFormat};
 
-use crate::{
-    apply_cli_overrides, color_choice_to_mode, get_scan_paths, get_stats_scan_paths,
-};
+use crate::{apply_cli_overrides, color_choice_to_mode, get_scan_paths, get_stats_scan_paths};
 
 #[test]
 fn apply_cli_overrides_max_lines() {

@@ -1360,7 +1360,11 @@ fn check_multiple_languages() {
     fs::write(temp_dir.path().join("index.js"), "console.log('hi');\n").unwrap();
     fs::write(temp_dir.path().join("main.ts"), "const x: number = 1;\n").unwrap();
     fs::write(temp_dir.path().join("lib.c"), "int main() { return 0; }\n").unwrap();
-    fs::write(temp_dir.path().join("lib.cpp"), "int main() { return 0; }\n").unwrap();
+    fs::write(
+        temp_dir.path().join("lib.cpp"),
+        "int main() { return 0; }\n",
+    )
+    .unwrap();
 
     cmd()
         .arg("check")
@@ -1377,7 +1381,11 @@ fn check_multiple_languages() {
 fn stats_multiple_languages() {
     let temp_dir = TempDir::new().unwrap();
 
-    fs::write(temp_dir.path().join("main.rs"), "fn main() {\n    let x = 1;\n}\n").unwrap();
+    fs::write(
+        temp_dir.path().join("main.rs"),
+        "fn main() {\n    let x = 1;\n}\n",
+    )
+    .unwrap();
     fs::write(temp_dir.path().join("app.py"), "x = 1\ny = 2\n").unwrap();
 
     cmd()

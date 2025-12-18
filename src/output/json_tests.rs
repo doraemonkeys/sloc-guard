@@ -111,7 +111,8 @@ fn json_override_reason_included() {
             total: 760,
             code: 750,
             comment: 5,
-            blank: 5, ignored: 0,
+            blank: 5,
+            ignored: 0,
         },
         limit: 800,
         override_reason: Some("Legacy code from migration".to_string()),
@@ -173,14 +174,16 @@ fn json_with_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
-    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
-        .with_chunks(vec![SplitChunk {
-            suggested_name: "big_file_part1".to_string(),
-            functions: vec!["func1".to_string()],
-            start_line: 1,
-            end_line: 300,
-            line_count: 300,
-        }]);
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec!["func1".to_string()],
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+        ]);
     result.suggestions = Some(suggestion);
 
     let formatter = JsonFormatter::new().with_suggestions(true);
@@ -196,14 +199,16 @@ fn json_without_suggestions_flag_excludes_suggestions() {
     use crate::analyzer::{SplitChunk, SplitSuggestion};
 
     let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
-    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
-        .with_chunks(vec![SplitChunk {
-            suggested_name: "big_file_part1".to_string(),
-            functions: vec!["func1".to_string()],
-            start_line: 1,
-            end_line: 300,
-            line_count: 300,
-        }]);
+    let suggestion =
+        SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500).with_chunks(vec![
+            SplitChunk {
+                suggested_name: "big_file_part1".to_string(),
+                functions: vec!["func1".to_string()],
+                start_line: 1,
+                end_line: 300,
+                line_count: 300,
+            },
+        ]);
     result.suggestions = Some(suggestion);
 
     let formatter = JsonFormatter::new().with_suggestions(false);

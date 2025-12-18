@@ -30,12 +30,18 @@ pub enum ColorChoice {
 
 #[derive(Parser, Debug)]
 #[command(name = "sloc-guard")]
-#[command(author, version, about = "Source Lines of Code guard - enforce code size limits")]
-#[command(long_about = "A tool to enforce source lines of code (SLOC) limits per file.\n\n\
+#[command(
+    author,
+    version,
+    about = "Source Lines of Code guard - enforce code size limits"
+)]
+#[command(
+    long_about = "A tool to enforce source lines of code (SLOC) limits per file.\n\n\
     Exit codes:\n  \
     0 - All checks passed\n  \
     1 - Threshold violations found\n  \
-    2 - Configuration or runtime error")]
+    2 - Configuration or runtime error"
+)]
 pub struct Cli {
     /// Increase output verbosity (-v, -vv for more)
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]

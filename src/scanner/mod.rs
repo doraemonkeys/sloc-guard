@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
-use crate::error::Result;
 use crate::SlocGuardError;
+use crate::error::Result;
 
 /// Trait for scanning directories and finding files.
 pub trait FileScanner {

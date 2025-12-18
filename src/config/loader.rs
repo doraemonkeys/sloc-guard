@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, SlocGuardError};
 
-use super::remote::{fetch_remote_config, is_remote_url};
 use super::Config;
+use super::remote::{fetch_remote_config, is_remote_url};
 
 /// Trait for loading configuration from various sources.
 pub trait ConfigLoader {
@@ -111,9 +111,7 @@ impl Default for FileConfigLoader<RealFileSystem> {
 impl FileConfigLoader<RealFileSystem> {
     #[must_use]
     pub const fn new() -> Self {
-        Self {
-            fs: RealFileSystem,
-        }
+        Self { fs: RealFileSystem }
     }
 }
 
@@ -142,14 +140,8 @@ impl<F: FileSystem> FileConfigLoader<F> {
         toml::from_str(content).map_err(SlocGuardError::from)
     }
 
-    fn load_with_extends(
-        &self,
-        path: &Path,
-        visited: &mut HashSet<String>,
-    ) -> Result<toml::Value> {
-        let canonical = path
-            .canonicalize()
-            .unwrap_or_else(|_| path.to_path_buf());
+    fn load_with_extends(&self, path: &Path, visited: &mut HashSet<String>) -> Result<toml::Value> {
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let key = canonical.to_string_lossy().to_string();
 
         if !visited.insert(key) {

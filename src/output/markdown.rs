@@ -12,7 +12,9 @@ pub struct MarkdownFormatter {
 impl MarkdownFormatter {
     #[must_use]
     pub const fn new() -> Self {
-        Self { show_suggestions: false }
+        Self {
+            show_suggestions: false,
+        }
     }
 
     #[must_use]
@@ -87,7 +89,11 @@ impl OutputFormatter for MarkdownFormatter {
                 "| Status | File | Lines | Limit | Code | Comment | Blank | Reason |"
             )
             .ok();
-            writeln!(output, "|:------:|------|------:|------:|-----:|--------:|------:|--------|").ok();
+            writeln!(
+                output,
+                "|:------:|------|------:|------:|-----:|--------:|------:|--------|"
+            )
+            .ok();
 
             for result in &non_passed {
                 let icon = Self::status_icon(&result.status);
@@ -111,7 +117,11 @@ impl OutputFormatter for MarkdownFormatter {
             if self.show_suggestions {
                 let with_suggestions: Vec<_> = non_passed
                     .iter()
-                    .filter(|r| r.suggestions.as_ref().is_some_and(crate::analyzer::SplitSuggestion::has_suggestions))
+                    .filter(|r| {
+                        r.suggestions
+                            .as_ref()
+                            .is_some_and(crate::analyzer::SplitSuggestion::has_suggestions)
+                    })
                     .collect();
 
                 if !with_suggestions.is_empty() {

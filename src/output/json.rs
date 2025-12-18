@@ -13,7 +13,9 @@ pub struct JsonFormatter {
 impl JsonFormatter {
     #[must_use]
     pub const fn new() -> Self {
-        Self { show_suggestions: false }
+        Self {
+            show_suggestions: false,
+        }
     }
 
     #[must_use]
@@ -85,7 +87,10 @@ impl OutputFormatter for JsonFormatter {
                 failed,
                 grandfathered,
             },
-            results: results.iter().map(|r| convert_result(r, self.show_suggestions)).collect(),
+            results: results
+                .iter()
+                .map(|r| convert_result(r, self.show_suggestions))
+                .collect(),
         };
 
         Ok(serde_json::to_string_pretty(&output)?)

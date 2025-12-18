@@ -49,9 +49,9 @@ impl HttpClient for ReqwestClient {
             )));
         }
 
-        response.text().map_err(|e| {
-            SlocGuardError::Config(format!("Failed to read response from {url}: {e}"))
-        })
+        response
+            .text()
+            .map_err(|e| SlocGuardError::Config(format!("Failed to read response from {url}: {e}")))
     }
 }
 
@@ -204,9 +204,7 @@ pub fn clear_cache() -> usize {
     if let Ok(entries) = fs::read_dir(&dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().is_some_and(|ext| ext == "toml")
-                && fs::remove_file(&path).is_ok()
-            {
+            if path.extension().is_some_and(|ext| ext == "toml") && fs::remove_file(&path).is_ok() {
                 count += 1;
             }
         }

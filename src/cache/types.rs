@@ -156,7 +156,12 @@ impl Cache {
     /// Get cached entry if metadata (mtime + size) matches.
     /// This is a fast check that avoids reading file content.
     #[must_use]
-    pub fn get_if_metadata_matches(&self, path: &str, mtime: u64, size: u64) -> Option<&CacheEntry> {
+    pub fn get_if_metadata_matches(
+        &self,
+        path: &str,
+        mtime: u64,
+        size: u64,
+    ) -> Option<&CacheEntry> {
         self.files
             .get(path)
             .filter(|entry| entry.metadata_matches(mtime, size))
@@ -165,9 +170,7 @@ impl Cache {
     /// Get cached entry if hash matches.
     #[must_use]
     pub fn get_if_valid(&self, path: &str, file_hash: &str) -> Option<&CacheEntry> {
-        self.files
-            .get(path)
-            .filter(|entry| entry.hash == file_hash)
+        self.files.get(path).filter(|entry| entry.hash == file_hash)
     }
 
     /// Add or update a cached entry.

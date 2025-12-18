@@ -65,7 +65,8 @@ impl GoParser {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            fn_pattern: Regex::new(r"(?m)^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)").expect("Invalid regex"),
+            fn_pattern: Regex::new(r"(?m)^func\s+(?:\([^)]+\)\s+)?([a-zA-Z_][a-zA-Z0-9_]*)")
+                .expect("Invalid regex"),
         }
     }
 }
@@ -104,8 +105,10 @@ impl PythonParser {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            fn_pattern: Regex::new(r"(?m)^(\s*)(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("Invalid regex"),
-            class_pattern: Regex::new(r"(?m)^(\s*)class\s+([a-zA-Z_][a-zA-Z0-9_]*)").expect("Invalid regex"),
+            fn_pattern: Regex::new(r"(?m)^(\s*)(?:async\s+)?def\s+([a-zA-Z_][a-zA-Z0-9_]*)")
+                .expect("Invalid regex"),
+            class_pattern: Regex::new(r"(?m)^(\s*)class\s+([a-zA-Z_][a-zA-Z0-9_]*)")
+                .expect("Invalid regex"),
         }
     }
 
@@ -197,8 +200,16 @@ impl FunctionParser for JsParser {
                 .fn_pattern
                 .captures(line)
                 .and_then(|caps| caps.get(3))
-                .or_else(|| self.arrow_pattern.captures(line).and_then(|caps| caps.get(3)))
-                .or_else(|| self.class_pattern.captures(line).and_then(|caps| caps.get(2)))
+                .or_else(|| {
+                    self.arrow_pattern
+                        .captures(line)
+                        .and_then(|caps| caps.get(3))
+                })
+                .or_else(|| {
+                    self.class_pattern
+                        .captures(line)
+                        .and_then(|caps| caps.get(2))
+                })
                 .map(|m| m.as_str().to_string());
 
             if let Some(name) = name {

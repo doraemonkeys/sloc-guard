@@ -2,7 +2,7 @@ mod parser;
 mod split;
 mod types;
 
-pub use parser::{get_parser, FunctionParser};
+pub use parser::{FunctionParser, get_parser};
 pub use split::SplitAnalyzer;
 pub use types::{FunctionInfo, SplitChunk, SplitSuggestion};
 
@@ -10,10 +10,7 @@ use crate::checker::CheckResult;
 use crate::language::LanguageRegistry;
 
 /// Generate split suggestions for failed or warning results.
-pub fn generate_split_suggestions(
-    results: &mut [CheckResult],
-    registry: &LanguageRegistry,
-) {
+pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &LanguageRegistry) {
     let analyzer = SplitAnalyzer::default();
 
     for result in results.iter_mut() {
@@ -33,7 +30,8 @@ pub fn generate_split_suggestions(
             continue;
         };
 
-        if let Some(suggestion) = analyzer.analyze(&result.path, &content, &language.name, result.limit)
+        if let Some(suggestion) =
+            analyzer.analyze(&result.path, &content, &language.name, result.limit)
             && suggestion.has_suggestions()
         {
             result.set_suggestions(suggestion);

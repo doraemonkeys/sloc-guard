@@ -17,7 +17,13 @@ impl SplitAnalyzer {
 
     /// Analyze a file and generate split suggestions.
     #[must_use]
-    pub fn analyze(&self, path: &Path, content: &str, language: &str, limit: usize) -> Option<SplitSuggestion> {
+    pub fn analyze(
+        &self,
+        path: &Path,
+        content: &str,
+        language: &str,
+        limit: usize,
+    ) -> Option<SplitSuggestion> {
         let parser = get_parser(language)?;
         let functions = parser.parse(content);
 
@@ -38,15 +44,17 @@ impl SplitAnalyzer {
         Some(suggestion)
     }
 
-    fn generate_chunks(&self, path: &Path, functions: &[FunctionInfo], limit: usize) -> Vec<SplitChunk> {
+    fn generate_chunks(
+        &self,
+        path: &Path,
+        functions: &[FunctionInfo],
+        limit: usize,
+    ) -> Vec<SplitChunk> {
         if functions.is_empty() {
             return Vec::new();
         }
 
-        let base_name = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("file");
+        let base_name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
 
         let mut chunks = Vec::new();
         let mut current_chunk_funcs: Vec<&FunctionInfo> = Vec::new();
@@ -55,7 +63,8 @@ impl SplitAnalyzer {
 
         for func in functions {
             // If adding this function would exceed target size and we have something, start a new chunk
-            if current_lines + func.line_count > self.target_size && !current_chunk_funcs.is_empty() {
+            if current_lines + func.line_count > self.target_size && !current_chunk_funcs.is_empty()
+            {
                 chunks.push(Self::create_chunk(
                     base_name,
                     chunk_index,
@@ -92,18 +101,10 @@ impl SplitAnalyzer {
         }
 
         // Only return chunks if we would actually split the file (more than 1 chunk)
-        if chunks.len() > 1 {
-            chunks
-        } else {
-            Vec::new()
-        }
+        if chunks.len() > 1 { chunks } else { Vec::new() }
     }
 
-    fn create_chunk(
-        base_name: &str,
-        index: usize,
-        functions: &[&FunctionInfo],
-    ) -> SplitChunk {
+    fn create_chunk(base_name: &str, index: usize, functions: &[&FunctionInfo]) -> SplitChunk {
         let func_names: Vec<String> = functions.iter().map(|f| f.name.clone()).collect();
         let start_line = functions.first().map_or(1, |f| f.start_line);
         let end_line = functions.last().map_or(1, |f| f.end_line);

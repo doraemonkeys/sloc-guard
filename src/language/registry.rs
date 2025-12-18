@@ -64,9 +64,7 @@ impl LanguageRegistry {
 
     #[must_use]
     pub fn get_by_extension(&self, ext: &str) -> Option<&Language> {
-        self.extension_map
-            .get(ext)
-            .map(|&idx| &self.languages[idx])
+        self.extension_map.get(ext).map(|&idx| &self.languages[idx])
     }
 
     #[must_use]

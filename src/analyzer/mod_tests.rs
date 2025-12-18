@@ -45,7 +45,12 @@ fn generate_split_suggestions_skips_unknown_extension() {
 #[test]
 fn generate_split_suggestions_skips_missing_file() {
     let registry = LanguageRegistry::default();
-    let mut results = vec![make_result("nonexistent_file.rs", 600, 500, CheckStatus::Failed)];
+    let mut results = vec![make_result(
+        "nonexistent_file.rs",
+        600,
+        500,
+        CheckStatus::Failed,
+    )];
 
     generate_split_suggestions(&mut results, &registry);
 

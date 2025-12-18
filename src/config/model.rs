@@ -24,7 +24,6 @@ pub struct Config {
     pub languages: std::collections::HashMap<String, CustomLanguageConfig>,
 }
 
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CustomLanguageConfig {
     #[serde(default)]

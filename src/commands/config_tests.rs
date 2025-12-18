@@ -117,7 +117,12 @@ fn validate_config_semantics_empty_override_path() {
 
     let result = validate_config_semantics(&config);
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("path cannot be empty"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("path cannot be empty")
+    );
 }
 
 #[test]
@@ -136,10 +141,12 @@ fn validate_config_semantics_rule_without_extensions_or_max_lines() {
 
     let result = validate_config_semantics(&config);
     assert!(result.is_err());
-    assert!(result
-        .unwrap_err()
-        .to_string()
-        .contains("must specify at least"));
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("must specify at least")
+    );
 }
 
 #[test]

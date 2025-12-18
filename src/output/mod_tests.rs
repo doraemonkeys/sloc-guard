@@ -13,7 +13,8 @@ fn sample_results() -> Vec<CheckResult> {
                 total: 110,
                 code: 100,
                 comment: 5,
-                blank: 5, ignored: 0,
+                blank: 5,
+                ignored: 0,
             },
             limit: 500,
             override_reason: None,
@@ -26,7 +27,8 @@ fn sample_results() -> Vec<CheckResult> {
                 total: 600,
                 code: 550,
                 comment: 30,
-                blank: 20, ignored: 0,
+                blank: 20,
+                ignored: 0,
             },
             limit: 500,
             override_reason: None,
@@ -47,7 +49,10 @@ fn output_format_from_str() {
         "markdown".parse::<OutputFormat>().unwrap(),
         OutputFormat::Markdown
     );
-    assert_eq!("md".parse::<OutputFormat>().unwrap(), OutputFormat::Markdown);
+    assert_eq!(
+        "md".parse::<OutputFormat>().unwrap(),
+        OutputFormat::Markdown
+    );
 }
 
 #[test]

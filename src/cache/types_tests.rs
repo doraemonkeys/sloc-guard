@@ -8,7 +8,8 @@ fn test_cache_entry_new() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
     let entry = CacheEntry::new("abc123".to_string(), &stats, 1000, 512);
 
@@ -27,7 +28,8 @@ fn test_cached_line_stats_from() {
         total: 50,
         code: 40,
         comment: 5,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
     let cached = CachedLineStats::from(&stats);
 
@@ -43,7 +45,8 @@ fn test_line_stats_from_cached() {
         total: 50,
         code: 40,
         comment: 5,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
     let stats = LineStats::from(&cached);
 
@@ -78,7 +81,8 @@ fn test_cache_set_and_get() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
 
     cache.set("src/main.rs", "file_hash".to_string(), &stats, 1000, 512);
@@ -98,7 +102,8 @@ fn test_cache_get_if_valid() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
 
     cache.set("src/main.rs", "file_hash".to_string(), &stats, 1000, 512);
@@ -147,9 +152,16 @@ fn test_cache_save_and_load() {
         total: 100,
         code: 80,
         comment: 15,
-        blank: 5, ignored: 0,
+        blank: 5,
+        ignored: 0,
     };
-    cache.set("src/main.rs", "file_hash_xyz".to_string(), &stats, 2000, 1024);
+    cache.set(
+        "src/main.rs",
+        "file_hash_xyz".to_string(),
+        &stats,
+        2000,
+        1024,
+    );
 
     let temp_file = NamedTempFile::new().unwrap();
     let path = temp_file.path().to_path_buf();

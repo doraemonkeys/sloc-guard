@@ -25,9 +25,8 @@ impl<F: FileFilter> GitAwareScanner<F> {
     }
 
     fn scan_with_gix(&self, root: &Path) -> Result<Vec<PathBuf>> {
-        let repo = gix::discover(root).map_err(|e| {
-            SlocGuardError::Git(format!("Failed to discover git repository: {e}"))
-        })?;
+        let repo = gix::discover(root)
+            .map_err(|e| SlocGuardError::Git(format!("Failed to discover git repository: {e}")))?;
 
         let workdir = repo
             .workdir()
@@ -51,19 +50,22 @@ impl<F: FileFilter> GitAwareScanner<F> {
         let prefix = if root_abs == workdir_abs {
             PathBuf::new()
         } else {
-            root_abs.strip_prefix(&workdir_abs).map_err(|_| {
-                SlocGuardError::Git(format!(
-                    "Scan path {} is not within git workdir {}",
-                    root_abs.display(),
-                    workdir_abs.display()
-                ))
-            })?.to_path_buf()
+            root_abs
+                .strip_prefix(&workdir_abs)
+                .map_err(|_| {
+                    SlocGuardError::Git(format!(
+                        "Scan path {} is not within git workdir {}",
+                        root_abs.display(),
+                        workdir_abs.display()
+                    ))
+                })?
+                .to_path_buf()
         };
 
         // Get index for tracked files
-        let index = repo.index_or_empty().map_err(|e| {
-            SlocGuardError::Git(format!("Failed to get git index: {e}"))
-        })?;
+        let index = repo
+            .index_or_empty()
+            .map_err(|e| SlocGuardError::Git(format!("Failed to get git index: {e}")))?;
 
         // Walk the directory with gitignore support
         let should_interrupt = AtomicBool::new(false);
@@ -128,8 +130,7 @@ impl<F: FileFilter> gix::dir::walk::Delegate for Collector<'_, F> {
             let path = entry.rela_path.to_path_lossy();
 
             // Check if within our scan prefix
-            let in_prefix = self.prefix.as_os_str().is_empty()
-                || path.starts_with(self.prefix);
+            let in_prefix = self.prefix.as_os_str().is_empty() || path.starts_with(self.prefix);
 
             if in_prefix && self.filter.should_include(path.as_ref()) {
                 self.files.push(path.into_owned());
