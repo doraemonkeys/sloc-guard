@@ -25,22 +25,12 @@ Lint: make ci
 All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional completed features:
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
-- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition
+- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends)
 - **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output
 
 ---
 
 ## Phase 4: Advanced Features (Pending)
-
-### Task 4.8a: Config Inheritance (local)
-
-Location: `src/config/loader.rs`
-
-```
-- Add "extends" field to config (local paths only)
-- Load base config first, merge local overrides
-- Cycle detection for recursive extends
-```
 
 ### Task 4.8b-1: Remote Config Fetch
 
@@ -177,9 +167,8 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Short-term** | 4.8a Config Inheritance (local) |
-| **2. Medium** | 4.10 Split Suggestions (--fix) |
-| **3. Deferred** | 4.8b-1 Remote Config Fetch |
+| **1. Short-term** | 4.10 Split Suggestions (--fix) |
+| **2. Deferred** | 4.8b-1 Remote Config Fetch |
 | | 4.8b-2 Remote Config Cache |
 | | 4.8b-3 --no-extends Flag |
 | | 5.1c Directory Statistics |

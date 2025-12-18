@@ -41,16 +41,18 @@ impl MockFileSystem {
 
 impl FileSystem for MockFileSystem {
     fn read_to_string(&self, path: &Path) -> std::io::Result<String> {
+        let normalized = normalize_path(path);
         self.files
             .lock()
             .unwrap()
-            .get(path)
+            .get(&normalized)
             .cloned()
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "file not found"))
     }
 
     fn exists(&self, path: &Path) -> bool {
-        self.files.lock().unwrap().contains_key(path)
+        let normalized = normalize_path(path);
+        self.files.lock().unwrap().contains_key(&normalized)
     }
 
     fn current_dir(&self) -> std::io::Result<PathBuf> {
@@ -60,6 +62,26 @@ impl FileSystem for MockFileSystem {
     fn home_dir(&self) -> Option<PathBuf> {
         self.home_dir.clone()
     }
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy().replace('\\', "/");
+    let mut components = Vec::new();
+    for part in path_str.split('/') {
+        match part {
+            ".." => {
+                components.pop();
+            }
+            "." | "" => {}
+            _ => components.push(part),
+        }
+    }
+    let normalized = if path_str.starts_with('/') {
+        format!("/{}", components.join("/"))
+    } else {
+        components.join("/")
+    };
+    PathBuf::from(normalized)
 }
 
 #[test]
@@ -247,4 +269,197 @@ reason = "Legacy code"
 fn default_loader_can_be_created() {
     let _loader = FileConfigLoader::new();
     let _loader_default = FileConfigLoader::default();
+}
+
+#[test]
+fn extends_loads_base_config() {
+    let base_content = r#"
+[default]
+max_lines = 300
+extensions = ["rs", "go"]
+"#;
+    let child_content = r#"
+extends = "/base/config.toml"
+
+[default]
+max_lines = 500
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/base/config.toml", base_content)
+        .with_file("/project/config.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader
+        .load_from_path(Path::new("/project/config.toml"))
+        .unwrap();
+
+    assert_eq!(config.default.max_lines, 500);
+    assert_eq!(config.default.extensions, vec!["rs", "go"]);
+    assert!(config.extends.is_none());
+}
+
+#[test]
+fn extends_with_relative_path() {
+    let base_content = r"
+[default]
+max_lines = 200
+";
+    let child_content = r#"
+extends = "../base/config.toml"
+
+[default]
+skip_comments = false
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/configs/base/config.toml", base_content)
+        .with_file("/configs/project/config.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader
+        .load_from_path(Path::new("/configs/project/config.toml"))
+        .unwrap();
+
+    assert_eq!(config.default.max_lines, 200);
+    assert!(!config.default.skip_comments);
+}
+
+#[test]
+fn extends_chain_works() {
+    let grandparent_content = r#"
+[default]
+max_lines = 100
+
+[exclude]
+patterns = ["**/vendor/**"]
+"#;
+    let parent_content = r#"
+extends = "/configs/grandparent.toml"
+
+[default]
+max_lines = 200
+"#;
+    let child_content = r#"
+extends = "/configs/parent.toml"
+
+[default]
+max_lines = 300
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/configs/grandparent.toml", grandparent_content)
+        .with_file("/configs/parent.toml", parent_content)
+        .with_file("/configs/child.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader
+        .load_from_path(Path::new("/configs/child.toml"))
+        .unwrap();
+
+    assert_eq!(config.default.max_lines, 300);
+    assert_eq!(config.exclude.patterns, vec!["**/vendor/**"]);
+}
+
+#[test]
+fn extends_detects_direct_cycle() {
+    let config_a = r#"
+extends = "/configs/b.toml"
+"#;
+    let config_b = r#"
+extends = "/configs/a.toml"
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/configs/a.toml", config_a)
+        .with_file("/configs/b.toml", config_b);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/configs/a.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(err, SlocGuardError::Config(msg) if msg.contains("Circular")));
+}
+
+#[test]
+fn extends_detects_self_reference() {
+    let config = r#"
+extends = "/configs/self.toml"
+
+[default]
+max_lines = 100
+"#;
+
+    let fs = MockFileSystem::new().with_file("/configs/self.toml", config);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/configs/self.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(err, SlocGuardError::Config(msg) if msg.contains("Circular")));
+}
+
+#[test]
+fn extends_merges_rules() {
+    let base_content = r#"
+[rules.rust]
+extensions = ["rs"]
+max_lines = 300
+
+[rules.python]
+extensions = ["py"]
+max_lines = 400
+"#;
+    let child_content = r#"
+extends = "/base.toml"
+
+[rules.rust]
+max_lines = 500
+
+[rules.go]
+extensions = ["go"]
+max_lines = 600
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/base.toml", base_content)
+        .with_file("/child.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader.load_from_path(Path::new("/child.toml")).unwrap();
+
+    // Child overrides max_lines but inherits extensions from base
+    let rust_rule = config.rules.get("rust").unwrap();
+    assert_eq!(rust_rule.max_lines, Some(500));
+    assert_eq!(rust_rule.extensions, vec!["rs"]);
+
+    // Python rule inherited entirely from base
+    let python_rule = config.rules.get("python").unwrap();
+    assert_eq!(python_rule.max_lines, Some(400));
+    assert_eq!(python_rule.extensions, vec!["py"]);
+
+    // Go rule defined only in child
+    let go_rule = config.rules.get("go").unwrap();
+    assert_eq!(go_rule.max_lines, Some(600));
+    assert_eq!(go_rule.extensions, vec!["go"]);
+}
+
+#[test]
+fn extends_error_on_missing_base() {
+    let child_content = r#"
+extends = "/nonexistent/base.toml"
+
+[default]
+max_lines = 100
+"#;
+
+    let fs = MockFileSystem::new().with_file("/child.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/child.toml"));
+
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), SlocGuardError::FileRead { .. }));
 }

@@ -16,7 +16,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 |--------|---------|---------|
 | `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig` |
-| `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
+| `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml`, supports `extends` for config inheritance |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/comment` | `counter/comment.rs` | `CommentDetector` - detects single/multi-line comments |
 | `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directives (file/next/block) |
@@ -42,7 +42,8 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ```rust
 // Config priority: CLI args > config file > defaults
-Config { default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride>, languages: HashMap<String, CustomLanguageConfig> }
+Config { extends: Option<String>, default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride>, languages: HashMap<String, CustomLanguageConfig> }
+// extends: local path to base config (relative to config file), merged recursively with cycle detection
 DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
 RuleConfig { extensions: Vec<String>, max_lines: Option<usize>, skip_comments: Option<bool>, skip_blank: Option<bool>, warn_threshold: Option<f64> }
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
@@ -97,7 +98,8 @@ ScanProgress::finish()  // Clear progress bar
 ## Data Flow (check command)
 
 ```
-CLI args → load_config() → apply_cli_overrides()
+CLI args → load_config() → [if extends] resolve extends chain (cycle detection) → merge configs
+         → apply_cli_overrides()
          → [if --baseline] load_baseline() → Baseline
          → [if !--no-cache] load_cache(config_hash) → Cache
          → LanguageRegistry::with_custom_languages(config.languages)

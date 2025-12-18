@@ -2,6 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends: Option<String>,
+
     #[serde(default)]
     pub default: DefaultConfig,
 
@@ -20,6 +23,7 @@ pub struct Config {
     #[serde(default)]
     pub languages: std::collections::HashMap<String, CustomLanguageConfig>,
 }
+
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CustomLanguageConfig {

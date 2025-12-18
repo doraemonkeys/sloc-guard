@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::error::{Result, SlocGuardError};
@@ -127,6 +128,80 @@ impl<F: FileSystem> FileConfigLoader<F> {
     fn parse_config(content: &str) -> Result<Config> {
         toml::from_str(content).map_err(SlocGuardError::from)
     }
+
+    fn load_with_extends(
+        &self,
+        path: &Path,
+        visited: &mut HashSet<PathBuf>,
+    ) -> Result<toml::Value> {
+        let canonical = path
+            .canonicalize()
+            .unwrap_or_else(|_| path.to_path_buf());
+
+        if !visited.insert(canonical.clone()) {
+            return Err(SlocGuardError::Config(format!(
+                "Circular extends detected: {}",
+                canonical.display()
+            )));
+        }
+
+        let content = self
+            .fs
+            .read_to_string(path)
+            .map_err(|source| SlocGuardError::FileRead {
+                path: path.to_path_buf(),
+                source,
+            })?;
+
+        let mut config_value: toml::Value =
+            toml::from_str(&content).map_err(SlocGuardError::from)?;
+
+        let extends_path = config_value
+            .get("extends")
+            .and_then(toml::Value::as_str)
+            .map(|s| {
+                let extends_path = Path::new(s);
+                if extends_path.is_absolute() {
+                    extends_path.to_path_buf()
+                } else {
+                    path.parent()
+                        .unwrap_or_else(|| Path::new("."))
+                        .join(extends_path)
+                }
+            });
+
+        if let Some(extends) = extends_path {
+            let base_value = self.load_with_extends(&extends, visited)?;
+            config_value = merge_toml_values(base_value, config_value);
+        }
+
+        if let Some(table) = config_value.as_table_mut() {
+            table.remove("extends");
+        }
+
+        Ok(config_value)
+    }
+}
+
+/// Merge two TOML values. Child values take precedence.
+/// Tables are merged recursively. Arrays are replaced, not appended.
+fn merge_toml_values(base: toml::Value, child: toml::Value) -> toml::Value {
+    match (base, child) {
+        (toml::Value::Table(mut base_table), toml::Value::Table(child_table)) => {
+            for (key, child_val) in child_table {
+                match base_table.remove(&key) {
+                    Some(base_val) => {
+                        base_table.insert(key, merge_toml_values(base_val, child_val));
+                    }
+                    None => {
+                        base_table.insert(key, child_val);
+                    }
+                }
+            }
+            toml::Value::Table(base_table)
+        }
+        (_, child) => child,
+    }
 }
 
 impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
@@ -147,15 +222,11 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_from_path(&self, path: &Path) -> Result<Config> {
-        let content = self
-            .fs
-            .read_to_string(path)
-            .map_err(|source| SlocGuardError::FileRead {
-                path: path.to_path_buf(),
-                source,
-            })?;
-
-        Self::parse_config(&content)
+        let mut visited = HashSet::new();
+        let merged_value = self.load_with_extends(path, &mut visited)?;
+        let config_str =
+            toml::to_string(&merged_value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
+        Self::parse_config(&config_str)
     }
 }
 
