@@ -36,6 +36,8 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 Focus: Address architecture flaws, Scanner/Structure visibility conflict, UX ambiguities, and CLAUDE.md violations.
 
 ### Task 5.5.1: Scanner vs Structure Visibility Conflict (Critical)
+> ⚠️ **Plan Mode Required**: 跨 4+ 模块的架构重构，先制定完整计划再实施。
+
 Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/structure.rs`
 **Problem**: `[scanner].extensions` filters files globally → Structure checker "blind" to non-code files.
 - Scenario: Dir has 100 `.txt` files, scanner only sees `.rs` → Structure reports 0 files → false pass.
@@ -56,6 +58,8 @@ Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/structure.rs`
 - `StructureChecker` sees full directory contents (uses its own `count_exclude`).
 
 ### Task 5.5.2: Override Separation (Content vs Structure)
+> ⚠️ **Plan Mode Required**: 配置结构拆分 + checker 适配，涉及多模块联动。
+
 Location: `src/config/model.rs`, `src/checker/*.rs`
 **Problem**: `[[override]]` mixing file limits and directory limits causes semantic confusion.
 - Same array contains two different concepts (file SLOC vs directory counts)
@@ -87,6 +91,8 @@ reason = "Legacy monolith, gradual migration in progress"  # reason REQUIRED
 - Loader validates: override.max_lines >= effective rule limit (error if stricter)
 
 ### Task 5.5.3: Extension-Based Rule Syntax Sugar
+> ⚠️ **Plan Mode Required**: 新增配置语法 + loader 展开逻辑 + 字段一致性验证。
+
 Location: `src/config/model.rs`, `src/config/loader.rs`
 **Problem**: Removing `[rules.<ext>]` in favor of `[[content.rules]]` pattern degrades UX for common case.
 - Old: `[rules.rs] max_lines = 1000` (simple, intuitive)
@@ -110,25 +116,16 @@ max_lines = 1500
 - Loader expands `[content.languages.rs]` into internal `PathRule { pattern: "**/*.rs", ... }`.
 - **Field parity**: `[content.languages.X]` MUST support all fields that `[[content.rules]]` supports.
 
-### Task 5.5.4: Structure Pattern Semantics Clarification
+### Task 5.5.4: Structure Pattern Semantics Clarification ✅
 Location: `src/checker/structure.rs`, `docs/sloc-guard.example.toml`
-**Problem**: `[[structure.rules]]` pattern ambiguity:
-- Does `src/components/*` match `src/components/Button/`? `src/components/Button/Icon/`?
-- How to express "apply rule to all nested levels"?
-- Difference between `*` and `**` unclear.
-
-**Solution**: Enforce directory-only matching with clear glob semantics.
-```
-- `structure.rules` patterns ONLY match directories (files silently ignored).
-- Glob behavior:
+**Completed**: Enforced directory-only matching with clear glob semantics.
+- `structure.rules` patterns ONLY match directories (by design: `dir_stats` only contains directory paths)
+- Glob behavior documented:
   - `src/components/*` → matches DIRECT children only (Button/, Icon/)
   - `src/components/**` → matches ALL descendants recursively
   - `src/features` → exact match only
-- Document explicitly with examples in sloc-guard.example.toml
-```
-Implementation:
-- In `StructureChecker::check()`, filter matched paths: `if !path.is_dir() { continue; }`
-- Add doc comments in example TOML clarifying `*` vs `**` behavior
+- Added doc comments to `get_limits()` and `check()` methods clarifying semantics
+- Example TOML includes explicit documentation and usage examples
 
 ### Task 5.5.5: Naming & Semantics Polish ✅
 Location: `src/config/model.rs`, `docs/sloc-guard.example.toml`
@@ -148,6 +145,8 @@ Location: `src/commands/context.rs` (renamed from `common.rs`)
 **Completed**: Renamed to `context.rs`, updated all imports.
 
 ### Task 5.5.7: Refactor `CheckResult` to Enum
+> ⚠️ **Plan Mode Required**: 修改核心数据结构，需更新所有 output formatters 和 commands。
+
 Location: `src/checker/threshold.rs`
 ```
 - Violates CLAUDE.md: "Use Enums with associated data... rather than Structs with many optional fields"
@@ -163,6 +162,8 @@ Location: `src/checker/threshold.rs`
 ```
 
 ### Task 5.5.8: Config Versioning
+> ⚠️ **Plan Mode Required**: 版本检测 + v1→v2 迁移逻辑 + 向后兼容处理。
+
 Location: `src/config/model.rs`, `src/config/loader.rs`
 ```
 - Add `version` field to config schema (e.g., "2.0")
@@ -174,6 +175,8 @@ Location: `src/config/model.rs`, `src/config/loader.rs`
 ```
 
 ### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
+> ⚠️ **Plan Mode Required**: 规则优先级逻辑重构，跨 loader/checker 模块。
+
 Location: `src/checker/threshold.rs`, `src/config/loader.rs`, `docs/sloc-guard.example.toml`
 **Problem**: Multiple rules can match same file, priority unclear.
 - `[[content.rules]] pattern = "tests/**"` vs `[[content.rules]] pattern = "**/*.test.ts"`
@@ -277,7 +280,7 @@ Location: `src/output/html.rs`
 | Priority | Tasks |
 |----------|-------|
 | **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
-| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, 5.5.4 Pattern Semantics, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
+| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
 | **3. Documentation** | ~~5.5.12 extends Examples~~ |
 | **4. Code Quality** | ~~5.5.6 Rename common.rs~~, 5.5.7 CheckResult Enum, 5.5.8 Versioning |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |

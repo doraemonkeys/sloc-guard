@@ -232,6 +232,12 @@ impl StructureChecker {
     /// Get limits for a directory path (rule takes priority over global default).
     /// Returns (`max_files`, `max_dirs`, `warn_threshold`).
     /// A limit of `-1` (UNLIMITED) means no check should be performed.
+    ///
+    /// # Glob Semantics (structure rules only match directories)
+    ///
+    /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
+    /// - `src/components/**` — matches ALL descendants recursively
+    /// - `src/features`      — exact directory match only
     fn get_limits(&self, path: &Path) -> (Option<i64>, Option<i64>, Option<f64>) {
         // Check rules first (higher priority)
         for rule in &self.rules {
@@ -249,6 +255,9 @@ impl StructureChecker {
     }
 
     /// Check directory stats against limits and return violations.
+    ///
+    /// Only directories are checked (files are not tracked in `dir_stats`).
+    /// Each directory's immediate children counts are compared against applicable limits.
     /// Limits of `-1` (UNLIMITED) are skipped.
     #[must_use]
     #[allow(
