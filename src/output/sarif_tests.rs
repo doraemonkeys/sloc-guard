@@ -195,3 +195,83 @@ fn sarif_windows_path_converted() {
             ["uri"];
     assert_eq!(uri, "src/subdir/file.rs");
 }
+
+#[test]
+fn sarif_with_suggestions() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
+        .with_chunks(vec![SplitChunk {
+            suggested_name: "big_file_part1".to_string(),
+            functions: vec!["func1".to_string()],
+            start_line: 1,
+            end_line: 300,
+            line_count: 300,
+        }]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = SarifFormatter::new().with_suggestions(true);
+    let output = formatter.format(&[result]).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let props = &parsed["runs"][0]["results"][0]["properties"];
+    assert!(props.get("suggestions").is_some());
+}
+
+#[test]
+fn sarif_without_suggestions_flag_excludes_suggestions() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
+        .with_chunks(vec![SplitChunk {
+            suggested_name: "big_file_part1".to_string(),
+            functions: vec!["func1".to_string()],
+            start_line: 1,
+            end_line: 300,
+            line_count: 300,
+        }]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = SarifFormatter::new().with_suggestions(false);
+    let output = formatter.format(&[result]).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let props = &parsed["runs"][0]["results"][0]["properties"];
+    assert!(props.get("suggestions").is_none());
+}
+
+#[test]
+fn sarif_default_formatter() {
+    let formatter = SarifFormatter::default();
+    let results = vec![make_result("test.rs", 600, 500, CheckStatus::Failed)];
+
+    let output = formatter.format(&results).unwrap();
+    assert!(output.contains("$schema"));
+}
+
+#[test]
+fn sarif_override_reason_included() {
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Warning,
+        stats: LineStats {
+            total: 460,
+            code: 450,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: Some("Legacy migration code".to_string()),
+        suggestions: None,
+    }];
+
+    let formatter = SarifFormatter::new();
+    let output = formatter.format(&results).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let props = &parsed["runs"][0]["results"][0]["properties"];
+    assert_eq!(props["overrideReason"], "Legacy migration code");
+}

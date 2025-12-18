@@ -139,3 +139,86 @@ fn json_override_reason_excluded_when_none() {
     let file_result = &parsed.get("results").unwrap()[0];
     assert!(file_result.get("override_reason").is_none());
 }
+
+#[test]
+fn json_grandfathered_status() {
+    let formatter = JsonFormatter::new();
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Grandfathered,
+        stats: LineStats {
+            total: 610,
+            code: 600,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let summary = parsed.get("summary").unwrap();
+    assert_eq!(summary.get("grandfathered").unwrap(), 1);
+
+    let file_result = &parsed.get("results").unwrap()[0];
+    assert_eq!(file_result.get("status").unwrap(), "grandfathered");
+}
+
+#[test]
+fn json_with_suggestions() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
+        .with_chunks(vec![SplitChunk {
+            suggested_name: "big_file_part1".to_string(),
+            functions: vec!["func1".to_string()],
+            start_line: 1,
+            end_line: 300,
+            line_count: 300,
+        }]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = JsonFormatter::new().with_suggestions(true);
+    let output = formatter.format(&[result]).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let file_result = &parsed.get("results").unwrap()[0];
+    assert!(file_result.get("suggestions").is_some());
+}
+
+#[test]
+fn json_without_suggestions_flag_excludes_suggestions() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("big_file.rs", 600, 500, CheckStatus::Failed);
+    let suggestion = SplitSuggestion::new(PathBuf::from("big_file.rs"), 600, 500)
+        .with_chunks(vec![SplitChunk {
+            suggested_name: "big_file_part1".to_string(),
+            functions: vec!["func1".to_string()],
+            start_line: 1,
+            end_line: 300,
+            line_count: 300,
+        }]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = JsonFormatter::new().with_suggestions(false);
+    let output = formatter.format(&[result]).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    let file_result = &parsed.get("results").unwrap()[0];
+    assert!(file_result.get("suggestions").is_none());
+}
+
+#[test]
+fn json_default_formatter() {
+    let formatter = JsonFormatter::default();
+    let results = vec![make_result("test.rs", 100, 500, CheckStatus::Passed)];
+
+    let output = formatter.format(&results).unwrap();
+    assert!(output.contains("summary"));
+}

@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, SlocGuardError};
 
+use super::remote::{fetch_remote_config, is_remote_url};
 use super::Config;
 
 /// Trait for loading configuration from various sources.
@@ -18,6 +19,18 @@ pub trait ConfigLoader {
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     fn load_from_path(&self, path: &Path) -> Result<Config>;
+
+    /// Load configuration without resolving extends.
+    ///
+    /// # Errors
+    /// Returns an error if the config file cannot be read or parsed.
+    fn load_without_extends(&self) -> Result<Config>;
+
+    /// Load configuration from a specific path without resolving extends.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read or parsed.
+    fn load_from_path_without_extends(&self, path: &Path) -> Result<Config>;
 }
 
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
@@ -132,13 +145,14 @@ impl<F: FileSystem> FileConfigLoader<F> {
     fn load_with_extends(
         &self,
         path: &Path,
-        visited: &mut HashSet<PathBuf>,
+        visited: &mut HashSet<String>,
     ) -> Result<toml::Value> {
         let canonical = path
             .canonicalize()
             .unwrap_or_else(|_| path.to_path_buf());
+        let key = canonical.to_string_lossy().to_string();
 
-        if !visited.insert(canonical.clone()) {
+        if !visited.insert(key) {
             return Err(SlocGuardError::Config(format!(
                 "Circular extends detected: {}",
                 canonical.display()
@@ -153,25 +167,56 @@ impl<F: FileSystem> FileConfigLoader<F> {
                 source,
             })?;
 
-        let mut config_value: toml::Value =
-            toml::from_str(&content).map_err(SlocGuardError::from)?;
+        self.process_config_content(&content, Some(path), visited)
+    }
 
-        let extends_path = config_value
+    fn load_remote_with_extends(
+        &self,
+        url: &str,
+        visited: &mut HashSet<String>,
+    ) -> Result<toml::Value> {
+        if !visited.insert(url.to_string()) {
+            return Err(SlocGuardError::Config(format!(
+                "Circular extends detected: {url}"
+            )));
+        }
+
+        let content = fetch_remote_config(url)?;
+        self.process_config_content(&content, None, visited)
+    }
+
+    fn process_config_content(
+        &self,
+        content: &str,
+        base_path: Option<&Path>,
+        visited: &mut HashSet<String>,
+    ) -> Result<toml::Value> {
+        let mut config_value: toml::Value =
+            toml::from_str(content).map_err(SlocGuardError::from)?;
+
+        let extends_value = config_value
             .get("extends")
             .and_then(toml::Value::as_str)
-            .map(|s| {
-                let extends_path = Path::new(s);
-                if extends_path.is_absolute() {
+            .map(String::from);
+
+        if let Some(extends) = extends_value {
+            let base_value = if is_remote_url(&extends) {
+                self.load_remote_with_extends(&extends, visited)?
+            } else {
+                let extends_path = Path::new(&extends);
+                let resolved_path = if extends_path.is_absolute() {
                     extends_path.to_path_buf()
-                } else {
-                    path.parent()
+                } else if let Some(base) = base_path {
+                    base.parent()
                         .unwrap_or_else(|| Path::new("."))
                         .join(extends_path)
-                }
-            });
-
-        if let Some(extends) = extends_path {
-            let base_value = self.load_with_extends(&extends, visited)?;
+                } else {
+                    return Err(SlocGuardError::Config(format!(
+                        "Cannot resolve relative path '{extends}' from remote config"
+                    )));
+                };
+                self.load_with_extends(&resolved_path, visited)?
+            };
             config_value = merge_toml_values(base_value, config_value);
         }
 
@@ -227,6 +272,33 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
         let config_str =
             toml::to_string(&merged_value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
         Self::parse_config(&config_str)
+    }
+
+    fn load_without_extends(&self) -> Result<Config> {
+        if let Some(local_path) = self.local_config_path()
+            && self.fs.exists(&local_path)
+        {
+            return self.load_from_path_without_extends(&local_path);
+        }
+
+        if let Some(user_path) = self.user_config_path()
+            && self.fs.exists(&user_path)
+        {
+            return self.load_from_path_without_extends(&user_path);
+        }
+
+        Ok(Config::default())
+    }
+
+    fn load_from_path_without_extends(&self, path: &Path) -> Result<Config> {
+        let content = self
+            .fs
+            .read_to_string(path)
+            .map_err(|source| SlocGuardError::FileRead {
+                path: path.to_path_buf(),
+                source,
+            })?;
+        Self::parse_config(&content)
     }
 }
 

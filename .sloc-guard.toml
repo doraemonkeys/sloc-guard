@@ -1,5 +1,5 @@
-# 请严格遵守阈值，主动拆分大文件
 [default]
+# 请严格遵守阈值，主动拆分
 max_lines = 700
 extensions = ["rs"]
 skip_comments = true
@@ -8,6 +8,7 @@ warn_threshold = 1
 
 [[path_rules]]
 pattern = "**/*_tests.rs"
+# 请严格遵守阈值，主动拆分
 max_lines = 1500
 warn_threshold = 1
 

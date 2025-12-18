@@ -1,10 +1,12 @@
 mod loader;
 mod model;
+mod remote;
 
 pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
 pub use model::{
     Config, CustomLanguageConfig, DefaultConfig, ExcludeConfig, FileOverride, PathRule, RuleConfig,
 };
+pub use remote::{clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url};
 
 #[cfg(test)]
 mod tests {

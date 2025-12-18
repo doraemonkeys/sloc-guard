@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::error::Result;
+use crate::SlocGuardError;
 
 /// Trait for scanning directories and finding files.
 pub trait FileScanner {
@@ -43,6 +44,45 @@ impl<F: FileFilter> FileScanner for DirectoryScanner<F> {
     fn scan(&self, root: &Path) -> Result<Vec<PathBuf>> {
         Ok(self.scan_impl(root))
     }
+}
+
+/// Scan files from paths using either `GitAwareScanner` or `DirectoryScanner`.
+///
+/// Uses `GitAwareScanner` (respects .gitignore) if `use_gitignore` is true and
+/// falls back to `DirectoryScanner` if not in a git repository.
+///
+/// # Errors
+/// Returns an error if the directory cannot be read or if glob patterns are invalid.
+pub fn scan_files(
+    paths: &[PathBuf],
+    extensions: &[String],
+    exclude_patterns: &[String],
+    use_gitignore: bool,
+) -> Result<Vec<PathBuf>> {
+    let mut all_files = Vec::new();
+
+    if use_gitignore {
+        let filter = GlobFilter::new(extensions.to_vec(), exclude_patterns)?;
+        let scanner = GitAwareScanner::new(filter);
+        for path in paths {
+            match scanner.scan(path) {
+                Ok(files) => all_files.extend(files),
+                Err(SlocGuardError::Git(_)) => {
+                    return scan_files(paths, extensions, exclude_patterns, false);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    } else {
+        let filter = GlobFilter::new(extensions.to_vec(), exclude_patterns)?;
+        let scanner = DirectoryScanner::new(filter);
+        for path in paths {
+            let files = scanner.scan(path)?;
+            all_files.extend(files);
+        }
+    }
+
+    Ok(all_files)
 }
 
 #[cfg(test)]

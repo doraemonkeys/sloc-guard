@@ -463,3 +463,81 @@ max_lines = 100
     assert!(result.is_err());
     assert!(matches!(result.unwrap_err(), SlocGuardError::FileRead { .. }));
 }
+
+#[test]
+fn load_without_extends_ignores_extends_field() {
+    let base_content = r"
+[default]
+max_lines = 100
+";
+    let child_content = r#"
+extends = "/base.toml"
+
+[default]
+max_lines = 200
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/base.toml", base_content)
+        .with_file("/project/.sloc-guard.toml", child_content)
+        .with_current_dir("/project");
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader.load_without_extends().unwrap();
+
+    // Should have max_lines from child only, not merged with base
+    assert_eq!(config.default.max_lines, 200);
+    // Extends field should be preserved in the config
+    assert_eq!(config.extends, Some("/base.toml".to_string()));
+}
+
+#[test]
+fn load_from_path_without_extends_ignores_extends() {
+    let base_content = r#"
+[default]
+max_lines = 100
+extensions = ["rs", "go"]
+"#;
+    let child_content = r#"
+extends = "/base.toml"
+
+[default]
+max_lines = 300
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/base.toml", base_content)
+        .with_file("/child.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader
+        .load_from_path_without_extends(Path::new("/child.toml"))
+        .unwrap();
+
+    // Should have only child's max_lines, not merged
+    assert_eq!(config.default.max_lines, 300);
+    // Extensions should be default (not from base)
+    assert_eq!(config.default.extensions, Config::default().default.extensions);
+    // Extends field should be preserved
+    assert_eq!(config.extends, Some("/base.toml".to_string()));
+}
+
+#[test]
+fn load_without_extends_falls_back_to_user_config() {
+    let user_content = r#"
+extends = "https://example.com/base.toml"
+
+[default]
+max_lines = 400
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_home_dir(Some(PathBuf::from("/home/user")))
+        .with_file("/home/user/.config/sloc-guard/config.toml", user_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let config = loader.load_without_extends().unwrap();
+
+    assert_eq!(config.default.max_lines, 400);
+    assert_eq!(config.extends, Some("https://example.com/base.toml".to_string()));
+}

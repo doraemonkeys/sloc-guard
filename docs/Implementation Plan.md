@@ -25,24 +25,8 @@ Lint: make ci
 All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional completed features:
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
-- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix)
+- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
 - **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output
-
----
-
-## Phase 4: Advanced Features (Pending)
-
-### Task 4.8b: Remote Config Support
-
-Location: `src/config/loader.rs`, `src/config/cache.rs` (new), `src/cli.rs`
-
-```
-- Add reqwest dependency (blocking feature)
-- Implement fetch_remote_config(url) → Result<String>
-- Error handling: timeout, 404, invalid URL
-- Cache remote configs: ~/.cache/sloc-guard/configs/, hash URL as filename, 1 hour TTL
-- Add --no-extends CLI flag to skip extends resolution
-```
 
 ---
 
@@ -131,8 +115,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Deferred** | 4.8b Remote Config Support |
-| | 5.1c Directory Statistics |
+| **1. Deferred** | 5.1c Directory Statistics |
 | | 5.2 Trend Tracking |
 | | 5.3a-d HTML Report |
 | | Phase 6 |

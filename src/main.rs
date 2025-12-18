@@ -24,7 +24,7 @@ use sloc_guard::output::{
     ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
     StatsMarkdownFormatter, StatsTextFormatter, TextFormatter,
 };
-use sloc_guard::scanner::{DirectoryScanner, FileScanner, GitAwareScanner, GlobFilter};
+use sloc_guard::scanner::scan_files;
 use sloc_guard::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 /// File size threshold for streaming reads (10 MB)
@@ -80,7 +80,7 @@ fn run_check(args: &CheckArgs, cli: &Cli) -> i32 {
 
 fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     // 1. Load configuration
-    let mut config = load_config(args.config.as_deref(), cli.no_config)?;
+    let mut config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
 
     // 2. Apply CLI argument overrides
     apply_cli_overrides(&mut config, args);
@@ -185,13 +185,17 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     }
 }
 
-fn load_config(config_path: Option<&Path>, no_config: bool) -> sloc_guard::Result<Config> {
+fn load_config(config_path: Option<&Path>, no_config: bool, no_extends: bool) -> sloc_guard::Result<Config> {
     if no_config {
         return Ok(Config::default());
     }
 
     let loader = FileConfigLoader::new();
-    config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
+    if no_extends {
+        config_path.map_or_else(|| loader.load_without_extends(), |path| loader.load_from_path_without_extends(path))
+    } else {
+        config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
+    }
 }
 
 fn load_baseline(baseline_path: Option<&Path>) -> sloc_guard::Result<Option<Baseline>> {
@@ -312,43 +316,6 @@ fn filter_by_git_diff(
         .collect();
 
     Ok(filtered)
-}
-
-/// Scan files from paths using either `GitAwareScanner` or `DirectoryScanner`.
-///
-/// Uses `GitAwareScanner` (respects .gitignore) if `use_gitignore` is true and
-/// falls back to `DirectoryScanner` if not in a git repository.
-fn scan_files(
-    paths: &[std::path::PathBuf],
-    extensions: &[String],
-    exclude_patterns: &[String],
-    use_gitignore: bool,
-) -> sloc_guard::Result<Vec<std::path::PathBuf>> {
-    let mut all_files = Vec::new();
-
-    if use_gitignore {
-        let filter = GlobFilter::new(extensions.to_vec(), exclude_patterns)?;
-        let scanner = GitAwareScanner::new(filter);
-        for path in paths {
-            match scanner.scan(path) {
-                Ok(files) => all_files.extend(files),
-                Err(sloc_guard::SlocGuardError::Git(_)) => {
-                    // Not in a git repository, fall back to regular scan
-                    return scan_files(paths, extensions, exclude_patterns, false);
-                }
-                Err(e) => return Err(e),
-            }
-        }
-    } else {
-        let filter = GlobFilter::new(extensions.to_vec(), exclude_patterns)?;
-        let scanner = DirectoryScanner::new(filter);
-        for path in paths {
-            let files = scanner.scan(path)?;
-            all_files.extend(files);
-        }
-    }
-
-    Ok(all_files)
 }
 
 fn process_file(
@@ -496,7 +463,7 @@ fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
 
 fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     // 1. Load configuration (for exclude patterns)
-    let config = load_config(args.config.as_deref(), cli.no_config)?;
+    let config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
 
     // 1.1 Load cache if not disabled
     let config_hash = compute_config_hash(&config);
@@ -672,7 +639,7 @@ fn run_baseline_update(args: &BaselineUpdateArgs, cli: &Cli) -> i32 {
 
 fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard::Result<usize> {
     // 1. Load configuration
-    let config = load_config(args.config.as_deref(), cli.no_config)?;
+    let config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
 
     // 2. Prepare extensions and exclude patterns
     let extensions = args
@@ -759,3 +726,15 @@ fn get_baseline_scan_paths(
 #[cfg(test)]
 #[path = "main_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "main_cli_tests.rs"]
+mod cli_tests;
+
+#[cfg(test)]
+#[path = "main_integration_tests.rs"]
+mod integration_tests;
+
+#[cfg(test)]
+#[path = "main_baseline_tests.rs"]
+mod baseline_tests;

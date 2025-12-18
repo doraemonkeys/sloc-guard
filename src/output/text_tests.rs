@@ -260,3 +260,100 @@ fn without_suggestions_flag_hides_split_suggestions() {
 
     assert!(!output.contains("Split suggestions:"));
 }
+
+#[test]
+fn grandfathered_status_shown_in_summary() {
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Grandfathered,
+        stats: LineStats {
+            total: 610,
+            code: 600,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("grandfathered"));
+    assert!(output.contains("baseline:"));
+}
+
+#[test]
+fn verbose_one_shows_grandfathered_files() {
+    let formatter = TextFormatter::with_verbose(ColorMode::Never, 1);
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Grandfathered,
+        stats: LineStats {
+            total: 610,
+            code: 600,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("GRANDFATHERED"));
+    assert!(output.contains("legacy.rs"));
+}
+
+#[test]
+fn verbose_zero_hides_grandfathered_files() {
+    let formatter = TextFormatter::with_verbose(ColorMode::Never, 0);
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Grandfathered,
+        stats: LineStats {
+            total: 610,
+            code: 600,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    // Grandfathered file details should not appear (only in summary)
+    assert!(!output.contains("GRANDFATHERED: legacy.rs"));
+    assert!(output.contains("grandfathered"));
+}
+
+#[test]
+fn grandfathered_colored_output() {
+    let formatter = TextFormatter::new(ColorMode::Always);
+    let results = vec![CheckResult {
+        path: PathBuf::from("legacy.rs"),
+        status: CheckStatus::Grandfathered,
+        stats: LineStats {
+            total: 610,
+            code: 600,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    // Should contain ANSI color codes (cyan for grandfathered)
+    assert!(output.contains("\x1b["));
+}

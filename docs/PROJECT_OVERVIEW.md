@@ -14,9 +14,10 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore, --fix), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore, --fix), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands; global flags: --no-config, --no-extends |
 | `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig` |
-| `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml`, supports `extends` for config inheritance |
+| `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml`, supports `extends` for config inheritance (local path or remote URL) |
+| `config/remote` | `config/remote.rs` | `HttpClient` trait, `ReqwestClient`, `fetch_remote_config[_with_client]`, `is_remote_url`, `clear_cache` - remote config fetching with 1h TTL cache, DI for testability |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/comment` | `counter/comment.rs` | `CommentDetector` - detects single/multi-line comments |
 | `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directives (file/next/block) |
@@ -44,7 +45,8 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 ```rust
 // Config priority: CLI args > config file > defaults
 Config { extends: Option<String>, default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride>, languages: HashMap<String, CustomLanguageConfig> }
-// extends: local path to base config (relative to config file), merged recursively with cycle detection
+// extends: local path or remote URL (http/https) to base config, merged recursively with cycle detection
+// Remote configs cached at ~/.cache/sloc-guard/configs/ (Windows: %LOCALAPPDATA%\sloc-guard\configs\) with 1h TTL
 DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
 RuleConfig { extensions: Vec<String>, max_lines: Option<usize>, skip_comments: Option<bool>, skip_blank: Option<bool>, warn_threshold: Option<f64> }
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
@@ -105,7 +107,8 @@ FunctionParser trait + get_parser(language) → Box<dyn FunctionParser>  // Rust
 ## Data Flow (check command)
 
 ```
-CLI args → load_config() → [if extends] resolve extends chain (cycle detection) → merge configs
+CLI args → load_config() → [if extends && !--no-extends] resolve extends chain (local or remote, cycle detection) → merge configs
+         → [if remote URL] fetch_remote_config(url) with cache lookup (1h TTL)
          → apply_cli_overrides()
          → [if --baseline] load_baseline() → Baseline
          → [if !--no-cache] load_cache(config_hash) → Cache
@@ -206,8 +209,9 @@ CLI args → load_config()
 - `rayon` - parallel file processing
 - `indicatif` - progress bar display
 - `gix` - git integration (--diff mode)
-- `sha2` - SHA-256 hashing (baseline, cache)
+- `sha2` - SHA-256 hashing (baseline, cache, remote config cache)
 - `regex` - function pattern matching (split suggestions)
+- `reqwest` - HTTP client for remote config fetching (blocking + rustls-tls)
 - `thiserror` - error handling
 
 ## Test Files

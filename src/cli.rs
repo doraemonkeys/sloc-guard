@@ -51,6 +51,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_config: bool,
 
+    /// Skip resolving extends in configuration (ignore remote/local inheritance)
+    #[arg(long, global = true)]
+    pub no_extends: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }

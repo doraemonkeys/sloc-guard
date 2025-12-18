@@ -185,3 +185,46 @@ fn without_suggestions_flag_hides_split_suggestions_section() {
 
     assert!(!output.contains("### Split Suggestions"));
 }
+
+#[test]
+fn empty_functions_shows_dash() {
+    use crate::analyzer::{SplitChunk, SplitSuggestion};
+
+    let mut result = make_result("src/big_file.rs", CheckStatus::Failed, 600, 500);
+    let suggestion = SplitSuggestion::new(PathBuf::from("src/big_file.rs"), 600, 500)
+        .with_chunks(vec![SplitChunk {
+            suggested_name: "big_file_part1".to_string(),
+            functions: vec![], // Empty functions
+            start_line: 1,
+            end_line: 300,
+            line_count: 300,
+        }]);
+    result.suggestions = Some(suggestion);
+
+    let formatter = MarkdownFormatter::new().with_suggestions(true);
+    let output = formatter.format(&[result]).unwrap();
+
+    assert!(output.contains("### Split Suggestions"));
+    assert!(output.contains("| - |")); // Should show dash for empty functions
+}
+
+#[test]
+fn default_formatter() {
+    let formatter = MarkdownFormatter::default();
+    let results = vec![make_result("src/test.rs", CheckStatus::Passed, 100, 500)];
+
+    let output = formatter.format(&results).unwrap();
+    assert!(output.contains("## SLOC Guard Results"));
+}
+
+#[test]
+fn no_grandfathered_row_when_count_is_zero() {
+    let results = vec![
+        make_result("src/pass.rs", CheckStatus::Passed, 100, 500),
+    ];
+
+    let formatter = MarkdownFormatter::new();
+    let output = formatter.format(&results).unwrap();
+
+    assert!(!output.contains("Grandfathered"));
+}
