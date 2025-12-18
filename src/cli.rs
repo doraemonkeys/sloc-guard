@@ -12,6 +12,8 @@ pub enum GroupBy {
     None,
     /// Group by language
     Lang,
+    /// Group by directory
+    Dir,
 }
 
 /// Color output control

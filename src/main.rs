@@ -511,6 +511,7 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let project_stats = ProjectStatistics::new(file_stats);
     let project_stats = match args.group_by {
         GroupBy::Lang => project_stats.with_language_breakdown(),
+        GroupBy::Dir => project_stats.with_directory_breakdown(),
         GroupBy::None => project_stats,
     };
     let project_stats = if let Some(n) = args.top {

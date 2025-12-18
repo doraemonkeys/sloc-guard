@@ -585,3 +585,190 @@ fn markdown_formatter_with_language_breakdown() {
     assert!(output.contains("| Rust | 1 | 80 | 15 | 5 |"));
     assert!(output.contains("| Go | 1 | 40 | 5 | 5 |"));
 }
+
+#[test]
+fn directory_breakdown_single_directory() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("src/a.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("src/b.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown();
+    let by_directory = stats.by_directory.unwrap();
+
+    assert_eq!(by_directory.len(), 1);
+    assert_eq!(by_directory[0].directory, "src");
+    assert_eq!(by_directory[0].files, 2);
+    assert_eq!(by_directory[0].code, 120);
+    assert_eq!(by_directory[0].comment, 20);
+    assert_eq!(by_directory[0].blank, 10);
+}
+
+#[test]
+fn directory_breakdown_multiple_directories() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("src/main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("tests/test.rs"),
+            stats: LineStats {
+                total: 200,
+                code: 150,
+                comment: 30,
+                blank: 20, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("src/lib.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown();
+    let by_directory = stats.by_directory.unwrap();
+
+    assert_eq!(by_directory.len(), 2);
+    // Sorted by code count descending, tests has more code
+    assert_eq!(by_directory[0].directory, "tests");
+    assert_eq!(by_directory[0].files, 1);
+    assert_eq!(by_directory[0].code, 150);
+
+    assert_eq!(by_directory[1].directory, "src");
+    assert_eq!(by_directory[1].files, 2);
+    assert_eq!(by_directory[1].code, 120);
+}
+
+#[test]
+fn text_formatter_with_directory_breakdown() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("src/main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("tests/test.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown();
+    let output = StatsTextFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("By Directory:"));
+    assert!(output.contains("src (1 files):"));
+    assert!(output.contains("tests (1 files):"));
+    assert!(output.contains("Summary:"));
+}
+
+#[test]
+fn json_formatter_with_directory_breakdown() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("src/main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("tests/test.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown();
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(parsed.get("by_directory").is_some());
+    let by_directory = parsed.get("by_directory").unwrap().as_array().unwrap();
+    assert_eq!(by_directory.len(), 2);
+}
+
+#[test]
+fn markdown_formatter_with_directory_breakdown() {
+    let files = vec![
+        FileStatistics {
+            path: PathBuf::from("src/main.rs"),
+            stats: LineStats {
+                total: 100,
+                code: 80,
+                comment: 15,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+        FileStatistics {
+            path: PathBuf::from("tests/test.rs"),
+            stats: LineStats {
+                total: 50,
+                code: 40,
+                comment: 5,
+                blank: 5, ignored: 0,
+            },
+            language: "Rust".to_string(),
+        },
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown();
+    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+
+    assert!(output.contains("### By Directory"));
+    assert!(output.contains("| Directory | Files | Code | Comments | Blank |"));
+    assert!(output.contains("| `src` | 1 | 80 | 15 | 5 |"));
+    assert!(output.contains("| `tests` | 1 | 40 | 5 | 5 |"));
+}

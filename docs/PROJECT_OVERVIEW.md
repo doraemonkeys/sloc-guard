@@ -32,7 +32,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/json` | `output/json.rs` | `JsonFormatter` - structured JSON output |
 | `output/sarif` | `output/sarif.rs` | `SarifFormatter` - SARIF 2.1.0 output for GitHub Code Scanning |
 | `output/markdown` | `output/markdown.rs` | `MarkdownFormatter` - table-based markdown output for PR comments |
-| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `LanguageStats` - stats output with language breakdown, top-N files, average |
+| `output/stats` | `output/stats.rs` | `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `LanguageStats`, `DirectoryStats` - stats output with language/directory breakdown, top-N files, average |
 | `output/progress` | `output/progress.rs` | `ScanProgress` - indicatif-based progress bar, disabled in quiet mode or non-TTY |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/config` | `commands/config.rs` | `run_config`, `validate_config_semantics`, `format_config_text` |
@@ -73,9 +73,12 @@ TextFormatter::with_verbose(mode, verbose)  // verbose >= 1 shows passed files
 
 // Stats results (no threshold checking)
 FileStatistics { path, stats: LineStats, language: String }
-ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank, by_language, top_files, average_code_lines }
+ProjectStatistics { files, total_files, total_lines, total_code, total_comment, total_blank, by_language, by_directory, top_files, average_code_lines }
 LanguageStats { language, files, total_lines, code, comment, blank }
-GroupBy::None | Lang  // --group-by option for stats command
+DirectoryStats { directory, files, total_lines, code, comment, blank }
+GroupBy::None | Lang | Dir  // --group-by option for stats command
+ProjectStatistics::with_language_breakdown() → computes per-language stats
+ProjectStatistics::with_directory_breakdown() → computes per-directory stats
 ProjectStatistics::with_top_files(n) → computes top N files by code lines + average
 
 // Git integration

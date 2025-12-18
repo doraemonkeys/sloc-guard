@@ -26,20 +26,11 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output
+- **Phase 5**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir)
 
 ---
 
 ## Phase 5: Statistics Extension (Pending)
-
-### Task 5.1c: Directory Statistics
-
-Location: `src/output/stats.rs`
-
-```
-- Per-directory breakdown
-- Add --group-by dir option
-```
 
 ### Task 5.2: Trend Tracking
 
@@ -115,8 +106,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Deferred** | 5.1c Directory Statistics |
-| | 5.2 Trend Tracking |
+| **1. Deferred** | 5.2 Trend Tracking |
 | | 5.3a-d HTML Report |
 | | Phase 6 |
 

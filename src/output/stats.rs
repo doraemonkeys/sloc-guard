@@ -25,6 +25,16 @@ pub struct LanguageStats {
     pub blank: usize,
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DirectoryStats {
+    pub directory: String,
+    pub files: usize,
+    pub total_lines: usize,
+    pub code: usize,
+    pub comment: usize,
+    pub blank: usize,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct ProjectStatistics {
     pub files: Vec<FileStatistics>,
@@ -34,6 +44,7 @@ pub struct ProjectStatistics {
     pub total_comment: usize,
     pub total_blank: usize,
     pub by_language: Option<Vec<LanguageStats>>,
+    pub by_directory: Option<Vec<DirectoryStats>>,
     pub top_files: Option<Vec<FileStatistics>>,
     pub average_code_lines: Option<f64>,
 }
@@ -60,6 +71,7 @@ impl ProjectStatistics {
             total_comment,
             total_blank,
             by_language: None,
+            by_directory: None,
             top_files: None,
             average_code_lines: None,
         }
@@ -87,6 +99,35 @@ impl ProjectStatistics {
         by_language.sort_by(|a, b| b.code.cmp(&a.code));
 
         self.by_language = Some(by_language);
+        self
+    }
+
+    #[must_use]
+    pub fn with_directory_breakdown(mut self) -> Self {
+        let mut dir_map: HashMap<String, DirectoryStats> = HashMap::new();
+
+        for file in &self.files {
+            let dir_name = file
+                .path
+                .parent()
+                .map_or_else(|| ".".to_string(), |p| p.display().to_string());
+            let entry = dir_map.entry(dir_name.clone()).or_insert_with(|| {
+                DirectoryStats {
+                    directory: dir_name,
+                    ..Default::default()
+                }
+            });
+            entry.files += 1;
+            entry.total_lines += file.stats.total;
+            entry.code += file.stats.code;
+            entry.comment += file.stats.comment;
+            entry.blank += file.stats.blank;
+        }
+
+        let mut by_directory: Vec<DirectoryStats> = dir_map.into_values().collect();
+        by_directory.sort_by(|a, b| b.code.cmp(&a.code));
+
+        self.by_directory = Some(by_directory);
         self
     }
 
@@ -157,6 +198,23 @@ impl StatsFormatter for StatsTextFormatter {
                 writeln!(output, "  Blank: {}", lang.blank).ok();
                 writeln!(output).ok();
             }
+        } else if let Some(ref by_directory) = stats.by_directory {
+            writeln!(output, "By Directory:").ok();
+            writeln!(output).ok();
+
+            for dir in by_directory {
+                writeln!(
+                    output,
+                    "{} ({} files):",
+                    dir.directory, dir.files
+                )
+                .ok();
+                writeln!(output, "  Total lines: {}", dir.total_lines).ok();
+                writeln!(output, "  Code: {}", dir.code).ok();
+                writeln!(output, "  Comments: {}", dir.comment).ok();
+                writeln!(output, "  Blank: {}", dir.blank).ok();
+                writeln!(output).ok();
+            }
         } else {
             // Original behavior: show per-file stats
             for file in &stats.files {
@@ -199,6 +257,8 @@ struct JsonStatsOutput {
     #[serde(skip_serializing_if = "Option::is_none")]
     by_language: Option<Vec<LanguageStats>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    by_directory: Option<Vec<DirectoryStats>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     top_files: Option<Vec<JsonFileStats>>,
     files: Vec<JsonFileStats>,
 }
@@ -236,6 +296,7 @@ impl StatsFormatter for StatsJsonFormatter {
                 average_code_lines: stats.average_code_lines,
             },
             by_language: stats.by_language.clone(),
+            by_directory: stats.by_directory.clone(),
             top_files: stats.top_files.as_ref().map(|files| {
                 files
                     .iter()
@@ -318,6 +379,21 @@ impl StatsFormatter for StatsMarkdownFormatter {
                     output,
                     "| {} | {} | {} | {} | {} |",
                     lang.language, lang.files, lang.code, lang.comment, lang.blank
+                )
+                .ok();
+            }
+        }
+
+        // Directory breakdown if available
+        if let Some(ref by_directory) = stats.by_directory {
+            writeln!(output, "### By Directory\n").ok();
+            writeln!(output, "| Directory | Files | Code | Comments | Blank |").ok();
+            writeln!(output, "|-----------|------:|-----:|---------:|------:|").ok();
+            for dir in by_directory {
+                writeln!(
+                    output,
+                    "| `{}` | {} | {} | {} | {} |",
+                    dir.directory, dir.files, dir.code, dir.comment, dir.blank
                 )
                 .ok();
             }
