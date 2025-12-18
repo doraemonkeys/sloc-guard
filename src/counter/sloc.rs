@@ -54,7 +54,7 @@ impl<'a> SlocCounter<'a> {
     pub fn count(&self, source: &str) -> CountResult {
         let mut stats = LineStats::new();
         let mut in_multi_line_comment = false;
-        let mut multi_line_end_marker: Option<&str> = None;
+        let mut multi_line_end_marker: Option<&'a str> = None;
 
         for line in source.lines() {
             // Check for ignore directive in first N lines
@@ -87,7 +87,7 @@ impl<'a> SlocCounter<'a> {
     pub fn count_reader<R: BufRead>(&self, reader: R) -> std::io::Result<CountResult> {
         let mut stats = LineStats::new();
         let mut in_multi_line_comment = false;
-        let mut multi_line_end_marker: Option<&str> = None;
+        let mut multi_line_end_marker: Option<&'a str> = None;
 
         for line_result in reader.lines() {
             let line = line_result?;
@@ -122,7 +122,7 @@ impl<'a> SlocCounter<'a> {
         line: &str,
         stats: &mut LineStats,
         in_multi_line_comment: &mut bool,
-        multi_line_end_marker: &mut Option<&str>,
+        multi_line_end_marker: &mut Option<&'a str>,
     ) {
         stats.total += 1;
 

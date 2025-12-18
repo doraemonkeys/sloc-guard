@@ -2,7 +2,9 @@ mod loader;
 mod model;
 
 pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
-pub use model::{Config, DefaultConfig, ExcludeConfig, FileOverride, PathRule, RuleConfig};
+pub use model::{
+    Config, CustomLanguageConfig, DefaultConfig, ExcludeConfig, FileOverride, PathRule, RuleConfig,
+};
 
 #[cfg(test)]
 mod tests {

@@ -9,9 +9,9 @@
 | Module | Status | Description |
 |--------|--------|-------------|
 | `cli` | Done | CLI with check (--baseline, --no-cache), stats (--no-cache, --group-by, --top), init, config, baseline commands + global options (verbose, quiet, color, no-config) |
-| `config/model` | Done | Config, DefaultConfig, RuleConfig (with warn_threshold), ExcludeConfig, FileOverride, PathRule, strict |
+| `config/model` | Done | Config, DefaultConfig, RuleConfig (with warn_threshold), ExcludeConfig, FileOverride, PathRule, strict, CustomLanguageConfig |
 | `config/loader` | Done | FileConfigLoader with search order: CLI -> project .sloc-guard.toml -> $HOME/.config/sloc-guard/config.toml -> defaults |
-| `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++) |
+| `language/registry` | Done | Language definitions with comment syntax (Rust, Go, Python, JS/TS, C/C++), custom language support via config |
 | `counter/comment` | Done | CommentDetector for single/multi-line comment detection |
 | `counter/sloc` | Done | SlocCounter with LineStats, CountResult, inline ignore-file directive |
 | `scanner/filter` | Done | GlobFilter for extension and exclude pattern filtering |
@@ -83,6 +83,7 @@ make ci
 | **Phase 5.1b** | Top-N & Metrics (--top N, top files by code lines, average code lines) | ✅ Done |
 | **Phase 3.2** | Git-Aware Exclude (gix dirwalk, --no-gitignore flag) | ✅ Done |
 | **Phase 2.3** | Markdown Output (MarkdownFormatter, StatsMarkdownFormatter for PR comments) | ✅ Done |
+| **Phase 4.5** | Custom Language Definition ([languages.<name>] config section) | ✅ Done |
 
 ---
 
@@ -108,14 +109,14 @@ Location: `src/config/model.rs`, `src/checker/threshold.rs`, `src/output/*.rs`
 - [x] Include reason in JSON/SARIF/Markdown output
 ```
 
-### Task 4.5: Custom Language Definition
+### Task 4.5: Custom Language Definition (Done)
 
 Location: `src/config/model.rs`, `src/language/registry.rs`
 
 ```
-- Add [languages.<name>] section in config
-- Allow: extensions, single_line_comments, multi_line_comments
-- Override built-in if same extension
+- [x] Add [languages.<name>] section in config
+- [x] Allow: extensions, single_line_comments, multi_line_comments
+- [x] Override built-in if same extension
 ```
 
 ### Task 4.6b: Inline Ignore (block/next)
@@ -235,8 +236,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks | Effort |
 |----------|-------|--------|
-| **1. Short-term** | 4.5 Custom Languages | ~3h |
-| | 4.6b Inline Ignore (block/next) | ~2h |
+| **1. Short-term** | 4.6b Inline Ignore (block/next) | ~2h |
 | **2. Medium** | 4.8a Config Inheritance (local) | ~2h |
 | **3. Deferred** | 4.8b Config Inheritance (URL) | ~2h |
 | | 5.1c Directory Statistics | ~2h |

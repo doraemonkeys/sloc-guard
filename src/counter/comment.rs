@@ -19,10 +19,10 @@ impl<'a> CommentDetector<'a> {
     }
 
     #[must_use]
-    pub fn find_multi_line_start(&self, line: &str) -> Option<(&'static str, &'static str)> {
-        for &(start, end) in &self.syntax.multi_line {
-            if line.contains(start) {
-                return Some((start, end));
+    pub fn find_multi_line_start(&self, line: &str) -> Option<(&'a str, &'a str)> {
+        for (start, end) in &self.syntax.multi_line {
+            if line.contains(start.as_str()) {
+                return Some((start.as_str(), end.as_str()));
             }
         }
         None

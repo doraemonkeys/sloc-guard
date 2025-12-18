@@ -102,7 +102,7 @@ fn run_check_impl(args: &CheckArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
 
     // 7. Process each file (parallel with rayon)
-    let registry = LanguageRegistry::default();
+    let registry = LanguageRegistry::with_custom_languages(&config.languages);
     let warn_threshold = args.warn_threshold.unwrap_or(config.default.warn_threshold);
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
 
@@ -500,7 +500,7 @@ fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> sloc_guard::Result<i32> {
     let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
 
     // 5. Process each file and collect statistics (parallel with rayon)
-    let registry = LanguageRegistry::default();
+    let registry = LanguageRegistry::with_custom_languages(&config.languages);
 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files
@@ -603,7 +603,7 @@ fn collect_file_stats_cached(
     Some(FileStatistics {
         path: file_path.to_path_buf(),
         stats,
-        language: language.name.to_string(),
+        language: language.name.clone(),
     })
 }
 
@@ -666,7 +666,7 @@ fn run_baseline_update_impl(args: &BaselineUpdateArgs, cli: &Cli) -> sloc_guard:
     let all_files = scan_files(&paths_to_scan, &extensions, &exclude_patterns, use_gitignore)?;
 
     // 5. Process each file and find violations
-    let registry = LanguageRegistry::default();
+    let registry = LanguageRegistry::with_custom_languages(&config.languages);
     let warn_threshold = config.default.warn_threshold;
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
 

@@ -15,9 +15,9 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | File(s) | Purpose |
 |--------|---------|---------|
 | `cli` | `cli.rs` | Clap-derived CLI: `check` (--baseline, --no-cache, --no-gitignore), `stats` (--no-cache, --group-by, --top, --no-gitignore), `init`, `config`, `baseline` commands |
-| `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule` |
+| `config/model` | `config/model.rs` | `Config`, `DefaultConfig`, `RuleConfig` (with warn_threshold), `ExcludeConfig`, `FileOverride`, `PathRule`, `CustomLanguageConfig` |
 | `config/loader` | `config/loader.rs` | `FileConfigLoader` - loads `.sloc-guard.toml` or `~/.config/sloc-guard/config.toml` |
-| `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined: Rust/Go/Python/JS/TS/C/C++ |
+| `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/comment` | `counter/comment.rs` | `CommentDetector` - detects single/multi-line comments |
 | `counter/sloc` | `counter/sloc.rs` | `SlocCounter` → `CountResult{Stats(LineStats), IgnoredFile}`, inline ignore directive |
 | `scanner/filter` | `scanner/filter.rs` | `GlobFilter` - extension + exclude pattern filtering |
@@ -42,16 +42,18 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ```rust
 // Config priority: CLI args > config file > defaults
-Config { default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride> }
+Config { default: DefaultConfig, rules: HashMap<String, RuleConfig>, path_rules: Vec<PathRule>, exclude: ExcludeConfig, overrides: Vec<FileOverride>, languages: HashMap<String, CustomLanguageConfig> }
 DefaultConfig { max_lines: 500, extensions: [rs,go,py,js,ts,c,cpp], include_paths, skip_comments: true, skip_blank: true, warn_threshold: 0.9, strict: false, gitignore: true }
 RuleConfig { extensions: Vec<String>, max_lines: Option<usize>, skip_comments: Option<bool>, skip_blank: Option<bool>, warn_threshold: Option<f64> }
 PathRule { pattern: String, max_lines: usize, warn_threshold: Option<f64> }  // glob patterns like "src/generated/**"
 FileOverride { path: String, max_lines: usize, reason: Option<String> }  // per-file override with optional reason
+CustomLanguageConfig { extensions: Vec<String>, single_line_comments: Vec<String>, multi_line_comments: Vec<(String, String)> }  // custom language via [languages.<name>]
 
 // Line counting
 LineStats { total, code, comment, blank }  // sloc() returns code count
 CountResult::Stats(LineStats) | IgnoredFile  // IgnoredFile when "// sloc-guard:ignore-file" in first 10 lines
-CommentSyntax { single_line: Vec<&str>, multi_line: Vec<(start, end)> }
+CommentSyntax { single_line: Vec<String>, multi_line: Vec<(String, String)> }
+LanguageRegistry::with_custom_languages(&config.languages) // builds registry with custom languages (override built-in if same extension)
 
 // Check results
 CheckStatus::Passed | Warning | Failed | Grandfathered
@@ -94,6 +96,7 @@ ScanProgress::finish()  // Clear progress bar
 CLI args → load_config() → apply_cli_overrides()
          → [if --baseline] load_baseline() → Baseline
          → [if !--no-cache] load_cache(config_hash) → Cache
+         → LanguageRegistry::with_custom_languages(config.languages)
          → GlobFilter::new(extensions, excludes)
          → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → [if --diff] GitDiff::get_changed_files() → filter to changed only
@@ -119,6 +122,7 @@ CLI args → load_config() → apply_cli_overrides()
 ```
 CLI args → load_config()
          → [if !--no-cache] load_cache(config_hash) → Cache
+         → LanguageRegistry::with_custom_languages(config.languages)
          → GlobFilter::new(extensions, excludes)
          → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → ScanProgress::new(file_count, quiet)
@@ -155,6 +159,7 @@ config show:
 
 ```
 CLI args → load_config()
+         → LanguageRegistry::with_custom_languages(config.languages)
          → GlobFilter::new(extensions, excludes)
          → [if gitignore enabled] GitAwareScanner::scan(paths) else DirectoryScanner::scan(paths)
          → ScanProgress::new(file_count, quiet)

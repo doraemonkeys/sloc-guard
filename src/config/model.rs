@@ -16,6 +16,21 @@ pub struct Config {
 
     #[serde(default, rename = "override")]
     pub overrides: Vec<FileOverride>,
+
+    #[serde(default)]
+    pub languages: std::collections::HashMap<String, CustomLanguageConfig>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CustomLanguageConfig {
+    #[serde(default)]
+    pub extensions: Vec<String>,
+
+    #[serde(default)]
+    pub single_line_comments: Vec<String>,
+
+    #[serde(default)]
+    pub multi_line_comments: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
