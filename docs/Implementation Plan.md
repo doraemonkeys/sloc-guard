@@ -123,6 +123,27 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 ---
 
+## Phase 10: Code Quality & Testability (Pending)
+
+### Task 10.1: IO Abstraction for Pure Unit Testing
+Location: `src/commands/check.rs`, `src/commands/context.rs`, `src/scanner/*.rs`
+```
+- Define Scanner trait (abstracts scan_files)
+- Define FileReader trait (abstracts file reading in process_file_with_cache)
+- Inject IO abstractions via CheckContext
+- Enable pure unit testing of run_check_with_context without real file system
+```
+Note: Related FileSystem trait exists in `src/config/loader.rs` - consider unifying.
+
+### Task 10.2: Replace unwrap() with expect()
+Location: `src/config/loader.rs:129`
+```
+- Replace .unwrap() with .expect("reason") for clearer error context
+- Reason: iterating over keys guarantees existence, but expect() documents intent
+```
+
+---
+
 ## Priority Order
 
 | Priority | Tasks |
@@ -133,6 +154,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | **4. Visualization** | 7.1-7.2 HTML Charts/Trends |
 | **5. UX Improvements** | 9.3 Smart init |
 | **6. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| **7. Code Quality** | 10.1 IO Abstraction, 10.2 expect() cleanup |
 
 ---
 
