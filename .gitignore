@@ -4,5 +4,9 @@ build_rs_cov.profraw
 TODO
 *gitignore_*
 *_gitignore*
+!gitignore_tests.rs
+!gitignore_tests.toml
+!gitignore_tests.go
+
 *local.json
 .sloc-guard-*.json
