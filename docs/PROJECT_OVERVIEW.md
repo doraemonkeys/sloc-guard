@@ -95,6 +95,7 @@ FunctionParser: Rust, Go, Python, JS/TS, C/C++
 ```
 CLI args → load_config() → [if extends] resolve chain (local/remote, cycle detection)
          → [if v1 config] migrate_v1_to_v2() auto-conversion
+         → expand_language_rules() → [content.languages.X] to [[content.rules]]
          → [if !--no-cache] load_cache(config_hash)
          → LanguageRegistry
          → [if gitignore] GitAwareScanner else DirectoryScanner
@@ -109,6 +110,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 
 ```
 → [if --baseline] load_baseline() | [if --diff] filter changed files
+→ get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → ThresholdChecker::check() → CheckResult (parallel, per-file)
 → StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
 → [if baseline] mark Grandfathered | [if --fix] generate_split_suggestions()

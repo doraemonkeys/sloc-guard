@@ -86,7 +86,7 @@ fn process_file_nonexistent_returns_none() {
     let cache = Mutex::new(Cache::new(String::new()));
     let path = PathBuf::from("nonexistent_file.rs");
 
-    let result = process_file_for_check(&path, &registry, &checker, true, true, &cache);
+    let result = process_file_for_check(&path, &registry, &checker, &cache);
     assert!(result.is_none());
 }
 
@@ -98,7 +98,7 @@ fn process_file_unknown_extension_returns_none() {
     let cache = Mutex::new(Cache::new(String::new()));
     let path = PathBuf::from("Cargo.toml");
 
-    let result = process_file_for_check(&path, &registry, &checker, true, true, &cache);
+    let result = process_file_for_check(&path, &registry, &checker, &cache);
     assert!(result.is_none());
 }
 
@@ -110,7 +110,7 @@ fn process_file_valid_rust_file() {
     let cache = Mutex::new(Cache::new(String::new()));
     let path = PathBuf::from("src/lib.rs");
 
-    let result = process_file_for_check(&path, &registry, &checker, true, true, &cache);
+    let result = process_file_for_check(&path, &registry, &checker, &cache);
     assert!(result.is_some());
     let check_result = result.unwrap();
     assert!(check_result.is_passed());

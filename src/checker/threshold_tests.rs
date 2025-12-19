@@ -51,16 +51,14 @@ fn check_warns_near_threshold() {
 #[test]
 fn check_uses_rule_specific_limit() {
     let mut config = default_config();
-    config.rules.insert(
-        "rust".to_string(),
-        crate::config::RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(300),
-            skip_comments: None,
-            skip_blank: None,
-            warn_threshold: None,
-        },
-    );
+    // Use V2 content.rules format instead of legacy config.rules
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 300,
+        warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
+    });
 
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(350);
@@ -307,26 +305,27 @@ fn path_rule_has_lower_priority_than_override() {
 #[test]
 fn path_rule_has_higher_priority_than_extension_rule() {
     let mut config = default_config();
-    config.rules.insert(
-        "rust".to_string(),
-        crate::config::RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(300),
-            skip_comments: None,
-            skip_blank: None,
-            warn_threshold: None,
-        },
-    );
-    config.path_rules.push(crate::config::PathRule {
+    // Use V2 content.rules format: extension rule first, then specific path rule
+    // Since "last match wins", the path rule should override the extension rule
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 300,
+        warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
+    });
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "**/proto/**".to_string(),
         max_lines: 800,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(400);
 
-    // path_rule should override extension rule
+    // path_rule should override extension rule (last match wins)
     let result = checker.check(Path::new("src/proto/messages.rs"), &stats);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 800);
@@ -397,16 +396,14 @@ fn multiple_path_rules_last_match_wins() {
 #[test]
 fn rule_warn_threshold_overrides_default() {
     let mut config = default_config();
-    config.rules.insert(
-        "rust".to_string(),
-        crate::config::RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(500),
-            skip_comments: None,
-            skip_blank: None,
-            warn_threshold: Some(0.8),
-        },
-    );
+    // Use V2 content.rules format
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 500,
+        warn_threshold: Some(0.8),
+        skip_comments: None,
+        skip_blank: None,
+    });
 
     let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
     let stats = stats_with_code(410); // 82% of 500 limit
@@ -419,16 +416,14 @@ fn rule_warn_threshold_overrides_default() {
 #[test]
 fn rule_without_warn_threshold_uses_default() {
     let mut config = default_config();
-    config.rules.insert(
-        "rust".to_string(),
-        crate::config::RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(500),
-            skip_comments: None,
-            skip_blank: None,
-            warn_threshold: None,
-        },
-    );
+    // Use V2 content.rules format
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 500,
+        warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
+    });
 
     let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
     let stats = stats_with_code(410); // 82% of 500 limit
@@ -441,26 +436,26 @@ fn rule_without_warn_threshold_uses_default() {
 #[test]
 fn path_rule_warn_threshold_overrides_extension_rule() {
     let mut config = default_config();
-    config.rules.insert(
-        "rust".to_string(),
-        crate::config::RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(500),
-            skip_comments: None,
-            skip_blank: None,
-            warn_threshold: Some(0.8),
-        },
-    );
-    config.path_rules.push(crate::config::PathRule {
+    // Use V2 content.rules format: extension rule first, then specific path rule
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 500,
+        warn_threshold: Some(0.8),
+        skip_comments: None,
+        skip_blank: None,
+    });
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 500,
         warn_threshold: Some(1.0), // Disable warnings
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(450); // 90% of limit
 
-    // path_rule warn_threshold=1.0 should override extension rule's 0.8
+    // path_rule warn_threshold=1.0 should override extension rule's 0.8 (last match wins)
     let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
     assert!(result.is_passed());
 
@@ -468,3 +463,120 @@ fn path_rule_warn_threshold_overrides_extension_rule() {
     let result2 = checker.check(Path::new("src/lib.rs"), &stats);
     assert!(result2.is_warning());
 }
+
+#[test]
+fn get_skip_settings_from_path_rule() {
+    let mut config = default_config();
+    config.content.skip_comments = true;
+    config.content.skip_blank = true;
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+        skip_comments: Some(false),
+        skip_blank: Some(false),
+    });
+
+    let checker = ThresholdChecker::new(config);
+
+    // Matching path should use rule's skip settings
+    let (skip_comments, skip_blank) =
+        checker.get_skip_settings_for_path(Path::new("src/generated/parser.rs"));
+    assert!(!skip_comments);
+    assert!(!skip_blank);
+}
+
+#[test]
+fn get_skip_settings_falls_back_to_global() {
+    let mut config = default_config();
+    config.content.skip_comments = true;
+    config.content.skip_blank = false;
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+        skip_comments: None, // Not specified
+        skip_blank: None,    // Not specified
+    });
+
+    let checker = ThresholdChecker::new(config);
+
+    // Should use global defaults when rule doesn't specify
+    let (skip_comments, skip_blank) =
+        checker.get_skip_settings_for_path(Path::new("src/generated/parser.rs"));
+    assert!(skip_comments); // from global
+    assert!(!skip_blank); // from global
+}
+
+#[test]
+fn get_skip_settings_uses_global_when_no_rule_matches() {
+    let mut config = default_config();
+    config.content.skip_comments = false;
+    config.content.skip_blank = true;
+
+    let checker = ThresholdChecker::new(config);
+
+    // Non-matching path should use global defaults
+    let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(Path::new("src/lib.rs"));
+    assert!(!skip_comments);
+    assert!(skip_blank);
+}
+
+#[test]
+fn get_skip_settings_last_match_wins() {
+    let mut config = default_config();
+    config.content.skip_comments = true;
+    config.content.skip_blank = true;
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "src/**".to_string(),
+        max_lines: 500,
+        warn_threshold: None,
+        skip_comments: Some(false),
+        skip_blank: Some(false),
+    });
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "src/generated/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+        skip_comments: Some(true),
+        skip_blank: Some(false),
+    });
+
+    let checker = ThresholdChecker::new(config);
+
+    // Last matching rule should be used
+    let (skip_comments, skip_blank) =
+        checker.get_skip_settings_for_path(Path::new("src/generated/parser.rs"));
+    assert!(skip_comments); // From last matching rule
+    assert!(!skip_blank); // From last matching rule
+
+    // First rule only for non-generated
+    let (skip_comments2, skip_blank2) = checker.get_skip_settings_for_path(Path::new("src/lib.rs"));
+    assert!(!skip_comments2);
+    assert!(!skip_blank2);
+}
+
+#[test]
+fn language_rule_expanded_skip_settings_work() {
+    // This tests that language rules (expanded to content.rules by loader)
+    // correctly apply skip_comments/skip_blank
+    let mut config = default_config();
+    config.content.skip_comments = true;
+    config.content.skip_blank = true;
+
+    // Simulate expanded language rule (what loader does)
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 300,
+        warn_threshold: None,
+        skip_comments: Some(false),
+        skip_blank: Some(true),
+    });
+
+    let checker = ThresholdChecker::new(config);
+
+    let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(Path::new("src/lib.rs"));
+    assert!(!skip_comments); // From rule
+    assert!(skip_blank); // From rule
+}
+

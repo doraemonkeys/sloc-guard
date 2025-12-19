@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobMatcher};
@@ -193,13 +193,13 @@ struct CompiledPathRule {
     matcher: GlobMatcher,
     max_lines: usize,
     warn_threshold: Option<f64>,
+    skip_comments: Option<bool>,
+    skip_blank: Option<bool>,
 }
 
 pub struct ThresholdChecker {
     config: Config,
     warning_threshold: f64,
-    extension_limits: HashMap<String, usize>,
-    extension_warn_thresholds: HashMap<String, f64>,
     path_rules: Vec<CompiledPathRule>,
     /// Extensions to process (from content.extensions).
     /// Empty set means process all files.
@@ -209,16 +209,12 @@ pub struct ThresholdChecker {
 impl ThresholdChecker {
     #[must_use]
     pub fn new(config: Config) -> Self {
-        let extension_limits = Self::build_extension_limits(&config);
-        let extension_warn_thresholds = Self::build_extension_warn_thresholds(&config);
         let path_rules = Self::build_path_rules(&config);
         let allowed_extensions: HashSet<String> =
             config.content.extensions.iter().cloned().collect();
         Self {
             config,
             warning_threshold: 0.9,
-            extension_limits,
-            extension_warn_thresholds,
             path_rules,
             allowed_extensions,
         }
@@ -243,50 +239,6 @@ impl ThresholdChecker {
             .is_some_and(|ext| self.allowed_extensions.contains(ext))
     }
 
-    fn build_extension_limits(config: &Config) -> HashMap<String, usize> {
-        let mut index = HashMap::new();
-
-        // First, process legacy rules (lower priority)
-        for rule in config.rules.values() {
-            if let Some(max_lines) = rule.max_lines {
-                for ext in &rule.extensions {
-                    index.insert(ext.clone(), max_lines);
-                }
-            }
-        }
-
-        // Then, process content.languages (higher priority for V2)
-        for (ext, lang_rule) in &config.content.languages {
-            if let Some(max_lines) = lang_rule.max_lines {
-                index.insert(ext.clone(), max_lines);
-            }
-        }
-
-        index
-    }
-
-    fn build_extension_warn_thresholds(config: &Config) -> HashMap<String, f64> {
-        let mut index = HashMap::new();
-
-        // First, process legacy rules (lower priority)
-        for rule in config.rules.values() {
-            if let Some(warn_threshold) = rule.warn_threshold {
-                for ext in &rule.extensions {
-                    index.insert(ext.clone(), warn_threshold);
-                }
-            }
-        }
-
-        // Then, process content.languages (higher priority for V2)
-        for (ext, lang_rule) in &config.content.languages {
-            if let Some(warn_threshold) = lang_rule.warn_threshold {
-                index.insert(ext.clone(), warn_threshold);
-            }
-        }
-
-        index
-    }
-
     fn build_path_rules(config: &Config) -> Vec<CompiledPathRule> {
         let mut rules = Vec::new();
 
@@ -297,6 +249,8 @@ impl ThresholdChecker {
                     matcher: glob.compile_matcher(),
                     max_lines: rule.max_lines,
                     warn_threshold: rule.warn_threshold,
+                    skip_comments: None,
+                    skip_blank: None,
                 });
             }
         }
@@ -308,6 +262,8 @@ impl ThresholdChecker {
                     matcher: glob.compile_matcher(),
                     max_lines: rule.max_lines,
                     warn_threshold: rule.warn_threshold,
+                    skip_comments: rule.skip_comments,
+                    skip_blank: rule.skip_blank,
                 });
             }
         }
@@ -360,14 +316,7 @@ impl ThresholdChecker {
             }
         }
 
-        // 4. Check extension rules
-        if let Some(ext) = path.extension().and_then(|e| e.to_str())
-            && let Some(&limit) = self.extension_limits.get(ext)
-        {
-            return (limit, None);
-        }
-
-        // 5. Fall back to content.max_lines (V2) with legacy fallback
+        // 4. Fall back to content.max_lines (V2) with legacy fallback
         (self.config.content.max_lines, None)
     }
 
@@ -381,16 +330,33 @@ impl ThresholdChecker {
             }
         }
 
-        // 2. Check extension rules
-        if let Some(ext) = path.extension().and_then(|e| e.to_str())
-            && let Some(&threshold) = self.extension_warn_thresholds.get(ext)
-        {
-            return threshold;
-        }
-
-        // 3. Fall back to instance warning_threshold
+        // 2. Fall back to instance warning_threshold
         // (set via with_warning_threshold or from config during initialization)
         self.warning_threshold
+    }
+
+    /// Returns (`skip_comments`, `skip_blank`) settings for a path.
+    /// Priority: `path_rules` (last match) > global defaults
+    #[must_use]
+    pub fn get_skip_settings_for_path(&self, path: &Path) -> (bool, bool) {
+        // Check path_rules (last match wins)
+        for path_rule in self.path_rules.iter().rev() {
+            if path_rule.matcher.is_match(path) {
+                let skip_comments = path_rule
+                    .skip_comments
+                    .unwrap_or(self.config.content.skip_comments);
+                let skip_blank = path_rule
+                    .skip_blank
+                    .unwrap_or(self.config.content.skip_blank);
+                return (skip_comments, skip_blank);
+            }
+        }
+
+        // Fall back to global defaults
+        (
+            self.config.content.skip_comments,
+            self.config.content.skip_blank,
+        )
     }
 }
 

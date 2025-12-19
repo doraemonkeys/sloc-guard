@@ -81,22 +81,12 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     let warn_threshold = args.warn_threshold.unwrap_or(config.content.warn_threshold);
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
 
-    let skip_comments = config.content.skip_comments && !args.no_skip_comments;
-    let skip_blank = config.content.skip_blank && !args.no_skip_blank;
-
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let mut results: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| checker.should_process(file_path)) // Filter by extension here
         .filter_map(|file_path| {
-            let result = process_file_for_check(
-                file_path,
-                &registry,
-                &checker,
-                skip_comments,
-                skip_blank,
-                &cache,
-            );
+            let result = process_file_for_check(file_path, &registry, &checker, &cache);
             progress.inc();
             result
         })
@@ -251,11 +241,10 @@ pub(crate) fn process_file_for_check(
     file_path: &Path,
     registry: &LanguageRegistry,
     checker: &ThresholdChecker,
-    skip_comments: bool,
-    skip_blank: bool,
     cache: &Mutex<Cache>,
 ) -> Option<CheckResult> {
     let (stats, _language) = process_file_with_cache(file_path, registry, cache)?;
+    let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
     Some(checker.check(file_path, &effective_stats))
 }

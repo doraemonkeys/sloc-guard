@@ -1,14 +1,17 @@
-[default]
-max_lines = 600
+version = "2"
+
+[scanner]
+gitignore = true
+exclude = ["target/**", ".git/**", ".tmp/**"]
+
+[content]
 extensions = ["rs"]
+max_lines = 600
+warn_threshold = 0.9
 skip_comments = true
 skip_blank = false
-warn_threshold = 0.9
 
-[[path_rules]]
+[[content.rules]]
 pattern = "**/*_tests.rs"
 max_lines = 1400
 warn_threshold = 0.9
-
-[exclude]
-patterns = ["**/target/**", "**/.git/**", ".tmp/**"]

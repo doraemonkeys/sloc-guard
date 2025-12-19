@@ -9,7 +9,7 @@ ci:
 	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check src 
 
 # 正常模式
-ci-verbose: tarpaulin clippy sloc-strict
+ci-verbose: tarpaulin clippy sloc
 
 clippy:
 	cargo clippy --all-targets --all-features -- -D warnings

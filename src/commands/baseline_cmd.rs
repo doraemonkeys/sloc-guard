@@ -7,12 +7,12 @@ use crate::baseline::{Baseline, compute_file_hash};
 use crate::cache::{Cache, compute_config_hash};
 use crate::checker::{CheckResult, Checker, ThresholdChecker};
 use crate::cli::{BaselineAction, BaselineArgs, BaselineUpdateArgs, Cli};
-use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 use crate::output::ScanProgress;
 use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
+use super::check::compute_effective_stats;
 use super::context::{load_config, process_file_with_cache, resolve_scan_paths};
 
 #[must_use]
@@ -71,22 +71,12 @@ pub(crate) fn run_baseline_update_impl(
         ThresholdChecker::new(config.clone()).with_warning_threshold(config.content.warn_threshold);
     let cache = Mutex::new(Cache::new(compute_config_hash(&config)));
 
-    let skip_comments = config.content.skip_comments;
-    let skip_blank = config.content.skip_blank;
-
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let violations: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| checker.should_process(file_path)) // Filter by extension
         .filter_map(|file_path| {
-            let result = process_file_for_baseline(
-                file_path,
-                &registry,
-                &checker,
-                skip_comments,
-                skip_blank,
-                &cache,
-            );
+            let result = process_file_for_baseline(file_path, &registry, &checker, &cache);
             progress.inc();
             result
                 .filter(CheckResult::is_failed)
@@ -113,31 +103,12 @@ fn process_file_for_baseline(
     file_path: &Path,
     registry: &LanguageRegistry,
     checker: &ThresholdChecker,
-    skip_comments: bool,
-    skip_blank: bool,
     cache: &Mutex<Cache>,
 ) -> Option<CheckResult> {
     let (stats, _language) = process_file_with_cache(file_path, registry, cache)?;
+    let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
     Some(checker.check(file_path, &effective_stats))
-}
-
-fn compute_effective_stats(stats: &LineStats, skip_comments: bool, skip_blank: bool) -> LineStats {
-    let mut effective = stats.clone();
-
-    // If not skipping comments, add them to code count
-    if !skip_comments {
-        effective.code += effective.comment;
-        effective.comment = 0;
-    }
-
-    // If not skipping blanks, add them to code count
-    if !skip_blank {
-        effective.code += effective.blank;
-        effective.blank = 0;
-    }
-
-    effective
 }
 
 #[cfg(test)]

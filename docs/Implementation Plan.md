@@ -57,29 +57,27 @@ Location: `src/config/model.rs`, `src/checker/*.rs`
 - Validation: at least one of `max_files`/`max_dirs` required, values >= -1
 - `StructureViolation.override_reason` tracks reason in violation output
 
-### Task 5.5.3: Extension-Based Rule Syntax Sugar
-Location: `src/config/model.rs`, `src/config/loader.rs`
-**Problem**: Removing `[rules.<ext>]` in favor of `[[content.rules]]` pattern degrades UX for common case.
-- Old: `[rules.rs] max_lines = 1000` (simple, intuitive)
-- New: `[[content.rules]] pattern = "**/*.rs"` (verbose, error-prone glob)
-
-**Solution**: Support both syntaxes with full field parity.
+### Task 5.5.3: Extension-Based Rule Syntax Sugar ✅
+Location: `src/config/model.rs`, `src/config/loader.rs`, `src/checker/threshold.rs`
+**Completed**: Full field parity between `[content.languages.X]` and `[[content.rules]]`.
+- Loader expands `[content.languages.rs]` into `ContentRule { pattern: "**/*.rs", ... }` at HEAD of rules
+- Priority enforced: explicit `[[content.rules]]` override language shorthand (last match wins)
+- Per-file `skip_comments`/`skip_blank` now functional (were previously "ghost fields")
+- Removed separate extension-based indexes from `ThresholdChecker`
+- V1→V2 migration: `[rules.python] extensions=["py"]` → `[content.languages.py]` (by extension, not name)
 ```toml
 # Shorthand (extension-based, implicit **/*.ext)
 [content.languages.rs]
 max_lines = 1000
-warn_threshold = 0.9   # Must support ALL fields that [[content.rules]] supports
+warn_threshold = 0.9
 skip_comments = true
 skip_blank = true
 
-# Full pattern (for complex cases like *.test.ts)
+# Full pattern (for complex cases)
 [[content.rules]]
 pattern = "**/*.test.ts"
 max_lines = 1500
 ```
-- Priority: `[[content.rules]]` > `[content.languages.<ext>]` > `[content]` defaults.
-- Loader expands `[content.languages.rs]` into internal `PathRule { pattern: "**/*.rs", ... }`.
-- **Field parity**: `[content.languages.X]` MUST support all fields that `[[content.rules]]` supports.
 
 ### Task 5.5.4: Structure Pattern Semantics Clarification ✅
 Location: `src/checker/structure.rs`, `docs/sloc-guard.example.toml`
@@ -256,7 +254,7 @@ Location: `src/output/html.rs`
 | Priority | Tasks |
 |----------|-------|
 | **1. Critical Architecture** | ~~5.5.1 Scanner/Structure Visibility~~, ~~5.5.2 Override Separation (incl. 5.5.14 required reason)~~ |
-| **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
+| **2. UX & Semantics** | ~~5.5.3 Extension Syntax Sugar~~, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
 | **3. Code Quality** | 5.5.13 Testability (DI), ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~~5.5.8 Versioning~~ |
 | **4. Documentation** | ~~5.5.12 extends Examples~~ |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
