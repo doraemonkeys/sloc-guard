@@ -352,3 +352,51 @@ fn grandfathered_colored_output() {
     // Should contain ANSI color codes (cyan for grandfathered)
     assert!(output.contains("\x1b["));
 }
+
+#[test]
+fn format_structure_file_count_violation() {
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("."),
+        stats: LineStats {
+            total: 10,
+            code: 10,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        limit: 5,
+        override_reason: Some("structure: files count exceeded".to_string()),
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("Files: 10 (limit: 5)"));
+    assert!(!output.contains("Lines:"));
+    assert!(!output.contains("Breakdown:"));
+}
+
+#[test]
+fn format_structure_dir_count_violation() {
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("."),
+        stats: LineStats {
+            total: 25,
+            code: 25,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        limit: 20,
+        override_reason: Some("structure: subdirs count exceeded".to_string()),
+        suggestions: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("Directories: 25 (limit: 20)"));
+    assert!(!output.contains("Lines:"));
+    assert!(!output.contains("Breakdown:"));
+}

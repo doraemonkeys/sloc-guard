@@ -111,26 +111,48 @@ impl TextFormatter {
         )
         .ok();
 
-        writeln!(
-            output,
-            "   Lines: {} (limit: {})",
-            result.stats().sloc(),
-            result.limit()
-        )
-        .ok();
+        let reason = result.override_reason();
+        let is_structure_files = reason.is_some_and(|r| r.contains("structure: files"));
+        let is_structure_dirs = reason.is_some_and(|r| r.contains("structure: subdirs"));
 
-        writeln!(
-            output,
-            "   Breakdown: code={}, comment={}, blank={}",
-            result.stats().code,
-            result.stats().comment,
-            result.stats().blank
-        )
-        .ok();
+        if is_structure_files {
+            writeln!(
+                output,
+                "   Files: {} (limit: {})",
+                result.stats().sloc(),
+                result.limit()
+            )
+            .ok();
+        } else if is_structure_dirs {
+            writeln!(
+                output,
+                "   Directories: {} (limit: {})",
+                result.stats().sloc(),
+                result.limit()
+            )
+            .ok();
+        } else {
+            writeln!(
+                output,
+                "   Lines: {} (limit: {})",
+                result.stats().sloc(),
+                result.limit()
+            )
+            .ok();
+
+            writeln!(
+                output,
+                "   Breakdown: code={}, comment={}, blank={}",
+                result.stats().code,
+                result.stats().comment,
+                result.stats().blank
+            )
+            .ok();
+        }
 
         // Show override reason if present (in verbose mode or for any status)
-        if let Some(reason) = result.override_reason() {
-            writeln!(output, "   Reason: {reason}").ok();
+        if let Some(r) = reason {
+            writeln!(output, "   Reason: {r}").ok();
         }
 
         // Show split suggestions if enabled and available
