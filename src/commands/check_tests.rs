@@ -11,8 +11,8 @@ use crate::language::LanguageRegistry;
 use crate::output::{ColorMode, OutputFormat};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
-use crate::commands::context::RealFileReader;
 use super::*;
+use crate::commands::context::RealFileReader;
 
 #[test]
 fn compute_effective_stats_skip_both() {
