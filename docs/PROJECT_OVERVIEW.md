@@ -26,7 +26,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `baseline`/`cache` | `*/types.rs` | `Baseline` (grandfathering), `Cache` (mtime+size validation) |
 | `output/*` | `output/*.rs` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`; shared utilities |
+| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`; `CheckContext`/`StatsContext` for DI |
 | `analyzer` | `analyzer/*.rs` | `FunctionParser` - multi-language split suggestions (--fix) |
 | `stats` | `stats/trend.rs` | `TrendHistory` - historical stats with delta computation |
 | `main` | `main.rs` | CLI parsing, command dispatch to `commands/*` |
@@ -86,6 +86,10 @@ Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime
 FunctionInfo { name, start_line, end_line, line_count }
 SplitSuggestion { original_path, total_lines, limit, functions, chunks }
 FunctionParser: Rust, Go, Python, JS/TS, C/C++
+
+// Context for DI (commands/context.rs)
+CheckContext { registry, threshold_checker, structure_checker }  // from_config() or new()
+StatsContext { registry, allowed_extensions }  // from_config() or new()
 ```
 
 ## Data Flow
@@ -109,6 +113,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 ### check-specific
 
 ```
+→ CheckContext::from_config() creates injectable context
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → ThresholdChecker::check() → CheckResult (parallel, per-file)
@@ -120,6 +125,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 ### stats-specific
 
 ```
+→ StatsContext::from_config() creates injectable context
 → collect FileStatistics → ProjectStatistics
 → [if --group-by] language/directory breakdown | [if --top N] top files
 → [if --trend] TrendHistory delta → save history

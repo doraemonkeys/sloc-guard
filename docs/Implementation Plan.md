@@ -130,18 +130,15 @@ Location: `src/config/model.rs`, `src/config/loader.rs`
 - Loader validates version: unsupported → error, missing/v1 → migrate to v2
 - `migrate_v1_to_v2()` migrates `default`→`scanner`+`content`, `path_rules`→`content.rules`, etc.
 
-### Task 5.5.13: Testability Refactoring (Dependency Injection)
-
-Location: `src/commands/check.rs`, `src/commands/stats.rs`
-**Problem**: Command handlers directly instantiate dependencies (LanguageRegistry, ThresholdChecker, StructureChecker, ScanProgress), violating "Design for Testability" principle.
-- Tight coupling makes unit testing impossible without mocking entire file system
-- Cannot inject test doubles for isolated testing
-
-**Solution**: Extract dependencies into injectable context structure.
-- Create `CheckContext` containing all checker/registry dependencies
-- Factory method creates production context from config
-- Tests construct context with controlled/mock components
-- Consider trait abstractions if full mockability needed later
+### Task 5.5.13: Testability Refactoring (Dependency Injection) ✅
+Location: `src/commands/context.rs`, `src/commands/check.rs`, `src/commands/stats.rs`
+**Completed**: Dependencies extracted into injectable context structures.
+- `CheckContext` struct holds `LanguageRegistry`, `ThresholdChecker`, `StructureChecker`
+- `StatsContext` struct holds `LanguageRegistry`, `allowed_extensions`
+- Factory methods `from_config()` for production use
+- Constructor `new()` for testing with custom components
+- `run_check_with_context()` and `run_stats_with_context()` accept injected dependencies
+- Tests demonstrate context injection: `check_context_from_config_creates_valid_context`, `check_context_new_allows_custom_injection`, etc.
 
 ### Task 5.5.14: Enforce Required Reason Field ✅
 Location: `src/config/model.rs`
@@ -150,19 +147,18 @@ Location: `src/config/model.rs`
 - `StructureOverride.reason: String` (not Option) - required field
 - TOML deserialization fails if reason missing
 
-### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
+### Task 5.5.9: Rule Priority Chain Documentation & Enforcement ✅
 Location: `src/checker/threshold.rs`, `src/config/loader.rs`, `docs/sloc-guard.example.toml`
-**Problem**: Multiple rules can match same file, priority unclear.
-- `[[content.rules]] pattern = "tests/**"` vs `[[content.rules]] pattern = "**/*.test.ts"`
-- Which wins for `tests/foo.test.ts`?
-- `[content.languages.rs]` 和 `[[content.rules]] pattern = "**/*.rs"` 本质相同却可能有不同结果
-
-**Solution**: Define and enforce explicit priority chain.
+**Completed**: Priority chain defined and documented.
+- `expand_language_rules()` inserts language rules at HEAD of rule chain
+- Explicit `[[content.rules]]` always override language shorthand (LAST match wins)
+- Example TOML documents priority chain in header comments
+- Tests verify: `multiple_path_rules_last_match_wins`, `path_rule_has_higher_priority_than_extension_rule`
 ```
 Content Rule Priority (high → low):
 1. [[content.override]] - exact path match
 2. [[content.rules]] - LAST declared match wins (later rules override earlier)
-3. [content.languages.<ext>] - extension shorthand
+3. [content.languages.<ext>] - extension shorthand (expanded to HEAD of rules)
 4. [content] defaults
 
 Structure Rule Priority (high → low):
@@ -170,12 +166,6 @@ Structure Rule Priority (high → low):
 2. [[structure.rules]] - LAST declared match wins
 3. [structure] defaults
 ```
-- **Implementation**: Loader expands `[content.languages.X]` into internal rules and **inserts at HEAD** of rule chain
-  - This ensures explicit `[[content.rules]]` always override language shorthand
-  - User writes: `[content.languages.rs]` + `[[content.rules]] pattern="**/*.rs"`
-  - Internal: rules list = `[expanded_rs_rule, explicit_rs_rule]` → explicit wins (LAST match)
-- Add comments in example TOML documenting priority chain
-- Consider: warn on overlapping rules at config load time (optional strict mode)
 
 ### Task 5.5.10: Structure warn_threshold Symmetry ✅
 Location: `src/config/model.rs`, `src/checker/structure.rs`
@@ -254,8 +244,8 @@ Location: `src/output/html.rs`
 | Priority | Tasks |
 |----------|-------|
 | **1. Critical Architecture** | ~~5.5.1 Scanner/Structure Visibility~~, ~~5.5.2 Override Separation (incl. 5.5.14 required reason)~~ |
-| **2. UX & Semantics** | ~~5.5.3 Extension Syntax Sugar~~, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
-| **3. Code Quality** | 5.5.13 Testability (DI), ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~~5.5.8 Versioning~~ |
+| **2. UX & Semantics** | ~~5.5.3 Extension Syntax Sugar~~, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, ~~5.5.9 Priority Chain~~, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
+| **3. Code Quality** | ~~5.5.13 Testability (DI)~~, ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~~5.5.8 Versioning~~ |
 | **4. Documentation** | ~~5.5.12 extends Examples~~ |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 

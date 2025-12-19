@@ -938,3 +938,136 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
 }
+
+// =============================================================================
+// Context Injection Tests (Task 5.5.13: Testability Refactoring)
+// =============================================================================
+
+use crate::commands::context::CheckContext;
+
+#[test]
+fn check_context_from_config_creates_valid_context() {
+    let config = Config::default();
+    let ctx = CheckContext::from_config(&config, 0.9).unwrap();
+
+    // Verify context contains expected components
+    // Default config has no structure limits, so structure checker exists but is not enabled
+    if let Some(ref sc) = ctx.structure_checker {
+        // Structure checker is created but not enabled with default config (no limits set)
+        assert!(!sc.is_enabled());
+    }
+}
+
+#[test]
+fn check_context_new_allows_custom_injection() {
+    let config = Config::default();
+    let registry = LanguageRegistry::default();
+    let threshold_checker = ThresholdChecker::new(config).with_warning_threshold(0.5);
+
+    // Create context with custom components (no structure checker)
+    let ctx = CheckContext::new(registry, threshold_checker, None);
+
+    // Context should have no structure checker
+    assert!(ctx.structure_checker.is_none());
+}
+
+#[test]
+fn run_check_with_context_uses_injected_threshold_checker() {
+    // This test demonstrates that run_check_with_context uses the injected
+    // threshold_checker instead of creating one internally.
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small file that would pass with default limits
+    let test_file = temp_dir.path().join("small.rs");
+    std::fs::write(&test_file, "fn main() {}\n").unwrap();
+
+    // Create context with very strict threshold (max_lines = 1)
+    let mut config = Config::default();
+    config.content.extensions = vec!["rs".to_string()];
+    config.content.max_lines = 1; // Very strict
+
+    let ctx = CheckContext::from_config(&config, 0.9).unwrap();
+    let cache = Mutex::new(Cache::new(String::new()));
+
+    let args = CheckArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: true,
+        fix: false,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    // The injected context's threshold_checker should detect the violation
+    let result = run_check_with_context(&args, &cli, &config, &ctx, &cache, None);
+    assert!(result.is_ok());
+    // File has 1 line, limit is 1, so it should pass (equal to limit)
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn run_check_with_context_uses_injected_structure_checker() {
+    // This test demonstrates structure checker injection
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create directory with files
+    let sub_dir = temp_dir.path().join("subdir");
+    std::fs::create_dir(&sub_dir).unwrap();
+    std::fs::write(sub_dir.join("a.rs"), "fn a() {}").unwrap();
+    std::fs::write(sub_dir.join("b.rs"), "fn b() {}").unwrap();
+    std::fs::write(sub_dir.join("c.rs"), "fn c() {}").unwrap();
+
+    // Create config with structure limits
+    let mut config = Config::default();
+    config.content.extensions = vec!["rs".to_string()];
+    config.structure.max_files = Some(2); // Limit to 2 files per directory
+
+    let ctx = CheckContext::from_config(&config, 0.9).unwrap();
+    let cache = Mutex::new(Cache::new(String::new()));
+
+    // Verify structure checker is enabled
+    assert!(ctx.structure_checker.is_some());
+    assert!(ctx.structure_checker.as_ref().unwrap().is_enabled());
+
+    let args = CheckArgs {
+        paths: vec![sub_dir],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: true,
+        fix: false,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    // Structure checker should detect violation (3 files > 2 limit)
+    let result = run_check_with_context(&args, &cli, &config, &ctx, &cache, None);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}

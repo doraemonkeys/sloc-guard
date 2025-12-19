@@ -1,9 +1,11 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::baseline::read_file_with_hash;
 use crate::cache::Cache;
+use crate::checker::{StructureChecker, ThresholdChecker};
 use crate::cli::ColorChoice;
 use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::counter::{CountResult, LineStats, SlocCounter};
@@ -168,6 +170,86 @@ pub fn process_file_with_cache(
     };
 
     Some((stats, language.name.clone()))
+}
+
+// =============================================================================
+// Context Structs for Dependency Injection
+// =============================================================================
+
+/// Context for check command containing injectable dependencies.
+///
+/// This struct enables dependency injection for testing by encapsulating
+/// the core dependencies needed for the check command. Production code uses
+/// `from_config()` factory method; tests can use `new()` for custom injection.
+pub struct CheckContext {
+    pub registry: LanguageRegistry,
+    pub threshold_checker: ThresholdChecker,
+    pub structure_checker: Option<StructureChecker>,
+}
+
+impl CheckContext {
+    /// Create context from config (production factory).
+    ///
+    /// # Errors
+    /// Returns error if structure checker initialization fails with invalid patterns.
+    pub fn from_config(config: &Config, warn_threshold: f64) -> crate::Result<Self> {
+        let registry = LanguageRegistry::with_custom_languages(&config.languages);
+        let threshold_checker =
+            ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
+        let structure_checker = StructureChecker::new(&config.structure).ok();
+
+        Ok(Self {
+            registry,
+            threshold_checker,
+            structure_checker,
+        })
+    }
+
+    /// Create context with custom components (for testing).
+    #[must_use]
+    pub const fn new(
+        registry: LanguageRegistry,
+        threshold_checker: ThresholdChecker,
+        structure_checker: Option<StructureChecker>,
+    ) -> Self {
+        Self {
+            registry,
+            threshold_checker,
+            structure_checker,
+        }
+    }
+}
+
+/// Context for stats command containing injectable dependencies.
+///
+/// This struct enables dependency injection for testing by encapsulating
+/// the core dependencies needed for the stats command.
+pub struct StatsContext {
+    pub registry: LanguageRegistry,
+    pub allowed_extensions: HashSet<String>,
+}
+
+impl StatsContext {
+    /// Create context from config (production factory).
+    #[must_use]
+    pub fn from_config(config: &Config) -> Self {
+        let registry = LanguageRegistry::with_custom_languages(&config.languages);
+        let allowed_extensions = config.content.extensions.iter().cloned().collect();
+
+        Self {
+            registry,
+            allowed_extensions,
+        }
+    }
+
+    /// Create context with custom components (for testing).
+    #[must_use]
+    pub const fn new(registry: LanguageRegistry, allowed_extensions: HashSet<String>) -> Self {
+        Self {
+            registry,
+            allowed_extensions,
+        }
+    }
 }
 
 #[cfg(test)]

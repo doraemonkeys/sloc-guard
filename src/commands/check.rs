@@ -7,7 +7,7 @@ use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
 use crate::checker::{
-    CheckResult, Checker, StructureChecker, StructureViolation, ThresholdChecker, ViolationType,
+    CheckResult, Checker, StructureViolation, ThresholdChecker, ViolationType,
 };
 use crate::cli::{CheckArgs, Cli};
 use crate::counter::LineStats;
@@ -22,7 +22,7 @@ use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::context::{
     color_choice_to_mode, load_cache, load_config, process_file_with_cache, resolve_scan_paths,
-    save_cache, write_output,
+    save_cache, write_output, CheckContext,
 };
 
 #[must_use]
@@ -55,47 +55,64 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
-    // 4. Prepare exclude patterns from scanner config
-    let mut exclude_patterns = config.scanner.exclude.clone();
-    exclude_patterns.extend(args.exclude.clone());
-
-    // 5. Determine paths to scan
-    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
-
-    // 6. Scan directories (respecting .gitignore if enabled)
-    // Scanner now returns ALL files, extension filtering is done by ThresholdChecker
-    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
-    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
-
-    // 6.1 Filter by git diff if --diff is specified
-    let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
-
-    // 7. Process each file (parallel with rayon)
-    let registry = LanguageRegistry::with_custom_languages(&config.languages);
-
     // Apply CLI extensions override to config.content if provided
     if let Some(ref cli_extensions) = args.ext {
         config.content.extensions.clone_from(cli_extensions);
     }
 
+    // 4. Build check context with dependencies
     let warn_threshold = args.warn_threshold.unwrap_or(config.content.warn_threshold);
-    let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
+    let ctx = CheckContext::from_config(&config, warn_threshold)?;
 
+    // 5. Run check with context
+    run_check_with_context(args, cli, &config, &ctx, &cache, baseline.as_ref())
+}
+
+/// Internal implementation accepting injectable context (for testing).
+///
+/// This function contains the core check logic and accepts pre-built dependencies,
+/// enabling unit testing with custom/mock components.
+pub(crate) fn run_check_with_context(
+    args: &CheckArgs,
+    cli: &Cli,
+    config: &crate::config::Config,
+    ctx: &CheckContext,
+    cache: &Mutex<Cache>,
+    baseline: Option<&Baseline>,
+) -> crate::Result<i32> {
+    // 1. Prepare exclude patterns from scanner config
+    let mut exclude_patterns = config.scanner.exclude.clone();
+    exclude_patterns.extend(args.exclude.clone());
+
+    // 2. Determine paths to scan
+    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, config);
+
+    // 3. Scan directories (respecting .gitignore if enabled)
+    // Scanner now returns ALL files, extension filtering is done by ThresholdChecker
+    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
+
+    // 3.1 Filter by git diff if --diff is specified
+    let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
+
+    // 4. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let mut results: Vec<_> = all_files
         .par_iter()
-        .filter(|file_path| checker.should_process(file_path)) // Filter by extension here
+        .filter(|file_path| ctx.threshold_checker.should_process(file_path)) // Filter by extension
         .filter_map(|file_path| {
-            let result = process_file_for_check(file_path, &registry, &checker, &cache);
+            let result =
+                process_file_for_check(file_path, &ctx.registry, &ctx.threshold_checker, cache);
             progress.inc();
             result
         })
         .collect();
     progress.finish();
 
-    // 7.2 Run structure checks if enabled
-    let structure_checker = StructureChecker::new(&config.structure)?;
-    if structure_checker.is_enabled() {
+    // 5. Run structure checks if enabled (using injected structure_checker)
+    if let Some(ref structure_checker) = ctx.structure_checker
+        && structure_checker.is_enabled()
+    {
         for path in &paths_to_scan {
             if path.is_dir() {
                 let violations = structure_checker.check_directory(path)?;
@@ -108,31 +125,31 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
         }
     }
 
-    // 7.3 Save cache if not disabled
+    // 6. Save cache if not disabled
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
         save_cache(&cache_guard);
     }
 
-    // 8. Apply baseline comparison: mark failures as grandfathered if in baseline
-    if let Some(ref baseline) = baseline {
+    // 7. Apply baseline comparison: mark failures as grandfathered if in baseline
+    if let Some(baseline) = baseline {
         apply_baseline_comparison(&mut results, baseline);
     }
 
-    // 8.1 Generate split suggestions for failed files if --fix is enabled
+    // 7.1 Generate split suggestions for failed files if --fix is enabled
     if args.fix {
-        generate_split_suggestions(&mut results, &registry);
+        generate_split_suggestions(&mut results, &ctx.registry);
     }
 
-    // 9. Format output
+    // 8. Format output
     let color_mode = color_choice_to_mode(cli.color);
     let output = format_output(args.format, &results, color_mode, cli.verbose, args.fix)?;
 
-    // 10. Write output
+    // 9. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
 
-    // 11. Determine exit code
+    // 10. Determine exit code
     let has_failures = results.iter().any(CheckResult::is_failed);
     let has_warnings = results.iter().any(CheckResult::is_warning);
 
