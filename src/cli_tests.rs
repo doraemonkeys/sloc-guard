@@ -216,22 +216,22 @@ fn cli_check_with_include() {
 }
 
 #[test]
-fn cli_check_no_skip_comments() {
-    let cli = Cli::parse_from(["sloc-guard", "check", "--no-skip-comments"]);
+fn cli_check_count_comments() {
+    let cli = Cli::parse_from(["sloc-guard", "check", "--count-comments"]);
     match cli.command {
         Commands::Check(args) => {
-            assert!(args.no_skip_comments);
+            assert!(args.count_comments);
         }
         _ => panic!("Expected Check command"),
     }
 }
 
 #[test]
-fn cli_check_no_skip_blank() {
-    let cli = Cli::parse_from(["sloc-guard", "check", "--no-skip-blank"]);
+fn cli_check_count_blank() {
+    let cli = Cli::parse_from(["sloc-guard", "check", "--count-blank"]);
     match cli.command {
         Commands::Check(args) => {
-            assert!(args.no_skip_blank);
+            assert!(args.count_blank);
         }
         _ => panic!("Expected Check command"),
     }

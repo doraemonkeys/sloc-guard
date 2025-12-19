@@ -39,21 +39,13 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **6.4**: Documentation Clarification - CLI help text updates (paths vs --include, CLI override scope, --diff behavior), README.md creation.
   - **6.5.1**: `--update-baseline[=MODE]` for `check` command. Modes: `all`(default), `content`, `structure`, `new`. Baseline V2 format (tagged enum for content/structure entries). V1 auto-migration. Deprecates `baseline update` subcommand.
   - **6.6**: `--report-json <PATH>` for `check` command. Outputs `ProjectStatistics` JSON alongside check results (avoids separate stats run in CI).
+  - **6.9.1**: CLI parameter renames: `--fix` → `--suggest`, `--no-skip-comments` → `--count-comments`, `--no-skip-blank` → `--count-blank`.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
 
 ---
 
-## Phase 6.9: CLI Naming Cleanup (Pending)
-
-### Task 6.9.1: Rename Misleading Parameters
-Location: `src/cli.rs`
-```
-- --fix → --suggest (or --suggestions)
-- --no-skip-comments → --count-comments
-- --no-skip-blank → --count-blank
-- Update all references in commands and help text
-```
+## Phase 6.9: CLI Naming Cleanup (Partial)
 
 ### Task 6.9.2: config show Format Enum
 Location: `src/cli.rs`, `src/commands/config.rs`

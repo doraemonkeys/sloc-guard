@@ -217,7 +217,7 @@ fn check_output_to_file() {
 }
 
 #[test]
-fn check_no_skip_comments_counts_comments() {
+fn check_count_comments_counts_comments() {
     let temp_dir = TempDir::new().unwrap();
     let rust_file = temp_dir.path().join("commented.rs");
 
@@ -242,7 +242,7 @@ fn check_no_skip_comments_counts_comments() {
         .assert()
         .success();
 
-    // Without skip_comments, all 60 lines count -> fails at limit 50
+    // With --count-comments, all 60 lines count -> fails at limit 50
     cmd()
         .arg("check")
         .arg("--no-gitignore")
@@ -250,13 +250,13 @@ fn check_no_skip_comments_counts_comments() {
         .arg("--no-config")
         .arg("--max-lines")
         .arg("50")
-        .arg("--no-skip-comments")
+        .arg("--count-comments")
         .assert()
         .code(1);
 }
 
 #[test]
-fn check_no_skip_blank_counts_blanks() {
+fn check_count_blank_counts_blanks() {
     let temp_dir = TempDir::new().unwrap();
     let rust_file = temp_dir.path().join("blanks.rs");
 
@@ -279,7 +279,7 @@ fn check_no_skip_blank_counts_blanks() {
         .assert()
         .success();
 
-    // Without skip_blank, all 60 lines count -> fails
+    // With --count-blank, all 60 lines count -> fails
     cmd()
         .arg("check")
         .arg("--no-gitignore")
@@ -287,7 +287,7 @@ fn check_no_skip_blank_counts_blanks() {
         .arg("--no-config")
         .arg("--max-lines")
         .arg("50")
-        .arg("--no-skip-blank")
+        .arg("--count-blank")
         .assert()
         .code(1);
 }

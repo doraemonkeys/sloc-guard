@@ -28,7 +28,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `output/*` | `output/*.rs` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI |
-| `analyzer` | `analyzer/*.rs` | `FunctionParser` - multi-language split suggestions (--fix) |
+| `analyzer` | `analyzer/*.rs` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `stats/trend.rs` | `TrendHistory` - historical stats with delta computation |
 | `main` | `main.rs` | CLI parsing, command dispatch to `commands/*` |
 
@@ -94,7 +94,7 @@ StructureViolationType::Files | Dirs
 BaselineUpdateMode::All | Content | Structure | New  // --update-baseline mode
 Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime, size}> }  // .sloc-guard-cache.json
 
-// Split suggestions (--fix)
+// Split suggestions (--suggest)
 FunctionInfo { name, start_line, end_line, line_count }
 SplitSuggestion { original_path, total_lines, limit, functions, chunks }
 FunctionParser: Rust, Go, Python, JS/TS, C/C++
@@ -131,7 +131,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 → ThresholdChecker::check() → CheckResult (parallel, per-file)
 → StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
 → [if baseline] mark Grandfathered | [if --update-baseline] save violations to baseline
-→ [if --fix] generate_split_suggestions()
+→ [if --suggest] generate_split_suggestions()
 → [if --report-json] ProjectStatistics → StatsJsonFormatter → write to path
 → format (Text/Json/Sarif/Markdown/Html) → output
 ```

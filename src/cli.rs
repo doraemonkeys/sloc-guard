@@ -143,13 +143,13 @@ pub struct CheckArgs {
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 
-    /// Count comment lines as code
+    /// Count comment lines as code (disables `skip_comments`)
     #[arg(long)]
-    pub no_skip_comments: bool,
+    pub count_comments: bool,
 
-    /// Count blank lines as code
+    /// Count blank lines as code (disables `skip_blank`)
     #[arg(long)]
-    pub no_skip_blank: bool,
+    pub count_blank: bool,
 
     /// Warning threshold (0.0-1.0, warn when usage exceeds this ratio)
     #[arg(long)]
@@ -195,7 +195,7 @@ pub struct CheckArgs {
 
     /// Show split suggestions for files exceeding thresholds
     #[arg(long)]
-    pub fix: bool,
+    pub suggest: bool,
 
     /// Maximum files per directory (overrides config [structure] defaults; rules take precedence)
     #[arg(long, value_name = "COUNT")]

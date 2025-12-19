@@ -159,8 +159,8 @@ pub(crate) fn run_check_with_context(
         update_baseline_from_results(&results, mode, baseline_path, baseline)?;
     }
 
-    // 7.1 Generate split suggestions for failed files if --fix is enabled
-    if args.fix {
+    // 7.1 Generate split suggestions for failed files if --suggest is enabled
+    if args.suggest {
         generate_split_suggestions(&mut results, &ctx.registry);
     }
 
@@ -173,7 +173,7 @@ pub(crate) fn run_check_with_context(
 
     // 8. Format output
     let color_mode = color_choice_to_mode(cli.color);
-    let output = format_output(args.format, &results, color_mode, cli.verbose, args.fix)?;
+    let output = format_output(args.format, &results, color_mode, cli.verbose, args.suggest)?;
 
     // 9. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -356,11 +356,11 @@ pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args
         config.content.max_lines = max_lines;
     }
 
-    if args.no_skip_comments {
+    if args.count_comments {
         config.content.skip_comments = false;
     }
 
-    if args.no_skip_blank {
+    if args.count_blank {
         config.content.skip_blank = false;
     }
 
