@@ -11,6 +11,7 @@ use crate::language::LanguageRegistry;
 use crate::output::{ColorMode, OutputFormat};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
+use crate::commands::context::RealFileReader;
 use super::*;
 
 #[test]
@@ -83,9 +84,10 @@ fn process_file_nonexistent_returns_none() {
     let config = Config::default();
     let checker = ThresholdChecker::new(config);
     let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
     let path = PathBuf::from("nonexistent_file.rs");
 
-    let result = process_file_for_check(&path, &registry, &checker, &cache);
+    let result = process_file_for_check(&path, &registry, &checker, &cache, &reader);
     assert!(result.is_none());
 }
 
@@ -95,9 +97,10 @@ fn process_file_unknown_extension_returns_none() {
     let config = Config::default();
     let checker = ThresholdChecker::new(config);
     let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
     let path = PathBuf::from("Cargo.toml");
 
-    let result = process_file_for_check(&path, &registry, &checker, &cache);
+    let result = process_file_for_check(&path, &registry, &checker, &cache, &reader);
     assert!(result.is_none());
 }
 
@@ -107,9 +110,10 @@ fn process_file_valid_rust_file() {
     let config = Config::default();
     let checker = ThresholdChecker::new(config);
     let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
     let path = PathBuf::from("src/lib.rs");
 
-    let result = process_file_for_check(&path, &registry, &checker, &cache);
+    let result = process_file_for_check(&path, &registry, &checker, &cache, &reader);
     assert!(result.is_some());
     let (check_result, file_stats) = result.unwrap();
     assert!(check_result.is_passed());

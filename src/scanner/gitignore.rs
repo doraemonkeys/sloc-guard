@@ -96,7 +96,7 @@ impl<F: FileFilter> GitAwareScanner<F> {
     }
 }
 
-impl<F: FileFilter> FileScanner for GitAwareScanner<F> {
+impl<F: FileFilter + Send + Sync> FileScanner for GitAwareScanner<F> {
     fn scan(&self, root: &Path) -> Result<Vec<PathBuf>> {
         self.scan_with_gix(root)
     }

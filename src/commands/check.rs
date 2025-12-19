@@ -16,11 +16,10 @@ use crate::output::{
     ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
     TextFormatter,
 };
-use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::context::{
-    CheckContext, color_choice_to_mode, load_cache, load_config, process_file_with_cache,
+    CheckContext, FileReader, color_choice_to_mode, load_cache, load_config, process_file_with_cache,
     resolve_scan_paths, save_cache, write_output,
 };
 
@@ -69,7 +68,10 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
 
     // 4. Build check context with dependencies
     let warn_threshold = args.warn_threshold.unwrap_or(config.content.warn_threshold);
-    let ctx = CheckContext::from_config(&config, warn_threshold)?;
+    let mut exclude_patterns = config.scanner.exclude.clone();
+    exclude_patterns.extend(args.exclude.clone());
+    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
+    let ctx = CheckContext::from_config(&config, warn_threshold, exclude_patterns, use_gitignore)?;
 
     // 5. Run check with context
     run_check_with_context(args, cli, &paths, &config, &ctx, &cache, baseline.as_ref())
@@ -88,29 +90,28 @@ pub(crate) fn run_check_with_context(
     cache: &Mutex<Cache>,
     baseline: Option<&Baseline>,
 ) -> crate::Result<i32> {
-    // 1. Prepare exclude patterns from scanner config
-    let mut exclude_patterns = config.scanner.exclude.clone();
-    exclude_patterns.extend(args.exclude.clone());
-
-    // 2. Determine paths to scan
+    // 1. Determine paths to scan
     let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
 
-    // 3. Scan directories (respecting .gitignore if enabled)
-    // Scanner now returns ALL files, extension filtering is done by ThresholdChecker
-    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
-    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
+    // 2. Scan directories using injected scanner (respects .gitignore and exclude patterns)
+    let all_files = ctx.scanner.scan_all(&paths_to_scan)?;
 
-    // 3.1 Filter by git diff if --diff is specified
+    // 2.1 Filter by git diff if --diff is specified
     let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
 
-    // 4. Process each file (parallel with rayon) using injected context
+    // 3. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let processed: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| ctx.threshold_checker.should_process(file_path)) // Filter by extension
         .filter_map(|file_path| {
-            let result =
-                process_file_for_check(file_path, &ctx.registry, &ctx.threshold_checker, cache);
+            let result = process_file_for_check(
+                file_path,
+                &ctx.registry,
+                &ctx.threshold_checker,
+                cache,
+                ctx.file_reader.as_ref(),
+            );
             progress.inc();
             result
         })
@@ -412,8 +413,9 @@ pub(crate) fn process_file_for_check(
     registry: &LanguageRegistry,
     checker: &ThresholdChecker,
     cache: &Mutex<Cache>,
+    reader: &dyn FileReader,
 ) -> Option<(CheckResult, FileStatistics)> {
-    let (stats, language) = process_file_with_cache(file_path, registry, cache)?;
+    let (stats, language) = process_file_with_cache(file_path, registry, cache, reader)?;
     let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
     let check_result = checker.check(file_path, &effective_stats);

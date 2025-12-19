@@ -19,7 +19,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
-| `scanner/*` | `scanner/*.rs` | `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore) |
+| `scanner/*` | `scanner/*.rs` | `FileScanner` trait, `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback) |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
 | `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir count limits with glob-based rules |
 | `checker/explain` | `checker/explain.rs` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
@@ -100,7 +100,11 @@ SplitSuggestion { original_path, total_lines, limit, functions, chunks }
 FunctionParser: Rust, Go, Python, JS/TS, C/C++
 
 // Context for DI (commands/context.rs)
-CheckContext { registry, threshold_checker, structure_checker }  // from_config() or new()
+FileReader trait { read(), metadata() }  // IO abstraction for file reading
+RealFileReader  // Production impl using std::fs
+FileScanner trait { scan(), scan_all() }  // IO abstraction for directory traversal
+CompositeScanner  // Production impl with git/non-git fallback
+CheckContext { registry, threshold_checker, structure_checker, scanner, file_reader }  // from_config() or new()
 StatsContext { registry, allowed_extensions }  // from_config() or new()
 ```
 
@@ -125,10 +129,12 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 ### check-specific
 
 ```
-→ CheckContext::from_config() creates injectable context
+→ CheckContext::from_config(config, warn_threshold, exclude_patterns, use_gitignore)
+   → creates injectable context with CompositeScanner + RealFileReader
+→ ctx.scanner.scan_all() → file list
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
-→ ThresholdChecker::check() → CheckResult (parallel, per-file)
+→ process_file_with_cache(ctx.file_reader) → ThresholdChecker::check() → CheckResult (parallel)
 → StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
 → [if baseline] mark Grandfathered | [if --update-baseline] save violations to baseline
 → [if --suggest] generate_split_suggestions()

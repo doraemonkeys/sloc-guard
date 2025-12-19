@@ -13,7 +13,9 @@ use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::check::compute_effective_stats;
-use super::context::{load_config, process_file_with_cache, resolve_scan_paths};
+use super::context::{
+    FileReader, RealFileReader, load_config, process_file_with_cache, resolve_scan_paths,
+};
 
 #[must_use]
 pub fn run_baseline(args: &BaselineArgs, cli: &Cli) -> i32 {
@@ -73,13 +75,14 @@ pub(crate) fn run_baseline_update_impl(
     let checker =
         ThresholdChecker::new(config.clone()).with_warning_threshold(config.content.warn_threshold);
     let cache = Mutex::new(Cache::new(compute_config_hash(&config)));
+    let reader = RealFileReader;
 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let violations: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| checker.should_process(file_path)) // Filter by extension
         .filter_map(|file_path| {
-            let result = process_file_for_baseline(file_path, &registry, &checker, &cache);
+            let result = process_file_for_baseline(file_path, &registry, &checker, &cache, &reader);
             progress.inc();
             result
                 .filter(CheckResult::is_failed)
@@ -107,8 +110,9 @@ fn process_file_for_baseline(
     registry: &LanguageRegistry,
     checker: &ThresholdChecker,
     cache: &Mutex<Cache>,
+    reader: &dyn FileReader,
 ) -> Option<CheckResult> {
-    let (stats, _language) = process_file_with_cache(file_path, registry, cache)?;
+    let (stats, _language) = process_file_with_cache(file_path, registry, cache, reader)?;
     let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
     Some(checker.check(file_path, &effective_stats))

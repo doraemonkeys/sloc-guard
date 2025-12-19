@@ -15,8 +15,8 @@ use crate::stats::TrendHistory;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::context::{
-    DEFAULT_HISTORY_PATH, StatsContext, load_cache, load_config, process_file_with_cache,
-    resolve_scan_paths, save_cache, write_output,
+    DEFAULT_HISTORY_PATH, FileReader, RealFileReader, StatsContext, load_cache, load_config,
+    process_file_with_cache, resolve_scan_paths, save_cache, write_output,
 };
 
 #[must_use]
@@ -79,6 +79,7 @@ pub(crate) fn run_stats_with_context(
     let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
     // 4. Process each file and collect statistics (parallel with rayon) using injected context
+    let reader = RealFileReader;
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files
         .par_iter()
@@ -93,7 +94,7 @@ pub(crate) fn run_stats_with_context(
                 .is_some_and(|ext| ctx.allowed_extensions.contains(ext))
         })
         .filter_map(|file_path| {
-            let result = collect_file_stats(file_path, &ctx.registry, cache);
+            let result = collect_file_stats(file_path, &ctx.registry, cache, &reader);
             progress.inc();
             result
         })
@@ -150,8 +151,9 @@ fn collect_file_stats(
     file_path: &Path,
     registry: &LanguageRegistry,
     cache: &Mutex<Cache>,
+    reader: &dyn FileReader,
 ) -> Option<FileStatistics> {
-    let (stats, language) = process_file_with_cache(file_path, registry, cache)?;
+    let (stats, language) = process_file_with_cache(file_path, registry, cache, reader)?;
     Some(FileStatistics {
         path: file_path.to_path_buf(),
         stats,

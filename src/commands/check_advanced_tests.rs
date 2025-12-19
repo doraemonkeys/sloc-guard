@@ -12,10 +12,11 @@ use crate::config::Config;
 use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 use crate::output::OutputFormat;
+use crate::scanner::{CompositeScanner, FileScanner};
 use crate::{EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::*;
-use crate::commands::context::CheckContext;
+use crate::commands::context::{CheckContext, FileReader, RealFileReader};
 
 fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: bool) -> Cli {
     Cli {
@@ -302,7 +303,7 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
 #[test]
 fn check_context_from_config_creates_valid_context() {
     let config = Config::default();
-    let ctx = CheckContext::from_config(&config, 0.9).unwrap();
+    let ctx = CheckContext::from_config(&config, 0.9, Vec::new(), false).unwrap();
 
     // Verify context contains expected components
     // Default config has no structure limits, so structure checker exists but is not enabled
@@ -317,9 +318,11 @@ fn check_context_new_allows_custom_injection() {
     let config = Config::default();
     let registry = LanguageRegistry::default();
     let threshold_checker = ThresholdChecker::new(config).with_warning_threshold(0.5);
+    let scanner: Box<dyn FileScanner> = Box::new(CompositeScanner::new(Vec::new(), false));
+    let file_reader: Box<dyn FileReader> = Box::new(RealFileReader);
 
     // Create context with custom components (no structure checker)
-    let ctx = CheckContext::new(registry, threshold_checker, None);
+    let ctx = CheckContext::new(registry, threshold_checker, None, scanner, file_reader);
 
     // Context should have no structure checker
     assert!(ctx.structure_checker.is_none());
@@ -340,7 +343,7 @@ fn run_check_with_context_uses_injected_threshold_checker() {
     config.content.extensions = vec!["rs".to_string()];
     config.content.max_lines = 1; // Very strict
 
-    let ctx = CheckContext::from_config(&config, 0.9).unwrap();
+    let ctx = CheckContext::from_config(&config, 0.9, Vec::new(), false).unwrap();
     let cache = Mutex::new(Cache::new(String::new()));
 
     let args = CheckArgs {
@@ -395,7 +398,7 @@ fn run_check_with_context_uses_injected_structure_checker() {
     config.content.extensions = vec!["rs".to_string()];
     config.structure.max_files = Some(2); // Limit to 2 files per directory
 
-    let ctx = CheckContext::from_config(&config, 0.9).unwrap();
+    let ctx = CheckContext::from_config(&config, 0.9, Vec::new(), false).unwrap();
     let cache = Mutex::new(Cache::new(String::new()));
 
     // Verify structure checker is enabled

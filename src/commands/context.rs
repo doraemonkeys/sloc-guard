@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use crate::baseline::read_file_with_hash;
+use sha2::{Digest, Sha256};
+
 use crate::cache::Cache;
 use crate::checker::{StructureChecker, ThresholdChecker};
 use crate::cli::ColorChoice;
@@ -11,26 +13,13 @@ use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
+use crate::scanner::{CompositeScanner, FileScanner};
 
 /// Default cache file path
 pub const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
 
 /// Default history file path for trend tracking
 pub const DEFAULT_HISTORY_PATH: &str = ".sloc-guard-history.json";
-
-/// Get file metadata (mtime, size) for cache validation.
-#[must_use]
-pub fn get_file_metadata(path: &Path) -> Option<(u64, u64)> {
-    let metadata = fs::metadata(path).ok()?;
-    let mtime = metadata
-        .modified()
-        .ok()?
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()?
-        .as_secs();
-    let size = metadata.len();
-    Some((mtime, size))
-}
 
 #[must_use]
 pub(crate) const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
@@ -136,6 +125,7 @@ pub fn process_file_with_cache(
     file_path: &Path,
     registry: &LanguageRegistry,
     cache: &Mutex<Cache>,
+    reader: &dyn FileReader,
 ) -> Option<(LineStats, String)> {
     let ext = file_path.extension()?.to_str()?;
     let language = registry.get_by_extension(ext)?;
@@ -143,7 +133,7 @@ pub fn process_file_with_cache(
     let path_key = file_path.to_string_lossy().replace('\\', "/");
 
     // Get file metadata for fast cache validation
-    let (mtime, size) = get_file_metadata(file_path)?;
+    let (mtime, size) = reader.metadata(file_path).ok()?;
 
     // Try to get stats from cache using metadata (no file read needed)
     let cached_stats = {
@@ -157,7 +147,7 @@ pub fn process_file_with_cache(
         stats
     } else {
         // Cache miss: read file, compute hash, and count lines
-        let (file_hash, content) = read_file_with_hash(file_path).ok()?;
+        let (file_hash, content) = read_file_with_hash(reader, file_path)?;
         let counter = SlocCounter::new(&language.comment_syntax);
         let result = count_lines_from_content(&content, &counter)?;
 
@@ -173,6 +163,64 @@ pub fn process_file_with_cache(
 }
 
 // =============================================================================
+// IO Abstraction Traits for Testability
+// =============================================================================
+
+/// Trait for reading file contents and metadata (for testability).
+///
+/// This trait abstracts filesystem operations to enable pure unit testing
+/// without real file system access.
+pub trait FileReader: Send + Sync {
+    /// Read file contents as bytes.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read.
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>>;
+
+    /// Get file metadata (mtime in seconds since epoch, size in bytes).
+    ///
+    /// # Errors
+    /// Returns an error if metadata cannot be retrieved.
+    fn metadata(&self, path: &Path) -> io::Result<(u64, u64)>;
+}
+
+/// Real filesystem implementation of `FileReader`.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct RealFileReader;
+
+impl FileReader for RealFileReader {
+    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
+        fs::read(path)
+    }
+
+    fn metadata(&self, path: &Path) -> io::Result<(u64, u64)> {
+        let metadata = fs::metadata(path)?;
+        let mtime = metadata
+            .modified()?
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(io::Error::other)?
+            .as_secs();
+        let size = metadata.len();
+        Ok((mtime, size))
+    }
+}
+
+/// Read file contents and compute SHA-256 hash.
+#[must_use]
+pub fn read_file_with_hash(reader: &dyn FileReader, path: &Path) -> Option<(String, Vec<u8>)> {
+    let content = reader.read(path).ok()?;
+    let hash = compute_hash_from_bytes(&content);
+    Some((hash, content))
+}
+
+/// Compute SHA-256 hash from bytes.
+fn compute_hash_from_bytes(content: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content);
+    format!("{:x}", hasher.finalize())
+}
+
+// =============================================================================
 // Context Structs for Dependency Injection
 // =============================================================================
 
@@ -185,6 +233,10 @@ pub struct CheckContext {
     pub registry: LanguageRegistry,
     pub threshold_checker: ThresholdChecker,
     pub structure_checker: Option<StructureChecker>,
+    /// Injectable file scanner for directory traversal.
+    pub scanner: Box<dyn FileScanner>,
+    /// Injectable file reader for content access.
+    pub file_reader: Box<dyn FileReader>,
 }
 
 impl CheckContext {
@@ -192,31 +244,44 @@ impl CheckContext {
     ///
     /// # Errors
     /// Returns error if structure checker initialization fails with invalid patterns.
-    pub fn from_config(config: &Config, warn_threshold: f64) -> crate::Result<Self> {
+    pub fn from_config(
+        config: &Config,
+        warn_threshold: f64,
+        exclude_patterns: Vec<String>,
+        use_gitignore: bool,
+    ) -> crate::Result<Self> {
         let registry = LanguageRegistry::with_custom_languages(&config.languages);
         let threshold_checker =
             ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
         let structure_checker =
             StructureChecker::with_scanner_exclude(&config.structure, &config.scanner.exclude).ok();
+        let scanner = Box::new(CompositeScanner::new(exclude_patterns, use_gitignore));
+        let file_reader = Box::new(RealFileReader);
 
         Ok(Self {
             registry,
             threshold_checker,
             structure_checker,
+            scanner,
+            file_reader,
         })
     }
 
     /// Create context with custom components (for testing).
     #[must_use]
-    pub const fn new(
+    pub fn new(
         registry: LanguageRegistry,
         threshold_checker: ThresholdChecker,
         structure_checker: Option<StructureChecker>,
+        scanner: Box<dyn FileScanner>,
+        file_reader: Box<dyn FileReader>,
     ) -> Self {
         Self {
             registry,
             threshold_checker,
             structure_checker,
+            scanner,
+            file_reader,
         }
     }
 }

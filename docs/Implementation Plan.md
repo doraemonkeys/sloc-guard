@@ -46,23 +46,23 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 
 ---
 
-## Phase 10: Code Quality & Testability (Next Priority)
+## Phase 10: Code Quality & Testability (Complete)
 
-### Task 10.1: IO Abstraction for Pure Unit Testing
+### Task 10.1: IO Abstraction for Pure Unit Testing ✅
 Location: `src/commands/check.rs`, `src/commands/context.rs`, `src/scanner/*.rs`
 ```
-- Define Scanner trait (abstracts scan_files)
+- Define Scanner trait (abstracts scan_files) - FileScanner trait with scan_all method
 - Define FileReader trait (abstracts file reading in process_file_with_cache)
-- Inject IO abstractions via CheckContext
+- Inject IO abstractions via CheckContext (scanner + file_reader fields)
 - Enable pure unit testing of run_check_with_context without real file system
+- CompositeScanner handles git/non-git fallback logic
 ```
-Note: Related FileSystem trait exists in `src/config/loader.rs` - consider unifying.
 
-### Task 10.2: Replace unwrap() with expect()
-Location: `src/config/loader.rs:129`
+### Task 10.2: Replace unwrap() with expect() ✅
+Location: `src/config/loader.rs:133`
 ```
-- Replace .unwrap() with .expect("reason") for clearer error context
-- Reason: iterating over keys guarantees existence, but expect() documents intent
+- .expect("key exists: iterating over collected keys")
+- Documents intent for code path guaranteed by iteration
 ```
 
 ---
@@ -137,7 +137,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Code Quality** | 10.1 IO Abstraction, 10.2 expect() cleanup |
+| ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
 | **2. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
 | **3. Visualization** | 7.1-7.2 HTML Charts/Trends |
 | **4. UX Improvements** | 9.3 Smart init |

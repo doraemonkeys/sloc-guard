@@ -154,3 +154,62 @@ fn color_choice_to_mode_always() {
 fn color_choice_to_mode_never() {
     assert_eq!(color_choice_to_mode(ColorChoice::Never), ColorMode::Never);
 }
+
+// =============================================================================
+// FileReader Tests
+// =============================================================================
+
+#[test]
+fn real_file_reader_reads_file_contents() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, b"hello world").unwrap();
+
+    let reader = RealFileReader;
+    let content = reader.read(&file_path).unwrap();
+
+    assert_eq!(content, b"hello world");
+}
+
+#[test]
+fn real_file_reader_returns_error_for_nonexistent_file() {
+    let reader = RealFileReader;
+    let result = reader.read(std::path::Path::new("nonexistent_file.txt"));
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn real_file_reader_metadata_returns_size() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, b"hello").unwrap();
+
+    let reader = RealFileReader;
+    let (_, size) = reader.metadata(&file_path).unwrap();
+
+    assert_eq!(size, 5); // "hello" is 5 bytes
+}
+
+#[test]
+fn read_file_with_hash_returns_content_and_hash() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.txt");
+    std::fs::write(&file_path, b"test content").unwrap();
+
+    let reader = RealFileReader;
+    let result = read_file_with_hash(&reader, &file_path);
+
+    assert!(result.is_some());
+    let (hash, content) = result.unwrap();
+    assert_eq!(content, b"test content");
+    assert!(!hash.is_empty());
+}
+
+#[test]
+fn read_file_with_hash_returns_none_for_nonexistent() {
+    let reader = RealFileReader;
+    let result = read_file_with_hash(&reader, std::path::Path::new("nonexistent.txt"));
+
+    assert!(result.is_none());
+}

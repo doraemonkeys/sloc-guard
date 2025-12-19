@@ -126,7 +126,11 @@ fn expand_language_rules(config: &mut Config) {
     let expanded_rules: Vec<ContentRule> = extensions
         .into_iter()
         .map(|ext| {
-            let lang_rule = config.content.languages.get(&ext).unwrap();
+            let lang_rule = config
+                .content
+                .languages
+                .get(&ext)
+                .expect("key exists: iterating over collected keys");
             ContentRule {
                 pattern: format!("**/*.{ext}"),
                 max_lines: lang_rule.max_lines.unwrap_or(config.content.max_lines),
