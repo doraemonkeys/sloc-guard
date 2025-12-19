@@ -13,5 +13,5 @@ Split specified task into 2-3 subtasks. Each subtask must:
 - Deliver complete functionality that can be verified (avoid partial implementations that are untestable)
 - Focus on functionality and requirements (not code details)
 
-Update `docs/Implementation Plan.md` with the new subtask structure.
+Update `docs/Implementation Plan.md` with the new subtask structure. Keep concise—avoid redundancy to reduce AI context usage.
 
