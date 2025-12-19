@@ -5,7 +5,7 @@ edition = "2024"
 repository = "https://github.com/doraemonkeys/sloc-guard"
 homepage = "https://github.com/doraemonkeys/sloc-guard"
 license = "Apache-2.0"
-description = "SLOC enforcement tool - enforces file size limits by counting source lines of code"
+description = ""
 
 [dependencies]
 # CLI parsing
