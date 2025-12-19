@@ -1,7 +1,7 @@
 # ==============================================================================
-# SlocGuard Configuration (Ideal State / Future V2)
+# SlocGuard Configuration (V2)
 # ==============================================================================
-# This configuration reflects the architectural refactoring plan (Phase 5.5).
+# This configuration reflects the V2 architecture.
 # 
 # Sections:
 # 1. [scanner]   - What files to look for (Discovery)

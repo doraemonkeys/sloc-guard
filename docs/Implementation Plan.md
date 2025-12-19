@@ -23,188 +23,108 @@ Lint: make ci
 
 ## Completed (Compressed)
 
-All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional completed features:
+All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
-- **Phase 4**: Path-Based Rules, Inline Ignore (file/block/next), Strict Mode, Baseline (format/update/compare), SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance (local extends), Split Suggestions (--fix), Remote Config Support (http/https extends with caching, --no-extends flag)
-- **Phase 5 (Partial)**: Language Breakdown (--group-by lang), Top-N & Metrics (--top N), Markdown Output, Directory Statistics (--group-by dir), Trend Tracking (--trend, .sloc-guard-history.json), HTML Report (--format html, summary + file list + sortable columns + status filtering), Structure Guard (config schema + analyzer + check integration)
+- **Phase 4**: Path-Based Rules, Inline Ignore, Strict Mode, Baseline, SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance, Split Suggestions, Remote Config.
+- **Phase 5 (Partial)**: Language Breakdown, Top-N & Metrics, Markdown Output, Directory Statistics, Trend Tracking, HTML Report, Structure Guard.
+- **Phase 5.5 (Refactoring & V2 Config)**:
+  - **Architecture**: Scanner/Structure separation, `ScannerConfig` vs `ContentConfig`, `CheckResult` enum refactor, Dependency Injection (Context) implementation.
+  - **Config V2**: Separated `[[content.override]]` vs `[[structure.override]]` (with required reason), Versioning (auto-migration v1→v2), `warn_threshold` for structure, Unlimited (`-1`) limits.
+  - **UX**: Extension-based rule sugar (`[content.languages.rs]`), Explicit Rule Priority (Override > Rule > Lang > Default), Structure pattern semantics clarification, Renamed `structure.count_exclude`.
 
 ---
 
-## Phase 5.5: Code Quality & Architecture Refactoring (Pending)
+## Phase 6: CLI Symmetry & Usability (Pending)
 
-Focus: Address architecture flaws, Scanner/Structure visibility conflict, UX ambiguities, and CLAUDE.md violations.
-
-### Task 5.5.1: Scanner vs Structure Visibility Conflict ✅
-Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/threshold.rs`
-**Completed**: Decoupled file discovery from content filtering.
-- V2 Config Schema: `[scanner]` (gitignore, exclude) + `[content]` (extensions, max_lines, rules, etc.)
-- `ScannerConfig { gitignore: bool, exclude: Vec<String> }` - no extension filtering
-- `ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }`
-- `scan_files()` now returns ALL files (respecting gitignore + exclude only)
-- `ThresholdChecker::should_process()` filters files by `content.extensions`
-- V1→V2 auto-migration in `loader.rs::migrate_v1_to_v2()`
-- CONFIG_VERSION bumped to "2"
-
-### Task 5.5.2: Override Separation (Content vs Structure) ✅
-Location: `src/config/model.rs`, `src/checker/*.rs`
-**Completed**: Split overrides into type-safe `[[content.override]]` and `[[structure.override]]`.
-- `ContentOverride { path, max_lines, reason }` - file-only, reason required
-- `StructureOverride { path, max_files, max_dirs, reason }` - directory-only, reason required
-- `StructureConfig.overrides: Vec<StructureOverride>` with TOML syntax `[[structure.override]]`
-- `StructureChecker` checks overrides first (highest priority), then rules, then global defaults
-- Path suffix matching (same as `ThresholdChecker`)
-- Validation: at least one of `max_files`/`max_dirs` required, values >= -1
-- `StructureViolation.override_reason` tracks reason in violation output
-
-### Task 5.5.3: Extension-Based Rule Syntax Sugar ✅
-Location: `src/config/model.rs`, `src/config/loader.rs`, `src/checker/threshold.rs`
-**Completed**: Full field parity between `[content.languages.X]` and `[[content.rules]]`.
-- Loader expands `[content.languages.rs]` into `ContentRule { pattern: "**/*.rs", ... }` at HEAD of rules
-- Priority enforced: explicit `[[content.rules]]` override language shorthand (last match wins)
-- Per-file `skip_comments`/`skip_blank` now functional (were previously "ghost fields")
-- Removed separate extension-based indexes from `ThresholdChecker`
-- V1→V2 migration: `[rules.python] extensions=["py"]` → `[content.languages.py]` (by extension, not name)
-```toml
-# Shorthand (extension-based, implicit **/*.ext)
-[content.languages.rs]
-max_lines = 1000
-warn_threshold = 0.9
-skip_comments = true
-skip_blank = true
-
-# Full pattern (for complex cases)
-[[content.rules]]
-pattern = "**/*.test.ts"
-max_lines = 1500
+### Task 6.1: check Structure Parameters
+Location: `src/cli.rs`, `src/commands/check.rs`
+```
+- Add --max-files, --max-dirs to CheckArgs
+- Semantics: Override [structure] defaults only (not [[structure.rules]])
+- REQUIRE explicit <PATH> argument when using --max-files/--max-dirs
+  - Error if used without <PATH>: "error: --max-files/--max-dirs require a target <PATH>"
+  - Rationale: Global structure limits are rarely meaningful; per-directory use is intuitive
+- Help text: "Overrides default limits for <PATH>; rules take precedence"
 ```
 
-### Task 5.5.4: Structure Pattern Semantics Clarification ✅
-Location: `src/checker/structure.rs`, `docs/sloc-guard.example.toml`
-**Completed**: Enforced directory-only matching with clear glob semantics.
-- `structure.rules` patterns ONLY match directories (by design: `dir_stats` only contains directory paths)
-- Glob behavior documented:
-  - `src/components/*` → matches DIRECT children only (Button/, Icon/)
-  - `src/components/**` → matches ALL descendants recursively
-  - `src/features` → exact match only
-- Added doc comments to `get_limits()` and `check()` methods clarifying semantics
-- Example TOML includes explicit documentation and usage examples
-
-### Task 5.5.5: Naming & Semantics Polish ✅
-Location: `src/config/model.rs`, `docs/sloc-guard.example.toml`
-**Completed**: Renamed `structure.ignore` → `structure.count_exclude` for semantic clarity.
-- "ignored" implies "invisible/not scanned" which is misleading
-- `count_exclude` = "exists but doesn't count toward quota" (accurate)
+### Task 6.2: --diff Optional Parameter
+Location: `src/cli.rs`, `src/commands/check.rs`
 ```
-Documentation for `scanner.exclude` vs `structure.count_exclude`:
-  | Config                       | Effect                                      |
-  |------------------------------|---------------------------------------------|
-  | `scanner.exclude = ["*.svg"]`| Completely invisible to ALL checkers        |
-  | `structure.count_exclude`    | Visible but doesn't count toward dir quota  |
+- Change --diff from Option<String> to num_args = 0..=1
+- Default to "HEAD" when --diff provided without value
+- Update help text to clarify behavior
 ```
 
-### Task 5.5.6: Rename `common.rs` Module ✅
-Location: `src/commands/context.rs` (renamed from `common.rs`)
-**Completed**: Renamed to `context.rs`, updated all imports.
-
-### Task 5.5.7: Refactor `CheckResult` to Enum ✅
-Location: `src/checker/threshold.rs`
-**Completed**: Refactored `CheckResult` from struct to enum with associated data.
-```rust
-pub enum CheckResult {
-    Passed { path, stats, limit, override_reason },
-    Warning { path, stats, limit, override_reason, suggestions },
-    Failed { path, stats, limit, override_reason, suggestions },
-    Grandfathered { path, stats, limit, override_reason },
-}
+### Task 6.3: --history-file Parameter
+Location: `src/cli.rs`, `src/commands/stats.rs`
 ```
-- Removed `CheckStatus` enum (redundant with variant)
-- Added accessor methods: `path()`, `stats()`, `limit()`, `override_reason()`, `suggestions()`
-- Consuming transformations: `into_grandfathered()`, `with_suggestions()`
-- Updated all output formatters and commands
-
-### Task 5.5.8: Config Versioning ✅
-Location: `src/config/model.rs`, `src/config/loader.rs`
-**Completed**: Full V2 config schema with migration support.
-- `CONFIG_VERSION` = "2", `CONFIG_VERSION_V1` = "1"
-- Loader validates version: unsupported → error, missing/v1 → migrate to v2
-- `migrate_v1_to_v2()` migrates `default`→`scanner`+`content`, `path_rules`→`content.rules`, etc.
-
-### Task 5.5.13: Testability Refactoring (Dependency Injection) ✅
-Location: `src/commands/context.rs`, `src/commands/check.rs`, `src/commands/stats.rs`
-**Completed**: Dependencies extracted into injectable context structures.
-- `CheckContext` struct holds `LanguageRegistry`, `ThresholdChecker`, `StructureChecker`
-- `StatsContext` struct holds `LanguageRegistry`, `allowed_extensions`
-- Factory methods `from_config()` for production use
-- Constructor `new()` for testing with custom components
-- `run_check_with_context()` and `run_stats_with_context()` accept injected dependencies
-- Tests demonstrate context injection: `check_context_from_config_creates_valid_context`, `check_context_new_allows_custom_injection`, etc.
-
-### Task 5.5.14: Enforce Required Reason Field ✅
-Location: `src/config/model.rs`
-**Completed**: As part of Task 5.5.2.
-- `ContentOverride.reason: String` (not Option) - required field
-- `StructureOverride.reason: String` (not Option) - required field
-- TOML deserialization fails if reason missing
-
-### Task 5.5.9: Rule Priority Chain Documentation & Enforcement ✅
-Location: `src/checker/threshold.rs`, `src/config/loader.rs`, `docs/sloc-guard.example.toml`
-**Completed**: Priority chain defined and documented.
-- `expand_language_rules()` inserts language rules at HEAD of rule chain
-- Explicit `[[content.rules]]` always override language shorthand (LAST match wins)
-- Example TOML documents priority chain in header comments
-- Tests verify: `multiple_path_rules_last_match_wins`, `path_rule_has_higher_priority_than_extension_rule`
-```
-Content Rule Priority (high → low):
-1. [[content.override]] - exact path match
-2. [[content.rules]] - LAST declared match wins (later rules override earlier)
-3. [content.languages.<ext>] - extension shorthand (expanded to HEAD of rules)
-4. [content] defaults
-
-Structure Rule Priority (high → low):
-1. [[structure.override]] - exact path match
-2. [[structure.rules]] - LAST declared match wins
-3. [structure] defaults
+- Add --history-file <PATH> to StatsArgs (default: .sloc-guard-history.json)
+- Pass custom path to TrendHistory::load/save
 ```
 
-### Task 5.5.10: Structure warn_threshold Symmetry ✅
-Location: `src/config/model.rs`, `src/checker/structure.rs`
-**Completed**: Added `warn_threshold` to `StructureConfig` and `StructureRule`.
-- Content: `max_lines = 400, warn_threshold = 0.8` → warns at 320
-- Structure: `max_files = 50, warn_threshold = 0.9` → warns at 45
-```toml
-[structure]
-max_files = 50
-max_dirs = 10
-warn_threshold = 0.9  # Warn at 45 files / 9 dirs
-
-[[structure.rules]]
-pattern = "src/components/*"
-max_files = 5
-warn_threshold = 0.8  # Override threshold per rule
+### Task 6.4: Documentation Clarification
+Location: `docs/`, CLI help text
 ```
-- `StructureConfig { warn_threshold: Option<f64> }`
-- `StructureRule { warn_threshold: Option<f64> }`
-- `StructureViolation { is_warning: bool }` - distinguishes warnings from failures
+- S1: Clarify paths (scan roots) vs --include (allowlist filter)
+- S2: Document CLI override scope (overrides [content]/[structure] defaults, not rules)
+- S3: Document --diff default behavior (HEAD)
+- S4: Clarify --diff structure semantics: limits reporting scope, but counts use full disk state
+```
 
-### Task 5.5.11: "Unlimited" Special Value Semantics ✅
-Location: `src/config/model.rs`, `src/checker/structure.rs`, `docs/sloc-guard.example.toml`
-**Completed**: Use `-1` (UNLIMITED) to express "no limit" for a specific field.
-- `max_dirs = -1` means unlimited (skip check for this field)
-- Changed `max_files`/`max_dirs` from `Option<usize>` to `Option<i64>`
-- Added `UNLIMITED` constant (`-1`)
-- Validation rejects values < `-1`
-- Documentation updated in example TOML
-
-### Task 5.5.12: Add `extends` Examples to Documentation ✅
-Location: `docs/sloc-guard.example.toml`
-**Completed**: Added extends examples (local/remote inheritance, override values, `--no-extends` flag).
+### Task 6.6: check --report-json (Stats in Check)
+Location: `src/cli.rs`, `src/commands/check.rs`
+```
+- Add --report-json <PATH> to CheckArgs
+- Output ProjectStatistics alongside check results
+- Avoids running stats separately in CI pipelines
+```
 
 ---
 
-## Phase 6: Statistics Extension (Pending)
+## Phase 6.5: Baseline Consolidation (Pending)
 
-### Task 6.1: HTML Charts (Pure CSS)
+### Task 6.5.1: check --update-baseline
+Location: `src/cli.rs`, `src/commands/check.rs`, `src/commands/baseline_cmd.rs`
+```
+- Add --update-baseline[=MODE] to CheckArgs (optional value)
+- MODE values:
+  - all (default): Replace baseline with current violations
+  - content: Update SLOC violations only
+  - structure: Update directory violations only
+  - new: Add-only mode (add new violations, preserve existing entries)
+    - Prevents accidental removal of entries for fixed files
+    - Useful for incremental adoption in legacy projects
+- Merge baseline update logic into run_check()
+- Deprecate baseline update subcommand (warn + redirect)
+```
+
+---
+
+## Phase 6.9: CLI Naming Cleanup (Pending)
+
+### Task 6.9.1: Rename Misleading Parameters
+Location: `src/cli.rs`
+```
+- --fix → --suggest (or --suggestions)
+- --no-skip-comments → --count-comments
+- --no-skip-blank → --count-blank
+- Update all references in commands and help text
+```
+
+### Task 6.9.2: config show Format Enum
+Location: `src/cli.rs`, `src/commands/config.rs`
+```
+- Define ConfigOutputFormat enum (Text, Json)
+- Replace format: String with typed enum in ConfigArgs
+- Add value_parser for validation
+```
+
+---
+
+## Phase 7: Statistics Extension (Pending)
+
+### Task 7.1: HTML Charts (Pure CSS)
 Location: `src/output/html.rs`
 ```
 - File size distribution bar chart (pure CSS)
@@ -212,7 +132,7 @@ Location: `src/output/html.rs`
 - No external dependencies
 ```
 
-### Task 6.2: HTML Trend Visualization
+### Task 7.2: HTML Trend Visualization
 Location: `src/output/html.rs`
 ```
 - Integrate with .sloc-guard-history.json (if exists)
@@ -222,19 +142,57 @@ Location: `src/output/html.rs`
 
 ---
 
-## Phase 7: CI/CD Support (Pending)
+## Phase 8: CI/CD Support (Pending)
 
-### Task 7.1: GitHub Action
+### Task 8.1: GitHub Action
 ```
 - Create reusable GitHub Action
 - Input: paths, config-path, fail-on-warning
 - Output: total-files, passed, failed, warnings
 ```
 
-### Task 7.2: Pre-commit Hook
+### Task 8.2: Pre-commit Hook
 ```
 - Document .pre-commit-config.yaml setup
 - Support staged files only mode
+```
+
+---
+
+## Phase 9: Advanced Features (Pending)
+
+### Task 9.1: explain Command (High Priority)
+Location: `src/cli.rs`, `src/commands/explain.rs` (new)
+```
+- New command: sloc-guard explain <PATH>
+- Output: Which rule matched, override applied, final effective limits
+- Shows config source (local/remote) and rule chain for debugging
+- Essential for troubleshooting complex configurations
+```
+
+### Task 9.2: Structure max_depth
+Location: `src/config/structure.rs`, `src/checker/structure.rs`
+```
+- Add max_depth to [structure] and [[structure.rules]]
+- Limits directory nesting depth (prevents deeply nested structures)
+- StructureChecker tracks depth during traversal
+```
+
+### Task 9.3: init --detect (Smart Init)
+Location: `src/commands/init.rs`
+```
+- Add --detect flag to init command
+- Auto-detect project type (Cargo.toml→Rust, package.json→Node, etc.)
+- Generate language-appropriate default rules
+- Reduces configuration barrier for new users
+```
+
+### Task 9.4: Structure Whitelist Mode
+Location: `src/config/structure.rs`, `src/checker/structure.rs`
+```
+- Add allow_extensions / allow_patterns to [[structure.rules]]
+- Stricter than count_exclude: files not matching are violations
+- Enforces architectural purity (e.g., only .rs in src/domain/models)
 ```
 
 ---
@@ -243,11 +201,15 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Critical Architecture** | ~~5.5.1 Scanner/Structure Visibility~~, ~~5.5.2 Override Separation (incl. 5.5.14 required reason)~~ |
-| **2. UX & Semantics** | ~~5.5.3 Extension Syntax Sugar~~, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, ~~5.5.9 Priority Chain~~, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
-| **3. Code Quality** | ~~5.5.13 Testability (DI)~~, ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~~5.5.8 Versioning~~ |
-| **4. Documentation** | ~~5.5.12 extends Examples~~ |
-| **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
+| **1. CLI Usability (High)** | 6.1-6.2 Structure params, --diff optional |
+| **2. Debugging (High Value)** | 9.1 explain command (essential for complex configs) |
+| **3. CLI Enhancement (Medium)** | 6.3-6.4, 6.6 --history-file, docs, --report-json |
+| **4. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
+| **5. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
+| **6. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
+| **7. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **8. UX Improvements** | 9.3 Smart init |
+| **9. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 
 ---
 
