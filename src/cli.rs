@@ -67,14 +67,9 @@ pub enum BaselineUpdateMode {
 #[command(
     author,
     version,
-    about = "Source Lines of Code guard - enforce code size limits"
-)]
-#[command(
-    long_about = "A tool to enforce source lines of code (SLOC) limits per file.\n\n\
-    Exit codes:\n  \
-    0 - All checks passed\n  \
-    1 - Threshold violations found\n  \
-    2 - Configuration or runtime error"
+    about = "Enforce code size (SLOC) and directory structure limits",
+    long_about = "Enforce source lines of code (SLOC) limits per file and directory structure \
+    limits (file/folder counts). Counts code lines excluding comments and blanks by default."
 )]
 pub struct Cli {
     /// Increase output verbosity (-v, -vv for more)
