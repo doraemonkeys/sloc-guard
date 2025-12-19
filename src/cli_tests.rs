@@ -98,6 +98,18 @@ fn cli_check_with_diff() {
 }
 
 #[test]
+fn cli_check_with_diff_no_value() {
+    // When --diff is provided without a value, it should default to "HEAD"
+    let cli = Cli::parse_from(["sloc-guard", "check", "--diff"]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.diff, Some("HEAD".to_string()));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
 fn cli_stats_command() {
     let cli = Cli::parse_from(["sloc-guard", "stats", "src"]);
     match cli.command {

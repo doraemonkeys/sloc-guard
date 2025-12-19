@@ -137,8 +137,8 @@ pub struct CheckArgs {
     #[arg(long)]
     pub warn_only: bool,
 
-    /// Compare against a git reference (branch or commit)
-    #[arg(long)]
+    /// Compare against a git reference (branch or commit). Defaults to HEAD if no value provided.
+    #[arg(long, num_args = 0..=1, default_missing_value = "HEAD")]
     pub diff: Option<String>,
 
     /// Treat warnings as failures (exit code 1)

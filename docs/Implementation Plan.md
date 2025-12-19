@@ -34,18 +34,11 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **UX**: Extension-based rule sugar (`[content.languages.rs]`), Explicit Rule Priority (Override > Rule > Lang > Default), Structure pattern semantics clarification, Renamed `structure.count_exclude`.
 - **Phase 6 (Partial)**:
   - **6.1**: `--max-files`, `--max-dirs` CLI params for `check` command. Requires explicit `<PATH>` argument, overrides `[structure]` defaults (not rules).
+  - **6.2**: `--diff` optional parameter. Defaults to `HEAD` when provided without value (`--diff` same as `--diff HEAD`).
 
 ---
 
 ## Phase 6: CLI Symmetry & Usability (Pending)
-
-### Task 6.2: --diff Optional Parameter
-Location: `src/cli.rs`, `src/commands/check.rs`
-```
-- Change --diff from Option<String> to num_args = 0..=1
-- Default to "HEAD" when --diff provided without value
-- Update help text to clarify behavior
-```
 
 ### Task 6.3: --history-file Parameter
 Location: `src/cli.rs`, `src/commands/stats.rs`
@@ -192,15 +185,14 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. CLI Usability (High)** | ~~6.1~~ ✅, 6.2 --diff optional |
-| **2. Debugging (High Value)** | 9.1 explain command (essential for complex configs) |
-| **3. CLI Enhancement (Medium)** | 6.3-6.4, 6.6 --history-file, docs, --report-json |
-| **4. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
-| **5. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
-| **6. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
-| **7. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **8. UX Improvements** | 9.3 Smart init |
-| **9. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| **1. Debugging (High Value)** | 9.1 explain command (essential for complex configs) |
+| **2. CLI Enhancement (Medium)** | 6.3-6.4, 6.6 --history-file, docs, --report-json |
+| **3. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
+| **4. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
+| **5. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
+| **6. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **7. UX Improvements** | 9.3 Smart init |
+| **8. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 
 ---
 
