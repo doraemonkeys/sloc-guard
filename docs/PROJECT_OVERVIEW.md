@@ -1,6 +1,7 @@
 # sloc-guard Project Overview
 
 > **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
+> **Scope**: This document reflects the current codebase state only and does not describe future plans.
 
 **SLOC (Source Lines of Code) enforcement tool** - enforces file size limits by counting code lines (excluding comments and blanks) and enforces directory structure limits (file/folder counts).
 
@@ -151,5 +152,4 @@ show: load_config() → format_config_text() or JSON
 `clap` v4, `serde`/`toml`/`serde_json`, `walkdir`, `globset`, `rayon`, `indicatif`, `gix`, `sha2`, `regex`, `reqwest` (blocking + rustls-tls), `thiserror`
 
 ## Test
-
 Each module has `*_tests.rs`. Run: `make ci` or `cargo test`

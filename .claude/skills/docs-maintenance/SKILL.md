@@ -1,6 +1,6 @@
 ---
 name: docs-maintenance
-description: Maintain sloc-guard project documentation. Use when user completes a feature and asks to update docs. Updates PROJECT_OVERVIEW.md, Requirements.md, and Implementation Plan.md.
+description: Maintain sloc-guard project documentation. Use when user completes a feature and asks to update docs.
 ---
 
 # Documentation Maintenance

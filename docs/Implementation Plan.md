@@ -36,8 +36,6 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 Focus: Address architecture flaws, Scanner/Structure visibility conflict, UX ambiguities, and CLAUDE.md violations.
 
 ### Task 5.5.1: Scanner vs Structure Visibility Conflict (Critical)
-> ⚠️ **Plan Mode Required**: 跨 4+ 模块的架构重构，先制定完整计划再实施。
-
 Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/structure.rs`
 **Problem**: `[scanner].extensions` filters files globally → Structure checker "blind" to non-code files.
 - Scenario: Dir has 100 `.txt` files, scanner only sees `.rs` → Structure reports 0 files → false pass.
@@ -58,8 +56,6 @@ Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/structure.rs`
 - `StructureChecker` sees full directory contents (uses its own `count_exclude`).
 
 ### Task 5.5.2: Override Separation (Content vs Structure)
-> ⚠️ **Plan Mode Required**: 配置结构拆分 + checker 适配，涉及多模块联动。
-
 Location: `src/config/model.rs`, `src/checker/*.rs`
 **Problem**: `[[override]]` mixing file limits and directory limits causes semantic confusion.
 - Same array contains two different concepts (file SLOC vs directory counts)
@@ -91,8 +87,6 @@ reason = "Legacy monolith, gradual migration in progress"  # reason REQUIRED
 - Loader validates: override.max_lines >= effective rule limit (error if stricter)
 
 ### Task 5.5.3: Extension-Based Rule Syntax Sugar
-> ⚠️ **Plan Mode Required**: 新增配置语法 + loader 展开逻辑 + 字段一致性验证。
-
 Location: `src/config/model.rs`, `src/config/loader.rs`
 **Problem**: Removing `[rules.<ext>]` in favor of `[[content.rules]]` pattern degrades UX for common case.
 - Old: `[rules.rs] max_lines = 1000` (simple, intuitive)
@@ -172,9 +166,32 @@ Location: `src/config/model.rs`, `src/config/loader.rs`
 - Migration path: v1 config auto-converted to v2 internally
 - Warn when `version` is missing (deprecation notice)
 
-### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
-> ⚠️ **Plan Mode Required**: 规则优先级逻辑重构，跨 loader/checker 模块。
+### Task 5.5.13: Testability Refactoring (Dependency Injection)
 
+Location: `src/commands/check.rs`, `src/commands/stats.rs`
+**Problem**: Command handlers directly instantiate dependencies (LanguageRegistry, ThresholdChecker, StructureChecker, ScanProgress), violating "Design for Testability" principle.
+- Tight coupling makes unit testing impossible without mocking entire file system
+- Cannot inject test doubles for isolated testing
+
+**Solution**: Extract dependencies into injectable context structure.
+- Create `CheckContext` containing all checker/registry dependencies
+- Factory method creates production context from config
+- Tests construct context with controlled/mock components
+- Consider trait abstractions if full mockability needed later
+
+### Task 5.5.14: Enforce Required Reason Field
+
+Location: `src/config/model.rs`, `src/config/loader.rs`
+**Problem**: Override `reason` field is optional, violating "Make Illegal States Unrepresentable" principle.
+- Task 5.5.2 design requires reason to be mandatory
+- Current code allows overrides without justification → audit trail gap
+
+**Solution**: Make reason mandatory in type system.
+- Remove `Option` wrapper from `reason` field in override types
+- Loader rejects overrides with missing/empty reason
+- **Note**: Fix as part of 5.5.2 migration (ContentOverride/StructureOverride split)
+
+### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
 Location: `src/checker/threshold.rs`, `src/config/loader.rs`, `docs/sloc-guard.example.toml`
 **Problem**: Multiple rules can match same file, priority unclear.
 - `[[content.rules]] pattern = "tests/**"` vs `[[content.rules]] pattern = "**/*.test.ts"`
@@ -277,10 +294,10 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation |
+| **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation (incl. 5.5.14 required reason) |
 | **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
-| **3. Documentation** | ~~5.5.12 extends Examples~~ |
-| **4. Code Quality** | ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~5.5.8 Versioning~ (partial) |
+| **3. Code Quality** | 5.5.13 Testability (DI), ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~5.5.8 Versioning~ (partial) |
+| **4. Documentation** | ~~5.5.12 extends Examples~~ |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 
 ---
