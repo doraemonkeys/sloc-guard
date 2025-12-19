@@ -69,6 +69,7 @@ fn run_stats_impl_with_valid_directory() {
         top: None,
         no_gitignore: false,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -96,6 +97,7 @@ fn run_stats_impl_with_json_output() {
         top: None,
         no_gitignore: false,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -123,6 +125,7 @@ fn run_stats_impl_with_include_paths() {
         top: None,
         no_gitignore: false,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -150,6 +153,7 @@ fn run_stats_returns_config_error_on_invalid_config() {
         top: None,
         no_gitignore: true,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, false);
@@ -175,6 +179,7 @@ fn run_stats_impl_with_markdown_output() {
         top: None,
         no_gitignore: false,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -202,6 +207,7 @@ fn run_stats_impl_with_group_by_lang() {
         top: None,
         no_gitignore: false,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -225,10 +231,45 @@ fn run_stats_impl_with_top_files() {
         top: Some(5),
         no_gitignore: false,
         trend: false,
+        history_file: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
 
     let result = run_stats_impl(&args, &cli);
     assert!(result.is_ok());
+}
+
+#[test]
+fn run_stats_impl_with_custom_history_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let history_path = temp_dir.path().join("custom-history.json");
+
+    let args = StatsArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        format: OutputFormat::Text,
+        output: None,
+        no_cache: true,
+        group_by: GroupBy::None,
+        top: None,
+        no_gitignore: false,
+        trend: true,
+        history_file: Some(history_path.clone()),
+    };
+
+    let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
+
+    let result = run_stats_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert!(history_path.exists(), "Custom history file should be created");
+
+    // Verify the history file contains valid JSON
+    let content = std::fs::read_to_string(&history_path).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+    assert!(parsed.get("version").is_some());
+    assert!(parsed.get("entries").is_some());
 }

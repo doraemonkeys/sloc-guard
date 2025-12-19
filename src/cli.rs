@@ -232,6 +232,10 @@ pub struct StatsArgs {
     /// Track and display trend (delta from previous run)
     #[arg(long)]
     pub trend: bool,
+
+    /// Path to history file for trend tracking (default: .sloc-guard-history.json)
+    #[arg(long, value_name = "PATH")]
+    pub history_file: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]

@@ -121,7 +121,8 @@ pub(crate) fn run_stats_with_context(
 
     // 5.2 Trend tracking if enabled
     let project_stats = if args.trend {
-        let history_path = Path::new(DEFAULT_HISTORY_PATH);
+        let default_path = Path::new(DEFAULT_HISTORY_PATH).to_path_buf();
+        let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
         let trend = history.compute_delta(&project_stats);
         history.add(&project_stats);
