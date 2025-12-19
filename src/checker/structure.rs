@@ -88,6 +88,12 @@ pub struct StructureChecker {
     max_files: Option<i64>,
     max_dirs: Option<i64>,
     warn_threshold: Option<f64>,
+    /// Patterns from scanner.exclude - directories matching these are completely skipped.
+    scanner_exclude: GlobSet,
+    /// Base directory names extracted from scanner.exclude patterns ending with "/**".
+    /// Used to match directories like ".git" when pattern is ".git/**".
+    scanner_exclude_dir_names: Vec<String>,
+    /// Patterns from `structure.count_exclude` - items matching these are not counted.
     ignore_patterns: GlobSet,
     rules: Vec<CompiledStructureRule>,
     overrides: Vec<StructureOverride>,
@@ -100,8 +106,21 @@ impl StructureChecker {
     /// Returns an error if any ignore or rule pattern is invalid,
     /// or if any limit value is less than -1.
     pub fn new(config: &StructureConfig) -> Result<Self> {
+        Self::with_scanner_exclude(config, &[])
+    }
+
+    /// Create a new structure checker with scanner exclude patterns.
+    ///
+    /// Scanner exclude patterns cause directories to be completely skipped during traversal.
+    /// This is separate from `count_exclude` which only affects counting.
+    ///
+    /// # Errors
+    /// Returns an error if any pattern is invalid or any limit value is less than -1.
+    pub fn with_scanner_exclude(config: &StructureConfig, scanner_exclude: &[String]) -> Result<Self> {
         Self::validate_limits(config)?;
 
+        let scanner_exclude_set = Self::build_ignore_patterns(scanner_exclude)?;
+        let scanner_exclude_dir_names = Self::extract_dir_names_from_patterns(scanner_exclude);
         let ignore_patterns = Self::build_ignore_patterns(&config.count_exclude)?;
         let rules = Self::build_rules(&config.rules)?;
 
@@ -109,10 +128,36 @@ impl StructureChecker {
             max_files: config.max_files,
             max_dirs: config.max_dirs,
             warn_threshold: config.warn_threshold,
+            scanner_exclude: scanner_exclude_set,
+            scanner_exclude_dir_names,
             ignore_patterns,
             rules,
             overrides: config.overrides.clone(),
         })
+    }
+
+    /// Extract directory names from patterns ending with "/**".
+    ///
+    /// For pattern ".git/**", extracts ".git".
+    /// For pattern "target/**", extracts "target".
+    fn extract_dir_names_from_patterns(patterns: &[String]) -> Vec<String> {
+        patterns
+            .iter()
+            .filter_map(|p| {
+                // Handle patterns ending with /** or \**
+                let trimmed = p.trim_end_matches("/**").trim_end_matches("\\**");
+                if trimmed.len() < p.len() {
+                    // Pattern was trimmed, extract the last component
+                    let last_component = trimmed
+                        .rsplit(['/', '\\'])
+                        .next()
+                        .filter(|s| !s.is_empty() && !s.contains('*'));
+                    last_component.map(String::from)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Validate that all limit values are >= -1.
@@ -253,13 +298,23 @@ impl StructureChecker {
             let entry = entry.map_err(SlocGuardError::Io)?;
             let path = entry.path();
             let file_name = path.file_name().unwrap_or_default();
+            let file_type = entry.file_type().map_err(SlocGuardError::Io)?;
 
-            // Check if this entry should be ignored
-            if self.ignore_patterns.is_match(file_name) || self.ignore_patterns.is_match(&path) {
+            // Check scanner.exclude patterns - completely skip matching entries
+            // For directory patterns like ".git/**", we check both the path and
+            // a synthetic child path to catch the directory itself
+            if self.is_scanner_excluded(&path, file_type.is_dir()) {
                 continue;
             }
 
-            let file_type = entry.file_type().map_err(SlocGuardError::Io)?;
+            // Check structure.count_exclude patterns - don't count but may still traverse
+            if self.ignore_patterns.is_match(file_name) || self.ignore_patterns.is_match(&path) {
+                // Still recurse into directories for stats collection, just don't count this entry
+                if file_type.is_dir() {
+                    self.collect_dir_stats_recursive(&path, stats)?;
+                }
+                continue;
+            }
 
             if file_type.is_file() {
                 dir_stats.file_count += 1;
@@ -272,6 +327,31 @@ impl StructureChecker {
 
         stats.insert(dir.to_path_buf(), dir_stats);
         Ok(())
+    }
+
+    /// Check if a path should be excluded based on scanner.exclude patterns.
+    ///
+    /// For directory patterns like ".git/**", this also matches the ".git" directory itself,
+    /// not just its contents.
+    fn is_scanner_excluded(&self, path: &Path, is_dir: bool) -> bool {
+        let file_name = path.file_name().unwrap_or_default();
+        let file_name_str = file_name.to_string_lossy();
+
+        // Direct match on filename or full path
+        if self.scanner_exclude.is_match(file_name) || self.scanner_exclude.is_match(path) {
+            return true;
+        }
+
+        // For directories, check if the name matches any extracted dir names from "dir/**" patterns
+        if is_dir {
+            for dir_name in &self.scanner_exclude_dir_names {
+                if file_name_str == *dir_name {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Check if a directory path matches an override path.

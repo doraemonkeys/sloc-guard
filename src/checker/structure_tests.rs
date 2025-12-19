@@ -948,3 +948,63 @@ fn override_requires_at_least_one_limit() {
         assert!(msg.contains("must specify at least one of max_files or max_dirs"));
     }
 }
+
+// ============================================================================
+// Scanner Exclude Tests (scanner.exclude should skip directories entirely)
+// ============================================================================
+
+#[test]
+fn scanner_exclude_skips_directories_entirely() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    // Create regular directory with files
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+
+    // Create .git directory (should be excluded by scanner.exclude)
+    std::fs::create_dir(root.join(".git")).unwrap();
+    std::fs::create_dir(root.join(".git/hooks")).unwrap();
+    std::fs::write(root.join(".git/config"), "[core]").unwrap();
+    std::fs::write(root.join(".git/hooks/pre-commit"), "#!/bin/sh").unwrap();
+
+    // Create target directory (should also be excluded)
+    std::fs::create_dir(root.join("target")).unwrap();
+    std::fs::write(root.join("target/debug.txt"), "debug").unwrap();
+
+    let config = StructureConfig {
+        max_files: Some(10),
+        ..Default::default()
+    };
+
+    // Pass scanner exclude patterns
+    let scanner_exclude = vec![".git/**".to_string(), "target/**".to_string()];
+    let checker = StructureChecker::with_scanner_exclude(&config, &scanner_exclude).unwrap();
+    let stats = checker.collect_dir_stats(root).unwrap();
+
+    // Root should have 1 dir (src only, .git and target excluded)
+    let root_stats = stats.get(root).unwrap();
+    assert_eq!(root_stats.dir_count, 1, "root should only see 'src' dir");
+
+    // .git should NOT be in stats (completely skipped)
+    assert!(
+        !stats.contains_key(&root.join(".git")),
+        ".git should not be traversed"
+    );
+    assert!(
+        !stats.contains_key(&root.join(".git/hooks")),
+        ".git/hooks should not be traversed"
+    );
+
+    // target should NOT be in stats
+    assert!(
+        !stats.contains_key(&root.join("target")),
+        "target should not be traversed"
+    );
+
+    // src should be in stats
+    assert!(
+        stats.contains_key(&root.join("src")),
+        "src should be traversed"
+    );
+}

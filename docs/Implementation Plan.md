@@ -46,6 +46,27 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 
 ---
 
+## Phase 10: Code Quality & Testability (Next Priority)
+
+### Task 10.1: IO Abstraction for Pure Unit Testing
+Location: `src/commands/check.rs`, `src/commands/context.rs`, `src/scanner/*.rs`
+```
+- Define Scanner trait (abstracts scan_files)
+- Define FileReader trait (abstracts file reading in process_file_with_cache)
+- Inject IO abstractions via CheckContext
+- Enable pure unit testing of run_check_with_context without real file system
+```
+Note: Related FileSystem trait exists in `src/config/loader.rs` - consider unifying.
+
+### Task 10.2: Replace unwrap() with expect()
+Location: `src/config/loader.rs:129`
+```
+- Replace .unwrap() with .expect("reason") for clearer error context
+- Reason: iterating over keys guarantees existence, but expect() documents intent
+```
+
+---
+
 ## Phase 7: Statistics Extension (Pending)
 
 ### Task 7.1: HTML Charts (Pure CSS)
@@ -112,36 +133,15 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 ---
 
-## Phase 10: Code Quality & Testability (Pending)
-
-### Task 10.1: IO Abstraction for Pure Unit Testing
-Location: `src/commands/check.rs`, `src/commands/context.rs`, `src/scanner/*.rs`
-```
-- Define Scanner trait (abstracts scan_files)
-- Define FileReader trait (abstracts file reading in process_file_with_cache)
-- Inject IO abstractions via CheckContext
-- Enable pure unit testing of run_check_with_context without real file system
-```
-Note: Related FileSystem trait exists in `src/config/loader.rs` - consider unifying.
-
-### Task 10.2: Replace unwrap() with expect()
-Location: `src/config/loader.rs:129`
-```
-- Replace .unwrap() with .expect("reason") for clearer error context
-- Reason: iterating over keys guarantees existence, but expect() documents intent
-```
-
----
-
 ## Priority Order
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
-| **2. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **3. UX Improvements** | 9.3 Smart init |
-| **4. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
-| **5. Code Quality** | 10.1 IO Abstraction, 10.2 expect() cleanup |
+| **1. Code Quality** | 10.1 IO Abstraction, 10.2 expect() cleanup |
+| **2. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
+| **3. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **4. UX Improvements** | 9.3 Smart init |
+| **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 
 ---
 

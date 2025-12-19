@@ -196,7 +196,8 @@ impl CheckContext {
         let registry = LanguageRegistry::with_custom_languages(&config.languages);
         let threshold_checker =
             ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
-        let structure_checker = StructureChecker::new(&config.structure).ok();
+        let structure_checker =
+            StructureChecker::with_scanner_exclude(&config.structure, &config.scanner.exclude).ok();
 
         Ok(Self {
             registry,
