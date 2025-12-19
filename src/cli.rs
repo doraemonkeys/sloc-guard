@@ -88,8 +88,9 @@ pub enum Commands {
 #[derive(Parser, Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckArgs {
-    /// Paths to check (files or directories)
-    #[arg(default_value = ".")]
+    /// Paths to check (files or directories). Defaults to current directory.
+    /// Required when using --max-files or --max-dirs.
+    #[arg()]
     pub paths: Vec<PathBuf>,
 
     /// Path to configuration file
@@ -159,6 +160,14 @@ pub struct CheckArgs {
     /// Show split suggestions for files exceeding thresholds
     #[arg(long)]
     pub fix: bool,
+
+    /// Maximum files per directory (overrides config [structure] defaults; rules take precedence)
+    #[arg(long, value_name = "COUNT")]
+    pub max_files: Option<i64>,
+
+    /// Maximum subdirectories per directory (overrides config [structure] defaults; rules take precedence)
+    #[arg(long, value_name = "COUNT")]
+    pub max_dirs: Option<i64>,
 }
 
 #[derive(Parser, Debug)]

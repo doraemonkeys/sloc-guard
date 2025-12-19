@@ -187,6 +187,8 @@ fn run_check_impl_with_valid_directory() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -217,6 +219,8 @@ fn run_check_impl_with_warn_only() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -247,6 +251,8 @@ fn run_check_impl_with_threshold_exceeded() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -280,6 +286,8 @@ fn run_check_impl_with_json_output() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -313,6 +321,8 @@ fn run_check_impl_with_verbose() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -342,6 +352,8 @@ fn run_check_impl_with_no_skip_flags() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -371,6 +383,8 @@ fn run_check_impl_with_include_paths() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -400,6 +414,8 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -430,6 +446,8 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -460,6 +478,8 @@ fn run_check_impl_warn_only_overrides_strict() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -494,6 +514,8 @@ fn run_check_returns_config_error_on_invalid_config() {
         no_cache: true,
         no_gitignore: true,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -525,6 +547,8 @@ fn run_check_impl_with_sarif_output() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -561,6 +585,8 @@ fn run_check_impl_with_markdown_output() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -595,6 +621,8 @@ fn apply_cli_overrides_max_lines() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -625,6 +653,8 @@ fn apply_cli_overrides_no_skip_comments() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -655,6 +685,8 @@ fn apply_cli_overrides_no_skip_blank() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -683,6 +715,8 @@ fn apply_cli_overrides_warn_threshold() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -846,6 +880,8 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
         no_cache: true,
         no_gitignore: false,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -886,6 +922,8 @@ fn run_check_impl_without_baseline_fails_on_violations() {
         no_cache: true,
         no_gitignore: true,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -930,6 +968,8 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
         no_cache: true,
         no_gitignore: true,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -1008,12 +1048,15 @@ fn run_check_with_context_uses_injected_threshold_checker() {
         no_cache: true,
         no_gitignore: true,
         fix: false,
+        max_files: None,
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+    let paths = args.paths.clone();
 
     // The injected context's threshold_checker should detect the violation
-    let result = run_check_with_context(&args, &cli, &config, &ctx, &cache, None);
+    let result = run_check_with_context(&args, &cli, &paths, &config, &ctx, &cache, None);
     assert!(result.is_ok());
     // File has 1 line, limit is 1, so it should pass (equal to limit)
     assert_eq!(result.unwrap(), EXIT_SUCCESS);
@@ -1044,7 +1087,7 @@ fn run_check_with_context_uses_injected_structure_checker() {
     assert!(ctx.structure_checker.as_ref().unwrap().is_enabled());
 
     let args = CheckArgs {
-        paths: vec![sub_dir],
+        paths: vec![sub_dir.clone()],
         config: None,
         max_lines: None,
         ext: None,
@@ -1062,12 +1105,291 @@ fn run_check_with_context_uses_injected_structure_checker() {
         no_cache: true,
         no_gitignore: true,
         fix: false,
+        max_files: None,
+        max_dirs: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+    let paths = vec![sub_dir];
+
+    // Structure checker should detect violation (3 files > 2 limit)
+    let result = run_check_with_context(&args, &cli, &paths, &config, &ctx, &cache, None);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}
+
+// =============================================================================
+// Task 6.1: CLI Structure Parameters Tests
+// =============================================================================
+
+#[test]
+fn validate_and_resolve_paths_no_args_defaults_to_current_dir() {
+    let args = CheckArgs {
+        paths: vec![],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: None,
+        max_dirs: None,
+    };
+
+    let result = validate_and_resolve_paths(&args);
+    assert!(result.is_ok());
+    let paths = result.unwrap();
+    assert_eq!(paths.len(), 1);
+    assert_eq!(paths[0], PathBuf::from("."));
+}
+
+#[test]
+fn validate_and_resolve_paths_max_files_without_path_returns_error() {
+    let args = CheckArgs {
+        paths: vec![],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: Some(10),
+        max_dirs: None,
+    };
+
+    let result = validate_and_resolve_paths(&args);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("--max-files/--max-dirs require a target <PATH>"));
+}
+
+#[test]
+fn validate_and_resolve_paths_max_dirs_without_path_returns_error() {
+    let args = CheckArgs {
+        paths: vec![],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: None,
+        max_dirs: Some(5),
+    };
+
+    let result = validate_and_resolve_paths(&args);
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("--max-files/--max-dirs require a target <PATH>"));
+}
+
+#[test]
+fn validate_and_resolve_paths_max_files_with_path_succeeds() {
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: Some(10),
+        max_dirs: None,
+    };
+
+    let result = validate_and_resolve_paths(&args);
+    assert!(result.is_ok());
+    let paths = result.unwrap();
+    assert_eq!(paths.len(), 1);
+    assert_eq!(paths[0], PathBuf::from("src"));
+}
+
+#[test]
+fn apply_cli_overrides_structure_max_files() {
+    let mut config = Config::default();
+    assert!(config.structure.max_files.is_none());
+
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: Some(10),
+        max_dirs: None,
+    };
+
+    apply_cli_overrides(&mut config, &args);
+    assert_eq!(config.structure.max_files, Some(10));
+}
+
+#[test]
+fn apply_cli_overrides_structure_max_dirs() {
+    let mut config = Config::default();
+    assert!(config.structure.max_dirs.is_none());
+
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: None,
+        ext: None,
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: None,
+        max_dirs: Some(5),
+    };
+
+    apply_cli_overrides(&mut config, &args);
+    assert_eq!(config.structure.max_dirs, Some(5));
+}
+
+#[test]
+fn run_check_with_cli_max_files_overrides_config() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create 3 files in directory
+    std::fs::write(temp_dir.path().join("a.rs"), "fn a() {}").unwrap();
+    std::fs::write(temp_dir.path().join("b.rs"), "fn b() {}").unwrap();
+    std::fs::write(temp_dir.path().join("c.rs"), "fn c() {}").unwrap();
+
+    // Use --max-files=2 to trigger violation (3 files > 2 limit)
+    let args = CheckArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: None,
+        max_lines: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: true,
+        fix: false,
+        max_files: Some(2),
+        max_dirs: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
 
-    // Structure checker should detect violation (3 files > 2 limit)
-    let result = run_check_with_context(&args, &cli, &config, &ctx, &cache, None);
+    let result = run_check_impl(&args, &cli);
     assert!(result.is_ok());
+    // 3 files > 2 limit should fail
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}
+
+#[test]
+fn run_check_with_cli_max_dirs_overrides_config() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create 3 subdirectories
+    std::fs::create_dir(temp_dir.path().join("sub1")).unwrap();
+    std::fs::create_dir(temp_dir.path().join("sub2")).unwrap();
+    std::fs::create_dir(temp_dir.path().join("sub3")).unwrap();
+
+    // Use --max-dirs=2 to trigger violation (3 dirs > 2 limit)
+    let args = CheckArgs {
+        paths: vec![temp_dir.path().to_path_buf()],
+        config: None,
+        max_lines: None,
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: true,
+        fix: false,
+        max_files: None,
+        max_dirs: Some(2),
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // 3 dirs > 2 limit should fail
     assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
 }

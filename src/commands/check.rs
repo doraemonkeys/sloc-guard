@@ -37,6 +37,9 @@ pub fn run_check(args: &CheckArgs, cli: &Cli) -> i32 {
 }
 
 pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
+    // 0. Validate structure params require explicit path
+    let paths = validate_and_resolve_paths(args)?;
+
     // 1. Load configuration
     let mut config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
 
@@ -65,7 +68,7 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     let ctx = CheckContext::from_config(&config, warn_threshold)?;
 
     // 5. Run check with context
-    run_check_with_context(args, cli, &config, &ctx, &cache, baseline.as_ref())
+    run_check_with_context(args, cli, &paths, &config, &ctx, &cache, baseline.as_ref())
 }
 
 /// Internal implementation accepting injectable context (for testing).
@@ -75,6 +78,7 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
 pub(crate) fn run_check_with_context(
     args: &CheckArgs,
     cli: &Cli,
+    paths: &[std::path::PathBuf],
     config: &crate::config::Config,
     ctx: &CheckContext,
     cache: &Mutex<Cache>,
@@ -85,7 +89,7 @@ pub(crate) fn run_check_with_context(
     exclude_patterns.extend(args.exclude.clone());
 
     // 2. Determine paths to scan
-    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, config);
+    let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
 
     // 3. Scan directories (respecting .gitignore if enabled)
     // Scanner now returns ALL files, extension filtering is done by ThresholdChecker
@@ -205,6 +209,26 @@ pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &
     }
 }
 
+/// Validate structure params require explicit path and return resolved paths.
+///
+/// - If `--max-files` or `--max-dirs` is specified, paths must be explicitly provided
+/// - If no paths are provided and no structure params, defaults to current directory
+fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<std::path::PathBuf>> {
+    let has_structure_params = args.max_files.is_some() || args.max_dirs.is_some();
+
+    if args.paths.is_empty() {
+        if has_structure_params {
+            return Err(crate::SlocGuardError::Config(
+                "--max-files/--max-dirs require a target <PATH>".to_string(),
+            ));
+        }
+        // Default to current directory when no paths and no structure params
+        Ok(vec![std::path::PathBuf::from(".")])
+    } else {
+        Ok(args.paths.clone())
+    }
+}
+
 pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args: &CheckArgs) {
     if let Some(max_lines) = args.max_lines {
         config.content.max_lines = max_lines;
@@ -220,6 +244,15 @@ pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args
 
     if let Some(warn_threshold) = args.warn_threshold {
         config.content.warn_threshold = warn_threshold;
+    }
+
+    // Apply CLI structure overrides (override defaults, not rules)
+    if let Some(max_files) = args.max_files {
+        config.structure.max_files = Some(max_files);
+    }
+
+    if let Some(max_dirs) = args.max_dirs {
+        config.structure.max_dirs = Some(max_dirs);
     }
 }
 

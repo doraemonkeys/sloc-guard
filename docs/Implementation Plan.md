@@ -32,21 +32,12 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **Architecture**: Scanner/Structure separation, `ScannerConfig` vs `ContentConfig`, `CheckResult` enum refactor, Dependency Injection (Context) implementation.
   - **Config V2**: Separated `[[content.override]]` vs `[[structure.override]]` (with required reason), Versioning (auto-migration v1→v2), `warn_threshold` for structure, Unlimited (`-1`) limits.
   - **UX**: Extension-based rule sugar (`[content.languages.rs]`), Explicit Rule Priority (Override > Rule > Lang > Default), Structure pattern semantics clarification, Renamed `structure.count_exclude`.
+- **Phase 6 (Partial)**:
+  - **6.1**: `--max-files`, `--max-dirs` CLI params for `check` command. Requires explicit `<PATH>` argument, overrides `[structure]` defaults (not rules).
 
 ---
 
 ## Phase 6: CLI Symmetry & Usability (Pending)
-
-### Task 6.1: check Structure Parameters
-Location: `src/cli.rs`, `src/commands/check.rs`
-```
-- Add --max-files, --max-dirs to CheckArgs
-- Semantics: Override [structure] defaults only (not [[structure.rules]])
-- REQUIRE explicit <PATH> argument when using --max-files/--max-dirs
-  - Error if used without <PATH>: "error: --max-files/--max-dirs require a target <PATH>"
-  - Rationale: Global structure limits are rarely meaningful; per-directory use is intuitive
-- Help text: "Overrides default limits for <PATH>; rules take precedence"
-```
 
 ### Task 6.2: --diff Optional Parameter
 Location: `src/cli.rs`, `src/commands/check.rs`
@@ -201,7 +192,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. CLI Usability (High)** | 6.1-6.2 Structure params, --diff optional |
+| **1. CLI Usability (High)** | ~~6.1~~ ✅, 6.2 --diff optional |
 | **2. Debugging (High Value)** | 9.1 explain command (essential for complex configs) |
 | **3. CLI Enhancement (Medium)** | 6.3-6.4, 6.6 --history-file, docs, --report-json |
 | **4. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |

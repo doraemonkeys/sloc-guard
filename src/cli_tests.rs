@@ -7,7 +7,8 @@ fn cli_check_default_path() {
     let cli = Cli::parse_from(["sloc-guard", "check"]);
     match cli.command {
         Commands::Check(args) => {
-            assert_eq!(args.paths, vec![PathBuf::from(".")]);
+            // paths is empty by default; validate_and_resolve_paths() applies the "." default
+            assert!(args.paths.is_empty());
         }
         _ => panic!("Expected Check command"),
     }

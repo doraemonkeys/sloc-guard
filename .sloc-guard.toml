@@ -15,3 +15,9 @@ skip_blank = false
 pattern = "**/*_tests.rs"
 max_lines = 1400
 warn_threshold = 0.9
+
+[structure]
+max_files = 50
+max_dirs = 20
+warn_threshold = 0.9
+count_exclude = ["*_tests.rs"]
