@@ -24,7 +24,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir count limits with glob-based rules |
 | `checker/explain` | `checker/explain.rs` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
-| `baseline`/`cache` | `*/types.rs` | `Baseline` (grandfathering), `Cache` (mtime+size validation) |
+| `baseline`/`cache` | `*/types.rs` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
 | `output/*` | `output/*.rs` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
 | `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI |
@@ -87,7 +87,11 @@ TrendDelta { *_delta, previous_timestamp }
 
 // Git/Baseline/Cache
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>
-Baseline { version, files: HashMap<path, BaselineEntry{lines, hash}> }  // .sloc-guard-baseline.json
+// Baseline V2 (.sloc-guard-baseline.json) - auto-migrates V1 format
+Baseline { version: 2, files: HashMap<path, BaselineEntry> }
+BaselineEntry::Content { lines, hash } | Structure { violation_type, count }
+StructureViolationType::Files | Dirs
+BaselineUpdateMode::All | Content | Structure | New  // --update-baseline mode
 Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime, size}> }  // .sloc-guard-cache.json
 
 // Split suggestions (--fix)
@@ -126,7 +130,8 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → ThresholdChecker::check() → CheckResult (parallel, per-file)
 → StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
-→ [if baseline] mark Grandfathered | [if --fix] generate_split_suggestions()
+→ [if baseline] mark Grandfathered | [if --update-baseline] save violations to baseline
+→ [if --fix] generate_split_suggestions()
 → [if --report-json] ProjectStatistics → StatsJsonFormatter → write to path
 → format (Text/Json/Sarif/Markdown/Html) → output
 ```
@@ -141,7 +146,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 → format (StatsText/Json/Markdown) → output
 ```
 
-### baseline-specific
+### baseline-specific (deprecated: use `check --update-baseline` instead)
 
 ```
 → collect Failed files → compute_file_hash() → Baseline::save()

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 use super::run_baseline_update_impl;
-use crate::baseline::Baseline;
+use crate::baseline::{Baseline, BaselineEntry};
 use crate::cli::{BaselineUpdateArgs, Cli, ColorChoice, Commands, InitArgs};
 
 fn make_cli_for_baseline(quiet: bool, no_config: bool) -> Cli {
@@ -153,6 +153,11 @@ fn baseline_file_contains_correct_hash() {
     let baseline = Baseline::load(&baseline_path).unwrap();
     let entry = baseline.files().values().next().unwrap();
 
-    assert_eq!(entry.hash.len(), 64);
-    assert!(entry.hash.chars().all(|c| c.is_ascii_hexdigit()));
+    match entry {
+        BaselineEntry::Content { hash, .. } => {
+            assert_eq!(hash.len(), 64);
+            assert!(hash.chars().all(|c: char| c.is_ascii_hexdigit()));
+        }
+        BaselineEntry::Structure { .. } => panic!("Expected Content entry"),
+    }
 }

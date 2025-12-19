@@ -37,28 +37,10 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **6.2**: `--diff` optional parameter. Defaults to `HEAD` when provided without value (`--diff` same as `--diff HEAD`).
   - **6.3**: `--history-file` parameter for `stats` command. Custom path for trend history file (default: `.sloc-guard-history.json`).
   - **6.4**: Documentation Clarification - CLI help text updates (paths vs --include, CLI override scope, --diff behavior), README.md creation.
+  - **6.5.1**: `--update-baseline[=MODE]` for `check` command. Modes: `all`(default), `content`, `structure`, `new`. Baseline V2 format (tagged enum for content/structure entries). V1 auto-migration. Deprecates `baseline update` subcommand.
   - **6.6**: `--report-json <PATH>` for `check` command. Outputs `ProjectStatistics` JSON alongside check results (avoids separate stats run in CI).
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
-
----
-
-## Phase 6.5: Baseline Consolidation (Pending)
-
-### Task 6.5.1: check --update-baseline
-Location: `src/cli.rs`, `src/commands/check.rs`, `src/commands/baseline_cmd.rs`
-```
-- Add --update-baseline[=MODE] to CheckArgs (optional value)
-- MODE values:
-  - all (default): Replace baseline with current violations
-  - content: Update SLOC violations only
-  - structure: Update directory violations only
-  - new: Add-only mode (add new violations, preserve existing entries)
-    - Prevents accidental removal of entries for fixed files
-    - Useful for incremental adoption in legacy projects
-- Merge baseline update logic into run_check()
-- Deprecate baseline update subcommand (warn + redirect)
-```
 
 ---
 

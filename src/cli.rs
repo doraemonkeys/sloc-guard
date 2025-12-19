@@ -38,6 +38,20 @@ pub enum ExplainFormat {
     Json,
 }
 
+/// Baseline update mode for `check --update-baseline`
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum BaselineUpdateMode {
+    /// Replace baseline with all current violations (content + structure)
+    #[default]
+    All,
+    /// Update only SLOC (content) violations
+    Content,
+    /// Update only directory structure violations
+    Structure,
+    /// Add-only: preserve existing entries, only add new violations
+    New,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "sloc-guard")]
 #[command(
@@ -166,6 +180,10 @@ pub struct CheckArgs {
     /// Path to baseline file for grandfathering violations
     #[arg(long)]
     pub baseline: Option<PathBuf>,
+
+    /// Update baseline after check [possible values: all, content, structure, new]
+    #[arg(long, value_name = "MODE", num_args = 0..=1, default_missing_value = "all")]
+    pub update_baseline: Option<BaselineUpdateMode>,
 
     /// Disable file hash caching
     #[arg(long)]

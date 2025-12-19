@@ -23,6 +23,9 @@ pub fn run_baseline(args: &BaselineArgs, cli: &Cli) -> i32 {
 }
 
 fn run_baseline_update(args: &BaselineUpdateArgs, cli: &Cli) -> i32 {
+    // Deprecation warning
+    eprintln!("Warning: `baseline update` is deprecated. Use `check --update-baseline` instead.");
+
     match run_baseline_update_impl(args, cli) {
         Ok(count) => {
             if !cli.quiet {
@@ -90,7 +93,7 @@ pub(crate) fn run_baseline_update_impl(
     for (path, lines) in &violations {
         let path_str = path.to_string_lossy().replace('\\', "/");
         let hash = compute_file_hash(path)?;
-        baseline.set(&path_str, *lines, hash);
+        baseline.set_content(&path_str, *lines, hash);
     }
 
     // 7. Save baseline to file

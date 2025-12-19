@@ -870,7 +870,7 @@ fn baseline_update_creates_file() {
 
     assert!(baseline_path.exists());
     let content = fs::read_to_string(&baseline_path).unwrap();
-    assert!(content.contains("\"version\": 1"));
+    assert!(content.contains("\"version\": 2"));
     assert!(content.contains("large.rs"));
 }
 

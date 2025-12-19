@@ -4,12 +4,12 @@ use std::sync::Mutex;
 use rayon::prelude::*;
 
 use crate::analyzer::generate_split_suggestions;
-use crate::baseline::Baseline;
+use crate::baseline::{Baseline, StructureViolationType, compute_file_hash};
 use crate::cache::{Cache, compute_config_hash};
 use crate::checker::{
     CheckResult, Checker, StructureViolation, ThresholdChecker, ViolationType,
 };
-use crate::cli::{CheckArgs, Cli};
+use crate::cli::{BaselineUpdateMode, CheckArgs, Cli};
 use crate::counter::LineStats;
 use crate::git::{ChangedFiles, GitDiff};
 use crate::language::LanguageRegistry;
@@ -47,8 +47,13 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     // 2. Apply CLI argument overrides
     apply_cli_overrides(&mut config, args);
 
-    // 3. Load baseline if specified
-    let baseline = load_baseline(args.baseline.as_deref())?;
+    // 3. Load baseline if specified (allow non-existent if update-baseline is specified)
+    let baseline = if args.update_baseline.is_some() {
+        // When updating baseline, allow non-existent file
+        load_baseline_optional(args.baseline.as_deref())?
+    } else {
+        load_baseline(args.baseline.as_deref())?
+    };
 
     // 3.1 Load cache if not disabled
     let config_hash = compute_config_hash(&config);
@@ -145,6 +150,15 @@ pub(crate) fn run_check_with_context(
         apply_baseline_comparison(&mut results, baseline);
     }
 
+    // 7.0.1 Update baseline if --update-baseline is specified
+    if let Some(mode) = args.update_baseline {
+        let baseline_path = args
+            .baseline
+            .as_deref()
+            .unwrap_or_else(|| Path::new(".sloc-guard-baseline.json"));
+        update_baseline_from_results(&results, mode, baseline_path, baseline)?;
+    }
+
     // 7.1 Generate split suggestions for failed files if --fix is enabled
     if args.fix {
         generate_split_suggestions(&mut results, &ctx.registry);
@@ -197,6 +211,21 @@ pub(crate) fn load_baseline(baseline_path: Option<&Path>) -> crate::Result<Optio
     Ok(Some(Baseline::load(path)?))
 }
 
+/// Load baseline optionally - returns None if file doesn't exist (for update-baseline mode).
+pub(crate) fn load_baseline_optional(
+    baseline_path: Option<&Path>,
+) -> crate::Result<Option<Baseline>> {
+    let Some(path) = baseline_path else {
+        return Ok(None);
+    };
+
+    if !path.exists() {
+        return Ok(None);
+    }
+
+    Ok(Some(Baseline::load(path)?))
+}
+
 pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baseline) {
     for result in results.iter_mut() {
         if !result.is_failed() {
@@ -218,6 +247,88 @@ pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &
             *result = owned.into_grandfathered();
         }
     }
+}
+
+/// Update baseline file from check results based on the specified mode.
+fn update_baseline_from_results(
+    results: &[CheckResult],
+    mode: BaselineUpdateMode,
+    baseline_path: &Path,
+    existing_baseline: Option<&Baseline>,
+) -> crate::Result<()> {
+    let mut new_baseline = match mode {
+        BaselineUpdateMode::New => {
+            // Start with existing baseline for add-only mode
+            existing_baseline.cloned().unwrap_or_default()
+        }
+        _ => Baseline::new(),
+    };
+
+    for result in results {
+        if !result.is_failed() {
+            continue;
+        }
+
+        let path_str = result.path().to_string_lossy().replace('\\', "/");
+        let is_structure = is_structure_violation(result.override_reason());
+
+        // Apply mode filtering
+        let should_include = match mode {
+            BaselineUpdateMode::All => true,
+            BaselineUpdateMode::Content => !is_structure,
+            BaselineUpdateMode::Structure => is_structure,
+            BaselineUpdateMode::New => {
+                // In new mode, only add if not already in baseline
+                !new_baseline.contains(&path_str)
+            }
+        };
+
+        if !should_include {
+            continue;
+        }
+
+        if is_structure {
+            // Parse structure violation type from override_reason
+            if let Some((vtype, count)) =
+                parse_structure_violation(result.override_reason(), result.stats().code)
+            {
+                new_baseline.set_structure(&path_str, vtype, count);
+            }
+        } else {
+            // Content violation - compute file hash
+            let hash = compute_file_hash(result.path()).unwrap_or_default();
+            new_baseline.set_content(&path_str, result.stats().code, hash);
+        }
+    }
+
+    new_baseline.save(baseline_path)
+}
+
+/// Check if a check result represents a structure violation.
+fn is_structure_violation(override_reason: Option<&str>) -> bool {
+    override_reason.is_some_and(|r| r.starts_with("structure:"))
+}
+
+/// Parse structure violation type from `override_reason`.
+/// Returns (`StructureViolationType`, count) if parseable.
+fn parse_structure_violation(
+    override_reason: Option<&str>,
+    count: usize,
+) -> Option<(StructureViolationType, usize)> {
+    let reason = override_reason?;
+    if !reason.starts_with("structure:") {
+        return None;
+    }
+
+    let vtype = if reason.contains("files") {
+        StructureViolationType::Files
+    } else if reason.contains("subdirs") {
+        StructureViolationType::Dirs
+    } else {
+        return None;
+    };
+
+    Some((vtype, count))
 }
 
 /// Validate structure params require explicit path and return resolved paths.

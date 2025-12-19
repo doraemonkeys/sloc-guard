@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::io::{BufReader, Read, Write};
+use std::io::{Read, Write};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -8,20 +8,71 @@ use sha2::{Digest, Sha256};
 
 use crate::{Result, SlocGuardError};
 
-const BASELINE_VERSION: u32 = 1;
+const BASELINE_VERSION: u32 = 2;
 
-/// Entry for a single file in the baseline.
+/// Type of structure violation stored in baseline.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum StructureViolationType {
+    Files,
+    Dirs,
+}
+
+/// Entry for a single path in the baseline (V2 format).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BaselineEntry {
-    pub lines: usize,
-    pub hash: String,
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum BaselineEntry {
+    /// Content (SLOC) violation entry
+    Content {
+        lines: usize,
+        hash: String,
+    },
+    /// Structure (directory limit) violation entry
+    Structure {
+        violation_type: StructureViolationType,
+        count: usize,
+    },
 }
 
 impl BaselineEntry {
     #[must_use]
-    pub const fn new(lines: usize, hash: String) -> Self {
-        Self { lines, hash }
+    pub const fn content(lines: usize, hash: String) -> Self {
+        Self::Content { lines, hash }
     }
+
+    #[must_use]
+    pub const fn structure(violation_type: StructureViolationType, count: usize) -> Self {
+        Self::Structure {
+            violation_type,
+            count,
+        }
+    }
+
+    /// Returns true if this is a content entry.
+    #[must_use]
+    pub const fn is_content(&self) -> bool {
+        matches!(self, Self::Content { .. })
+    }
+
+    /// Returns true if this is a structure entry.
+    #[must_use]
+    pub const fn is_structure(&self) -> bool {
+        matches!(self, Self::Structure { .. })
+    }
+}
+
+/// Legacy entry format (V1) for backward compatibility.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct LegacyBaselineEntry {
+    lines: usize,
+    hash: String,
+}
+
+/// Legacy baseline format (V1) for backward compatibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LegacyBaseline {
+    version: u32,
+    files: HashMap<String, LegacyBaselineEntry>,
 }
 
 /// Baseline file structure for tracking grandfathered violations.
@@ -47,17 +98,38 @@ impl Baseline {
     }
 
     /// Load baseline from a JSON file.
+    /// Supports both V1 (legacy) and V2 formats with automatic migration.
     ///
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     pub fn load(path: &Path) -> Result<Self> {
-        let file = fs::File::open(path).map_err(|e| SlocGuardError::FileRead {
+        let content = fs::read_to_string(path).map_err(|e| SlocGuardError::FileRead {
             path: path.to_path_buf(),
             source: e,
         })?;
-        let reader = BufReader::new(file);
-        let baseline: Self = serde_json::from_reader(reader)?;
-        Ok(baseline)
+
+        // Try V2 format first
+        if let Ok(baseline) = serde_json::from_str::<Self>(&content) {
+            return Ok(baseline);
+        }
+
+        // Fall back to V1 migration
+        let legacy: LegacyBaseline = serde_json::from_str(&content)?;
+        Ok(Self::migrate_from_v1(legacy))
+    }
+
+    /// Migrate from V1 baseline format to V2.
+    fn migrate_from_v1(legacy: LegacyBaseline) -> Self {
+        let files = legacy
+            .files
+            .into_iter()
+            .map(|(path, entry)| (path, BaselineEntry::content(entry.lines, entry.hash)))
+            .collect();
+
+        Self {
+            version: BASELINE_VERSION,
+            files,
+        }
     }
 
     /// Save baseline to a JSON file.
@@ -74,10 +146,26 @@ impl Baseline {
         Ok(())
     }
 
-    /// Add or update a file entry in the baseline.
-    pub fn set(&mut self, path: &str, lines: usize, hash: String) {
+    /// Add or update a content entry in the baseline.
+    pub fn set_content(&mut self, path: &str, lines: usize, hash: String) {
         self.files
-            .insert(path.to_string(), BaselineEntry::new(lines, hash));
+            .insert(path.to_string(), BaselineEntry::content(lines, hash));
+    }
+
+    /// Add or update a structure entry in the baseline.
+    pub fn set_structure(
+        &mut self,
+        path: &str,
+        violation_type: StructureViolationType,
+        count: usize,
+    ) {
+        self.files
+            .insert(path.to_string(), BaselineEntry::structure(violation_type, count));
+    }
+
+    /// Add or update an entry in the baseline.
+    pub fn set(&mut self, path: &str, entry: BaselineEntry) {
+        self.files.insert(path.to_string(), entry);
     }
 
     /// Get a file entry from the baseline.
