@@ -101,8 +101,10 @@ pub enum Commands {
 #[derive(Parser, Debug)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct CheckArgs {
-    /// Paths to check (files or directories). Defaults to current directory.
-    /// Required when using --max-files or --max-dirs.
+    /// Scan roots: directories or files to check. Defaults to current directory.
+    /// These are the starting points for file discovery. Use --include to filter
+    /// which subdirectories are actually scanned. Required when using --max-files
+    /// or --max-dirs.
     #[arg()]
     pub paths: Vec<PathBuf>,
 
@@ -110,7 +112,7 @@ pub struct CheckArgs {
     #[arg(short, long)]
     pub config: Option<PathBuf>,
 
-    /// Maximum lines per file (overrides config)
+    /// Maximum lines per file (overrides [content] default; rules take precedence)
     #[arg(long)]
     pub max_lines: Option<usize>,
 
@@ -122,7 +124,8 @@ pub struct CheckArgs {
     #[arg(long, short = 'x')]
     pub exclude: Vec<String>,
 
-    /// Include only these directories (overrides config `include_paths`)
+    /// Allowlist filter: only scan these directories (overrides <PATH> arguments
+    /// and config `include_paths`). Use to restrict scanning to specific subdirs.
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 
@@ -150,7 +153,9 @@ pub struct CheckArgs {
     #[arg(long)]
     pub warn_only: bool,
 
-    /// Compare against a git reference (branch or commit). Defaults to HEAD if no value provided.
+    /// Compare against a git reference (branch/commit). Defaults to HEAD when no
+    /// value provided. Only content (SLOC) checks are filtered; structure checks
+    /// still count full directory state.
     #[arg(long, num_args = 0..=1, default_missing_value = "HEAD")]
     pub diff: Option<String>,
 
@@ -201,7 +206,7 @@ pub struct StatsArgs {
     #[arg(long, short = 'x')]
     pub exclude: Vec<String>,
 
-    /// Include only these directories
+    /// Allowlist filter: only scan these directories
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 
@@ -310,7 +315,7 @@ pub struct BaselineUpdateArgs {
     #[arg(long, short = 'x')]
     pub exclude: Vec<String>,
 
-    /// Include only these directories (overrides config `include_paths`)
+    /// Allowlist filter: only scan these directories
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 

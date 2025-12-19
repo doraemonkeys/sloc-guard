@@ -36,21 +36,13 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **6.1**: `--max-files`, `--max-dirs` CLI params for `check` command. Requires explicit `<PATH>` argument, overrides `[structure]` defaults (not rules).
   - **6.2**: `--diff` optional parameter. Defaults to `HEAD` when provided without value (`--diff` same as `--diff HEAD`).
   - **6.3**: `--history-file` parameter for `stats` command. Custom path for trend history file (default: `.sloc-guard-history.json`).
+  - **6.4**: Documentation Clarification - CLI help text updates (paths vs --include, CLI override scope, --diff behavior), README.md creation.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
 
 ---
 
 ## Phase 6: CLI Symmetry & Usability (Pending)
-
-### Task 6.4: Documentation Clarification
-Location: `docs/`, CLI help text
-```
-- S1: Clarify paths (scan roots) vs --include (allowlist filter)
-- S2: Document CLI override scope (overrides [content]/[structure] defaults, not rules)
-- S3: Document --diff default behavior (HEAD)
-- S4: Clarify --diff structure semantics: limits reporting scope, but counts use full disk state
-```
 
 ### Task 6.6: check --report-json (Stats in Check)
 Location: `src/cli.rs`, `src/commands/check.rs`
@@ -172,7 +164,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. CLI Enhancement (Medium)** | 6.4, 6.6 docs, --report-json |
+| **1. CLI Enhancement (Medium)** | 6.6 --report-json |
 | **2. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
 | **3. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
 | **4. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
