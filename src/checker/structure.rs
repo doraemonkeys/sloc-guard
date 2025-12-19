@@ -25,6 +25,8 @@ pub enum ViolationType {
     FileCount,
     DirCount,
     MaxDepth,
+    /// File type not allowed by whitelist (`allow_extensions`/`allow_patterns`).
+    DisallowedFile,
 }
 
 /// A structure limit violation.
@@ -38,6 +40,8 @@ pub struct StructureViolation {
     pub is_warning: bool,
     /// Reason for override if one was applied.
     pub override_reason: Option<String>,
+    /// Pattern of the rule that triggered this violation (for `DisallowedFile`).
+    pub triggering_rule_pattern: Option<String>,
 }
 
 impl StructureViolation {
@@ -56,6 +60,7 @@ impl StructureViolation {
             limit,
             is_warning: false,
             override_reason,
+            triggering_rule_pattern: None,
         }
     }
 
@@ -74,6 +79,21 @@ impl StructureViolation {
             limit,
             is_warning: true,
             override_reason,
+            triggering_rule_pattern: None,
+        }
+    }
+
+    /// Create a disallowed file violation.
+    #[must_use]
+    pub const fn disallowed_file(path: PathBuf, rule_pattern: String) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::DisallowedFile,
+            actual: 1,
+            limit: 0,
+            is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
         }
     }
 }
@@ -85,6 +105,12 @@ struct CompiledStructureRule {
     max_dirs: Option<i64>,
     max_depth: Option<i64>,
     warn_threshold: Option<f64>,
+    /// Validated extensions (with leading dot).
+    allow_extensions: Vec<String>,
+    /// Compiled patterns for whitelist matching.
+    allow_patterns: GlobSet,
+    /// True if this rule has a whitelist (`allow_extensions` or `allow_patterns`).
+    has_whitelist: bool,
 }
 
 /// Resolved limits for a directory path.
@@ -292,15 +318,52 @@ impl StructureChecker {
         })
     }
 
+    /// Validate that all extensions start with a dot.
+    fn validate_extensions(extensions: &[String], rule_index: usize) -> Result<Vec<String>> {
+        for ext in extensions {
+            if !ext.starts_with('.') {
+                return Err(SlocGuardError::Config(format!(
+                    "Invalid extension '{}' in rule {}: must start with '.' (e.g., '.rs')",
+                    ext,
+                    rule_index + 1
+                )));
+            }
+        }
+        Ok(extensions.to_vec())
+    }
+
+    /// Build a `GlobSet` from `allow_patterns`.
+    fn build_allow_patterns(patterns: &[String], rule_index: usize) -> Result<GlobSet> {
+        let mut builder = GlobSetBuilder::new();
+        for pattern in patterns {
+            let glob = Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: format!("allow_patterns[{}] in rule {}", pattern, rule_index + 1),
+                source: e,
+            })?;
+            builder.add(glob);
+        }
+        builder.build().map_err(|e| SlocGuardError::InvalidPattern {
+            pattern: format!("combined allow_patterns in rule {}", rule_index + 1),
+            source: e,
+        })
+    }
+
     fn build_rules(rules: &[crate::config::StructureRule]) -> Result<Vec<CompiledStructureRule>> {
         rules
             .iter()
-            .map(|rule| {
+            .enumerate()
+            .map(|(i, rule)| {
                 let glob =
                     Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
                         pattern: rule.pattern.clone(),
                         source: e,
                     })?;
+
+                let allow_extensions = Self::validate_extensions(&rule.allow_extensions, i)?;
+                let allow_patterns = Self::build_allow_patterns(&rule.allow_patterns, i)?;
+                let has_whitelist =
+                    !rule.allow_extensions.is_empty() || !rule.allow_patterns.is_empty();
+
                 Ok(CompiledStructureRule {
                     pattern: rule.pattern.clone(),
                     matcher: glob.compile_matcher(),
@@ -308,25 +371,61 @@ impl StructureChecker {
                     max_dirs: rule.max_dirs,
                     max_depth: rule.max_depth,
                     warn_threshold: rule.warn_threshold,
+                    allow_extensions,
+                    allow_patterns,
+                    has_whitelist,
                 })
             })
             .collect()
     }
 
-    /// Scan directories and collect stats for each.
+    /// Find the rule with whitelist that matches a directory.
+    fn find_matching_rule_with_whitelist(&self, dir: &Path) -> Option<&CompiledStructureRule> {
+        self.rules
+            .iter()
+            .find(|r| r.has_whitelist && r.matcher.is_match(dir))
+    }
+
+    /// Check if a file matches a whitelist rule (extensions OR patterns).
+    fn file_matches_whitelist(file_path: &Path, rule: &CompiledStructureRule) -> bool {
+        // Check extensions first (OR logic)
+        if !rule.allow_extensions.is_empty() && let Some(ext) = file_path.extension() {
+            let ext_with_dot = format!(".{}", ext.to_string_lossy());
+            if rule.allow_extensions.contains(&ext_with_dot) {
+                return true;
+            }
+        }
+
+        // Check patterns (OR logic with extensions)
+        let file_name = file_path.file_name().unwrap_or_default();
+        if rule.allow_patterns.is_match(file_name) || rule.allow_patterns.is_match(file_path) {
+            return true;
+        }
+
+        // No match - only fail if whitelist was actually specified
+        // (has_whitelist is already true at this point, so this returns false)
+        false
+    }
+
+    /// Scan directories and collect stats for each, along with whitelist violations.
     ///
     /// # Errors
     /// Returns an error if a directory cannot be read.
-    pub fn collect_dir_stats(&self, root: &Path) -> Result<HashMap<PathBuf, DirStats>> {
+    pub fn collect_dir_stats(
+        &self,
+        root: &Path,
+    ) -> Result<(HashMap<PathBuf, DirStats>, Vec<StructureViolation>)> {
         let mut stats = HashMap::new();
-        self.collect_dir_stats_recursive(root, &mut stats, 0)?;
-        Ok(stats)
+        let mut whitelist_violations = Vec::new();
+        self.collect_dir_stats_recursive(root, &mut stats, &mut whitelist_violations, 0)?;
+        Ok((stats, whitelist_violations))
     }
 
     fn collect_dir_stats_recursive(
         &self,
         dir: &Path,
         stats: &mut HashMap<PathBuf, DirStats>,
+        whitelist_violations: &mut Vec<StructureViolation>,
         depth: usize,
     ) -> Result<()> {
         let entries = std::fs::read_dir(dir).map_err(|e| SlocGuardError::FileRead {
@@ -338,6 +437,9 @@ impl StructureChecker {
             depth,
             ..Default::default()
         };
+
+        // Find whitelist rule for this directory (if any)
+        let whitelist_rule = self.find_matching_rule_with_whitelist(dir);
 
         for entry in entries {
             let entry = entry.map_err(SlocGuardError::Io)?;
@@ -352,21 +454,36 @@ impl StructureChecker {
                 continue;
             }
 
-            // Check structure.count_exclude patterns - don't count but may still traverse
+            // Check structure.count_exclude patterns - don't count AND skip whitelist check
             if self.ignore_patterns.is_match(file_name) || self.ignore_patterns.is_match(&path) {
                 // Still recurse into directories for stats collection, just don't count this entry
                 if file_type.is_dir() {
-                    self.collect_dir_stats_recursive(&path, stats, depth + 1)?;
+                    self.collect_dir_stats_recursive(
+                        &path,
+                        stats,
+                        whitelist_violations,
+                        depth + 1,
+                    )?;
                 }
                 continue;
             }
 
             if file_type.is_file() {
                 dir_stats.file_count += 1;
+
+                // Check whitelist if applicable
+                if let Some(rule) = whitelist_rule
+                    && !Self::file_matches_whitelist(&path, rule)
+                {
+                    whitelist_violations.push(StructureViolation::disallowed_file(
+                        path.clone(),
+                        rule.pattern.clone(),
+                    ));
+                }
             } else if file_type.is_dir() {
                 dir_stats.dir_count += 1;
                 // Recurse into subdirectory
-                self.collect_dir_stats_recursive(&path, stats, depth + 1)?;
+                self.collect_dir_stats_recursive(&path, stats, whitelist_violations, depth + 1)?;
             }
         }
 
@@ -590,8 +707,12 @@ impl StructureChecker {
     /// # Errors
     /// Returns an error if directories cannot be read.
     pub fn check_directory(&self, root: &Path) -> Result<Vec<StructureViolation>> {
-        let stats = self.collect_dir_stats(root)?;
-        Ok(self.check(&stats))
+        let (stats, mut whitelist_violations) = self.collect_dir_stats(root)?;
+        let mut violations = self.check(&stats);
+        violations.append(&mut whitelist_violations);
+        // Sort by path for consistent output
+        violations.sort_by(|a, b| a.path.cmp(&b.path));
+        Ok(violations)
     }
 
     /// Explain which rule matches a given directory path.

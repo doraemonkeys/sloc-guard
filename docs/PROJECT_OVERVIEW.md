@@ -43,7 +43,7 @@ ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, rules, overrides }
-StructureRule { pattern, max_files, max_dirs, max_depth, warn_threshold }  // [[structure.rules]]
+StructureRule { pattern, max_files, max_dirs, max_depth, warn_threshold, allow_extensions, allow_patterns }  // [[structure.rules]]
 StructureOverride { path, max_files, max_dirs, max_depth, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
@@ -62,8 +62,8 @@ CheckResult::Passed { path, stats, limit, override_reason }
 
 // Structure checking
 DirStats { file_count, dir_count, depth }  // immediate children counts + depth from scan root
-ViolationType::FileCount | DirCount | MaxDepth
-StructureViolation { path, violation_type, actual, limit, is_warning, override_reason }
+ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile
+StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
 // Explain (rule chain debugging)
 MatchStatus::Matched | Superseded | NoMatch

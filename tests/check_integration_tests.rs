@@ -343,6 +343,33 @@ fn check_structure_cli_override() {
         .success();
 }
 
+#[test]
+fn check_structure_whitelist_violation() {
+    let fixture = TestFixture::new();
+    // Config with whitelist rule: only .rs files allowed in src
+    fixture.create_config(
+        r#"
+version = "2"
+[content]
+max_lines = 100
+extensions = [".rs"]
+[[structure.rules]]
+pattern = "**/src"
+allow_extensions = [".rs"]
+"#,
+    );
+    fixture.create_rust_file("src/main.rs", 5);
+    // Create a disallowed file
+    fixture.create_file("src/config.json", "{}");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "src", "--no-cache"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("disallowed file"));
+}
+
 // =============================================================================
 // Comment/Blank Line Counting Tests
 // =============================================================================

@@ -202,6 +202,8 @@ fn explain_structure_rule_matches() {
             max_dirs: Some(10),
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -248,6 +250,8 @@ fn explain_structure_rule_chain_statuses() {
                 max_dirs: Some(10),
                 max_depth: None,
                 warn_threshold: None,
+                allow_extensions: vec![],
+                allow_patterns: vec![],
             },
             StructureRule {
                 pattern: "test/*".to_string(),
@@ -255,6 +259,8 @@ fn explain_structure_rule_chain_statuses() {
                 max_dirs: Some(15),
                 max_depth: None,
                 warn_threshold: None,
+                allow_extensions: vec![],
+                allow_patterns: vec![],
             },
         ],
         overrides: vec![StructureOverride {

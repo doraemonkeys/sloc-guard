@@ -44,6 +44,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
   - **9.2**: `max_depth` - limits directory nesting depth in `[structure]`, `[[structure.rules]]`, and `[[structure.override]]`. CLI `--max-depth` parameter. `StructureChecker` tracks depth during traversal.
+  - **9.4**: Structure Whitelist Mode - `allow_extensions` / `allow_patterns` on `[[structure.rules]]`. Files not matching whitelist are `DisallowedFile` violations. Stricter than `count_exclude`. OR logic (extension OR pattern match).
 - **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
 
 ---
@@ -96,14 +97,6 @@ Location: `src/commands/init.rs`
 - Reduces configuration barrier for new users
 ```
 
-### Task 9.4: Structure Whitelist Mode
-Location: `src/config/structure.rs`, `src/checker/structure.rs`
-```
-- Add allow_extensions / allow_patterns to [[structure.rules]]
-- Stricter than count_exclude: files not matching are violations
-- Enforces architectural purity (e.g., only .rs in src/domain/models)
-```
-
 ---
 
 ## Priority Order
@@ -111,7 +104,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | Priority | Tasks |
 |----------|-------|
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
-| **2. Structure Enhancements** | ~~9.2 max_depth~~ ✅, 9.4 whitelist mode |
+| ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | **3. Visualization** | 7.1-7.2 HTML Charts/Trends |
 | **4. UX Improvements** | 9.3 Smart init |
 | **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |

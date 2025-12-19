@@ -51,6 +51,8 @@ fn checker_enabled_with_rules() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -163,6 +165,8 @@ fn rule_overrides_global_limit() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -193,6 +197,8 @@ fn rule_inherits_unset_limit_from_global() {
             max_dirs: None, // Should inherit global max_dirs=3
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -228,7 +234,7 @@ fn collect_dir_stats_counts_files_and_dirs() {
     std::fs::create_dir(root.join("subdir2")).unwrap();
 
     let checker = StructureChecker::new(&default_config()).unwrap();
-    let stats = checker.collect_dir_stats(root).unwrap();
+    let (stats, _) = checker.collect_dir_stats(root).unwrap();
 
     let root_stats = stats.get(root).unwrap();
     assert_eq!(root_stats.file_count, 2);
@@ -250,7 +256,7 @@ fn collect_dir_stats_ignores_patterns() {
         ..Default::default()
     };
     let checker = StructureChecker::new(&config).unwrap();
-    let stats = checker.collect_dir_stats(root).unwrap();
+    let (stats, _) = checker.collect_dir_stats(root).unwrap();
 
     let root_stats = stats.get(root).unwrap();
     assert_eq!(root_stats.file_count, 1); // Only file1.txt counted
@@ -269,7 +275,7 @@ fn collect_dir_stats_recursive() {
     std::fs::write(root.join("src/utils/helper.rs"), "").unwrap();
 
     let checker = StructureChecker::new(&default_config()).unwrap();
-    let stats = checker.collect_dir_stats(root).unwrap();
+    let (stats, _) = checker.collect_dir_stats(root).unwrap();
 
     // Check root has src as subdir
     let root_stats = stats.get(root).unwrap();
@@ -389,6 +395,8 @@ fn invalid_rule_pattern_returns_error() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -510,6 +518,8 @@ fn warn_threshold_rule_overrides_global() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: Some(0.5), // Rule: warn at 25
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -613,6 +623,8 @@ fn rule_can_set_unlimited_to_override_global() {
             max_dirs: None,             // Inherit global (2)
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -674,6 +686,8 @@ fn invalid_rule_max_files_returns_error() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -695,6 +709,8 @@ fn invalid_rule_max_dirs_returns_error() {
             max_dirs: Some(-3), // Invalid
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -765,6 +781,8 @@ fn override_takes_priority_over_rules() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         overrides: vec![StructureOverride {
             path: "src/legacy".to_string(),
@@ -1025,7 +1043,7 @@ fn scanner_exclude_skips_directories_entirely() {
     // Pass scanner exclude patterns
     let scanner_exclude = vec![".git/**".to_string(), "target/**".to_string()];
     let checker = StructureChecker::with_scanner_exclude(&config, &scanner_exclude).unwrap();
-    let stats = checker.collect_dir_stats(root).unwrap();
+    let (stats, _) = checker.collect_dir_stats(root).unwrap();
 
     // Root should have 1 dir (src only, .git and target excluded)
     let root_stats = stats.get(root).unwrap();
@@ -1179,6 +1197,8 @@ fn rule_overrides_global_depth_limit() {
             max_dirs: None,
             max_depth: Some(5), // Override to allow deeper
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1245,6 +1265,8 @@ fn invalid_rule_max_depth_returns_error() {
             max_dirs: None,
             max_depth: Some(-3), // Invalid
             warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1268,7 +1290,7 @@ fn collect_dir_stats_tracks_depth() {
 
     let config = StructureConfig::default();
     let checker = StructureChecker::new(&config).unwrap();
-    let stats = checker.collect_dir_stats(root).unwrap();
+    let (stats, _) = checker.collect_dir_stats(root).unwrap();
 
     assert_eq!(stats.get(root).unwrap().depth, 0);
     assert_eq!(stats.get(&root.join("a")).unwrap().depth, 1);
@@ -1293,4 +1315,482 @@ fn override_with_max_depth_only() {
     // Should succeed because at least one limit (max_depth) is set
     let result = StructureChecker::new(&config);
     assert!(result.is_ok());
+}
+
+// ============================================================================
+// Whitelist Mode Tests (allow_extensions / allow_patterns)
+// ============================================================================
+
+#[test]
+fn invalid_allow_extension_without_dot_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec!["rs".to_string()], // Missing dot
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("must start with '.'"));
+    }
+}
+
+#[test]
+fn invalid_allow_pattern_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec!["[invalid".to_string()],
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+}
+
+#[test]
+fn whitelist_allow_extensions_allows_matching_files() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+    std::fs::write(root.join("src/lib.rs"), "").unwrap();
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn whitelist_allow_extensions_rejects_non_matching_files() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "fn main() {}").unwrap();
+    std::fs::write(root.join("src/config.json"), "{}").unwrap(); // Not allowed
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].violation_type, ViolationType::DisallowedFile);
+    assert!(violations[0].path.ends_with("config.json"));
+    assert_eq!(
+        violations[0].triggering_rule_pattern,
+        Some("**/src".to_string())
+    );
+}
+
+#[test]
+fn whitelist_allow_patterns_allows_matching_files() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/mod.rs"), "").unwrap();
+    std::fs::write(root.join("src/Makefile"), "").unwrap();
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec!["*.rs".to_string(), "Makefile".to_string()],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn whitelist_combined_extensions_and_patterns() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap(); // OK via extension
+    std::fs::write(root.join("src/Cargo.toml"), "").unwrap(); // OK via pattern
+    std::fs::write(root.join("src/random.txt"), "").unwrap(); // VIOLATION
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec!["Cargo.toml".to_string()],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].path.ends_with("random.txt"));
+}
+
+#[test]
+fn count_exclude_bypasses_whitelist_check() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+    std::fs::write(root.join("src/README.md"), "").unwrap(); // Would violate, but excluded
+
+    let config = StructureConfig {
+        count_exclude: vec!["*.md".to_string()],
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert!(violations.is_empty()); // README.md bypassed via count_exclude
+}
+
+#[test]
+fn whitelist_applies_only_to_files_not_directories() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::create_dir(root.join("src/utils")).unwrap(); // Directory, not checked
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert!(violations.is_empty()); // Directories are not subject to whitelist
+}
+
+#[test]
+fn empty_whitelist_allows_all_files() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/anything.xyz"), "").unwrap();
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: Some(10),
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn whitelist_recursive_pattern_applies_to_subdirectories() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir_all(root.join("src/sub")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+    std::fs::write(root.join("src/sub/lib.rs"), "").unwrap();
+    std::fs::write(root.join("src/sub/data.json"), "").unwrap(); // VIOLATION
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].path.ends_with("data.json"));
+}
+
+#[test]
+fn whitelist_with_file_without_extension() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+    std::fs::write(root.join("src/Dockerfile"), "").unwrap(); // No extension, must match pattern
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec!["Dockerfile".to_string()],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert!(violations.is_empty()); // Dockerfile allowed via pattern
+}
+
+#[test]
+fn whitelist_violation_without_pattern_match() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/Dockerfile"), "").unwrap(); // No extension, doesn't match
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].path.ends_with("Dockerfile"));
+}
+
+#[test]
+fn checker_enabled_with_whitelist_rule() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    assert!(checker.is_enabled());
+}
+
+#[test]
+fn whitelist_multiple_extensions() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+    std::fs::write(root.join("src/test.go"), "").unwrap();
+    std::fs::write(root.join("src/config.txt"), "").unwrap(); // VIOLATION
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string(), ".go".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].path.ends_with("config.txt"));
+}
+
+#[test]
+fn whitelist_collect_dir_stats_returns_violations_separately() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+    std::fs::write(root.join("src/bad.txt"), "").unwrap(); // VIOLATION
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let (stats, whitelist_violations) = checker.collect_dir_stats(root).unwrap();
+
+    // Stats should include all directories
+    assert!(stats.contains_key(root));
+    assert!(stats.contains_key(&root.join("src")));
+
+    // Whitelist violations should be collected
+    assert_eq!(whitelist_violations.len(), 1);
+    assert!(whitelist_violations[0].path.ends_with("bad.txt"));
+}
+
+#[test]
+fn whitelist_no_match_returns_no_violations() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    // Create directory that doesn't match the whitelist rule pattern
+    std::fs::create_dir(root.join("other")).unwrap();
+    std::fs::write(root.join("other/any.txt"), "").unwrap();
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![".rs".to_string()],
+            allow_patterns: vec![],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    // No violations because "other" doesn't match "**/src" pattern
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn whitelist_pattern_full_path_match() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    std::fs::create_dir(root.join("src")).unwrap();
+    std::fs::create_dir(root.join("src/config")).unwrap();
+    std::fs::write(root.join("src/main.rs"), "").unwrap();
+    std::fs::write(root.join("src/config/settings.json"), "").unwrap();
+
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**/src".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec!["config/*".to_string()],
+        }],
+        ..Default::default()
+    };
+
+    let checker = StructureChecker::new(&config).unwrap();
+    let violations = checker.check_directory(root).unwrap();
+
+    // main.rs should be a violation (doesn't match any extension or pattern)
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].path.ends_with("main.rs"));
 }

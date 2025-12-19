@@ -467,18 +467,35 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
         ignored: 0,
     };
 
-    let violation_label = match violation.violation_type {
-        ViolationType::FileCount => "files",
-        ViolationType::DirCount => "subdirs",
-        ViolationType::MaxDepth => "depth",
+    let override_reason = match violation.violation_type {
+        ViolationType::FileCount => Some("structure: files count exceeded".to_string()),
+        ViolationType::DirCount => Some("structure: subdirs count exceeded".to_string()),
+        ViolationType::MaxDepth => Some("structure: depth count exceeded".to_string()),
+        ViolationType::DisallowedFile => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("unknown");
+            Some(format!("structure: disallowed file (rule: {rule})"))
+        }
     };
 
-    CheckResult::Failed {
-        path: violation.path.clone(),
-        stats,
-        limit: violation.limit,
-        override_reason: Some(format!("structure: {violation_label} count exceeded")),
-        suggestions: None,
+    if violation.is_warning {
+        CheckResult::Warning {
+            path: violation.path.clone(),
+            stats,
+            limit: violation.limit,
+            override_reason,
+            suggestions: None,
+        }
+    } else {
+        CheckResult::Failed {
+            path: violation.path.clone(),
+            stats,
+            limit: violation.limit,
+            override_reason,
+            suggestions: None,
+        }
     }
 }
 

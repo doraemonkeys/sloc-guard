@@ -387,6 +387,18 @@ pub struct StructureRule {
     /// Override threshold for warnings in matched directories.
     #[serde(default)]
     pub warn_threshold: Option<f64>,
+
+    /// Whitelist of allowed file extensions (with leading dot, e.g., ".rs", ".go").
+    /// Files NOT matching these extensions are violations.
+    /// Combined with `allow_patterns` using OR logic.
+    #[serde(default)]
+    pub allow_extensions: Vec<String>,
+
+    /// Whitelist of allowed file patterns (glob patterns, e.g., "*.rs", "mod.*").
+    /// Files NOT matching these patterns are violations.
+    /// Combined with `allow_extensions` using OR logic.
+    #[serde(default)]
+    pub allow_patterns: Vec<String>,
 }
 
 /// Structure override for specific directories [[structure.override]].
