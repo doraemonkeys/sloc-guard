@@ -530,6 +530,14 @@ pub(crate) fn format_output(
 mod tests;
 
 #[cfg(test)]
+#[path = "check_run_tests.rs"]
+mod run_tests;
+
+#[cfg(test)]
+#[path = "check_conversion_tests.rs"]
+mod conversion_tests;
+
+#[cfg(test)]
 #[path = "check_baseline_tests.rs"]
 mod baseline_tests;
 
