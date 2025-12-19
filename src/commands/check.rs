@@ -377,3 +377,7 @@ pub(crate) fn format_output(
 #[cfg(test)]
 #[path = "check_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "check_advanced_tests.rs"]
+mod advanced_tests;
