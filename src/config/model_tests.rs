@@ -328,6 +328,6 @@ fn config_deserialize_without_version() {
 }
 
 #[test]
-fn config_version_constant_is_one() {
-    assert_eq!(CONFIG_VERSION, "1");
+fn config_version_constant_is_two() {
+    assert_eq!(CONFIG_VERSION, "2");
 }

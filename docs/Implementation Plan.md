@@ -35,25 +35,16 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented. Additional comple
 
 Focus: Address architecture flaws, Scanner/Structure visibility conflict, UX ambiguities, and CLAUDE.md violations.
 
-### Task 5.5.1: Scanner vs Structure Visibility Conflict (Critical)
-Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/structure.rs`
-**Problem**: `[scanner].extensions` filters files globally → Structure checker "blind" to non-code files.
-- Scenario: Dir has 100 `.txt` files, scanner only sees `.rs` → Structure reports 0 files → false pass.
-
-**Solution**: Decouple file discovery from content filtering.
-```
-[scanner]          # Physical discovery - NO extension filter
-  gitignore = true
-  exclude = [...]  # Global excludes (node_modules, target, etc.)
-
-[content]          # SLOC analysis scope
-  extensions = ["rs", "ts", ...]  # Only these for line counting
-  max_lines = 400
-  ...
-```
-- `Scanner` returns ALL files (respecting gitignore + exclude only).
-- `ThresholdChecker` filters by `content.extensions` before counting.
-- `StructureChecker` sees full directory contents (uses its own `count_exclude`).
+### Task 5.5.1: Scanner vs Structure Visibility Conflict ✅
+Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/threshold.rs`
+**Completed**: Decoupled file discovery from content filtering.
+- V2 Config Schema: `[scanner]` (gitignore, exclude) + `[content]` (extensions, max_lines, rules, etc.)
+- `ScannerConfig { gitignore: bool, exclude: Vec<String> }` - no extension filtering
+- `ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }`
+- `scan_files()` now returns ALL files (respecting gitignore + exclude only)
+- `ThresholdChecker::should_process()` filters files by `content.extensions`
+- V1→V2 auto-migration in `loader.rs::migrate_v1_to_v2()`
+- CONFIG_VERSION bumped to "2"
 
 ### Task 5.5.2: Override Separation (Content vs Structure)
 Location: `src/config/model.rs`, `src/checker/*.rs`
@@ -154,17 +145,12 @@ pub enum CheckResult {
 - Consuming transformations: `into_grandfathered()`, `with_suggestions()`
 - Updated all output formatters and commands
 
-### Task 5.5.8: Config Versioning (Partial ✅)
+### Task 5.5.8: Config Versioning ✅
 Location: `src/config/model.rs`, `src/config/loader.rs`
-**Completed**: Added `version` field to config schema with validation.
-- `CONFIG_VERSION` constant = "1"
-- `version` field in `Config` struct (optional, defaults to None)
-- Loader validates version on load: unsupported version → error with message
-- Missing version allowed (for backward compatibility)
-
-**Remaining** (blocked on Task 5.5.1/5.5.2):
-- Migration path: v1 config auto-converted to v2 internally
-- Warn when `version` is missing (deprecation notice)
+**Completed**: Full V2 config schema with migration support.
+- `CONFIG_VERSION` = "2", `CONFIG_VERSION_V1` = "1"
+- Loader validates version: unsupported → error, missing/v1 → migrate to v2
+- `migrate_v1_to_v2()` migrates `default`→`scanner`+`content`, `path_rules`→`content.rules`, etc.
 
 ### Task 5.5.13: Testability Refactoring (Dependency Injection)
 
@@ -294,9 +280,9 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Critical Architecture** | 5.5.1 Scanner/Structure Visibility, 5.5.2 Override Separation (incl. 5.5.14 required reason) |
+| **1. Critical Architecture** | ~~5.5.1 Scanner/Structure Visibility~~, 5.5.2 Override Separation (incl. 5.5.14 required reason) |
 | **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
-| **3. Code Quality** | 5.5.13 Testability (DI), ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~5.5.8 Versioning~ (partial) |
+| **3. Code Quality** | 5.5.13 Testability (DI), ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~~5.5.8 Versioning~~ |
 | **4. Documentation** | ~~5.5.12 extends Examples~~ |
 | **5. Deferred** | 6.1-6.2 HTML Charts/Trends, Phase 7 CI/CD |
 

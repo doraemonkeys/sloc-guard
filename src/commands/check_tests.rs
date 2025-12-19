@@ -598,13 +598,13 @@ fn apply_cli_overrides_max_lines() {
     };
 
     apply_cli_overrides(&mut config, &args);
-    assert_eq!(config.default.max_lines, 100);
+    assert_eq!(config.content.max_lines, 100);
 }
 
 #[test]
 fn apply_cli_overrides_no_skip_comments() {
     let mut config = Config::default();
-    assert!(config.default.skip_comments);
+    assert!(config.content.skip_comments);
 
     let args = CheckArgs {
         paths: vec![PathBuf::from(".")],
@@ -628,13 +628,13 @@ fn apply_cli_overrides_no_skip_comments() {
     };
 
     apply_cli_overrides(&mut config, &args);
-    assert!(!config.default.skip_comments);
+    assert!(!config.content.skip_comments);
 }
 
 #[test]
 fn apply_cli_overrides_no_skip_blank() {
     let mut config = Config::default();
-    assert!(config.default.skip_blank);
+    assert!(config.content.skip_blank);
 
     let args = CheckArgs {
         paths: vec![PathBuf::from(".")],
@@ -658,7 +658,7 @@ fn apply_cli_overrides_no_skip_blank() {
     };
 
     apply_cli_overrides(&mut config, &args);
-    assert!(!config.default.skip_blank);
+    assert!(!config.content.skip_blank);
 }
 
 #[test]
@@ -686,7 +686,7 @@ fn apply_cli_overrides_warn_threshold() {
     };
 
     apply_cli_overrides(&mut config, &args);
-    assert!((config.default.warn_threshold - 0.8).abs() < f64::EPSILON);
+    assert!((config.content.warn_threshold - 0.8).abs() < f64::EPSILON);
 }
 
 // Baseline comparison tests moved from main_baseline_tests.rs

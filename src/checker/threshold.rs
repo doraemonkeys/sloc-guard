@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobMatcher};
@@ -201,6 +201,9 @@ pub struct ThresholdChecker {
     extension_limits: HashMap<String, usize>,
     extension_warn_thresholds: HashMap<String, f64>,
     path_rules: Vec<CompiledPathRule>,
+    /// Extensions to process (from content.extensions).
+    /// Empty set means process all files.
+    allowed_extensions: HashSet<String>,
 }
 
 impl ThresholdChecker {
@@ -209,12 +212,15 @@ impl ThresholdChecker {
         let extension_limits = Self::build_extension_limits(&config);
         let extension_warn_thresholds = Self::build_extension_warn_thresholds(&config);
         let path_rules = Self::build_path_rules(&config);
+        let allowed_extensions: HashSet<String> =
+            config.content.extensions.iter().cloned().collect();
         Self {
             config,
             warning_threshold: 0.9,
             extension_limits,
             extension_warn_thresholds,
             path_rules,
+            allowed_extensions,
         }
     }
 
@@ -224,8 +230,23 @@ impl ThresholdChecker {
         self
     }
 
+    /// Check if a file should be processed based on its extension.
+    /// Files with extensions not in `content.extensions` are skipped.
+    #[must_use]
+    pub fn should_process(&self, path: &Path) -> bool {
+        if self.allowed_extensions.is_empty() {
+            return true; // No filter = process all files
+        }
+
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| self.allowed_extensions.contains(ext))
+    }
+
     fn build_extension_limits(config: &Config) -> HashMap<String, usize> {
         let mut index = HashMap::new();
+
+        // First, process legacy rules (lower priority)
         for rule in config.rules.values() {
             if let Some(max_lines) = rule.max_lines {
                 for ext in &rule.extensions {
@@ -233,11 +254,21 @@ impl ThresholdChecker {
                 }
             }
         }
+
+        // Then, process content.languages (higher priority for V2)
+        for (ext, lang_rule) in &config.content.languages {
+            if let Some(max_lines) = lang_rule.max_lines {
+                index.insert(ext.clone(), max_lines);
+            }
+        }
+
         index
     }
 
     fn build_extension_warn_thresholds(config: &Config) -> HashMap<String, f64> {
         let mut index = HashMap::new();
+
+        // First, process legacy rules (lower priority)
         for rule in config.rules.values() {
             if let Some(warn_threshold) = rule.warn_threshold {
                 for ext in &rule.extensions {
@@ -245,21 +276,43 @@ impl ThresholdChecker {
                 }
             }
         }
+
+        // Then, process content.languages (higher priority for V2)
+        for (ext, lang_rule) in &config.content.languages {
+            if let Some(warn_threshold) = lang_rule.warn_threshold {
+                index.insert(ext.clone(), warn_threshold);
+            }
+        }
+
         index
     }
 
     fn build_path_rules(config: &Config) -> Vec<CompiledPathRule> {
-        config
-            .path_rules
-            .iter()
-            .filter_map(|rule| {
-                Glob::new(&rule.pattern).ok().map(|glob| CompiledPathRule {
+        let mut rules = Vec::new();
+
+        // First, process legacy path_rules (lower priority)
+        for rule in &config.path_rules {
+            if let Ok(glob) = Glob::new(&rule.pattern) {
+                rules.push(CompiledPathRule {
                     matcher: glob.compile_matcher(),
                     max_lines: rule.max_lines,
                     warn_threshold: rule.warn_threshold,
-                })
-            })
-            .collect()
+                });
+            }
+        }
+
+        // Then, process content.rules (higher priority for V2)
+        for rule in &config.content.rules {
+            if let Ok(glob) = Glob::new(&rule.pattern) {
+                rules.push(CompiledPathRule {
+                    matcher: glob.compile_matcher(),
+                    max_lines: rule.max_lines,
+                    warn_threshold: rule.warn_threshold,
+                });
+            }
+        }
+
+        rules
     }
 
     fn path_matches_override(file_path: &Path, override_path: &str) -> bool {
@@ -285,34 +338,42 @@ impl ThresholdChecker {
 
     /// Returns (`max_lines`, `override_reason`) for a path.
     fn get_limit_for_path(&self, path: &Path) -> (usize, Option<String>) {
-        // 1. Check overrides first (highest priority)
+        // 1. Check content.overrides first (highest priority, V2)
+        for override_config in &self.config.content.overrides {
+            if Self::path_matches_override(path, &override_config.path) {
+                return (override_config.max_lines, Some(override_config.reason.clone()));
+            }
+        }
+
+        // 2. Check legacy overrides (for V1 migration)
         for override_config in &self.config.overrides {
             if Self::path_matches_override(path, &override_config.path) {
                 return (override_config.max_lines, override_config.reason.clone());
             }
         }
 
-        // 2. Check path_rules (glob patterns)
-        for path_rule in &self.path_rules {
+        // 3. Check path_rules (glob patterns) - last match wins
+        // Iterate in reverse to find the last matching rule
+        for path_rule in self.path_rules.iter().rev() {
             if path_rule.matcher.is_match(path) {
                 return (path_rule.max_lines, None);
             }
         }
 
-        // 3. Check extension rules
+        // 4. Check extension rules
         if let Some(ext) = path.extension().and_then(|e| e.to_str())
             && let Some(&limit) = self.extension_limits.get(ext)
         {
             return (limit, None);
         }
 
-        // 4. Fall back to default
-        (self.config.default.max_lines, None)
+        // 5. Fall back to content.max_lines (V2) with legacy fallback
+        (self.config.content.max_lines, None)
     }
 
     fn get_warn_threshold_for_path(&self, path: &Path) -> f64 {
-        // 1. Check path_rules for custom warn_threshold (higher priority)
-        for path_rule in &self.path_rules {
+        // 1. Check path_rules for custom warn_threshold (last match wins)
+        for path_rule in self.path_rules.iter().rev() {
             if path_rule.matcher.is_match(path)
                 && let Some(threshold) = path_rule.warn_threshold
             {
@@ -327,7 +388,8 @@ impl ThresholdChecker {
             return threshold;
         }
 
-        // 3. Fall back to default
+        // 3. Fall back to instance warning_threshold
+        // (set via with_warning_threshold or from config during initialization)
         self.warning_threshold
     }
 }

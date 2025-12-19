@@ -46,40 +46,38 @@ pub(crate) fn run_baseline_update_impl(
     cli: &Cli,
 ) -> crate::Result<usize> {
     // 1. Load configuration
-    let config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
+    let mut config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
 
-    // 2. Prepare extensions and exclude patterns
-    let extensions = args
-        .ext
-        .clone()
-        .unwrap_or_else(|| config.default.extensions.clone());
-    let mut exclude_patterns = config.exclude.patterns.clone();
+    // 2. Prepare exclude patterns from scanner config
+    let mut exclude_patterns = config.scanner.exclude.clone();
     exclude_patterns.extend(args.exclude.clone());
+
+    // Apply CLI extensions override if provided
+    if let Some(ref cli_extensions) = args.ext {
+        config.content.extensions.clone_from(cli_extensions);
+    }
 
     // 3. Determine paths to scan
     let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
 
     // 4. Scan directories (respecting .gitignore if enabled)
-    let use_gitignore = config.default.gitignore && !args.no_gitignore;
-    let all_files = scan_files(
-        &paths_to_scan,
-        &extensions,
-        &exclude_patterns,
-        use_gitignore,
-    )?;
+    // Scanner returns ALL files, extension filtering is done by ThresholdChecker
+    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
     // 5. Process each file and find violations
     let registry = LanguageRegistry::with_custom_languages(&config.languages);
     let checker =
-        ThresholdChecker::new(config.clone()).with_warning_threshold(config.default.warn_threshold);
+        ThresholdChecker::new(config.clone()).with_warning_threshold(config.content.warn_threshold);
     let cache = Mutex::new(Cache::new(compute_config_hash(&config)));
 
-    let skip_comments = config.default.skip_comments;
-    let skip_blank = config.default.skip_blank;
+    let skip_comments = config.content.skip_comments;
+    let skip_blank = config.content.skip_blank;
 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let violations: Vec<_> = all_files
         .par_iter()
+        .filter(|file_path| checker.should_process(file_path)) // Filter by extension
         .filter_map(|file_path| {
             let result = process_file_for_baseline(
                 file_path,

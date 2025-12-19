@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, SlocGuardError};
 
-use super::model::CONFIG_VERSION;
+use super::model::{
+    ContentOverride, ContentRule, LanguageRule, CONFIG_VERSION, CONFIG_VERSION_V1,
+};
 use super::remote::{fetch_remote_config, is_remote_url};
 use super::Config;
 
@@ -39,15 +41,72 @@ const USER_CONFIG_DIR: &str = "sloc-guard";
 const USER_CONFIG_NAME: &str = "config.toml";
 
 /// Validate config version. Returns an error if version is unsupported.
-/// Returns `true` if version is missing (caller may want to warn).
+/// Returns `true` if version is missing or V1 (requires migration).
 fn validate_config_version(config: &Config) -> Result<bool> {
     match &config.version {
-        None => Ok(true), // Missing version - caller may warn
-        Some(v) if v == CONFIG_VERSION => Ok(false),
+        None => Ok(true), // Missing version - needs migration
+        Some(v) if v == CONFIG_VERSION => Ok(false), // V2 - no migration
+        Some(v) if v == CONFIG_VERSION_V1 => Ok(true), // V1 - needs migration
         Some(v) => Err(SlocGuardError::Config(format!(
-            "Unsupported config version '{v}'. Current supported version is '{CONFIG_VERSION}'. \
+            "Unsupported config version '{v}'. Supported versions: '{CONFIG_VERSION_V1}', '{CONFIG_VERSION}'. \
              Please check for updates or adjust your config."
         ))),
+    }
+}
+
+/// Migrate V1 config fields to V2 structure.
+/// This function populates `scanner`/`content` fields from legacy fields.
+fn migrate_v1_to_v2(config: &mut Config) {
+    // Migrate default.gitignore -> scanner.gitignore
+    config.scanner.gitignore = config.default.gitignore;
+
+    // Migrate exclude.patterns -> scanner.exclude
+    if !config.exclude.patterns.is_empty() {
+        config.scanner.exclude = config.exclude.patterns.clone();
+    }
+
+    // Migrate default.* -> content.*
+    config.content.extensions = config.default.extensions.clone();
+    config.content.max_lines = config.default.max_lines;
+    config.content.warn_threshold = config.default.warn_threshold;
+    config.content.skip_comments = config.default.skip_comments;
+    config.content.skip_blank = config.default.skip_blank;
+    config.content.strict = config.default.strict;
+
+    // Migrate path_rules -> content.rules
+    for rule in &config.path_rules {
+        config.content.rules.push(ContentRule {
+            pattern: rule.pattern.clone(),
+            max_lines: rule.max_lines,
+            warn_threshold: rule.warn_threshold,
+            skip_comments: None,
+            skip_blank: None,
+        });
+    }
+
+    // Migrate overrides -> content.overrides
+    for ovr in &config.overrides {
+        config.content.overrides.push(ContentOverride {
+            path: ovr.path.clone(),
+            max_lines: ovr.max_lines,
+            reason: ovr
+                .reason
+                .clone()
+                .unwrap_or_else(|| "Legacy override (migrated from v1)".to_string()),
+        });
+    }
+
+    // Migrate rules (extension-based) -> content.languages
+    for (name, rule) in &config.rules {
+        config.content.languages.insert(
+            name.clone(),
+            LanguageRule {
+                max_lines: rule.max_lines,
+                warn_threshold: rule.warn_threshold,
+                skip_comments: rule.skip_comments,
+                skip_blank: rule.skip_blank,
+            },
+        );
     }
 }
 
@@ -151,9 +210,14 @@ impl<F: FileSystem> FileConfigLoader<F> {
     }
 
     fn parse_config(content: &str) -> Result<Config> {
-        let config: Config = toml::from_str(content).map_err(SlocGuardError::from)?;
-        let _version_missing = validate_config_version(&config)?;
-        // Note: Caller may use `config.version.is_none()` to check if a warning should be printed
+        let mut config: Config = toml::from_str(content).map_err(SlocGuardError::from)?;
+        let needs_migration = validate_config_version(&config)?;
+
+        // Migrate V1 config to V2 structure if needed
+        if needs_migration {
+            migrate_v1_to_v2(&mut config);
+        }
+
         Ok(config)
     }
 

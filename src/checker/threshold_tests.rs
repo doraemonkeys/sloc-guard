@@ -372,7 +372,7 @@ fn path_rule_without_warn_threshold_uses_default() {
 }
 
 #[test]
-fn multiple_path_rules_first_match_wins() {
+fn multiple_path_rules_last_match_wins() {
     let mut config = default_config();
     config.path_rules.push(crate::config::PathRule {
         pattern: "src/**".to_string(),
@@ -388,10 +388,10 @@ fn multiple_path_rules_first_match_wins() {
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(700);
 
-    // First matching rule should be used
+    // Last matching rule should be used (1000 limit)
     let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
-    assert!(result.is_failed()); // 700 > 600
-    assert_eq!(result.limit(), 600);
+    assert!(result.is_passed()); // 700 < 1000
+    assert_eq!(result.limit(), 1000);
 }
 
 #[test]

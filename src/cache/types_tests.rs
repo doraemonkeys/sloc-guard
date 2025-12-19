@@ -216,7 +216,7 @@ fn test_compute_config_hash() {
 fn test_compute_config_hash_different_configs() {
     let config1 = Config::default();
     let mut config2 = Config::default();
-    config2.default.max_lines = 1000;
+    config2.content.max_lines = 1000;
 
     let hash1 = compute_config_hash(&config1);
     let hash2 = compute_config_hash(&config2);

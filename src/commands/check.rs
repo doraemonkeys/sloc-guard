@@ -55,40 +55,39 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
-    // 4. Prepare extensions and exclude patterns
-    let extensions = args
-        .ext
-        .clone()
-        .unwrap_or_else(|| config.default.extensions.clone());
-    let mut exclude_patterns = config.exclude.patterns.clone();
+    // 4. Prepare exclude patterns from scanner config
+    let mut exclude_patterns = config.scanner.exclude.clone();
     exclude_patterns.extend(args.exclude.clone());
 
     // 5. Determine paths to scan
     let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
 
     // 6. Scan directories (respecting .gitignore if enabled)
-    let use_gitignore = config.default.gitignore && !args.no_gitignore;
-    let all_files = scan_files(
-        &paths_to_scan,
-        &extensions,
-        &exclude_patterns,
-        use_gitignore,
-    )?;
+    // Scanner now returns ALL files, extension filtering is done by ThresholdChecker
+    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
     // 6.1 Filter by git diff if --diff is specified
     let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
 
     // 7. Process each file (parallel with rayon)
     let registry = LanguageRegistry::with_custom_languages(&config.languages);
-    let warn_threshold = args.warn_threshold.unwrap_or(config.default.warn_threshold);
+
+    // Apply CLI extensions override to config.content if provided
+    if let Some(ref cli_extensions) = args.ext {
+        config.content.extensions.clone_from(cli_extensions);
+    }
+
+    let warn_threshold = args.warn_threshold.unwrap_or(config.content.warn_threshold);
     let checker = ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
 
-    let skip_comments = config.default.skip_comments && !args.no_skip_comments;
-    let skip_blank = config.default.skip_blank && !args.no_skip_blank;
+    let skip_comments = config.content.skip_comments && !args.no_skip_comments;
+    let skip_blank = config.content.skip_blank && !args.no_skip_blank;
 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let mut results: Vec<_> = all_files
         .par_iter()
+        .filter(|file_path| checker.should_process(file_path)) // Filter by extension here
         .filter_map(|file_path| {
             let result = process_file_for_check(
                 file_path,
@@ -152,7 +151,7 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     }
 
     // Strict mode: CLI flag takes precedence, otherwise use config
-    let strict = args.strict || config.default.strict;
+    let strict = args.strict || config.content.strict;
 
     if has_failures || (strict && has_warnings) {
         Ok(EXIT_THRESHOLD_EXCEEDED)
@@ -201,19 +200,19 @@ pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &
 
 pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args: &CheckArgs) {
     if let Some(max_lines) = args.max_lines {
-        config.default.max_lines = max_lines;
+        config.content.max_lines = max_lines;
     }
 
     if args.no_skip_comments {
-        config.default.skip_comments = false;
+        config.content.skip_comments = false;
     }
 
     if args.no_skip_blank {
-        config.default.skip_blank = false;
+        config.content.skip_blank = false;
     }
 
     if let Some(warn_threshold) = args.warn_threshold {
-        config.default.warn_threshold = warn_threshold;
+        config.content.warn_threshold = warn_threshold;
     }
 }
 

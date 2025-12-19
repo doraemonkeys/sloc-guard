@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -32,7 +33,7 @@ pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
 
 pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> {
     // 1. Load configuration (for exclude patterns)
-    let config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
+    let mut config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
 
     // 1.1 Load cache if not disabled
     let config_hash = compute_config_hash(&config);
@@ -43,25 +44,25 @@ pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> 
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
-    // 2. Prepare extensions and exclude patterns
-    let extensions = args
-        .ext
-        .clone()
-        .unwrap_or_else(|| config.default.extensions.clone());
-    let mut exclude_patterns = config.exclude.patterns.clone();
+    // 2. Prepare exclude patterns from scanner config
+    let mut exclude_patterns = config.scanner.exclude.clone();
     exclude_patterns.extend(args.exclude.clone());
+
+    // Apply CLI extensions override if provided
+    if let Some(ref cli_extensions) = args.ext {
+        config.content.extensions.clone_from(cli_extensions);
+    }
+
+    // Build allowed extensions set for filtering
+    let allowed_extensions: HashSet<String> = config.content.extensions.iter().cloned().collect();
 
     // 3. Determine paths to scan
     let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, &config);
 
     // 4. Scan directories (respecting .gitignore if enabled)
-    let use_gitignore = config.default.gitignore && !args.no_gitignore;
-    let all_files = scan_files(
-        &paths_to_scan,
-        &extensions,
-        &exclude_patterns,
-        use_gitignore,
-    )?;
+    // Scanner returns ALL files, extension filtering is done below
+    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
+    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
     // 5. Process each file and collect statistics (parallel with rayon)
     let registry = LanguageRegistry::with_custom_languages(&config.languages);
@@ -69,6 +70,16 @@ pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> 
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files
         .par_iter()
+        .filter(|file_path| {
+            // Filter by extension
+            if allowed_extensions.is_empty() {
+                return true;
+            }
+            file_path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| allowed_extensions.contains(ext))
+        })
         .filter_map(|file_path| {
             let result = collect_file_stats(file_path, &registry, &cache);
             progress.inc();

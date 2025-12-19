@@ -94,9 +94,12 @@ FunctionParser: Rust, Go, Python, JS/TS, C/C++
 
 ```
 CLI args → load_config() → [if extends] resolve chain (local/remote, cycle detection)
+         → [if v1 config] migrate_v1_to_v2() auto-conversion
          → [if !--no-cache] load_cache(config_hash)
-         → LanguageRegistry + GlobFilter
+         → LanguageRegistry
          → [if gitignore] GitAwareScanner else DirectoryScanner
+            Scanner returns ALL files (exclude patterns only, no extension filter)
+         → ThresholdChecker::should_process() filters by content.extensions
          → parallel file processing (rayon):
               cache lookup by mtime+size → [miss] SlocCounter::count() → update cache
          → save_cache()

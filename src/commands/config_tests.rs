@@ -170,7 +170,9 @@ fn config_show_json_format() {
     let result = run_config_show_impl(Some(&config_path), "json");
     assert!(result.is_ok());
     let output = result.unwrap();
-    assert!(output.contains("\"default\""));
+    // V2 schema has scanner, content, structure sections
+    assert!(output.contains("\"scanner\""));
+    assert!(output.contains("\"content\""));
     assert!(output.contains("\"max_lines\""));
 }
 
