@@ -62,7 +62,7 @@ CheckResult::Passed { path, stats, limit, override_reason }
 // Structure checking
 DirStats { file_count, dir_count }  // immediate children counts
 ViolationType::FileCount | DirCount
-StructureViolation { path, violation_type, actual, limit, is_warning }
+StructureViolation { path, violation_type, actual, limit, is_warning, override_reason }
 
 // Output
 OutputFormat::Text | Json | Sarif | Markdown | Html

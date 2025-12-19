@@ -46,36 +46,16 @@ Location: `src/config/model.rs`, `src/scanner/*.rs`, `src/checker/threshold.rs`
 - V1→V2 auto-migration in `loader.rs::migrate_v1_to_v2()`
 - CONFIG_VERSION bumped to "2"
 
-### Task 5.5.2: Override Separation (Content vs Structure)
+### Task 5.5.2: Override Separation (Content vs Structure) ✅
 Location: `src/config/model.rs`, `src/checker/*.rs`
-**Problem**: `[[override]]` mixing file limits and directory limits causes semantic confusion.
-- Same array contains two different concepts (file SLOC vs directory counts)
-- Only way to distinguish is by field presence (`max_lines` vs `max_files/max_dirs`)
-- Edge case: user sets `max_files` on a file path, or `max_lines` on a directory → undefined behavior
-- `[[content.rules]]` vs `[[content.override]]` 语义重叠 - 用户不知道该用哪个
-
-**Solution**: Split into `[[content.override]]` and `[[structure.override]]` with clear semantics.
-```toml
-# Content override (file SLOC limits)
-[[content.override]]
-path = "src/legacy/god_object.rs"
-max_lines = 5000
-reason = "Legacy core"  # reason REQUIRED
-
-# Structure override (directory limits)
-[[structure.override]]
-path = "src/legacy_module"
-max_files = 500
-max_dirs = 100
-reason = "Legacy monolith, gradual migration in progress"  # reason REQUIRED
-```
-- `ContentOverride { path, max_lines, reason }` - file-only
-- `StructureOverride { path, max_files, max_dirs, reason }` - directory-only
-- Type safety: loader validates path type matches override type
-- **Semantic distinction**:
-  - `[[content/structure.override]]` = **豁免** (只能放宽限制, reason 必填)
-  - `[[content/structure.rules]]` = **规则** (可严可宽, 用于批量 glob 匹配)
-- Loader validates: override.max_lines >= effective rule limit (error if stricter)
+**Completed**: Split overrides into type-safe `[[content.override]]` and `[[structure.override]]`.
+- `ContentOverride { path, max_lines, reason }` - file-only, reason required
+- `StructureOverride { path, max_files, max_dirs, reason }` - directory-only, reason required
+- `StructureConfig.overrides: Vec<StructureOverride>` with TOML syntax `[[structure.override]]`
+- `StructureChecker` checks overrides first (highest priority), then rules, then global defaults
+- Path suffix matching (same as `ThresholdChecker`)
+- Validation: at least one of `max_files`/`max_dirs` required, values >= -1
+- `StructureViolation.override_reason` tracks reason in violation output
 
 ### Task 5.5.3: Extension-Based Rule Syntax Sugar
 Location: `src/config/model.rs`, `src/config/loader.rs`
@@ -165,17 +145,12 @@ Location: `src/commands/check.rs`, `src/commands/stats.rs`
 - Tests construct context with controlled/mock components
 - Consider trait abstractions if full mockability needed later
 
-### Task 5.5.14: Enforce Required Reason Field
-
-Location: `src/config/model.rs`, `src/config/loader.rs`
-**Problem**: Override `reason` field is optional, violating "Make Illegal States Unrepresentable" principle.
-- Task 5.5.2 design requires reason to be mandatory
-- Current code allows overrides without justification → audit trail gap
-
-**Solution**: Make reason mandatory in type system.
-- Remove `Option` wrapper from `reason` field in override types
-- Loader rejects overrides with missing/empty reason
-- **Note**: Fix as part of 5.5.2 migration (ContentOverride/StructureOverride split)
+### Task 5.5.14: Enforce Required Reason Field ✅
+Location: `src/config/model.rs`
+**Completed**: As part of Task 5.5.2.
+- `ContentOverride.reason: String` (not Option) - required field
+- `StructureOverride.reason: String` (not Option) - required field
+- TOML deserialization fails if reason missing
 
 ### Task 5.5.9: Rule Priority Chain Documentation & Enforcement
 Location: `src/checker/threshold.rs`, `src/config/loader.rs`, `docs/sloc-guard.example.toml`
@@ -280,7 +255,7 @@ Location: `src/output/html.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Critical Architecture** | ~~5.5.1 Scanner/Structure Visibility~~, 5.5.2 Override Separation (incl. 5.5.14 required reason) |
+| **1. Critical Architecture** | ~~5.5.1 Scanner/Structure Visibility~~, ~~5.5.2 Override Separation (incl. 5.5.14 required reason)~~ |
 | **2. UX & Semantics** | 5.5.3 Extension Syntax Sugar, ~~5.5.4 Pattern Semantics~~, ~~5.5.5 Naming~~, 5.5.9 Priority Chain, ~~5.5.10 Structure warn_threshold~~, ~~5.5.11 Unlimited Value~~ |
 | **3. Code Quality** | 5.5.13 Testability (DI), ~~5.5.6 Rename common.rs~~, ~~5.5.7 CheckResult Enum~~, ~~5.5.8 Versioning~~ |
 | **4. Documentation** | ~~5.5.12 extends Examples~~ |

@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 
-use crate::config::{StructureConfig, UNLIMITED};
+use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
 use crate::error::{Result, SlocGuardError};
 
 /// Counts of immediate children in a directory.
@@ -29,6 +29,8 @@ pub struct StructureViolation {
     pub limit: usize,
     /// True if this is a warning (threshold exceeded but under hard limit).
     pub is_warning: bool,
+    /// Reason for override if one was applied.
+    pub override_reason: Option<String>,
 }
 
 impl StructureViolation {
@@ -38,6 +40,7 @@ impl StructureViolation {
         violation_type: ViolationType,
         actual: usize,
         limit: usize,
+        override_reason: Option<String>,
     ) -> Self {
         Self {
             path,
@@ -45,6 +48,7 @@ impl StructureViolation {
             actual,
             limit,
             is_warning: false,
+            override_reason,
         }
     }
 
@@ -54,6 +58,7 @@ impl StructureViolation {
         violation_type: ViolationType,
         actual: usize,
         limit: usize,
+        override_reason: Option<String>,
     ) -> Self {
         Self {
             path,
@@ -61,6 +66,7 @@ impl StructureViolation {
             actual,
             limit,
             is_warning: true,
+            override_reason,
         }
     }
 }
@@ -79,6 +85,7 @@ pub struct StructureChecker {
     warn_threshold: Option<f64>,
     ignore_patterns: GlobSet,
     rules: Vec<CompiledStructureRule>,
+    overrides: Vec<StructureOverride>,
 }
 
 impl StructureChecker {
@@ -99,6 +106,7 @@ impl StructureChecker {
             warn_threshold: config.warn_threshold,
             ignore_patterns,
             rules,
+            overrides: config.overrides.clone(),
         })
     }
 
@@ -138,6 +146,34 @@ impl StructureChecker {
             }
         }
 
+        // Validate overrides
+        for (i, ovr) in config.overrides.iter().enumerate() {
+            if let Some(limit) = ovr.max_files
+                && limit < UNLIMITED
+            {
+                return Err(SlocGuardError::Config(format!(
+                    "Invalid max_files value in override {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
+                    i + 1
+                )));
+            }
+            if let Some(limit) = ovr.max_dirs
+                && limit < UNLIMITED
+            {
+                return Err(SlocGuardError::Config(format!(
+                    "Invalid max_dirs value in override {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
+                    i + 1
+                )));
+            }
+            // Require at least one limit to be set
+            if ovr.max_files.is_none() && ovr.max_dirs.is_none() {
+                return Err(SlocGuardError::Config(format!(
+                    "Override {} for path '{}' must specify at least one of max_files or max_dirs.",
+                    i + 1,
+                    ovr.path
+                )));
+            }
+        }
+
         Ok(())
     }
 
@@ -145,7 +181,10 @@ impl StructureChecker {
     #[must_use]
     #[allow(clippy::missing_const_for_fn)] // Vec::is_empty() is not const
     pub fn is_enabled(&self) -> bool {
-        self.max_files.is_some() || self.max_dirs.is_some() || !self.rules.is_empty()
+        self.max_files.is_some()
+            || self.max_dirs.is_some()
+            || !self.rules.is_empty()
+            || !self.overrides.is_empty()
     }
 
     fn build_ignore_patterns(patterns: &[String]) -> Result<GlobSet> {
@@ -229,29 +268,70 @@ impl StructureChecker {
         Ok(())
     }
 
-    /// Get limits for a directory path (rule takes priority over global default).
-    /// Returns (`max_files`, `max_dirs`, `warn_threshold`).
+    /// Check if a directory path matches an override path.
+    /// Uses suffix matching similar to `ThresholdChecker`.
+    fn path_matches_override(dir_path: &Path, override_path: &str) -> bool {
+        let override_components: Vec<&str> = override_path
+            .split(['/', '\\'])
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let dir_components: Vec<_> = dir_path.components().collect();
+
+        if override_components.is_empty() || override_components.len() > dir_components.len() {
+            return false;
+        }
+
+        dir_components
+            .iter()
+            .rev()
+            .zip(override_components.iter().rev())
+            .all(|(dir_comp, override_comp)| {
+                if let Component::Normal(os_str) = dir_comp {
+                    os_str.to_string_lossy() == *override_comp
+                } else {
+                    false
+                }
+            })
+    }
+
+    /// Get limits for a directory path.
+    /// Returns (`max_files`, `max_dirs`, `warn_threshold`, `override_reason`).
     /// A limit of `-1` (UNLIMITED) means no check should be performed.
+    ///
+    /// # Priority Chain (high → low)
+    ///
+    /// 1. `[[structure.override]]` - exact path match (highest)
+    /// 2. `[[structure.rules]]` - glob pattern, last match wins
+    /// 3. `[structure]` defaults (lowest)
     ///
     /// # Glob Semantics (structure rules only match directories)
     ///
     /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
-    fn get_limits(&self, path: &Path) -> (Option<i64>, Option<i64>, Option<f64>) {
-        // Check rules first (higher priority)
-        for rule in &self.rules {
-            if rule.matcher.is_match(path) {
-                // Rule can override individual limits; fall back to global for unset
-                let max_files = rule.max_files.or(self.max_files);
-                let max_dirs = rule.max_dirs.or(self.max_dirs);
-                let warn_threshold = rule.warn_threshold.or(self.warn_threshold);
-                return (max_files, max_dirs, warn_threshold);
+    fn get_limits(&self, path: &Path) -> (Option<i64>, Option<i64>, Option<f64>, Option<String>) {
+        // 1. Check overrides first (highest priority)
+        for ovr in &self.overrides {
+            if Self::path_matches_override(path, &ovr.path) {
+                let max_files = ovr.max_files.or(self.max_files);
+                let max_dirs = ovr.max_dirs.or(self.max_dirs);
+                return (max_files, max_dirs, self.warn_threshold, Some(ovr.reason.clone()));
             }
         }
 
-        // Fall back to global defaults
-        (self.max_files, self.max_dirs, self.warn_threshold)
+        // 2. Check rules (glob patterns)
+        for rule in &self.rules {
+            if rule.matcher.is_match(path) {
+                let max_files = rule.max_files.or(self.max_files);
+                let max_dirs = rule.max_dirs.or(self.max_dirs);
+                let warn_threshold = rule.warn_threshold.or(self.warn_threshold);
+                return (max_files, max_dirs, warn_threshold, None);
+            }
+        }
+
+        // 3. Fall back to global defaults
+        (self.max_files, self.max_dirs, self.warn_threshold, None)
     }
 
     /// Check directory stats against limits and return violations.
@@ -269,7 +349,7 @@ impl StructureChecker {
         let mut violations = Vec::new();
 
         for (path, stats) in dir_stats {
-            let (max_files, max_dirs, warn_threshold) = self.get_limits(path);
+            let (max_files, max_dirs, warn_threshold, override_reason) = self.get_limits(path);
 
             // Check file count (skip if unlimited)
             if let Some(limit) = max_files
@@ -285,6 +365,7 @@ impl StructureChecker {
                         ViolationType::FileCount,
                         stats.file_count,
                         limit_usize,
+                        override_reason.clone(),
                     ));
                 } else if stats.file_count > warn_limit {
                     violations.push(StructureViolation::warning(
@@ -292,6 +373,7 @@ impl StructureChecker {
                         ViolationType::FileCount,
                         stats.file_count,
                         limit_usize,
+                        override_reason.clone(),
                     ));
                 }
             }
@@ -310,6 +392,7 @@ impl StructureChecker {
                         ViolationType::DirCount,
                         stats.dir_count,
                         limit_usize,
+                        override_reason.clone(),
                     ));
                 } else if stats.dir_count > warn_limit {
                     violations.push(StructureViolation::warning(
@@ -317,6 +400,7 @@ impl StructureChecker {
                         ViolationType::DirCount,
                         stats.dir_count,
                         limit_usize,
+                        override_reason.clone(),
                     ));
                 }
             }

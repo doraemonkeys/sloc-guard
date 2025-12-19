@@ -353,6 +353,10 @@ pub struct StructureConfig {
     /// Per-directory rules that override global limits.
     #[serde(default)]
     pub rules: Vec<StructureRule>,
+
+    /// Directory-level overrides [[structure.override]].
+    #[serde(default, rename = "override")]
+    pub overrides: Vec<StructureOverride>,
 }
 
 /// Rule for overriding structure limits on specific directories.
@@ -374,6 +378,25 @@ pub struct StructureRule {
     /// Override threshold for warnings in matched directories.
     #[serde(default)]
     pub warn_threshold: Option<f64>,
+}
+
+/// Structure override for specific directories [[structure.override]].
+/// Only for DIRECTORIES. Use to grandfather legacy directories.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StructureOverride {
+    /// Exact path to the directory.
+    pub path: String,
+
+    /// Maximum files allowed (-1 = unlimited).
+    #[serde(default)]
+    pub max_files: Option<i64>,
+
+    /// Maximum subdirs allowed (-1 = unlimited).
+    #[serde(default)]
+    pub max_dirs: Option<i64>,
+
+    /// Reason for the override (required for audit trail).
+    pub reason: String,
 }
 
 #[cfg(test)]
