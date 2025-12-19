@@ -184,9 +184,19 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
             }
         },
     );
+    let max_depth_str = exp.effective_max_depth.map_or_else(
+        || "none".to_string(),
+        |v| {
+            if v == -1 {
+                "unlimited".to_string()
+            } else {
+                v.to_string()
+            }
+        },
+    );
 
     output.push_str(&format!(
-        "  Limits:  max_files={max_files_str}, max_dirs={max_dirs_str}\n"
+        "  Limits:  max_files={max_files_str}, max_dirs={max_dirs_str}, max_depth={max_depth_str}\n"
     ));
     output.push_str(&format!("  Warn at: {:.0}%\n", exp.warn_threshold * 100.0));
 
@@ -217,8 +227,11 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
         let dirs_str = candidate
             .max_dirs
             .map_or_else(|| "-".to_string(), |v| v.to_string());
+        let depth_str = candidate
+            .max_depth
+            .map_or_else(|| "-".to_string(), |v| v.to_string());
         output.push_str(&format!(
-            "    [{status_char}] {}{} -> files={files_str}, dirs={dirs_str} {status_desc}\n",
+            "    [{status_char}] {}{} -> files={files_str}, dirs={dirs_str}, depth={depth_str} {status_desc}\n",
             candidate.source, pattern_str
         ));
     }

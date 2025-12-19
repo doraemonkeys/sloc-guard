@@ -338,6 +338,12 @@ pub struct StructureConfig {
     #[serde(default)]
     pub max_dirs: Option<i64>,
 
+    /// Global default limit for maximum directory nesting depth.
+    /// Depth 0 = scan root, depth 1 = direct subdirectories.
+    /// Use `-1` for unlimited (no check), `>0` for limit.
+    #[serde(default)]
+    pub max_depth: Option<i64>,
+
     /// Threshold (0.0-1.0) at which warnings are issued before hitting hard limits.
     /// Example: `max_files=50`, `warn_threshold=0.9` → warns at 45 files.
     #[serde(default)]
@@ -373,6 +379,11 @@ pub struct StructureRule {
     #[serde(default)]
     pub max_dirs: Option<i64>,
 
+    /// Override limit for maximum depth in matched directories.
+    /// Use `-1` for unlimited (no check), `>0` for limit.
+    #[serde(default)]
+    pub max_depth: Option<i64>,
+
     /// Override threshold for warnings in matched directories.
     #[serde(default)]
     pub warn_threshold: Option<f64>,
@@ -392,6 +403,10 @@ pub struct StructureOverride {
     /// Maximum subdirs allowed (-1 = unlimited).
     #[serde(default)]
     pub max_dirs: Option<i64>,
+
+    /// Maximum depth allowed (-1 = unlimited).
+    #[serde(default)]
+    pub max_depth: Option<i64>,
 
     /// Reason for the override (required for audit trail).
     pub reason: String,

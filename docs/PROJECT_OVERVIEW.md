@@ -21,7 +21,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `scanner/*.rs` | `FileScanner` trait, `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback) |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
-| `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir count limits with glob-based rules |
+| `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
 | `checker/explain` | `checker/explain.rs` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline`/`cache` | `*/types.rs` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
@@ -42,9 +42,9 @@ ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
-StructureConfig { max_files, max_dirs, warn_threshold, count_exclude, rules, overrides }
-StructureRule { pattern, max_files, max_dirs, warn_threshold }  // [[structure.rules]]
-StructureOverride { path, max_files, max_dirs, reason }  // [[structure.override]] - dir only
+StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, rules, overrides }
+StructureRule { pattern, max_files, max_dirs, max_depth, warn_threshold }  // [[structure.rules]]
+StructureOverride { path, max_files, max_dirs, max_depth, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
 // Line counting (ignore directives: ignore-file, ignore-next N, ignore-start/end)
@@ -61,8 +61,8 @@ CheckResult::Passed { path, stats, limit, override_reason }
 // Consuming: into_grandfathered(), with_suggestions()
 
 // Structure checking
-DirStats { file_count, dir_count }  // immediate children counts
-ViolationType::FileCount | DirCount
+DirStats { file_count, dir_count, depth }  // immediate children counts + depth from scan root
+ViolationType::FileCount | DirCount | MaxDepth
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason }
 
 // Explain (rule chain debugging)
@@ -70,7 +70,7 @@ MatchStatus::Matched | Superseded | NoMatch
 ContentRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
 ContentExplanation { path, matched_rule, effective_limit, warn_threshold, skip_*, rule_chain }
 StructureRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
-StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, warn_threshold, rule_chain }
+StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, rule_chain }
 
 // Output
 OutputFormat::Text | Json | Sarif | Markdown | Html

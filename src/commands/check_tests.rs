@@ -195,6 +195,7 @@ fn run_check_impl_with_valid_directory() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -229,6 +230,7 @@ fn run_check_impl_with_warn_only() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -263,6 +265,7 @@ fn run_check_impl_with_threshold_exceeded() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -300,6 +303,7 @@ fn run_check_impl_with_json_output() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -337,6 +341,7 @@ fn run_check_impl_with_verbose() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -370,6 +375,7 @@ fn run_check_impl_with_count_flags() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -403,6 +409,7 @@ fn run_check_impl_with_include_paths() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -436,6 +443,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -470,6 +478,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -504,6 +513,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -542,6 +552,7 @@ fn run_check_returns_config_error_on_invalid_config() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -577,6 +588,7 @@ fn run_check_impl_with_sarif_output() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -617,6 +629,7 @@ fn run_check_impl_with_markdown_output() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -655,6 +668,7 @@ fn apply_cli_overrides_max_lines() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -689,6 +703,7 @@ fn apply_cli_overrides_count_comments() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -723,6 +738,7 @@ fn apply_cli_overrides_count_blank() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -755,6 +771,7 @@ fn apply_cli_overrides_warn_threshold() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -789,6 +806,7 @@ fn run_check_impl_with_report_json_creates_stats_file() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: Some(stats_output.clone()),
     };
 
@@ -844,6 +862,7 @@ fn run_check_impl_without_report_json_does_not_create_file() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     };
 
@@ -884,6 +903,7 @@ fn run_check_impl_report_json_does_not_affect_exit_code() {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: Some(stats_output.clone()),
     };
 

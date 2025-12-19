@@ -15,6 +15,8 @@ use super::explain::{
 pub struct DirStats {
     pub file_count: usize,
     pub dir_count: usize,
+    /// Depth relative to scan root (root = 0).
+    pub depth: usize,
 }
 
 /// Type of structure violation.
@@ -22,6 +24,7 @@ pub struct DirStats {
 pub enum ViolationType {
     FileCount,
     DirCount,
+    MaxDepth,
 }
 
 /// A structure limit violation.
@@ -80,13 +83,25 @@ struct CompiledStructureRule {
     matcher: GlobMatcher,
     max_files: Option<i64>,
     max_dirs: Option<i64>,
+    max_depth: Option<i64>,
     warn_threshold: Option<f64>,
+}
+
+/// Resolved limits for a directory path.
+#[derive(Debug, Clone, Default)]
+struct StructureLimits {
+    max_files: Option<i64>,
+    max_dirs: Option<i64>,
+    max_depth: Option<i64>,
+    warn_threshold: Option<f64>,
+    override_reason: Option<String>,
 }
 
 /// Checker for directory structure limits.
 pub struct StructureChecker {
     max_files: Option<i64>,
     max_dirs: Option<i64>,
+    max_depth: Option<i64>,
     warn_threshold: Option<f64>,
     /// Patterns from scanner.exclude - directories matching these are completely skipped.
     scanner_exclude: GlobSet,
@@ -127,6 +142,7 @@ impl StructureChecker {
         Ok(Self {
             max_files: config.max_files,
             max_dirs: config.max_dirs,
+            max_depth: config.max_depth,
             warn_threshold: config.warn_threshold,
             scanner_exclude: scanner_exclude_set,
             scanner_exclude_dir_names,
@@ -176,6 +192,13 @@ impl StructureChecker {
                 "Invalid max_dirs value: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number."
             )));
         }
+        if let Some(limit) = config.max_depth
+            && limit < UNLIMITED
+        {
+            return Err(SlocGuardError::Config(format!(
+                "Invalid max_depth value: {limit}. Use -1 for unlimited, or a positive number."
+            )));
+        }
 
         for (i, rule) in config.rules.iter().enumerate() {
             if let Some(limit) = rule.max_files
@@ -191,6 +214,14 @@ impl StructureChecker {
             {
                 return Err(SlocGuardError::Config(format!(
                     "Invalid max_dirs value in rule {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
+                    i + 1
+                )));
+            }
+            if let Some(limit) = rule.max_depth
+                && limit < UNLIMITED
+            {
+                return Err(SlocGuardError::Config(format!(
+                    "Invalid max_depth value in rule {}: {limit}. Use -1 for unlimited, or a positive number.",
                     i + 1
                 )));
             }
@@ -214,10 +245,18 @@ impl StructureChecker {
                     i + 1
                 )));
             }
-            // Require at least one limit to be set
-            if ovr.max_files.is_none() && ovr.max_dirs.is_none() {
+            if let Some(limit) = ovr.max_depth
+                && limit < UNLIMITED
+            {
                 return Err(SlocGuardError::Config(format!(
-                    "Override {} for path '{}' must specify at least one of max_files or max_dirs.",
+                    "Invalid max_depth value in override {}: {limit}. Use -1 for unlimited, or a positive number.",
+                    i + 1
+                )));
+            }
+            // Require at least one limit to be set
+            if ovr.max_files.is_none() && ovr.max_dirs.is_none() && ovr.max_depth.is_none() {
+                return Err(SlocGuardError::Config(format!(
+                    "Override {} for path '{}' must specify at least one of max_files, max_dirs, or max_depth.",
                     i + 1,
                     ovr.path
                 )));
@@ -233,6 +272,7 @@ impl StructureChecker {
     pub fn is_enabled(&self) -> bool {
         self.max_files.is_some()
             || self.max_dirs.is_some()
+            || self.max_depth.is_some()
             || !self.rules.is_empty()
             || !self.overrides.is_empty()
     }
@@ -266,6 +306,7 @@ impl StructureChecker {
                     matcher: glob.compile_matcher(),
                     max_files: rule.max_files,
                     max_dirs: rule.max_dirs,
+                    max_depth: rule.max_depth,
                     warn_threshold: rule.warn_threshold,
                 })
             })
@@ -278,7 +319,7 @@ impl StructureChecker {
     /// Returns an error if a directory cannot be read.
     pub fn collect_dir_stats(&self, root: &Path) -> Result<HashMap<PathBuf, DirStats>> {
         let mut stats = HashMap::new();
-        self.collect_dir_stats_recursive(root, &mut stats)?;
+        self.collect_dir_stats_recursive(root, &mut stats, 0)?;
         Ok(stats)
     }
 
@@ -286,13 +327,17 @@ impl StructureChecker {
         &self,
         dir: &Path,
         stats: &mut HashMap<PathBuf, DirStats>,
+        depth: usize,
     ) -> Result<()> {
         let entries = std::fs::read_dir(dir).map_err(|e| SlocGuardError::FileRead {
             path: dir.to_path_buf(),
             source: e,
         })?;
 
-        let mut dir_stats = DirStats::default();
+        let mut dir_stats = DirStats {
+            depth,
+            ..Default::default()
+        };
 
         for entry in entries {
             let entry = entry.map_err(SlocGuardError::Io)?;
@@ -311,7 +356,7 @@ impl StructureChecker {
             if self.ignore_patterns.is_match(file_name) || self.ignore_patterns.is_match(&path) {
                 // Still recurse into directories for stats collection, just don't count this entry
                 if file_type.is_dir() {
-                    self.collect_dir_stats_recursive(&path, stats)?;
+                    self.collect_dir_stats_recursive(&path, stats, depth + 1)?;
                 }
                 continue;
             }
@@ -321,7 +366,7 @@ impl StructureChecker {
             } else if file_type.is_dir() {
                 dir_stats.dir_count += 1;
                 // Recurse into subdirectory
-                self.collect_dir_stats_recursive(&path, stats)?;
+                self.collect_dir_stats_recursive(&path, stats, depth + 1)?;
             }
         }
 
@@ -382,7 +427,7 @@ impl StructureChecker {
     }
 
     /// Get limits for a directory path.
-    /// Returns (`max_files`, `max_dirs`, `warn_threshold`, `override_reason`).
+    /// Returns a `StructureLimits` struct with all applicable limits.
     /// A limit of `-1` (UNLIMITED) means no check should be performed.
     ///
     /// # Priority Chain (high → low)
@@ -396,33 +441,41 @@ impl StructureChecker {
     /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
-    fn get_limits(&self, path: &Path) -> (Option<i64>, Option<i64>, Option<f64>, Option<String>) {
+    fn get_limits(&self, path: &Path) -> StructureLimits {
         // 1. Check overrides first (highest priority)
         for ovr in &self.overrides {
             if Self::path_matches_override(path, &ovr.path) {
-                let max_files = ovr.max_files.or(self.max_files);
-                let max_dirs = ovr.max_dirs.or(self.max_dirs);
-                return (
-                    max_files,
-                    max_dirs,
-                    self.warn_threshold,
-                    Some(ovr.reason.clone()),
-                );
+                return StructureLimits {
+                    max_files: ovr.max_files.or(self.max_files),
+                    max_dirs: ovr.max_dirs.or(self.max_dirs),
+                    max_depth: ovr.max_depth.or(self.max_depth),
+                    warn_threshold: self.warn_threshold,
+                    override_reason: Some(ovr.reason.clone()),
+                };
             }
         }
 
         // 2. Check rules (glob patterns)
         for rule in &self.rules {
             if rule.matcher.is_match(path) {
-                let max_files = rule.max_files.or(self.max_files);
-                let max_dirs = rule.max_dirs.or(self.max_dirs);
-                let warn_threshold = rule.warn_threshold.or(self.warn_threshold);
-                return (max_files, max_dirs, warn_threshold, None);
+                return StructureLimits {
+                    max_files: rule.max_files.or(self.max_files),
+                    max_dirs: rule.max_dirs.or(self.max_dirs),
+                    max_depth: rule.max_depth.or(self.max_depth),
+                    warn_threshold: rule.warn_threshold.or(self.warn_threshold),
+                    override_reason: None,
+                };
             }
         }
 
         // 3. Fall back to global defaults
-        (self.max_files, self.max_dirs, self.warn_threshold, None)
+        StructureLimits {
+            max_files: self.max_files,
+            max_dirs: self.max_dirs,
+            max_depth: self.max_depth,
+            warn_threshold: self.warn_threshold,
+            override_reason: None,
+        }
     }
 
     /// Check directory stats against limits and return violations.
@@ -440,15 +493,16 @@ impl StructureChecker {
         let mut violations = Vec::new();
 
         for (path, stats) in dir_stats {
-            let (max_files, max_dirs, warn_threshold, override_reason) = self.get_limits(path);
+            let limits = self.get_limits(path);
 
             // Check file count (skip if unlimited)
-            if let Some(limit) = max_files
+            if let Some(limit) = limits.max_files
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit =
-                    warn_threshold.map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                let warn_limit = limits
+                    .warn_threshold
+                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
 
                 if stats.file_count > limit_usize {
                     violations.push(StructureViolation::new(
@@ -456,7 +510,7 @@ impl StructureChecker {
                         ViolationType::FileCount,
                         stats.file_count,
                         limit_usize,
-                        override_reason.clone(),
+                        limits.override_reason.clone(),
                     ));
                 } else if stats.file_count > warn_limit {
                     violations.push(StructureViolation::warning(
@@ -464,18 +518,19 @@ impl StructureChecker {
                         ViolationType::FileCount,
                         stats.file_count,
                         limit_usize,
-                        override_reason.clone(),
+                        limits.override_reason.clone(),
                     ));
                 }
             }
 
             // Check directory count (skip if unlimited)
-            if let Some(limit) = max_dirs
+            if let Some(limit) = limits.max_dirs
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit =
-                    warn_threshold.map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                let warn_limit = limits
+                    .warn_threshold
+                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
 
                 if stats.dir_count > limit_usize {
                     violations.push(StructureViolation::new(
@@ -483,7 +538,7 @@ impl StructureChecker {
                         ViolationType::DirCount,
                         stats.dir_count,
                         limit_usize,
-                        override_reason.clone(),
+                        limits.override_reason.clone(),
                     ));
                 } else if stats.dir_count > warn_limit {
                     violations.push(StructureViolation::warning(
@@ -491,7 +546,35 @@ impl StructureChecker {
                         ViolationType::DirCount,
                         stats.dir_count,
                         limit_usize,
-                        override_reason.clone(),
+                        limits.override_reason.clone(),
+                    ));
+                }
+            }
+
+            // Check depth (skip if unlimited)
+            if let Some(limit) = limits.max_depth
+                && limit != UNLIMITED
+            {
+                let limit_usize = limit as usize;
+                let warn_limit = limits
+                    .warn_threshold
+                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+
+                if stats.depth > limit_usize {
+                    violations.push(StructureViolation::new(
+                        path.clone(),
+                        ViolationType::MaxDepth,
+                        stats.depth,
+                        limit_usize,
+                        limits.override_reason.clone(),
+                    ));
+                } else if stats.depth > warn_limit {
+                    violations.push(StructureViolation::warning(
+                        path.clone(),
+                        ViolationType::MaxDepth,
+                        stats.depth,
+                        limit_usize,
+                        limits.override_reason.clone(),
                     ));
                 }
             }
@@ -543,6 +626,7 @@ impl StructureChecker {
                 pattern: Some(ovr.path.clone()),
                 max_files: ovr.max_files,
                 max_dirs: ovr.max_dirs,
+                max_depth: ovr.max_depth,
                 status,
             });
         }
@@ -568,6 +652,7 @@ impl StructureChecker {
                 pattern: Some(rule.pattern.clone()),
                 max_files: rule.max_files,
                 max_dirs: rule.max_dirs,
+                max_depth: rule.max_depth,
                 status,
             });
         }
@@ -578,6 +663,7 @@ impl StructureChecker {
             pattern: None,
             max_files: self.max_files,
             max_dirs: self.max_dirs,
+            max_depth: self.max_depth,
             status: if found_match {
                 MatchStatus::Superseded
             } else {
@@ -586,14 +672,15 @@ impl StructureChecker {
         });
 
         // Get effective limits using the same logic as get_limits
-        let (effective_max_files, effective_max_dirs, warn_threshold, _) = self.get_limits(path);
+        let limits = self.get_limits(path);
 
         StructureExplanation {
             path: path.to_path_buf(),
             matched_rule,
-            effective_max_files,
-            effective_max_dirs,
-            warn_threshold: warn_threshold.unwrap_or(1.0),
+            effective_max_files: limits.max_files,
+            effective_max_dirs: limits.max_dirs,
+            effective_max_depth: limits.max_depth,
+            warn_threshold: limits.warn_threshold.unwrap_or(1.0),
             override_reason,
             rule_chain,
         }

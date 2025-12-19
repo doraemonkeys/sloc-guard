@@ -53,6 +53,7 @@ fn make_check_args(paths: Vec<PathBuf>) -> CheckArgs {
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     }
 }
@@ -175,7 +176,7 @@ fn validate_and_resolve_paths_max_files_without_path_returns_error() {
     let err = result.unwrap_err();
     assert!(
         err.to_string()
-            .contains("--max-files/--max-dirs require a target <PATH>")
+            .contains("--max-files/--max-dirs/--max-depth require a target <PATH>")
     );
 }
 
@@ -188,7 +189,7 @@ fn validate_and_resolve_paths_max_dirs_without_path_returns_error() {
     let err = result.unwrap_err();
     assert!(
         err.to_string()
-            .contains("--max-files/--max-dirs require a target <PATH>")
+            .contains("--max-files/--max-dirs/--max-depth require a target <PATH>")
     );
 }
 

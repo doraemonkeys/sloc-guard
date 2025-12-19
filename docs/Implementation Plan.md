@@ -43,6 +43,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **6.9.2**: `config show` format enum - `ConfigOutputFormat` (Text, Json) replaces String parameter.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
+  - **9.2**: `max_depth` - limits directory nesting depth in `[structure]`, `[[structure.rules]]`, and `[[structure.override]]`. CLI `--max-depth` parameter. `StructureChecker` tracks depth during traversal.
 - **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
 
 ---
@@ -86,14 +87,6 @@ Location: `src/output/html.rs`
 
 ## Phase 9: Advanced Features (Pending)
 
-### Task 9.2: Structure max_depth
-Location: `src/config/structure.rs`, `src/checker/structure.rs`
-```
-- Add max_depth to [structure] and [[structure.rules]]
-- Limits directory nesting depth (prevents deeply nested structures)
-- StructureChecker tracks depth during traversal
-```
-
 ### Task 9.3: init --detect (Smart Init)
 Location: `src/commands/init.rs`
 ```
@@ -118,7 +111,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | Priority | Tasks |
 |----------|-------|
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
-| **2. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
+| **2. Structure Enhancements** | ~~9.2 max_depth~~ ✅, 9.4 whitelist mode |
 | **3. Visualization** | 7.1-7.2 HTML Charts/Trends |
 | **4. UX Improvements** | 9.3 Smart init |
 | **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |

@@ -171,6 +171,7 @@ fn explain_structure_override_matches() {
             path: "src/legacy".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy directory".to_string(),
         }],
         ..Default::default()
@@ -199,6 +200,7 @@ fn explain_structure_rule_matches() {
             pattern: "src/components/*".to_string(),
             max_files: Some(50),
             max_dirs: Some(10),
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -244,12 +246,14 @@ fn explain_structure_rule_chain_statuses() {
                 pattern: "src/*".to_string(),
                 max_files: Some(20),
                 max_dirs: Some(10),
+                max_depth: None,
                 warn_threshold: None,
             },
             StructureRule {
                 pattern: "test/*".to_string(),
                 max_files: Some(30),
                 max_dirs: Some(15),
+                max_depth: None,
                 warn_threshold: None,
             },
         ],
@@ -257,6 +261,7 @@ fn explain_structure_rule_chain_statuses() {
             path: "build".to_string(),
             max_files: Some(100),
             max_dirs: Some(50),
+            max_depth: None,
             reason: "Build output".to_string(),
         }],
         ..Default::default()
@@ -380,6 +385,7 @@ fn format_structure_with_override_shows_reason() {
             path: "legacy".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy directory needs more files".to_string(),
         }],
         ..Default::default()

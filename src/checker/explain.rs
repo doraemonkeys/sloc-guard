@@ -81,6 +81,8 @@ pub struct StructureRuleCandidate {
     pub max_files: Option<i64>,
     /// Max directories limit (-1 for unlimited)
     pub max_dirs: Option<i64>,
+    /// Max depth limit (-1 for unlimited)
+    pub max_depth: Option<i64>,
     /// Match status
     pub status: MatchStatus,
 }
@@ -96,6 +98,8 @@ pub struct StructureExplanation {
     pub effective_max_files: Option<i64>,
     /// Effective max directories limit (-1 for unlimited)
     pub effective_max_dirs: Option<i64>,
+    /// Effective max depth limit (-1 for unlimited)
+    pub effective_max_depth: Option<i64>,
     /// Warning threshold (0.0-1.0)
     pub warn_threshold: f64,
     /// Override reason if applicable

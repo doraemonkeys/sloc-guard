@@ -54,6 +54,7 @@ fn make_check_args_with_baseline(
         suggest: false,
         max_files: None,
         max_dirs: None,
+        max_depth: None,
         report_json: None,
     }
 }

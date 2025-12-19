@@ -49,6 +49,7 @@ fn checker_enabled_with_rules() {
             pattern: "src/**".to_string(),
             max_files: Some(10),
             max_dirs: None,
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -76,6 +77,7 @@ fn check_under_limit_returns_no_violations() {
         DirStats {
             file_count: 5,
             dir_count: 2,
+            depth: 0,
         },
     );
 
@@ -93,6 +95,7 @@ fn check_over_file_limit_returns_violation() {
         DirStats {
             file_count: 15,
             dir_count: 2,
+            depth: 0,
         },
     );
 
@@ -114,6 +117,7 @@ fn check_over_dir_limit_returns_violation() {
         DirStats {
             file_count: 5,
             dir_count: 5,
+            depth: 0,
         },
     );
 
@@ -140,6 +144,7 @@ fn check_both_limits_exceeded_returns_both_violations() {
         DirStats {
             file_count: 10,
             dir_count: 5,
+            depth: 0,
         },
     );
 
@@ -156,6 +161,7 @@ fn rule_overrides_global_limit() {
             pattern: "src/generated/**".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -167,6 +173,7 @@ fn rule_overrides_global_limit() {
         DirStats {
             file_count: 50,
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -184,6 +191,7 @@ fn rule_inherits_unset_limit_from_global() {
             pattern: "src/generated/**".to_string(),
             max_files: Some(100),
             max_dirs: None, // Should inherit global max_dirs=3
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -195,6 +203,7 @@ fn rule_inherits_unset_limit_from_global() {
         DirStats {
             file_count: 50,
             dir_count: 5, // Exceeds inherited limit of 3
+            depth: 0,
         },
     );
 
@@ -306,6 +315,7 @@ fn violations_sorted_by_path() {
         DirStats {
             file_count: 10,
             dir_count: 0,
+            depth: 0,
         },
     );
     stats.insert(
@@ -313,6 +323,7 @@ fn violations_sorted_by_path() {
         DirStats {
             file_count: 10,
             dir_count: 0,
+            depth: 0,
         },
     );
     stats.insert(
@@ -320,6 +331,7 @@ fn violations_sorted_by_path() {
         DirStats {
             file_count: 10,
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -375,6 +387,7 @@ fn invalid_rule_pattern_returns_error() {
             pattern: "[invalid".to_string(),
             max_files: Some(10),
             max_dirs: None,
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -398,6 +411,7 @@ fn warn_threshold_triggers_warning_below_hard_limit() {
         DirStats {
             file_count: 47, // Above 45 (warn), below 50 (limit)
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -424,6 +438,7 @@ fn warn_threshold_no_warning_below_threshold() {
         DirStats {
             file_count: 44, // Below 45 (warn threshold)
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -446,6 +461,7 @@ fn warn_threshold_error_above_hard_limit() {
         DirStats {
             file_count: 55, // Above 50 (hard limit)
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -472,6 +488,7 @@ fn warn_threshold_dir_count() {
         DirStats {
             file_count: 0,
             dir_count: 9, // Above 8 (warn), below 10 (limit)
+            depth: 0,
         },
     );
 
@@ -491,6 +508,7 @@ fn warn_threshold_rule_overrides_global() {
             pattern: "src/special/**".to_string(),
             max_files: None, // Inherit 50
             max_dirs: None,
+            max_depth: None,
             warn_threshold: Some(0.5), // Rule: warn at 25
         }],
         ..Default::default()
@@ -502,6 +520,7 @@ fn warn_threshold_rule_overrides_global() {
         DirStats {
             file_count: 30, // Above 25 (rule warn), below 50 (limit)
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -525,6 +544,7 @@ fn no_warn_threshold_means_no_warnings() {
         DirStats {
             file_count: 49, // Just under limit, but no warn_threshold
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -548,6 +568,7 @@ fn unlimited_file_limit_skips_check() {
         DirStats {
             file_count: 1000, // Would exceed any normal limit
             dir_count: 1,
+            depth: 0,
         },
     );
 
@@ -571,6 +592,7 @@ fn unlimited_dir_limit_skips_check() {
         DirStats {
             file_count: 3,
             dir_count: 100, // Would exceed any normal limit
+            depth: 0,
         },
     );
 
@@ -589,6 +611,7 @@ fn rule_can_set_unlimited_to_override_global() {
             pattern: "src/generated/**".to_string(),
             max_files: Some(UNLIMITED), // Override to unlimited
             max_dirs: None,             // Inherit global (2)
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -600,6 +623,7 @@ fn rule_can_set_unlimited_to_override_global() {
         DirStats {
             file_count: 500, // Would exceed global limit but unlimited by rule
             dir_count: 5,    // Exceeds inherited limit of 2
+            depth: 0,
         },
     );
 
@@ -648,6 +672,7 @@ fn invalid_rule_max_files_returns_error() {
             pattern: "src/**".to_string(),
             max_files: Some(-10), // Invalid
             max_dirs: None,
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -668,6 +693,7 @@ fn invalid_rule_max_dirs_returns_error() {
             pattern: "src/**".to_string(),
             max_files: None,
             max_dirs: Some(-3), // Invalid
+            max_depth: None,
             warn_threshold: None,
         }],
         ..Default::default()
@@ -692,6 +718,7 @@ fn checker_enabled_with_overrides() {
             path: "src/legacy".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy module".to_string(),
         }],
         ..Default::default()
@@ -708,6 +735,7 @@ fn override_takes_priority_over_global() {
             path: "src/legacy".to_string(),
             max_files: Some(100), // Override limit
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy module".to_string(),
         }],
         ..Default::default()
@@ -719,6 +747,7 @@ fn override_takes_priority_over_global() {
         DirStats {
             file_count: 50, // Above global limit (10), below override limit (100)
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -734,12 +763,14 @@ fn override_takes_priority_over_rules() {
             pattern: "src/**".to_string(),
             max_files: Some(20),
             max_dirs: None,
+            max_depth: None,
             warn_threshold: None,
         }],
         overrides: vec![StructureOverride {
             path: "src/legacy".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy module".to_string(),
         }],
         ..Default::default()
@@ -751,6 +782,7 @@ fn override_takes_priority_over_rules() {
         DirStats {
             file_count: 50, // Above rule limit (20), below override limit (100)
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -765,6 +797,7 @@ fn override_reason_included_in_violation() {
             path: "src/legacy".to_string(),
             max_files: Some(10),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy module, scheduled for refactor".to_string(),
         }],
         ..Default::default()
@@ -776,6 +809,7 @@ fn override_reason_included_in_violation() {
         DirStats {
             file_count: 15, // Above override limit
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -794,6 +828,7 @@ fn override_path_suffix_matching() {
             path: "legacy".to_string(), // Just the directory name
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy".to_string(),
         }],
         ..Default::default()
@@ -805,6 +840,7 @@ fn override_path_suffix_matching() {
         DirStats {
             file_count: 50,
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -819,6 +855,7 @@ fn override_full_path_matching() {
             path: "src/legacy".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy".to_string(),
         }],
         ..Default::default()
@@ -830,6 +867,7 @@ fn override_full_path_matching() {
         DirStats {
             file_count: 50,
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -845,6 +883,7 @@ fn override_does_not_match_partial_directory_name() {
             path: "legacy".to_string(),
             max_files: Some(100),
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy".to_string(),
         }],
         ..Default::default()
@@ -856,6 +895,7 @@ fn override_does_not_match_partial_directory_name() {
         DirStats {
             file_count: 50,
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -871,6 +911,7 @@ fn override_with_unlimited_value() {
             path: "src/generated".to_string(),
             max_files: Some(UNLIMITED), // No limit for generated files
             max_dirs: None,
+            max_depth: None,
             reason: "Generated code".to_string(),
         }],
         ..Default::default()
@@ -882,6 +923,7 @@ fn override_with_unlimited_value() {
         DirStats {
             file_count: 1000, // Many files, but unlimited allowed
             dir_count: 0,
+            depth: 0,
         },
     );
 
@@ -896,6 +938,7 @@ fn invalid_override_max_files_returns_error() {
             path: "src/legacy".to_string(),
             max_files: Some(-10), // Invalid
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy".to_string(),
         }],
         ..Default::default()
@@ -916,6 +959,7 @@ fn invalid_override_max_dirs_returns_error() {
             path: "src/legacy".to_string(),
             max_files: None,
             max_dirs: Some(-5), // Invalid
+            max_depth: None,
             reason: "Legacy".to_string(),
         }],
         ..Default::default()
@@ -936,6 +980,7 @@ fn override_requires_at_least_one_limit() {
             path: "src/legacy".to_string(),
             max_files: None, // Neither set
             max_dirs: None,
+            max_depth: None,
             reason: "Legacy".to_string(),
         }],
         ..Default::default()
@@ -945,7 +990,7 @@ fn override_requires_at_least_one_limit() {
     assert!(result.is_err());
     if let Err(err) = result {
         let msg = err.to_string();
-        assert!(msg.contains("must specify at least one of max_files or max_dirs"));
+        assert!(msg.contains("must specify at least one of max_files, max_dirs, or max_depth"));
     }
 }
 
@@ -1007,4 +1052,245 @@ fn scanner_exclude_skips_directories_entirely() {
         stats.contains_key(&root.join("src")),
         "src should be traversed"
     );
+}
+
+// ============================================================================
+// Max Depth Tests
+// ============================================================================
+
+fn config_with_depth_limit(max_depth: i64) -> StructureConfig {
+    StructureConfig {
+        max_depth: Some(max_depth),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn checker_enabled_with_depth_limit() {
+    let checker = StructureChecker::new(&config_with_depth_limit(2)).unwrap();
+    assert!(checker.is_enabled());
+}
+
+#[test]
+fn check_depth_under_limit_returns_no_violations() {
+    let checker = StructureChecker::new(&config_with_depth_limit(3)).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("root"),
+        DirStats {
+            file_count: 0,
+            dir_count: 1,
+            depth: 0,
+        },
+    );
+    stats.insert(
+        PathBuf::from("root/sub1"),
+        DirStats {
+            file_count: 0,
+            dir_count: 1,
+            depth: 1,
+        },
+    );
+    stats.insert(
+        PathBuf::from("root/sub1/sub2"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 2,
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn check_depth_over_limit_returns_violation() {
+    let checker = StructureChecker::new(&config_with_depth_limit(2)).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("root"),
+        DirStats {
+            file_count: 0,
+            dir_count: 1,
+            depth: 0,
+        },
+    );
+    stats.insert(
+        PathBuf::from("root/sub1"),
+        DirStats {
+            file_count: 0,
+            dir_count: 1,
+            depth: 1,
+        },
+    );
+    stats.insert(
+        PathBuf::from("root/sub1/sub2"),
+        DirStats {
+            file_count: 0,
+            dir_count: 1,
+            depth: 2,
+        },
+    );
+    stats.insert(
+        PathBuf::from("root/sub1/sub2/sub3"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 3, // Exceeds limit of 2
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].violation_type, ViolationType::MaxDepth);
+    assert_eq!(violations[0].actual, 3);
+    assert_eq!(violations[0].limit, 2);
+}
+
+#[test]
+fn unlimited_depth_skips_check() {
+    let config = StructureConfig {
+        max_depth: Some(UNLIMITED),
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("root/a/b/c/d/e/f"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 100, // Very deep, but unlimited
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn rule_overrides_global_depth_limit() {
+    let config = StructureConfig {
+        max_depth: Some(2),
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: Some(5), // Override to allow deeper
+            warn_threshold: None,
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/a/b/c"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 4, // Exceeds global (2), but within rule (5)
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn depth_warn_threshold() {
+    let config = StructureConfig {
+        max_depth: Some(5),
+        warn_threshold: Some(0.6), // Warn at depth 3
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("root/a/b/c"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 4, // Above 3 (warn), below 5 (limit)
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+    assert_eq!(violations[0].violation_type, ViolationType::MaxDepth);
+}
+
+#[test]
+fn invalid_max_depth_value_returns_error() {
+    let config = StructureConfig {
+        max_depth: Some(-5), // Invalid
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("Invalid max_depth value"));
+    }
+}
+
+#[test]
+fn invalid_rule_max_depth_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: Some(-3), // Invalid
+            warn_threshold: None,
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("Invalid max_depth value in rule 1"));
+    }
+}
+
+#[test]
+fn collect_dir_stats_tracks_depth() {
+    let temp = TempDir::new().unwrap();
+    let root = temp.path();
+
+    // Create nested structure
+    std::fs::create_dir_all(root.join("a/b/c")).unwrap();
+    std::fs::write(root.join("a/b/c/file.txt"), "content").unwrap();
+
+    let config = StructureConfig::default();
+    let checker = StructureChecker::new(&config).unwrap();
+    let stats = checker.collect_dir_stats(root).unwrap();
+
+    assert_eq!(stats.get(root).unwrap().depth, 0);
+    assert_eq!(stats.get(&root.join("a")).unwrap().depth, 1);
+    assert_eq!(stats.get(&root.join("a/b")).unwrap().depth, 2);
+    assert_eq!(stats.get(&root.join("a/b/c")).unwrap().depth, 3);
+}
+
+#[test]
+fn override_with_max_depth_only() {
+    let config = StructureConfig {
+        max_depth: Some(2),
+        overrides: vec![StructureOverride {
+            path: "deep".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: Some(10), // Only max_depth set
+            reason: "Deep nesting allowed".to_string(),
+        }],
+        ..Default::default()
+    };
+
+    // Should succeed because at least one limit (max_depth) is set
+    let result = StructureChecker::new(&config);
+    assert!(result.is_ok());
 }

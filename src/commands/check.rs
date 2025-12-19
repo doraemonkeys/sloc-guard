@@ -332,15 +332,16 @@ fn parse_structure_violation(
 
 /// Validate structure params require explicit path and return resolved paths.
 ///
-/// - If `--max-files` or `--max-dirs` is specified, paths must be explicitly provided
+/// - If `--max-files`, `--max-dirs`, or `--max-depth` is specified, paths must be explicitly provided
 /// - If no paths are provided and no structure params, defaults to current directory
 fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<std::path::PathBuf>> {
-    let has_structure_params = args.max_files.is_some() || args.max_dirs.is_some();
+    let has_structure_params =
+        args.max_files.is_some() || args.max_dirs.is_some() || args.max_depth.is_some();
 
     if args.paths.is_empty() {
         if has_structure_params {
             return Err(crate::SlocGuardError::Config(
-                "--max-files/--max-dirs require a target <PATH>".to_string(),
+                "--max-files/--max-dirs/--max-depth require a target <PATH>".to_string(),
             ));
         }
         // Default to current directory when no paths and no structure params
@@ -374,6 +375,10 @@ pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args
 
     if let Some(max_dirs) = args.max_dirs {
         config.structure.max_dirs = Some(max_dirs);
+    }
+
+    if let Some(max_depth) = args.max_depth {
+        config.structure.max_depth = Some(max_depth);
     }
 }
 
@@ -465,6 +470,7 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
     let violation_label = match violation.violation_type {
         ViolationType::FileCount => "files",
         ViolationType::DirCount => "subdirs",
+        ViolationType::MaxDepth => "depth",
     };
 
     CheckResult::Failed {
