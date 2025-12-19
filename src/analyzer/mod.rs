@@ -31,7 +31,8 @@ pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &Langua
             continue;
         };
 
-        if let Some(suggestion) = analyzer.analyze(result.path(), &content, &language.name, result.limit())
+        if let Some(suggestion) =
+            analyzer.analyze(result.path(), &content, &language.name, result.limit())
             && suggestion.has_suggestions()
         {
             // Replace the result with its version containing suggestions

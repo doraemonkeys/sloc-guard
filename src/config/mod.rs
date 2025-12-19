@@ -4,9 +4,9 @@ mod remote;
 
 pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
 pub use model::{
-    Config, ContentConfig, ContentOverride, ContentRule, CustomLanguageConfig, DefaultConfig,
-    ExcludeConfig, FileOverride, LanguageRule, PathRule, RuleConfig, ScannerConfig, StructureConfig,
-    StructureOverride, StructureRule, CONFIG_VERSION, CONFIG_VERSION_V1, UNLIMITED,
+    CONFIG_VERSION, CONFIG_VERSION_V1, Config, ContentConfig, ContentOverride, ContentRule,
+    CustomLanguageConfig, DefaultConfig, ExcludeConfig, FileOverride, LanguageRule, PathRule,
+    RuleConfig, ScannerConfig, StructureConfig, StructureOverride, StructureRule, UNLIMITED,
 };
 pub use remote::{clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url};
 

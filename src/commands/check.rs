@@ -6,9 +6,7 @@ use rayon::prelude::*;
 use crate::analyzer::generate_split_suggestions;
 use crate::baseline::{Baseline, StructureViolationType, compute_file_hash};
 use crate::cache::{Cache, compute_config_hash};
-use crate::checker::{
-    CheckResult, Checker, StructureViolation, ThresholdChecker, ViolationType,
-};
+use crate::checker::{CheckResult, Checker, StructureViolation, ThresholdChecker, ViolationType};
 use crate::cli::{BaselineUpdateMode, CheckArgs, Cli};
 use crate::counter::LineStats;
 use crate::git::{ChangedFiles, GitDiff};
@@ -22,8 +20,8 @@ use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::context::{
-    color_choice_to_mode, load_cache, load_config, process_file_with_cache, resolve_scan_paths,
-    save_cache, write_output, CheckContext,
+    CheckContext, color_choice_to_mode, load_cache, load_config, process_file_with_cache,
+    resolve_scan_paths, save_cache, write_output,
 };
 
 #[must_use]

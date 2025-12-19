@@ -23,10 +23,7 @@ pub enum StructureViolationType {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BaselineEntry {
     /// Content (SLOC) violation entry
-    Content {
-        lines: usize,
-        hash: String,
-    },
+    Content { lines: usize, hash: String },
     /// Structure (directory limit) violation entry
     Structure {
         violation_type: StructureViolationType,
@@ -159,8 +156,10 @@ impl Baseline {
         violation_type: StructureViolationType,
         count: usize,
     ) {
-        self.files
-            .insert(path.to_string(), BaselineEntry::structure(violation_type, count));
+        self.files.insert(
+            path.to_string(),
+            BaselineEntry::structure(violation_type, count),
+        );
     }
 
     /// Add or update an entry in the baseline.

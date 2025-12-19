@@ -265,7 +265,10 @@ fn run_stats_impl_with_custom_history_file() {
 
     let result = run_stats_impl(&args, &cli);
     assert!(result.is_ok());
-    assert!(history_path.exists(), "Custom history file should be created");
+    assert!(
+        history_path.exists(),
+        "Custom history file should be created"
+    );
 
     // Verify the history file contains valid JSON
     let content = std::fs::read_to_string(&history_path).unwrap();

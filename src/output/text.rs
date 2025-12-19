@@ -104,7 +104,12 @@ impl TextFormatter {
         };
         let colored_status = self.colorize(status_str, result);
 
-        writeln!(output, "{icon} {colored_status}: {}", result.path().display()).ok();
+        writeln!(
+            output,
+            "{icon} {colored_status}: {}",
+            result.path().display()
+        )
+        .ok();
 
         writeln!(
             output,
@@ -117,7 +122,9 @@ impl TextFormatter {
         writeln!(
             output,
             "   Breakdown: code={}, comment={}, blank={}",
-            result.stats().code, result.stats().comment, result.stats().blank
+            result.stats().code,
+            result.stats().comment,
+            result.stats().blank
         )
         .ok();
 

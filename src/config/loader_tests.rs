@@ -598,7 +598,9 @@ max_lines = 300
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, SlocGuardError::Config(msg) if msg.contains("Unsupported config version")));
+    assert!(
+        matches!(err, SlocGuardError::Config(msg) if msg.contains("Unsupported config version"))
+    );
 }
 
 #[test]

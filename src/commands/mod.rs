@@ -1,7 +1,7 @@
 pub mod baseline_cmd;
 pub mod check;
-pub mod context;
 pub mod config;
+pub mod context;
 pub mod explain;
 pub mod init;
 pub mod stats;

@@ -579,4 +579,3 @@ fn language_rule_expanded_skip_settings_work() {
     assert!(!skip_comments); // From rule
     assert!(skip_blank); // From rule
 }
-

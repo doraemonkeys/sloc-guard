@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use crate::checker::{ContentRuleMatch, MatchStatus, StructureRuleMatch};
 use crate::cli::ExplainFormat;
-use crate::config::{Config, ContentConfig, ContentOverride, ContentRule, StructureConfig, StructureOverride, StructureRule};
+use crate::config::{
+    Config, ContentConfig, ContentOverride, ContentRule, StructureConfig, StructureOverride,
+    StructureRule,
+};
 
 use super::{format_content_explanation, format_structure_explanation};
 
@@ -71,7 +74,10 @@ fn explain_content_default_matches() {
     let checker = crate::checker::ThresholdChecker::new(config);
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
-    assert!(matches!(explanation.matched_rule, ContentRuleMatch::Default));
+    assert!(matches!(
+        explanation.matched_rule,
+        ContentRuleMatch::Default
+    ));
     assert_eq!(explanation.effective_limit, 500);
 }
 
@@ -178,7 +184,10 @@ fn explain_structure_override_matches() {
         StructureRuleMatch::Override { index: 0, .. }
     ));
     assert_eq!(explanation.effective_max_files, Some(100));
-    assert_eq!(explanation.override_reason, Some("Legacy directory".to_string()));
+    assert_eq!(
+        explanation.override_reason,
+        Some("Legacy directory".to_string())
+    );
 }
 
 #[test]

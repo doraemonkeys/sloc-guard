@@ -136,7 +136,7 @@ impl ProjectStatistics {
 
     /// Compute top N largest files by code lines and average code lines per file.
     #[must_use]
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Precision loss is acceptable for average calculation
     pub fn with_top_files(mut self, n: usize) -> Self {
         let mut sorted_files = self.files.clone();
         sorted_files.sort_by(|a, b| b.stats.code.cmp(&a.stats.code));

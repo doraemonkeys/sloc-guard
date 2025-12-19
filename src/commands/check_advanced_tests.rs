@@ -740,8 +740,12 @@ fn run_check_with_cli_max_dirs_overrides_config() {
 
 #[test]
 fn is_structure_violation_returns_true_for_structure_violations() {
-    assert!(super::is_structure_violation(Some("structure: files count exceeded")));
-    assert!(super::is_structure_violation(Some("structure: subdirs count exceeded")));
+    assert!(super::is_structure_violation(Some(
+        "structure: files count exceeded"
+    )));
+    assert!(super::is_structure_violation(Some(
+        "structure: subdirs count exceeded"
+    )));
 }
 
 #[test]
@@ -801,7 +805,7 @@ fn update_baseline_mode_all_creates_baseline_with_content_violations() {
         paths: vec![temp_dir.path().to_path_buf()],
         config: Some(config_path),
         max_lines: None,
-        ext: None,  // Use config extensions
+        ext: None, // Use config extensions
         exclude: vec![],
         include: vec![],
         count_comments: false,
@@ -828,7 +832,10 @@ fn update_baseline_mode_all_creates_baseline_with_content_violations() {
     let exit_code = result.expect("Check should succeed");
 
     // Should fail with threshold exceeded
-    assert_eq!(exit_code, EXIT_THRESHOLD_EXCEEDED, "Should detect violation");
+    assert_eq!(
+        exit_code, EXIT_THRESHOLD_EXCEEDED,
+        "Should detect violation"
+    );
 
     // Baseline file should be created
     assert!(baseline_path.exists(), "Baseline file should exist");
@@ -863,8 +870,7 @@ fn update_baseline_mode_content_only_excludes_structure() {
     }
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");
-    let config_content =
-        "version = \"2\"\n\n[content]\nmax_lines = 10\nextensions = [\"rs\"]\n\n[structure]\nmax_files = 5\n";
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 10\nextensions = [\"rs\"]\n\n[structure]\nmax_files = 5\n";
     std::fs::write(&config_path, config_content).unwrap();
 
     let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
@@ -927,8 +933,7 @@ fn update_baseline_mode_structure_only_excludes_content() {
     }
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");
-    let config_content =
-        "version = \"2\"\n\n[content]\nmax_lines = 10\nextensions = [\"rs\"]\n\n[structure]\nmax_files = 5\n";
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 10\nextensions = [\"rs\"]\n\n[structure]\nmax_files = 5\n";
     std::fs::write(&config_path, config_content).unwrap();
 
     let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
@@ -1028,7 +1033,10 @@ fn update_baseline_mode_new_preserves_existing_entries() {
     // Baseline should contain both old and new entries
     let baseline = Baseline::load(&baseline_path).unwrap();
     assert_eq!(baseline.len(), 2, "Should have 2 entries: old + new");
-    assert!(baseline.contains("old_file.rs"), "Should contain old_file.rs");
+    assert!(
+        baseline.contains("old_file.rs"),
+        "Should contain old_file.rs"
+    );
 
     // Check that the new file is in the baseline (path includes temp dir)
     let has_new_file = baseline

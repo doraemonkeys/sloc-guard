@@ -157,7 +157,7 @@ impl FunctionParser for PythonParser {
 }
 
 /// JavaScript/TypeScript function parser.
-#[allow(clippy::struct_field_names)]
+#[allow(clippy::struct_field_names)] // Fields are named for clarity in this specific parser
 pub struct JsParser {
     fn_pattern: Regex,
     arrow_pattern: Regex,

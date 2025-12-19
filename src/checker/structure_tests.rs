@@ -489,9 +489,9 @@ fn warn_threshold_rule_overrides_global() {
         warn_threshold: Some(0.9), // Global: warn at 45
         rules: vec![StructureRule {
             pattern: "src/special/**".to_string(),
-            max_files: None,            // Inherit 50
+            max_files: None, // Inherit 50
             max_dirs: None,
-            warn_threshold: Some(0.5),  // Rule: warn at 25
+            warn_threshold: Some(0.5), // Rule: warn at 25
         }],
         ..Default::default()
     };

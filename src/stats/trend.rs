@@ -61,7 +61,7 @@ pub struct TrendDelta {
 impl TrendDelta {
     /// Compute delta from previous entry to current stats.
     #[must_use]
-    #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_possible_wrap)] // Delta values can be negative and fit in i64
     pub const fn compute(previous: &TrendEntry, current: &ProjectStatistics) -> Self {
         Self {
             files_delta: current.total_files as i64 - previous.total_files as i64,

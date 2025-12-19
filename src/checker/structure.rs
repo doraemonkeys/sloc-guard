@@ -6,7 +6,9 @@ use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
 use crate::error::{Result, SlocGuardError};
 
-use super::explain::{MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch};
+use super::explain::{
+    MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
+};
 
 /// Counts of immediate children in a directory.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -320,7 +322,12 @@ impl StructureChecker {
             if Self::path_matches_override(path, &ovr.path) {
                 let max_files = ovr.max_files.or(self.max_files);
                 let max_dirs = ovr.max_dirs.or(self.max_dirs);
-                return (max_files, max_dirs, self.warn_threshold, Some(ovr.reason.clone()));
+                return (
+                    max_files,
+                    max_dirs,
+                    self.warn_threshold,
+                    Some(ovr.reason.clone()),
+                );
             }
         }
 
@@ -360,8 +367,8 @@ impl StructureChecker {
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit = warn_threshold
-                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                let warn_limit =
+                    warn_threshold.map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
 
                 if stats.file_count > limit_usize {
                     violations.push(StructureViolation::new(
@@ -387,8 +394,8 @@ impl StructureChecker {
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit = warn_threshold
-                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                let warn_limit =
+                    warn_threshold.map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
 
                 if stats.dir_count > limit_usize {
                     violations.push(StructureViolation::new(

@@ -3,11 +3,9 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, SlocGuardError};
 
-use super::model::{
-    ContentOverride, ContentRule, LanguageRule, CONFIG_VERSION, CONFIG_VERSION_V1,
-};
-use super::remote::{fetch_remote_config, is_remote_url};
 use super::Config;
+use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentOverride, ContentRule, LanguageRule};
+use super::remote::{fetch_remote_config, is_remote_url};
 
 /// Trait for loading configuration from various sources.
 pub trait ConfigLoader {
@@ -44,8 +42,8 @@ const USER_CONFIG_NAME: &str = "config.toml";
 /// Returns `true` if version is missing or V1 (requires migration).
 fn validate_config_version(config: &Config) -> Result<bool> {
     match &config.version {
-        None => Ok(true), // Missing version - needs migration
-        Some(v) if v == CONFIG_VERSION => Ok(false), // V2 - no migration
+        None => Ok(true),                              // Missing version - needs migration
+        Some(v) if v == CONFIG_VERSION => Ok(false),   // V2 - no migration
         Some(v) if v == CONFIG_VERSION_V1 => Ok(true), // V1 - needs migration
         Some(v) => Err(SlocGuardError::Config(format!(
             "Unsupported config version '{v}'. Supported versions: '{CONFIG_VERSION_V1}', '{CONFIG_VERSION}'. \

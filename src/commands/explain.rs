@@ -32,7 +32,10 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
         match StructureChecker::new(&config.structure) {
             Ok(checker) if checker.is_enabled() => {
                 let explanation = checker.explain(path);
-                println!("{}", format_structure_explanation(&explanation, args.format));
+                println!(
+                    "{}",
+                    format_structure_explanation(&explanation, args.format)
+                );
             }
             Ok(_) => {
                 println!("Path: {}", path.display());
@@ -68,7 +71,7 @@ fn format_structure_explanation(exp: &StructureExplanation, format: ExplainForma
     }
 }
 
-#[allow(clippy::format_push_string)]
+#[allow(clippy::format_push_string)] // Performance is not critical for explanation output
 fn format_content_text(exp: &ContentExplanation) -> String {
     let mut output = String::new();
 
@@ -98,7 +101,7 @@ fn format_content_text(exp: &ContentExplanation) -> String {
         clippy::cast_precision_loss,
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
-    )]
+    )] // Precision loss is acceptable for display purposes
     let warn_at = (exp.effective_limit as f64 * exp.warn_threshold) as usize;
     output.push_str(&format!(
         "  Warn at: {} lines ({:.0}%)\n",
@@ -136,7 +139,7 @@ fn format_content_text(exp: &ContentExplanation) -> String {
     output
 }
 
-#[allow(clippy::format_push_string)]
+#[allow(clippy::format_push_string)] // Performance is not critical for explanation output
 fn format_structure_text(exp: &StructureExplanation) -> String {
     let mut output = String::new();
 
@@ -161,24 +164,26 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
         }
     }
 
-    let max_files_str = exp
-        .effective_max_files
-        .map_or_else(|| "none".to_string(), |v| {
+    let max_files_str = exp.effective_max_files.map_or_else(
+        || "none".to_string(),
+        |v| {
             if v == -1 {
                 "unlimited".to_string()
             } else {
                 v.to_string()
             }
-        });
-    let max_dirs_str = exp
-        .effective_max_dirs
-        .map_or_else(|| "none".to_string(), |v| {
+        },
+    );
+    let max_dirs_str = exp.effective_max_dirs.map_or_else(
+        || "none".to_string(),
+        |v| {
             if v == -1 {
                 "unlimited".to_string()
             } else {
                 v.to_string()
             }
-        });
+        },
+    );
 
     output.push_str(&format!(
         "  Limits:  max_files={max_files_str}, max_dirs={max_dirs_str}\n"

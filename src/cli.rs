@@ -113,7 +113,7 @@ pub enum Commands {
 }
 
 #[derive(Parser, Debug)]
-#[allow(clippy::struct_excessive_bools)]
+#[allow(clippy::struct_excessive_bools)] // CLI arguments often require many boolean flags
 pub struct CheckArgs {
     /// Scan roots: directories or files to check. Defaults to current directory.
     /// These are the starting points for file discovery. Use --include to filter

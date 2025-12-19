@@ -162,7 +162,6 @@ pub struct Config {
     pub extends: Option<String>,
 
     // ========== V2 Fields ==========
-
     /// Scanner configuration (file discovery).
     #[serde(default)]
     pub scanner: ScannerConfig,
@@ -178,7 +177,6 @@ pub struct Config {
     // ========== V1 Legacy Fields (for migration) ==========
     // These fields are deserialized but not serialized (skip_serializing).
     // The loader migrates them to V2 fields.
-
     /// Legacy: default config (migrated to scanner + content).
     #[serde(default, skip_serializing)]
     pub default: DefaultConfig,

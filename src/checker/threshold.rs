@@ -7,8 +7,8 @@ use crate::analyzer::SplitSuggestion;
 use crate::config::Config;
 use crate::counter::LineStats;
 
-use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
 use super::Checker;
+use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
 
 /// Result of checking a file against configured thresholds.
 ///
@@ -81,15 +81,23 @@ impl CheckResult {
     #[must_use]
     pub fn override_reason(&self) -> Option<&str> {
         match self {
-            Self::Passed { override_reason, .. }
-            | Self::Warning { override_reason, .. }
-            | Self::Failed { override_reason, .. }
-            | Self::Grandfathered { override_reason, .. } => override_reason.as_deref(),
+            Self::Passed {
+                override_reason, ..
+            }
+            | Self::Warning {
+                override_reason, ..
+            }
+            | Self::Failed {
+                override_reason, ..
+            }
+            | Self::Grandfathered {
+                override_reason, ..
+            } => override_reason.as_deref(),
         }
     }
 
     #[must_use]
-    #[allow(clippy::missing_const_for_fn)]
+    #[allow(clippy::missing_const_for_fn)] // Accessing option reference isn't const
     pub fn suggestions(&self) -> Option<&SplitSuggestion> {
         match self {
             Self::Warning { suggestions, .. } | Self::Failed { suggestions, .. } => {
@@ -180,7 +188,7 @@ impl CheckResult {
     }
 
     #[must_use]
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)] // Precision loss is acceptable for usage percentage
     pub fn usage_percent(&self) -> f64 {
         let limit = self.limit();
         if limit == 0 {
@@ -298,7 +306,10 @@ impl ThresholdChecker {
         // 1. Check content.overrides first (highest priority, V2)
         for override_config in &self.config.content.overrides {
             if Self::path_matches_override(path, &override_config.path) {
-                return (override_config.max_lines, Some(override_config.reason.clone()));
+                return (
+                    override_config.max_lines,
+                    Some(override_config.reason.clone()),
+                );
             }
         }
 
@@ -400,7 +411,10 @@ impl ThresholdChecker {
                 found_match = true;
                 matched_rule = ContentRuleMatch::Override {
                     index: i,
-                    reason: ovr.reason.clone().unwrap_or_else(|| "legacy override".to_string()),
+                    reason: ovr
+                        .reason
+                        .clone()
+                        .unwrap_or_else(|| "legacy override".to_string()),
                 };
                 MatchStatus::Matched
             } else if matches {
@@ -454,7 +468,11 @@ impl ThresholdChecker {
 
             if is_selected {
                 matched_rule = ContentRuleMatch::Rule {
-                    index: if i < legacy_count { i } else { i - legacy_count },
+                    index: if i < legacy_count {
+                        i
+                    } else {
+                        i - legacy_count
+                    },
                     pattern: pattern.clone(),
                 };
             }
@@ -502,6 +520,7 @@ impl Checker for ThresholdChecker {
         let stats = line_stats.clone();
 
         #[allow(clippy::cast_precision_loss)]
+        // Precision loss is acceptable for threshold comparison
         if sloc > limit {
             CheckResult::Failed {
                 path,
