@@ -1,3 +1,4 @@
+use crate::cli::ConfigOutputFormat;
 use crate::config::{Config, FileOverride, RuleConfig};
 use tempfile::TempDir;
 
@@ -153,7 +154,7 @@ fn config_show_default_returns_text() {
     let config_path = temp_dir.path().join("test.toml");
     std::fs::write(&config_path, "# empty config uses defaults\n").unwrap();
 
-    let result = run_config_show_impl(Some(&config_path), "text");
+    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Text);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("Effective Configuration"));
@@ -167,7 +168,7 @@ fn config_show_json_format() {
     let config_path = temp_dir.path().join("test.toml");
     std::fs::write(&config_path, "# empty config uses defaults\n").unwrap();
 
-    let result = run_config_show_impl(Some(&config_path), "json");
+    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Json);
     assert!(result.is_ok());
     let output = result.unwrap();
     // V2 schema has scanner, content, structure sections
@@ -189,7 +190,7 @@ patterns = ["**/vendor/**"]
 "#;
     std::fs::write(&config_path, content).unwrap();
 
-    let result = run_config_show_impl(Some(&config_path), "text");
+    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Text);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("max_lines = 300"));
@@ -199,7 +200,7 @@ patterns = ["**/vendor/**"]
 #[test]
 fn config_show_nonexistent_file_returns_error() {
     let path = std::path::Path::new("nonexistent_config.toml");
-    let result = run_config_show_impl(Some(path), "text");
+    let result = run_config_show_impl(Some(path), ConfigOutputFormat::Text);
     assert!(result.is_err());
 }
 

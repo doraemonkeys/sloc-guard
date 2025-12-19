@@ -302,7 +302,7 @@ fn cli_config_show() {
         Commands::Config(args) => match args.action {
             ConfigAction::Show { config, format } => {
                 assert!(config.is_none());
-                assert_eq!(format, "json");
+                assert_eq!(format, ConfigOutputFormat::Json);
             }
             ConfigAction::Validate { .. } => panic!("Expected Show action"),
         },

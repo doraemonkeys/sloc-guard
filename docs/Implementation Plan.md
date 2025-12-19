@@ -40,20 +40,9 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **6.5.1**: `--update-baseline[=MODE]` for `check` command. Modes: `all`(default), `content`, `structure`, `new`. Baseline V2 format (tagged enum for content/structure entries). V1 auto-migration. Deprecates `baseline update` subcommand.
   - **6.6**: `--report-json <PATH>` for `check` command. Outputs `ProjectStatistics` JSON alongside check results (avoids separate stats run in CI).
   - **6.9.1**: CLI parameter renames: `--fix` → `--suggest`, `--no-skip-comments` → `--count-comments`, `--no-skip-blank` → `--count-blank`.
+  - **6.9.2**: `config show` format enum - `ConfigOutputFormat` (Text, Json) replaces String parameter.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
-
----
-
-## Phase 6.9: CLI Naming Cleanup (Partial)
-
-### Task 6.9.2: config show Format Enum
-Location: `src/cli.rs`, `src/commands/config.rs`
-```
-- Define ConfigOutputFormat enum (Text, Json)
-- Replace format: String with typed enum in ConfigArgs
-- Add value_parser for validation
-```
 
 ---
 
@@ -148,13 +137,11 @@ Location: `src/config/loader.rs:129`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
-| **2. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
-| **3. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
-| **4. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **5. UX Improvements** | 9.3 Smart init |
-| **6. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
-| **7. Code Quality** | 10.1 IO Abstraction, 10.2 expect() cleanup |
+| **1. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
+| **2. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **3. UX Improvements** | 9.3 Smart init |
+| **4. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| **5. Code Quality** | 10.1 IO Abstraction, 10.2 expect() cleanup |
 
 ---
 

@@ -38,6 +38,16 @@ pub enum ExplainFormat {
     Json,
 }
 
+/// Output format for config show command
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum ConfigOutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output
+    Json,
+}
+
 /// Baseline update mode for `check --update-baseline`
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub enum BaselineUpdateMode {
@@ -297,9 +307,9 @@ pub enum ConfigAction {
         #[arg(short, long)]
         config: Option<PathBuf>,
 
-        /// Output format [possible values: text, json]
-        #[arg(short, long, default_value = "text")]
-        format: String,
+        /// Output format
+        #[arg(short, long, value_enum, default_value = "text")]
+        format: ConfigOutputFormat,
     },
 }
 

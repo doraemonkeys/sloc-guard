@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use crate::cli::ConfigAction;
+use crate::cli::{ConfigAction, ConfigOutputFormat};
 use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
@@ -9,7 +9,7 @@ use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 pub fn run_config(args: &crate::cli::ConfigArgs) -> i32 {
     match &args.action {
         ConfigAction::Validate { config } => run_config_validate(config),
-        ConfigAction::Show { config, format } => run_config_show(config.as_deref(), format),
+        ConfigAction::Show { config, format } => run_config_show(config.as_deref(), *format),
     }
 }
 
@@ -85,7 +85,7 @@ pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn run_config_show(config_path: Option<&Path>, format: &str) -> i32 {
+fn run_config_show(config_path: Option<&Path>, format: ConfigOutputFormat) -> i32 {
     match run_config_show_impl(config_path, format) {
         Ok(output) => {
             print!("{output}");
@@ -102,15 +102,18 @@ fn run_config_show(config_path: Option<&Path>, format: &str) -> i32 {
 ///
 /// # Errors
 /// Returns an error if the configuration file cannot be loaded or serialization fails.
-pub(crate) fn run_config_show_impl(config_path: Option<&Path>, format: &str) -> Result<String> {
+pub(crate) fn run_config_show_impl(
+    config_path: Option<&Path>,
+    format: ConfigOutputFormat,
+) -> Result<String> {
     let config = load_config(config_path)?;
 
     match format {
-        "json" => {
+        ConfigOutputFormat::Json => {
             let json = serde_json::to_string_pretty(&config)?;
             Ok(format!("{json}\n"))
         }
-        _ => Ok(format_config_text(&config)),
+        ConfigOutputFormat::Text => Ok(format_config_text(&config)),
     }
 }
 
