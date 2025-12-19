@@ -1,7 +1,7 @@
 use clap::Parser;
 
 use sloc_guard::cli::{Cli, Commands};
-use sloc_guard::commands::{run_baseline, run_check, run_config, run_init, run_stats};
+use sloc_guard::commands::{run_baseline, run_check, run_config, run_explain, run_init, run_stats};
 
 fn main() {
     let cli = Cli::parse();
@@ -12,6 +12,7 @@ fn main() {
         Commands::Init(args) => run_init(args),
         Commands::Config(args) => run_config(args),
         Commands::Baseline(args) => run_baseline(args, &cli),
+        Commands::Explain(args) => run_explain(args, &cli),
     };
 
     std::process::exit(exit_code);

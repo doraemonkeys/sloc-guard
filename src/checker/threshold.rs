@@ -7,6 +7,7 @@ use crate::analyzer::SplitSuggestion;
 use crate::config::Config;
 use crate::counter::LineStats;
 
+use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
 use super::Checker;
 
 /// Result of checking a file against configured thresholds.
@@ -357,6 +358,138 @@ impl ThresholdChecker {
             self.config.content.skip_comments,
             self.config.content.skip_blank,
         )
+    }
+
+    /// Explain which rule matches a given file path.
+    ///
+    /// Returns a detailed breakdown of all evaluated rules and which one won.
+    #[must_use]
+    pub fn explain(&self, path: &Path) -> ContentExplanation {
+        let mut rule_chain = Vec::new();
+        let mut matched_rule = ContentRuleMatch::Default;
+        let mut found_match = false;
+
+        // 1. Check content.overrides (highest priority)
+        for (i, ovr) in self.config.content.overrides.iter().enumerate() {
+            let matches = Self::path_matches_override(path, &ovr.path);
+            let status = if matches && !found_match {
+                found_match = true;
+                matched_rule = ContentRuleMatch::Override {
+                    index: i,
+                    reason: ovr.reason.clone(),
+                };
+                MatchStatus::Matched
+            } else if matches {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::NoMatch
+            };
+
+            rule_chain.push(ContentRuleCandidate {
+                source: format!("content.overrides[{i}]"),
+                pattern: Some(ovr.path.clone()),
+                limit: ovr.max_lines,
+                status,
+            });
+        }
+
+        // 2. Check legacy overrides (for V1 migration)
+        for (i, ovr) in self.config.overrides.iter().enumerate() {
+            let matches = Self::path_matches_override(path, &ovr.path);
+            let status = if matches && !found_match {
+                found_match = true;
+                matched_rule = ContentRuleMatch::Override {
+                    index: i,
+                    reason: ovr.reason.clone().unwrap_or_else(|| "legacy override".to_string()),
+                };
+                MatchStatus::Matched
+            } else if matches {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::NoMatch
+            };
+
+            rule_chain.push(ContentRuleCandidate {
+                source: format!("overrides[{i}] (legacy)"),
+                pattern: Some(ovr.path.clone()),
+                limit: ovr.max_lines,
+                status,
+            });
+        }
+
+        // 3. Check path_rules (last match wins - iterate in reverse for display,
+        //    but track the actual last match)
+        // First, find the last matching rule index
+        let mut last_match_idx: Option<usize> = None;
+        for (i, rule) in self.path_rules.iter().enumerate() {
+            if rule.matcher.is_match(path) {
+                last_match_idx = Some(i);
+            }
+        }
+
+        // Now build the chain with correct status
+        let legacy_count = self.config.path_rules.len();
+        for (i, rule) in self.path_rules.iter().enumerate() {
+            let matches = rule.matcher.is_match(path);
+            let is_selected = !found_match && last_match_idx == Some(i);
+
+            let status = if is_selected {
+                found_match = true;
+                MatchStatus::Matched
+            } else if matches {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::NoMatch
+            };
+
+            // Determine source name based on whether it's legacy or V2
+            let (source, pattern) = if i < legacy_count {
+                let pattern = self.config.path_rules[i].pattern.clone();
+                (format!("path_rules[{i}] (legacy)"), pattern)
+            } else {
+                let idx = i - legacy_count;
+                let pattern = self.config.content.rules[idx].pattern.clone();
+                (format!("content.rules[{idx}]"), pattern)
+            };
+
+            if is_selected {
+                matched_rule = ContentRuleMatch::Rule {
+                    index: if i < legacy_count { i } else { i - legacy_count },
+                    pattern: pattern.clone(),
+                };
+            }
+
+            rule_chain.push(ContentRuleCandidate {
+                source,
+                pattern: Some(pattern),
+                limit: rule.max_lines,
+                status,
+            });
+        }
+
+        // 4. Add default
+        rule_chain.push(ContentRuleCandidate {
+            source: "content.max_lines (default)".to_string(),
+            pattern: None,
+            limit: self.config.content.max_lines,
+            status: if found_match {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::Matched
+            },
+        });
+
+        let (skip_comments, skip_blank) = self.get_skip_settings_for_path(path);
+
+        ContentExplanation {
+            path: path.to_path_buf(),
+            matched_rule,
+            effective_limit: self.get_limit_for_path(path).0,
+            warn_threshold: self.get_warn_threshold_for_path(path),
+            skip_comments,
+            skip_blank,
+            rule_chain,
+        }
     }
 }
 

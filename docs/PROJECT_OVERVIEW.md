@@ -15,18 +15,19 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init`, `config`, `baseline` commands |
+| `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init`, `config`, `baseline`, `explain` commands |
 | `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `scanner/*.rs` | `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore) |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
 | `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir count limits with glob-based rules |
+| `checker/explain` | `checker/explain.rs` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection for `--diff` mode |
 | `baseline`/`cache` | `*/types.rs` | `Baseline` (grandfathering), `Cache` (mtime+size validation) |
 | `output/*` | `output/*.rs` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`; `CheckContext`/`StatsContext` for DI |
+| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI |
 | `analyzer` | `analyzer/*.rs` | `FunctionParser` - multi-language split suggestions (--fix) |
 | `stats` | `stats/trend.rs` | `TrendHistory` - historical stats with delta computation |
 | `main` | `main.rs` | CLI parsing, command dispatch to `commands/*` |
@@ -63,6 +64,13 @@ CheckResult::Passed { path, stats, limit, override_reason }
 DirStats { file_count, dir_count }  // immediate children counts
 ViolationType::FileCount | DirCount
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason }
+
+// Explain (rule chain debugging)
+MatchStatus::Matched | Superseded | NoMatch
+ContentRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
+ContentExplanation { path, matched_rule, effective_limit, warn_threshold, skip_*, rule_chain }
+StructureRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
+StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, warn_threshold, rule_chain }
 
 // Output
 OutputFormat::Text | Json | Sarif | Markdown | Html
@@ -143,6 +151,15 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 ```
 validate: toml::from_str() → validate_config_semantics()
 show: load_config() → format_config_text() or JSON
+```
+
+### explain-specific
+
+```
+→ load_config() → path.is_file()?
+   [file] ThresholdChecker::explain(path) → ContentExplanation
+   [dir]  StructureChecker::explain(path) → StructureExplanation
+→ format (Text/Json) → output rule chain with match status
 ```
 
 ## Rule Priority (high→low)

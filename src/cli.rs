@@ -28,6 +28,16 @@ pub enum ColorChoice {
     Never,
 }
 
+/// Output format for explain command
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum ExplainFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output
+    Json,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "sloc-guard")]
 #[command(
@@ -83,6 +93,9 @@ pub enum Commands {
 
     /// Baseline management for grandfathering violations
     Baseline(BaselineArgs),
+
+    /// Explain which rules apply to a path
+    Explain(ExplainArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -300,6 +313,21 @@ pub struct BaselineUpdateArgs {
     /// Disable .gitignore filtering (scan all files)
     #[arg(long)]
     pub no_gitignore: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct ExplainArgs {
+    /// Path to explain (file or directory)
+    #[arg(value_name = "PATH")]
+    pub path: PathBuf,
+
+    /// Path to configuration file
+    #[arg(short, long)]
+    pub config: Option<PathBuf>,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: ExplainFormat,
 }
 
 #[cfg(test)]

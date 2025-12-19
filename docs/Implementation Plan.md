@@ -35,6 +35,8 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 6 (Partial)**:
   - **6.1**: `--max-files`, `--max-dirs` CLI params for `check` command. Requires explicit `<PATH>` argument, overrides `[structure]` defaults (not rules).
   - **6.2**: `--diff` optional parameter. Defaults to `HEAD` when provided without value (`--diff` same as `--diff HEAD`).
+- **Phase 9 (Partial)**:
+  - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
 
 ---
 
@@ -145,15 +147,6 @@ Location: `src/output/html.rs`
 
 ## Phase 9: Advanced Features (Pending)
 
-### Task 9.1: explain Command (High Priority)
-Location: `src/cli.rs`, `src/commands/explain.rs` (new)
-```
-- New command: sloc-guard explain <PATH>
-- Output: Which rule matched, override applied, final effective limits
-- Shows config source (local/remote) and rule chain for debugging
-- Essential for troubleshooting complex configurations
-```
-
 ### Task 9.2: Structure max_depth
 Location: `src/config/structure.rs`, `src/checker/structure.rs`
 ```
@@ -185,14 +178,13 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| **1. Debugging (High Value)** | 9.1 explain command (essential for complex configs) |
-| **2. CLI Enhancement (Medium)** | 6.3-6.4, 6.6 --history-file, docs, --report-json |
-| **3. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
-| **4. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
-| **5. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
-| **6. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **7. UX Improvements** | 9.3 Smart init |
-| **8. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| **1. CLI Enhancement (Medium)** | 6.3-6.4, 6.6 --history-file, docs, --report-json |
+| **2. Baseline Consolidation** | 6.5.1 check --update-baseline with granularity |
+| **3. CLI Cleanup (Low)** | 6.9.1-6.9.2 Renaming, format enum |
+| **4. Structure Enhancements** | 9.2 max_depth, 9.4 whitelist mode |
+| **5. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **6. UX Improvements** | 9.3 Smart init |
+| **7. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 
 ---
 

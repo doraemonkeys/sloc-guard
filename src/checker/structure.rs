@@ -6,6 +6,8 @@ use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
 use crate::error::{Result, SlocGuardError};
 
+use super::explain::{MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch};
+
 /// Counts of immediate children in a directory.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DirStats {
@@ -72,6 +74,7 @@ impl StructureViolation {
 }
 
 struct CompiledStructureRule {
+    pattern: String,
     matcher: GlobMatcher,
     max_files: Option<i64>,
     max_dirs: Option<i64>,
@@ -212,6 +215,7 @@ impl StructureChecker {
                         source: e,
                     })?;
                 Ok(CompiledStructureRule {
+                    pattern: rule.pattern.clone(),
                     matcher: glob.compile_matcher(),
                     max_files: rule.max_files,
                     max_dirs: rule.max_dirs,
@@ -418,6 +422,94 @@ impl StructureChecker {
     pub fn check_directory(&self, root: &Path) -> Result<Vec<StructureViolation>> {
         let stats = self.collect_dir_stats(root)?;
         Ok(self.check(&stats))
+    }
+
+    /// Explain which rule matches a given directory path.
+    ///
+    /// Returns a detailed breakdown of all evaluated rules and which one won.
+    #[must_use]
+    pub fn explain(&self, path: &Path) -> StructureExplanation {
+        let mut rule_chain = Vec::new();
+        let mut matched_rule = StructureRuleMatch::Default;
+        let mut found_match = false;
+        let mut override_reason = None;
+
+        // 1. Check overrides first (highest priority)
+        for (i, ovr) in self.overrides.iter().enumerate() {
+            let matches = Self::path_matches_override(path, &ovr.path);
+            let status = if matches && !found_match {
+                found_match = true;
+                override_reason = Some(ovr.reason.clone());
+                matched_rule = StructureRuleMatch::Override {
+                    index: i,
+                    reason: ovr.reason.clone(),
+                };
+                MatchStatus::Matched
+            } else if matches {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::NoMatch
+            };
+
+            rule_chain.push(StructureRuleCandidate {
+                source: format!("structure.overrides[{i}]"),
+                pattern: Some(ovr.path.clone()),
+                max_files: ovr.max_files,
+                max_dirs: ovr.max_dirs,
+                status,
+            });
+        }
+
+        // 2. Check rules (first match wins based on actual code behavior)
+        for (i, rule) in self.rules.iter().enumerate() {
+            let matches = rule.matcher.is_match(path);
+            let status = if matches && !found_match {
+                found_match = true;
+                matched_rule = StructureRuleMatch::Rule {
+                    index: i,
+                    pattern: rule.pattern.clone(),
+                };
+                MatchStatus::Matched
+            } else if matches {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::NoMatch
+            };
+
+            rule_chain.push(StructureRuleCandidate {
+                source: format!("structure.rules[{i}]"),
+                pattern: Some(rule.pattern.clone()),
+                max_files: rule.max_files,
+                max_dirs: rule.max_dirs,
+                status,
+            });
+        }
+
+        // 3. Add default
+        rule_chain.push(StructureRuleCandidate {
+            source: "structure (default)".to_string(),
+            pattern: None,
+            max_files: self.max_files,
+            max_dirs: self.max_dirs,
+            status: if found_match {
+                MatchStatus::Superseded
+            } else {
+                MatchStatus::Matched
+            },
+        });
+
+        // Get effective limits using the same logic as get_limits
+        let (effective_max_files, effective_max_dirs, warn_threshold, _) = self.get_limits(path);
+
+        StructureExplanation {
+            path: path.to_path_buf(),
+            matched_rule,
+            effective_max_files,
+            effective_max_dirs,
+            warn_threshold: warn_threshold.unwrap_or(1.0),
+            override_reason,
+            rule_chain,
+        }
     }
 }
 
