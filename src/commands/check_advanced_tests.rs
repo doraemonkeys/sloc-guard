@@ -192,6 +192,7 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -234,6 +235,7 @@ fn run_check_impl_without_baseline_fails_on_violations() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -280,6 +282,7 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -358,6 +361,7 @@ fn run_check_with_context_uses_injected_threshold_checker() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -415,6 +419,7 @@ fn run_check_with_context_uses_injected_structure_checker() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -453,6 +458,7 @@ fn validate_and_resolve_paths_no_args_defaults_to_current_dir() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let result = validate_and_resolve_paths(&args);
@@ -485,6 +491,7 @@ fn validate_and_resolve_paths_max_files_without_path_returns_error() {
         fix: false,
         max_files: Some(10),
         max_dirs: None,
+        report_json: None,
     };
 
     let result = validate_and_resolve_paths(&args);
@@ -519,6 +526,7 @@ fn validate_and_resolve_paths_max_dirs_without_path_returns_error() {
         fix: false,
         max_files: None,
         max_dirs: Some(5),
+        report_json: None,
     };
 
     let result = validate_and_resolve_paths(&args);
@@ -553,6 +561,7 @@ fn validate_and_resolve_paths_max_files_with_path_succeeds() {
         fix: false,
         max_files: Some(10),
         max_dirs: None,
+        report_json: None,
     };
 
     let result = validate_and_resolve_paths(&args);
@@ -588,6 +597,7 @@ fn apply_cli_overrides_structure_max_files() {
         fix: false,
         max_files: Some(10),
         max_dirs: None,
+        report_json: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -620,6 +630,7 @@ fn apply_cli_overrides_structure_max_dirs() {
         fix: false,
         max_files: None,
         max_dirs: Some(5),
+        report_json: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -657,6 +668,7 @@ fn run_check_with_cli_max_files_overrides_config() {
         fix: false,
         max_files: Some(2),
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -698,6 +710,7 @@ fn run_check_with_cli_max_dirs_overrides_config() {
         fix: false,
         max_files: None,
         max_dirs: Some(2),
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);

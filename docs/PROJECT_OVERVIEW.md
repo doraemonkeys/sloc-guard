@@ -127,6 +127,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 → ThresholdChecker::check() → CheckResult (parallel, per-file)
 → StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
 → [if baseline] mark Grandfathered | [if --fix] generate_split_suggestions()
+→ [if --report-json] ProjectStatistics → StatsJsonFormatter → write to path
 → format (Text/Json/Sarif/Markdown/Html) → output
 ```
 

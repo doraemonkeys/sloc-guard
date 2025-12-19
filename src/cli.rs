@@ -186,6 +186,10 @@ pub struct CheckArgs {
     /// Maximum subdirectories per directory (overrides config [structure] defaults; rules take precedence)
     #[arg(long, value_name = "COUNT")]
     pub max_dirs: Option<i64>,
+
+    /// Write statistics report to JSON file (avoids separate stats run in CI)
+    #[arg(long, value_name = "PATH")]
+    pub report_json: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]

@@ -14,8 +14,9 @@ use crate::counter::LineStats;
 use crate::git::{ChangedFiles, GitDiff};
 use crate::language::LanguageRegistry;
 use crate::output::{
-    HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter, SarifFormatter,
-    ScanProgress, TextFormatter,
+    FileStatistics, HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
+    ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
+    TextFormatter,
 };
 use crate::scanner::scan_files;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
@@ -101,7 +102,7 @@ pub(crate) fn run_check_with_context(
 
     // 4. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
-    let mut results: Vec<_> = all_files
+    let processed: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| ctx.threshold_checker.should_process(file_path)) // Filter by extension
         .filter_map(|file_path| {
@@ -112,6 +113,9 @@ pub(crate) fn run_check_with_context(
         })
         .collect();
     progress.finish();
+
+    // Separate check results and file statistics
+    let (mut results, file_stats): (Vec<_>, Vec<_>) = processed.into_iter().unzip();
 
     // 5. Run structure checks if enabled (using injected structure_checker)
     if let Some(ref structure_checker) = ctx.structure_checker
@@ -144,6 +148,13 @@ pub(crate) fn run_check_with_context(
     // 7.1 Generate split suggestions for failed files if --fix is enabled
     if args.fix {
         generate_split_suggestions(&mut results, &ctx.registry);
+    }
+
+    // 7.2 Write stats JSON if --report-json is specified
+    if let Some(ref report_path) = args.report_json {
+        let stats = ProjectStatistics::new(file_stats).with_language_breakdown();
+        let stats_json = StatsJsonFormatter.format(&stats)?;
+        write_output(Some(report_path), &stats_json, cli.quiet)?;
     }
 
     // 8. Format output
@@ -292,11 +303,17 @@ pub(crate) fn process_file_for_check(
     registry: &LanguageRegistry,
     checker: &ThresholdChecker,
     cache: &Mutex<Cache>,
-) -> Option<CheckResult> {
-    let (stats, _language) = process_file_with_cache(file_path, registry, cache)?;
+) -> Option<(CheckResult, FileStatistics)> {
+    let (stats, language) = process_file_with_cache(file_path, registry, cache)?;
     let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
-    Some(checker.check(file_path, &effective_stats))
+    let check_result = checker.check(file_path, &effective_stats);
+    let file_stats = FileStatistics {
+        path: file_path.to_path_buf(),
+        stats,
+        language,
+    };
+    Some((check_result, file_stats))
 }
 
 #[must_use]

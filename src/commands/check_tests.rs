@@ -111,8 +111,10 @@ fn process_file_valid_rust_file() {
 
     let result = process_file_for_check(&path, &registry, &checker, &cache);
     assert!(result.is_some());
-    let check_result = result.unwrap();
+    let (check_result, file_stats) = result.unwrap();
     assert!(check_result.is_passed());
+    assert_eq!(file_stats.path, path);
+    assert_eq!(file_stats.language, "Rust");
 }
 
 #[test]
@@ -188,6 +190,7 @@ fn run_check_impl_with_valid_directory() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -220,6 +223,7 @@ fn run_check_impl_with_warn_only() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -252,6 +256,7 @@ fn run_check_impl_with_threshold_exceeded() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -287,6 +292,7 @@ fn run_check_impl_with_json_output() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -322,6 +328,7 @@ fn run_check_impl_with_verbose() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -353,6 +360,7 @@ fn run_check_impl_with_no_skip_flags() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -384,6 +392,7 @@ fn run_check_impl_with_include_paths() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -415,6 +424,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -447,6 +457,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -479,6 +490,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -515,6 +527,7 @@ fn run_check_returns_config_error_on_invalid_config() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -548,6 +561,7 @@ fn run_check_impl_with_sarif_output() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -586,6 +600,7 @@ fn run_check_impl_with_markdown_output() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -622,6 +637,7 @@ fn apply_cli_overrides_max_lines() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -654,6 +670,7 @@ fn apply_cli_overrides_no_skip_comments() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -686,6 +703,7 @@ fn apply_cli_overrides_no_skip_blank() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -716,8 +734,142 @@ fn apply_cli_overrides_warn_threshold() {
         fix: false,
         max_files: None,
         max_dirs: None,
+        report_json: None,
     };
 
     apply_cli_overrides(&mut config, &args);
     assert!((config.content.warn_threshold - 0.8).abs() < f64::EPSILON);
+}
+
+#[test]
+fn run_check_impl_with_report_json_creates_stats_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let stats_output = temp_dir.path().join("stats.json");
+
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(2000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: None,
+        max_dirs: None,
+        report_json: Some(stats_output.clone()),
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+
+    // Verify stats file was created
+    assert!(stats_output.exists(), "Stats JSON file should be created");
+
+    // Verify JSON content structure
+    let content = std::fs::read_to_string(&stats_output).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+    // Check summary fields exist
+    assert!(json["summary"]["total_files"].is_number());
+    assert!(json["summary"]["total_lines"].is_number());
+    assert!(json["summary"]["code"].is_number());
+
+    // Check files array exists and has entries
+    assert!(json["files"].is_array());
+    assert!(!json["files"].as_array().unwrap().is_empty());
+
+    // Check language breakdown exists (included by default)
+    assert!(json["by_language"].is_array());
+}
+
+#[test]
+fn run_check_impl_without_report_json_does_not_create_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let stats_output = temp_dir.path().join("stats.json");
+
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(2000),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: None,
+        max_dirs: None,
+        report_json: None,
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+
+    // Verify stats file was NOT created
+    assert!(!stats_output.exists());
+}
+
+#[test]
+fn run_check_impl_report_json_does_not_affect_exit_code() {
+    let temp_dir = TempDir::new().unwrap();
+    let stats_output = temp_dir.path().join("stats.json");
+
+    // Set very low limit to trigger failure
+    let args = CheckArgs {
+        paths: vec![PathBuf::from("src")],
+        config: None,
+        max_lines: Some(1),
+        ext: Some(vec!["rs".to_string()]),
+        exclude: vec![],
+        include: vec![],
+        no_skip_comments: false,
+        no_skip_blank: false,
+        warn_threshold: None,
+        format: OutputFormat::Text,
+        output: None,
+        warn_only: false,
+        diff: None,
+        strict: false,
+        baseline: None,
+        no_cache: true,
+        no_gitignore: false,
+        fix: false,
+        max_files: None,
+        max_dirs: None,
+        report_json: Some(stats_output.clone()),
+    };
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Should still return threshold exceeded
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+
+    // Stats file should still be created even with failures
+    assert!(stats_output.exists());
 }
