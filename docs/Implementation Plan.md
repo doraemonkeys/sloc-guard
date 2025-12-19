@@ -43,27 +43,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **6.9.2**: `config show` format enum - `ConfigOutputFormat` (Text, Json) replaces String parameter.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
-
----
-
-## Phase 10: Code Quality & Testability (Complete)
-
-### Task 10.1: IO Abstraction for Pure Unit Testing ✅
-Location: `src/commands/check.rs`, `src/commands/context.rs`, `src/scanner/*.rs`
-```
-- Define Scanner trait (abstracts scan_files) - FileScanner trait with scan_all method
-- Define FileReader trait (abstracts file reading in process_file_with_cache)
-- Inject IO abstractions via CheckContext (scanner + file_reader fields)
-- Enable pure unit testing of run_check_with_context without real file system
-- CompositeScanner handles git/non-git fallback logic
-```
-
-### Task 10.2: Replace unwrap() with expect() ✅
-Location: `src/config/loader.rs:133`
-```
-- .expect("key exists: iterating over collected keys")
-- Documents intent for code path guaranteed by iteration
-```
+- **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
 
 ---
 
