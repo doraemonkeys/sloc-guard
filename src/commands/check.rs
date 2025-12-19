@@ -507,5 +507,9 @@ pub(crate) fn format_output(
 mod tests;
 
 #[cfg(test)]
-#[path = "check_advanced_tests.rs"]
-mod advanced_tests;
+#[path = "check_baseline_tests.rs"]
+mod baseline_tests;
+
+#[cfg(test)]
+#[path = "check_context_structure_tests.rs"]
+mod context_structure_tests;
