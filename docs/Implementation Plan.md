@@ -52,6 +52,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **11.6**: Configuration Presets - `extends = "preset:<name>"` syntax. Built-in presets: rust-strict, node-strict, python-strict, monorepo-base. Presets define ecosystem-specific defaults (extensions, max_lines, exclude patterns, structure limits). Lower priority than explicit config (child overrides preset).
 - **Phase 8 (Partial)**:
   - **8.1.1**: Core GitHub Action - `.github/action/action.yml` composite action. Inputs: paths, config-path, fail-on-warning, version, cache, sarif-output, baseline, diff. Outputs: total-files, passed, failed, warnings, sarif-file. Installation via cargo install from action repository. Cache integration for cargo registry, binary, and results.
+  - **8.1.2**: Problem Matchers and Job Summary - `problem-matcher.json` for PR annotations (FAILED/WARNING patterns). Job Summary via `$GITHUB_STEP_SUMMARY` with status, file counts, grandfathered count. New output: `grandfathered`.
 
 ---
 
@@ -82,13 +83,8 @@ Location: `src/output/html.rs`
 #### 8.1.1: Core Action with Cache ✅
 (Completed - see Completed section)
 
-#### 8.1.2: Problem Matchers and Job Summary (Pending)
-Location: `.github/action/`
-```
-- Problem Matcher JSON for PR annotations (::error file={file},line={line}::{message})
-- Job Summary markdown with stats (new violations, delta from baseline)
-- SARIF output path for chaining with upload-sarif
-```
+#### 8.1.2: Problem Matchers and Job Summary ✅
+(Completed - see Completed section)
 
 #### 8.1.3: Binary Download Optimization (Pending)
 Location: `.github/action/`

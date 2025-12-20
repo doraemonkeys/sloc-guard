@@ -1,0 +1,32 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "sloc-guard-error",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^. FAILED: (.+)$",
+          "file": 1
+        },
+        {
+          "regexp": "^\\s+(Lines|Files|Directories): (\\d+) \\(limit: (\\d+)\\)$",
+          "message": 0
+        }
+      ]
+    },
+    {
+      "owner": "sloc-guard-warning",
+      "severity": "warning",
+      "pattern": [
+        {
+          "regexp": "^. WARNING: (.+)$",
+          "file": 1
+        },
+        {
+          "regexp": "^\\s+(Lines|Files|Directories): (\\d+) \\(limit: (\\d+)\\)$",
+          "message": 0
+        }
+      ]
+    }
+  ]
+}

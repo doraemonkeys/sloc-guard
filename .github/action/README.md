@@ -31,7 +31,25 @@ Enforce source lines of code limits and directory structure constraints in your 
 | `passed` | Files that passed |
 | `failed` | Files that failed |
 | `warnings` | Files with warnings |
+| `grandfathered` | Violations grandfathered via baseline |
 | `sarif-file` | Path to SARIF file (if generated) |
+
+## Features
+
+### Job Summary
+
+The action automatically generates a Job Summary with check results that appears in the GitHub Actions workflow run page. The summary includes:
+- Overall status (passed/failed/warnings)
+- File count breakdown (total, passed, warnings, failed, grandfathered)
+- SARIF output path (if configured)
+
+### PR Annotations
+
+Violations are automatically annotated on the affected files in pull requests:
+- **Errors**: Files exceeding the SLOC limit
+- **Warnings**: Files approaching the limit
+
+These annotations appear directly in the PR diff view, making it easy to identify problematic files.
 
 ## Examples
 

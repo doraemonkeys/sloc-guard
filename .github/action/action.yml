@@ -52,6 +52,9 @@ outputs:
   warnings:
     description: 'Number of files with warnings'
     value: ${{ steps.run-check.outputs.warnings }}
+  grandfathered:
+    description: 'Number of grandfathered violations (from baseline)'
+    value: ${{ steps.run-check.outputs.grandfathered }}
   sarif-file:
     description: 'Path to generated SARIF file (if sarif-output was specified)'
     value: ${{ steps.run-check.outputs.sarif-file }}
@@ -116,6 +119,10 @@ runs:
         restore-keys: |
           sloc-guard-cache-${{ steps.cache-key.outputs.hash }}-${{ inputs.version }}-
 
+    - name: Register problem matcher
+      shell: bash
+      run: echo "::add-matcher::${{ github.action_path }}/problem-matcher.json"
+
     - name: Run sloc-guard check
       id: run-check
       shell: bash
@@ -154,27 +161,30 @@ runs:
         if [ -n "$SARIF_FILE" ]; then
           OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS 2>&1)
           echo "$OUTPUT" > "$SARIF_FILE"
-          # Run again for text output to parse stats
-          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text 2>&1)
+          # Run again for JSON and text output
+          JSON_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format json 2>&1)
+          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text --color never 2>&1)
           EXIT_CODE=$?
         else
-          OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format json 2>&1)
-          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text 2>&1)
+          JSON_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format json 2>&1)
+          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text --color never 2>&1)
           EXIT_CODE=$?
         fi
         set -e
 
         # Parse statistics from JSON output
         if command -v jq &> /dev/null; then
-          TOTAL=$(echo "$OUTPUT" | jq -r '.summary.total_files // 0' 2>/dev/null || echo "0")
-          PASSED=$(echo "$OUTPUT" | jq -r '.summary.passed // 0' 2>/dev/null || echo "0")
-          FAILED=$(echo "$OUTPUT" | jq -r '.summary.failed // 0' 2>/dev/null || echo "0")
-          WARNINGS=$(echo "$OUTPUT" | jq -r '.summary.warnings // 0' 2>/dev/null || echo "0")
+          TOTAL=$(echo "$JSON_OUTPUT" | jq -r '.summary.total_files // 0' 2>/dev/null || echo "0")
+          PASSED=$(echo "$JSON_OUTPUT" | jq -r '.summary.passed // 0' 2>/dev/null || echo "0")
+          FAILED=$(echo "$JSON_OUTPUT" | jq -r '.summary.failed // 0' 2>/dev/null || echo "0")
+          WARNINGS=$(echo "$JSON_OUTPUT" | jq -r '.summary.warnings // 0' 2>/dev/null || echo "0")
+          GRANDFATHERED=$(echo "$JSON_OUTPUT" | jq -r '.summary.grandfathered // 0' 2>/dev/null || echo "0")
         else
           TOTAL="0"
           PASSED="0"
           FAILED="0"
           WARNINGS="0"
+          GRANDFATHERED="0"
         fi
 
         # Set outputs
@@ -182,10 +192,62 @@ runs:
         echo "passed=$PASSED" >> $GITHUB_OUTPUT
         echo "failed=$FAILED" >> $GITHUB_OUTPUT
         echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+        echo "grandfathered=$GRANDFATHERED" >> $GITHUB_OUTPUT
         echo "sarif-file=$SARIF_FILE" >> $GITHUB_OUTPUT
 
-        # Print text output for workflow logs
+        # Print text output for workflow logs (triggers problem matcher)
         echo "$TEXT_OUTPUT"
 
         # Exit with original code
         exit $EXIT_CODE
+
+    - name: Generate Job Summary
+      if: always()
+      shell: bash
+      env:
+        TOTAL: ${{ steps.run-check.outputs.total-files }}
+        PASSED: ${{ steps.run-check.outputs.passed }}
+        FAILED: ${{ steps.run-check.outputs.failed }}
+        WARNINGS: ${{ steps.run-check.outputs.warnings }}
+        GRANDFATHERED: ${{ steps.run-check.outputs.grandfathered }}
+        SARIF_FILE: ${{ steps.run-check.outputs.sarif-file }}
+      run: |
+        # Determine overall status
+        if [ "$FAILED" = "0" ] && [ "$WARNINGS" = "0" ]; then
+          STATUS_ICON="✅"
+          STATUS_TEXT="All checks passed"
+        elif [ "$FAILED" = "0" ]; then
+          STATUS_ICON="⚠️"
+          STATUS_TEXT="Passed with warnings"
+        else
+          STATUS_ICON="❌"
+          STATUS_TEXT="Check failed"
+        fi
+
+        # Generate markdown summary
+        {
+          echo "## $STATUS_ICON sloc-guard Results"
+          echo ""
+          echo "**Status**: $STATUS_TEXT"
+          echo ""
+          echo "| Metric | Count |"
+          echo "|--------|-------|"
+          echo "| Total Files | $TOTAL |"
+          echo "| ✓ Passed | $PASSED |"
+          echo "| ⚠ Warnings | $WARNINGS |"
+          echo "| ✗ Failed | $FAILED |"
+          echo "| ◉ Grandfathered | $GRANDFATHERED |"
+        } >> $GITHUB_STEP_SUMMARY
+
+        # Add SARIF file info if generated
+        if [ -n "$SARIF_FILE" ]; then
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📄 SARIF output: \`$SARIF_FILE\`" >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Remove problem matcher
+      if: always()
+      shell: bash
+      run: |
+        echo "::remove-matcher owner=sloc-guard-error::"
+        echo "::remove-matcher owner=sloc-guard-warning::"
