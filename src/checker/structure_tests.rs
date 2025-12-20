@@ -1194,3 +1194,38 @@ fn override_empty_path_does_not_match() {
     let limits = checker.get_limits(&PathBuf::from("src/lib"));
     assert_eq!(limits.max_files, Some(10));
 }
+
+#[test]
+fn unconfigured_max_dirs_allows_unlimited_directories() {
+    // When max_dirs is not configured (None), directories with any number
+    // of subdirectories should not trigger violations.
+    let config = StructureConfig {
+        max_files: Some(100), // Only file limit is set
+        max_dirs: None,       // Directory limit is NOT configured
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 5,
+            dir_count: 99, // Large number of subdirectories
+            depth: 0,
+        },
+    );
+    stats.insert(
+        PathBuf::from("tests"),
+        DirStats {
+            file_count: 3,
+            dir_count: 50, // Another directory with many subdirs
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    // No violations because max_dirs is not configured
+    assert!(violations.is_empty());
+}

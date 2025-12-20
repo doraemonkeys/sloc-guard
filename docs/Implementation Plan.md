@@ -95,7 +95,70 @@ Location: `src/commands/init.rs`
 - Add --detect flag to init command
 - Auto-detect project type (Cargo.toml→Rust, package.json→Node, etc.)
 - Generate language-appropriate default rules
+- For monorepo: generate scoped [[content.rules]] per detected project subdirectory
 - Reduces configuration barrier for new users
+```
+
+---
+
+## Phase 11: Advanced Governance (Pending)
+
+### Task 11.1: Naming Convention Enforcement
+Location: `src/config/structure.rs`, `src/checker/structure.rs`
+```
+- Add `file_naming_pattern` (regex) to [[structure.rules]]
+- Validates filenames match pattern (e.g., PascalCase for components, `use*` for hooks)
+- New violation type: NamingConvention { expected_pattern, actual_filename }
+```
+
+### Task 11.2: File Co-location Check
+Location: `src/checker/structure.rs`
+```
+- Add `require_sibling` to [[structure.rules]]: { pattern: "*.ts", sibling: "*.spec.ts" }
+- Validates paired files exist together (component + test, implementation + docs)
+- New violation type: MissingSibling { file, expected_sibling_pattern }
+```
+
+### Task 11.3: Time-bound Overrides
+Location: `src/config/*.rs`, `src/checker/*.rs`
+```
+- Add `expires = "YYYY-MM-DD"` to [[content.override]] and [[structure.override]]
+- Expired overrides become violations (treat as if override doesn't exist)
+- Warning mode: warn N days before expiration (configurable)
+```
+
+### Task 11.4: Baseline Ratchet
+Location: `src/commands/check.rs`, `src/baseline/mod.rs`
+```
+- CI mode flag: --ratchet (or config: baseline.ratchet = true)
+- When current violations < baseline count, auto-update baseline
+- Prevents regression: error count can only decrease over time
+```
+
+### Task 11.6: Configuration Presets
+Location: `src/config/loader.rs`, `src/config/presets.rs` (new)
+```
+- Support `extends = "preset:react-strict"` syntax
+- Built-in presets: rust-strict, node-strict, python-strict, monorepo-base
+- Presets define sensible defaults for each ecosystem
+- Presets are lower priority than explicit config (can be overridden)
+```
+
+### Task 11.7: Deny Patterns
+Location: `src/config/structure.rs`, `src/checker/structure.rs`
+```
+- Add `deny_extensions` and `deny_patterns` to [structure] and [[structure.rules]]
+- Matches result in immediate violation regardless of other rules
+- Use case: ban .exe/.dll, enforce migration (.js → .ts)
+- New violation type: DeniedFile { pattern_or_extension }
+```
+
+### Task 11.8: Terminology Modernization
+```
+- Rename internal: "whitelist" → "allowlist" in code, docs, config field names
+- Config: allow_extensions/allow_patterns already named correctly
+- Update CLI help, error messages, documentation
+- No functional change, pure naming cleanup
 ```
 
 ---
@@ -108,8 +171,11 @@ Location: `src/commands/init.rs`
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
 | **4. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **5. UX Improvements** | 9.3 Smart init |
+| **5. UX Improvements** | 9.3 Smart init, 11.6 Presets |
 | **6. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
+| **8. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
+| **9. Cleanup** | 11.8 Terminology Modernization |
 
 ---
 
