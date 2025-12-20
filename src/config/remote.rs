@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 use sha2::{Digest, Sha256};
@@ -10,6 +11,9 @@ use crate::error::{Result, SlocGuardError};
 const CACHE_DIR: &str = "sloc-guard/configs";
 const CACHE_TTL_SECS: u64 = 3600; // 1 hour
 const REQUEST_TIMEOUT_SECS: u64 = 30;
+
+/// Flag to track whether the remote config fetch warning has been shown this session.
+static WARNING_SHOWN: AtomicBool = AtomicBool::new(false);
 
 /// HTTP client abstraction for dependency injection.
 pub trait HttpClient {
@@ -163,6 +167,13 @@ pub fn fetch_remote_config_with_client(url: &str, client: &impl HttpClient) -> R
         return Ok(cached);
     }
 
+    // Emit warning on first remote fetch per session
+    if !WARNING_SHOWN.swap(true, Ordering::SeqCst) {
+        eprintln!(
+            "Warning: Fetching remote config from {url}. Consider using --offline or extends_sha256 for reproducible builds."
+        );
+    }
+
     // Fetch from remote
     let content = client.get(url)?;
 
@@ -210,6 +221,18 @@ pub fn clear_cache() -> usize {
         }
     }
     count
+}
+
+/// Reset the warning flag for testing purposes.
+#[cfg(test)]
+pub fn reset_warning_flag() {
+    WARNING_SHOWN.store(false, Ordering::SeqCst);
+}
+
+/// Check if the warning has been shown this session.
+#[cfg(test)]
+pub fn was_warning_shown() -> bool {
+    WARNING_SHOWN.load(Ordering::SeqCst)
 }
 
 #[cfg(test)]

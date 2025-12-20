@@ -502,3 +502,129 @@ fn reqwest_client_can_be_instantiated() {
     // Just verify it can be created
     let _ = client;
 }
+
+// Warning flag tests
+
+static WARNING_LOCK: Mutex<()> = Mutex::new(());
+
+#[test]
+fn warning_flag_initially_false() {
+    let _lock = WARNING_LOCK.lock().unwrap();
+    reset_warning_flag();
+    assert!(!was_warning_shown());
+}
+
+#[test]
+fn warning_shown_on_first_remote_fetch() {
+    let _fs_lock = FS_LOCK.lock().unwrap();
+    let _warn_lock = WARNING_LOCK.lock().unwrap();
+    reset_warning_flag();
+
+    let content = "[default]\nmax_lines = 500\n";
+    let client = MockHttpClient::success(content);
+
+    let url = format!(
+        "https://mock-test-{}-warning.example.com/config.toml",
+        std::process::id()
+    );
+
+    // Clear cache
+    if let Some(path) = cache_file_path(&url) {
+        let _ = fs::remove_file(&path);
+    }
+
+    assert!(!was_warning_shown());
+    let result = fetch_remote_config_with_client(&url, &client);
+    assert!(result.is_ok());
+    assert!(was_warning_shown());
+
+    // Clean up
+    if let Some(path) = cache_file_path(&url) {
+        let _ = fs::remove_file(&path);
+    }
+}
+
+#[test]
+fn warning_shown_only_once_per_session() {
+    let _fs_lock = FS_LOCK.lock().unwrap();
+    let _warn_lock = WARNING_LOCK.lock().unwrap();
+    reset_warning_flag();
+
+    let content = "[default]\nmax_lines = 600\n";
+    let client = MockHttpClient::success(content);
+
+    let url1 = format!(
+        "https://mock-test-{}-warning-once-1.example.com/config.toml",
+        std::process::id()
+    );
+    let url2 = format!(
+        "https://mock-test-{}-warning-once-2.example.com/config.toml",
+        std::process::id()
+    );
+
+    // Clear caches
+    for url in [&url1, &url2] {
+        if let Some(path) = cache_file_path(url) {
+            let _ = fs::remove_file(&path);
+        }
+    }
+
+    // First fetch - warning shown
+    assert!(!was_warning_shown());
+    let _ = fetch_remote_config_with_client(&url1, &client);
+    assert!(was_warning_shown());
+
+    // Second fetch - warning already shown, flag still true
+    let _ = fetch_remote_config_with_client(&url2, &client);
+    assert!(was_warning_shown());
+
+    // Clean up
+    for url in [&url1, &url2] {
+        if let Some(path) = cache_file_path(url) {
+            let _ = fs::remove_file(&path);
+        }
+    }
+}
+
+#[test]
+fn warning_not_shown_when_cache_hit() {
+    let _fs_lock = FS_LOCK.lock().unwrap();
+    let _warn_lock = WARNING_LOCK.lock().unwrap();
+    reset_warning_flag();
+
+    let content = "[default]\nmax_lines = 700\n";
+    let client = MockHttpClient::success(content);
+
+    let url = format!(
+        "https://mock-test-{}-warning-cache.example.com/config.toml",
+        std::process::id()
+    );
+
+    // Clear cache
+    if let Some(path) = cache_file_path(&url) {
+        let _ = fs::remove_file(&path);
+    }
+
+    // First fetch - populates cache, shows warning
+    let _ = fetch_remote_config_with_client(&url, &client);
+
+    // Check if cache was created
+    let cache_exists = cache_file_path(&url).is_some_and(|p| p.exists());
+    if !cache_exists {
+        // No cache dir available, skip test
+        return;
+    }
+
+    // Reset warning flag
+    reset_warning_flag();
+    assert!(!was_warning_shown());
+
+    // Second fetch - should use cache, no warning
+    let _ = fetch_remote_config_with_client(&url, &client);
+    assert!(!was_warning_shown()); // Warning not shown because cache was used
+
+    // Clean up
+    if let Some(path) = cache_file_path(&url) {
+        let _ = fs::remove_file(&path);
+    }
+}

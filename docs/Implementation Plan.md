@@ -21,7 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
-- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.5 Git Scanner Fallback Warning, 12.8 FS .gitignore Support.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.5 Git Scanner Fallback Warning, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning.
 
 ---
 
@@ -72,19 +72,22 @@ Location: `src/config/*.rs`, `src/checker/threshold.rs`
 - Remove auto-migration code if any
 ```
 
-### Task 12.9: Remote Config Security Hardening
-Location: `src/config/loader.rs`, `src/config/remote.rs`
+### Task 12.9.2: Offline Mode
+Location: `src/config/remote.rs`, `src/cli.rs`, `src/commands/check.rs`
 ```
-- Problem: `extends = "https://..."` has reproducibility and security risks
-  - Remote server down or file changed → CI fails unpredictably
-  - Remote config could be tampered, injecting malicious ignore rules
-- Solution (3 parts):
-  1. Warning: Emit warning when fetching remote config (first use per session)
-  2. Caching + Offline: Cache remote config locally, add --offline flag to force cache
-  3. Hash Lock: Support `extends_sha256 = "abc123..."` to lock content hash
-     - If hash mismatch, error with clear message showing expected vs actual
-     - Prevents silent config drift
-- Cache location: `.sloc-guard/remote-cache/` (hashed URL as filename)
+- Add `--offline` flag to `check` and `stats` commands
+- When offline: only use cache, error if cache miss
+- Move cache from system dir to project-local `.sloc-guard/remote-cache/`
+- Cache format: `{sha256(url)}.toml`
+```
+
+### Task 12.9.3: Hash Lock (extends_sha256)
+Location: `src/config/model.rs`, `src/config/loader.rs`, `src/config/remote.rs`
+```
+- Add `extends_sha256` field to config model
+- Compute SHA256 of fetched content, compare with expected hash
+- Hash mismatch → error with expected vs actual hash
+- Prevents silent config drift
 ```
 
 ---
@@ -150,7 +153,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
-| **8. Config Validation** | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, 12.9 Remote Config Security |
+| **8. Config Validation** | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, 12.9.2-12.9.3 Remote Config Security |
 | **9. State File Cleanup** | 12.4 Consolidate State Files, 12.6 max_depth Example, 12.7 Remove V1 path_rules |
 | **10. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **11. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
