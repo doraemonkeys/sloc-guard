@@ -339,8 +339,9 @@ impl StructureChecker {
             }
         }
 
-        // 2. Check rules (glob patterns)
-        for rule in &self.rules {
+        // 2. Check rules (glob patterns) - last match wins
+        // Iterate in reverse to find the last matching rule
+        for rule in self.rules.iter().rev() {
             if rule.matcher.is_match(path) {
                 return StructureLimits {
                     max_files: rule.max_files.or(self.max_files),
@@ -506,10 +507,21 @@ impl StructureChecker {
             });
         }
 
-        // 2. Check rules (first match wins based on actual code behavior)
+        // 2. Check rules (last match wins for consistency with content rules)
+        // First find the index of the last matching rule
+        let last_matching_rule_idx = self
+            .rules
+            .iter()
+            .enumerate()
+            .rev()
+            .find(|(_, rule)| rule.matcher.is_match(path))
+            .map(|(i, _)| i);
+
+        // Then iterate forward to build rule chain with correct statuses
         for (i, rule) in self.rules.iter().enumerate() {
             let matches = rule.matcher.is_match(path);
-            let status = if matches && !found_match {
+            let is_last_match = last_matching_rule_idx == Some(i);
+            let status = if is_last_match && !found_match {
                 found_match = true;
                 matched_rule = StructureRuleMatch::Rule {
                     index: i,

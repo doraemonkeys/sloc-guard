@@ -68,15 +68,15 @@ Location: `src/output/html.rs`
 
 ---
 
-## Phase 12: Bug Fixes & Cleanup (Pending)
+## Phase 12: Bug Fixes & Cleanup (Partial)
 
-### Task 12.1: Fix Structure Rule Priority (Bug)
+### Task 12.1: Fix Structure Rule Priority (Bug) ✅
 Location: `src/checker/structure.rs`
 ```
 - Content rules use `.rev()` (last match wins) but Structure rules iterate forward (first match wins)
-- Inconsistent with documented behavior ("LAST declared match wins")
-- Change Structure rules to use `.rev()` for consistency with Content rules
-- Update `explain()` function comments to match actual behavior
+- Changed Structure rules to use `.rev()` for consistency with Content rules
+- Updated `explain()` function to correctly report last matching rule
+- Added edge case tests for rule priority
 ```
 
 ### Task 12.2: Remove Deprecated Baseline Command
