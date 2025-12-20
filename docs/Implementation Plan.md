@@ -68,6 +68,96 @@ Location: `src/output/html.rs`
 
 ---
 
+## Phase 12: Bug Fixes & Cleanup (Pending)
+
+### Task 12.1: Fix Structure Rule Priority (Bug)
+Location: `src/checker/structure.rs`
+```
+- Content rules use `.rev()` (last match wins) but Structure rules iterate forward (first match wins)
+- Inconsistent with documented behavior ("LAST declared match wins")
+- Change Structure rules to use `.rev()` for consistency with Content rules
+- Update `explain()` function comments to match actual behavior
+```
+
+### Task 12.2: Remove Deprecated Baseline Command
+Location: `src/commands/baseline_cmd.rs`, `src/main.rs`
+```
+- Delete baseline subcommand entirely (deprecated since --update-baseline added)
+- Remove from CLI parser
+- Update any documentation references
+```
+
+### Task 12.3: Override Path Validation
+Location: `src/config/content.rs`, `src/config/structure.rs`, `src/checker/*.rs`
+```
+- ContentOverride should only apply to files (error if path is directory)
+- StructureOverride should only apply to directories (error if path is file)
+- Add runtime validation when loading config or during check
+- Clear error messages for misconfigured overrides
+```
+
+### Task 12.4: Consolidate State Files
+Location: `src/baseline/mod.rs`, `src/cache/mod.rs`, `src/history/mod.rs`
+```
+- Current: 3 files in root (.sloc-guard-baseline.json, -cache.json, -history.json)
+- Move cache and history to `.sloc-guard/` hidden directory
+- Keep baseline in root (visible, part of team "contract")
+- Detect .git and optionally use `.git/sloc-guard/` for cache/history
+```
+
+### Task 12.5: Git Scanner Fallback Warning
+Location: `src/scanner/mod.rs`
+```
+- Current: Silent fallback from Git to FS scanner on any Git error
+- Distinguish "not a git repo" (silent fallback OK) vs "git error" (warn user)
+- Emit warning when fallback occurs due to git error (permissions, corruption, etc.)
+- Prevents silent behavior change causing different scan results
+```
+
+### Task 12.6: Document max_depth in Example Config
+Location: `example.toml`
+```
+- Add max_depth usage example in [structure] section
+- Show typical use case (limiting nesting depth)
+```
+
+### Task 12.7: Remove V1 Legacy path_rules
+Location: `src/config/*.rs`, `src/checker/threshold.rs`
+```
+- Remove deprecated `path_rules` (V1 format) - now superseded by `content.rules`
+- Per CLAUDE.md: "No Backward Compatibility" - prioritize clean architecture
+- Update config loader to reject V1 format with clear error message
+- Remove auto-migration code if any
+```
+
+### Task 12.8: FS Scanner .gitignore Support
+Location: `src/scanner/fs.rs`, `src/scanner/mod.rs`
+```
+- Problem: Git mode (gix) auto-respects .gitignore, FS mode ignores it → inconsistent counts
+- Example: logs/ with 10000 gitignored files → 0 in Git mode, 10000 in FS mode (fails max_files)
+- Solution: Use `ignore` crate to parse .gitignore in FS mode when scanner.gitignore=true
+- Parse root .gitignore + subdirectory .gitignore files (Git semantics)
+- Silent fallback if .gitignore missing or parse fails
+- Benefits: consistent behavior local↔CI, zero config, backward compatible
+```
+
+### Task 12.9: Remote Config Security Hardening
+Location: `src/config/loader.rs`, `src/config/remote.rs`
+```
+- Problem: `extends = "https://..."` has reproducibility and security risks
+  - Remote server down or file changed → CI fails unpredictably
+  - Remote config could be tampered, injecting malicious ignore rules
+- Solution (3 parts):
+  1. Warning: Emit warning when fetching remote config (first use per session)
+  2. Caching + Offline: Cache remote config locally, add --offline flag to force cache
+  3. Hash Lock: Support `extends_sha256 = "abc123..."` to lock content hash
+     - If hash mismatch, error with clear message showing expected vs actual
+     - Prevents silent config drift
+- Cache location: `.sloc-guard/remote-cache/` (hashed URL as filename)
+```
+
+---
+
 ## Phase 11: Advanced Governance (Pending)
 
 ### Task 11.1: Naming Convention Enforcement
@@ -136,9 +226,12 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**4. UX Improvements**~~ | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
 | ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
-| **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
-| **8. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
-| **9. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **7. Bug Fixes** | 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline |
+| **8. Config Validation** | 12.3 Override Path Validation, 12.5 Git Fallback Warning, 12.8 FS .gitignore Support, 12.9 Remote Config Security |
+| **9. State File Cleanup** | 12.4 Consolidate State Files, 12.6 max_depth Example, 12.7 Remove V1 path_rules |
+| **10. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
+| **11. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
+| **12. Visualization** | 7.1-7.2 HTML Charts/Trends |
 
 ---
 
