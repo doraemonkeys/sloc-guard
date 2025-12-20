@@ -5,7 +5,6 @@
 ## Quick Reference
 
 ```
-Exit Codes: 0=pass, 1=threshold exceeded, 2=config error, 3=IO error
 Lint: make ci
 ```
 
@@ -28,36 +27,12 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
 - **Phase 4**: Path-Based Rules, Inline Ignore, Strict Mode, Baseline, SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance, Split Suggestions, Remote Config.
 - **Phase 5 (Partial)**: Language Breakdown, Top-N & Metrics, Markdown Output, Directory Statistics, Trend Tracking, HTML Report, Structure Guard.
-- **Phase 5.5 (Refactoring & V2 Config)**:
-  - **Architecture**: Scanner/Structure separation, `ScannerConfig` vs `ContentConfig`, `CheckResult` enum refactor, Dependency Injection (Context) implementation.
-  - **Config V2**: Separated `[[content.override]]` vs `[[structure.override]]` (with required reason), Versioning (auto-migration v1→v2), `warn_threshold` for structure, Unlimited (`-1`) limits.
-  - **UX**: Extension-based rule sugar (`[content.languages.rs]`), Explicit Rule Priority (Override > Rule > Lang > Default), Structure pattern semantics clarification, Renamed `structure.count_exclude`.
-- **Phase 6 (Partial)**:
-  - **6.1**: `--max-files`, `--max-dirs` CLI params for `check` command. Requires explicit `<PATH>` argument, overrides `[structure]` defaults (not rules).
-  - **6.2**: `--diff` optional parameter. Defaults to `HEAD` when provided without value (`--diff` same as `--diff HEAD`).
-  - **6.3**: `--history-file` parameter for `stats` command. Custom path for trend history file (default: `.sloc-guard-history.json`).
-  - **6.4**: Documentation Clarification - CLI help text updates (paths vs --include, CLI override scope, --diff behavior), README.md creation.
-  - **6.5.1**: `--update-baseline[=MODE]` for `check` command. Modes: `all`(default), `content`, `structure`, `new`. Baseline V2 format (tagged enum for content/structure entries). V1 auto-migration. Deprecates `baseline update` subcommand.
-  - **6.6**: `--report-json <PATH>` for `check` command. Outputs `ProjectStatistics` JSON alongside check results (avoids separate stats run in CI).
-  - **6.9.1**: CLI parameter renames: `--fix` → `--suggest`, `--no-skip-comments` → `--count-comments`, `--no-skip-blank` → `--count-blank`.
-  - **6.9.2**: `config show` format enum - `ConfigOutputFormat` (Text, Json) replaces String parameter.
-- **Phase 9 (Partial)**:
-  - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
-  - **9.2**: `max_depth` - limits directory nesting depth in `[structure]`, `[[structure.rules]]`, and `[[structure.override]]`. CLI `--max-depth` parameter. `StructureChecker` tracks depth during traversal.
-  - **9.3**: `init --detect` - Auto-detect project type (Cargo.toml→Rust, package.json→Node, go.mod→Go, etc.). Generates language-appropriate V2 config with suitable `max_lines`, extensions, and exclude patterns. Monorepo support: detects subprojects and generates scoped `[[content.rules]]`.
-  - **9.4**: Structure Whitelist Mode - `allow_extensions` / `allow_patterns` on `[[structure.rules]]`. Files not matching whitelist are `DisallowedFile` violations. Stricter than `count_exclude`. OR logic (extension OR pattern match).
-  - **9.5**: Unified Directory Traversal - `scan_with_structure()` method on `FileScanner` trait. Single WalkDir pass collects files AND directory statistics. Eliminates redundant I/O from separate scanner and structure checker traversals.
-- **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
-- **Phase 11 (Partial)**:
-  - **11.6**: Configuration Presets - `extends = "preset:<name>"` syntax. Built-in presets: rust-strict, node-strict, python-strict, monorepo-base. Presets define ecosystem-specific defaults (extensions, max_lines, exclude patterns, structure limits). Lower priority than explicit config (child overrides preset).
-- **Phase 8 (Partial)**:
-  - **8.1.1**: Core GitHub Action - `.github/action/action.yml` composite action. Inputs: paths, config-path, fail-on-warning, version, cache, sarif-output, baseline, diff. Outputs: total-files, passed, failed, warnings, sarif-file. Installation via cargo install from action repository. Cache integration for cargo registry, binary, and results.
-  - **8.1.2**: Problem Matchers and Job Summary - `problem-matcher.json` for PR annotations (FAILED/WARNING patterns). Job Summary via `$GITHUB_STEP_SUMMARY` with status, file counts, grandfathered count. New output: `grandfathered`.
-  - **8.1.3**: Binary Download Optimization - Download pre-built binaries from GitHub Releases (x86_64/ARM64 Linux, macOS, Windows). SHA256 checksum verification. Exponential backoff retry (3 retries). Fallback to cargo install if binary unavailable.
-  - **8.2**: Pre-commit Hook - `.pre-commit-hooks.yaml` with `language: script`. Wrapper script `scripts/install-sloc-guard.sh` (OS/Arch detection, binary download with checksum, caching at `~/.cache/sloc-guard/`). New `--files` CLI parameter for pure incremental mode (skips directory scan, processes only listed files, disables structure checks).
-  - **8.3**: Universal Docker Image - Multi-stage `Dockerfile` (rust:alpine builder → alpine:3.21 runtime, ~10MB). Multi-arch support (linux/amd64, linux/arm64) via `.github/workflows/docker.yml`. Publish to ghcr.io on release tags. CI platform examples in README (GitLab CI, Jenkins, Azure Pipelines, CircleCI).
-  - **8.4**: Diff Mode Enhancement - `--staged` parameter for staging area only (mutually exclusive with `--diff`). Clarified semantics: `--diff HEAD` = uncommitted (staged + unstaged), `--staged` = staged only, `--diff origin/main` = PR changes.
-  - **8.5**: SARIF Auto-Upload Guidance - README documentation with GitHub Action examples. SARIF output/upload to Security tab via `github/codeql-action/upload-sarif@v3`. Action inputs/outputs reference. Docker and CI platform examples (GitLab CI, Azure Pipelines).
+- **Phase 5.5 (Refactoring & V2 Config)**: Scanner/Structure separation, `Config` V2 (auto-migration), `CheckResult` refactor, DI Context, Extension-based rule sugar, Explicit Rule Priority, Structure `warn_threshold`.
+- **Phase 6 (Partial)**: CLI updates (`--max-files/dirs`, `--diff/--staged`, `--history-file`, `--update-baseline`, `--report-json`), parameter renames (`--suggest`, `--count-*`), documentation updates.
+- **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, Binary Download Optimization, SARIF Guidance.
+- **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
+- **Phase 10**: IO Abstraction, error handling cleanup.
+- **Phase 11 (Partial)**: 11.6 Config Presets.
 
 ---
 
@@ -81,34 +56,13 @@ Location: `src/output/html.rs`
 
 ---
 
-## Phase 8: CI/CD Support (Pending)
+## Phase 8: CI/CD Support (Completed)
 
-### Task 8.1: GitHub Action
-
-#### 8.1.1: Core Action with Cache ✅
-(Completed - see Completed section)
-
-#### 8.1.2: Problem Matchers and Job Summary ✅
-(Completed - see Completed section)
-
-#### 8.1.3: Binary Download Optimization ✅
-(Completed - see Completed section)
-
-### Task 8.2: Pre-commit Hook ✅
-(Completed - see Completed section)
-
-### Task 8.3: Universal Docker Image ✅
-(Completed - see Completed section)
-
-### Task 8.4: Diff Mode Enhancement ✅
-(Completed - see Completed section)
-
-### Task 8.5: SARIF Auto-Upload Guidance ✅
-(Completed - see Completed section)
+(All Phase 8 tasks completed - see Completed section above)
 
 ---
 
-## Phase 9: Advanced Features (Pending)
+## Phase 9: Advanced Features (Completed)
 
 (All Phase 9 tasks completed - see Completed section above)
 
@@ -179,8 +133,8 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
-| **4. UX Improvements** | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
-| **5. CI/CD** | ~~8.1.1 Core Action~~ ✅, ~~8.1.2-8.1.3 GitHub Action~~ ✅, ~~8.2 Pre-commit Hook~~ ✅, ~~8.3 Docker Image~~ ✅, ~~8.4 Diff Mode Enhancement~~ ✅, ~~8.5 SARIF Guidance~~ ✅ |
+| ~~**4. UX Improvements**~~ | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
+| ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
 | **6. Cleanup** | 11.8 Terminology Modernization |
 | **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **8. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
