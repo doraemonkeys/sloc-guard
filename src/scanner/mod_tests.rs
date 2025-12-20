@@ -1110,3 +1110,188 @@ fn scan_with_structure_nested_directory_depth() {
     assert!(deep_stats.is_some());
     assert_eq!(deep_stats.unwrap().depth, 4);
 }
+
+// =============================================================================
+// DirectoryScanner .gitignore Support Tests (Non-Git Repo)
+// =============================================================================
+
+#[test]
+fn directory_scanner_with_gitignore_respects_gitignore_without_git_repo() {
+    let temp_dir = TempDir::new().unwrap();
+    // Note: NOT initializing a git repo
+
+    // Create .gitignore
+    std::fs::write(temp_dir.path().join(".gitignore"), "ignored/\n*.log\n").unwrap();
+
+    // Create files
+    std::fs::write(temp_dir.path().join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(temp_dir.path().join("debug.log"), "log content").unwrap();
+
+    let ignored_dir = temp_dir.path().join("ignored");
+    std::fs::create_dir(&ignored_dir).unwrap();
+    std::fs::write(ignored_dir.join("hidden.rs"), "ignored content").unwrap();
+
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let files = scanner.scan(temp_dir.path()).unwrap();
+
+    // Should find .gitignore and main.rs, but not debug.log or ignored/hidden.rs
+    assert!(files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(files.iter().any(|f| f.ends_with(".gitignore")));
+    assert!(!files.iter().any(|f| f.ends_with("debug.log")));
+    assert!(!files.iter().any(|f| f.ends_with("hidden.rs")));
+}
+
+#[test]
+fn directory_scanner_without_gitignore_ignores_gitignore_file() {
+    let temp_dir = TempDir::new().unwrap();
+
+    std::fs::write(temp_dir.path().join(".gitignore"), "*.log\n").unwrap();
+    std::fs::write(temp_dir.path().join("main.rs"), "").unwrap();
+    std::fs::write(temp_dir.path().join("debug.log"), "").unwrap();
+
+    // use_gitignore = false
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, false);
+    let files = scanner.scan(temp_dir.path()).unwrap();
+
+    // Should find all files including debug.log
+    assert!(files.iter().any(|f| f.ends_with("debug.log")));
+}
+
+#[test]
+fn directory_scanner_with_gitignore_nested_gitignore() {
+    let temp_dir = TempDir::new().unwrap();
+
+    std::fs::write(temp_dir.path().join(".gitignore"), "*.log\n").unwrap();
+
+    let sub_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&sub_dir).unwrap();
+    std::fs::write(sub_dir.join(".gitignore"), "local_only/\n").unwrap();
+    std::fs::write(sub_dir.join("main.rs"), "").unwrap();
+    std::fs::write(sub_dir.join("app.log"), "").unwrap();
+
+    let local_dir = sub_dir.join("local_only");
+    std::fs::create_dir(&local_dir).unwrap();
+    std::fs::write(local_dir.join("secret.rs"), "").unwrap();
+
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let files = scanner.scan(temp_dir.path()).unwrap();
+
+    assert!(files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(!files.iter().any(|f| f.ends_with("app.log")));
+    assert!(!files.iter().any(|f| f.ends_with("secret.rs")));
+}
+
+#[test]
+fn directory_scanner_with_gitignore_no_gitignore_file() {
+    // When .gitignore doesn't exist, should work normally
+    let temp_dir = TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("main.rs"), "").unwrap();
+    std::fs::write(temp_dir.path().join("test.log"), "").unwrap();
+
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let files = scanner.scan(temp_dir.path()).unwrap();
+
+    // Should find all files since no .gitignore exists
+    assert_eq!(files.len(), 2);
+}
+
+#[test]
+fn composite_scanner_fallback_respects_gitignore() {
+    // Test that DirectoryScanner with use_gitignore respects .gitignore
+    // Note: We test DirectoryScanner directly because CompositeScanner's fallback
+    // only triggers on GitRepoNotFound, but temp dirs may be inside a git repo
+    // (e.g., during tarpaulin runs with TEMP=.tmp)
+    let temp_dir = TempDir::new().unwrap();
+
+    std::fs::write(temp_dir.path().join(".gitignore"), "*.log\n").unwrap();
+    std::fs::write(temp_dir.path().join("main.rs"), "").unwrap();
+    std::fs::write(temp_dir.path().join("debug.log"), "").unwrap();
+
+    // Use DirectoryScanner with gitignore support directly
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let files = scanner.scan(temp_dir.path()).unwrap();
+
+    // Should respect .gitignore
+    assert!(files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(!files.iter().any(|f| f.ends_with("debug.log")));
+}
+
+#[test]
+fn directory_scanner_with_gitignore_scan_with_structure() {
+    let temp_dir = TempDir::new().unwrap();
+
+    std::fs::write(temp_dir.path().join(".gitignore"), "logs/\n").unwrap();
+
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "").unwrap();
+
+    let logs_dir = temp_dir.path().join("logs");
+    std::fs::create_dir(&logs_dir).unwrap();
+    // Add files to logs
+    for i in 0..5 {
+        std::fs::write(logs_dir.join(format!("log{i}.txt")), "").unwrap();
+    }
+
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
+
+    // logs directory should be ignored
+    assert!(
+        !result
+            .files
+            .iter()
+            .any(|f| f.to_string_lossy().contains("logs"))
+    );
+    // .gitignore + main.rs
+    assert_eq!(result.files.len(), 2);
+}
+
+#[test]
+fn directory_scanner_with_gitignore_negation_pattern() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Ignore all .log files except important.log
+    std::fs::write(
+        temp_dir.path().join(".gitignore"),
+        "*.log\n!important.log\n",
+    )
+    .unwrap();
+    std::fs::write(temp_dir.path().join("debug.log"), "").unwrap();
+    std::fs::write(temp_dir.path().join("important.log"), "").unwrap();
+    std::fs::write(temp_dir.path().join("main.rs"), "").unwrap();
+
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let files = scanner.scan(temp_dir.path()).unwrap();
+
+    assert!(files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(files.iter().any(|f| f.ends_with("important.log")));
+    assert!(!files.iter().any(|f| f.ends_with("debug.log")));
+}
+
+#[test]
+fn composite_scanner_fallback_respects_gitignore_scan_with_structure() {
+    // Test DirectoryScanner with gitignore + scan_with_structure
+    // Note: We test DirectoryScanner directly because CompositeScanner's fallback
+    // only triggers on GitRepoNotFound, but temp dirs may be inside a git repo
+    let temp_dir = TempDir::new().unwrap();
+
+    std::fs::write(temp_dir.path().join(".gitignore"), "build/\n").unwrap();
+    std::fs::write(temp_dir.path().join("main.rs"), "").unwrap();
+
+    let build_dir = temp_dir.path().join("build");
+    std::fs::create_dir(&build_dir).unwrap();
+    std::fs::write(build_dir.join("output.js"), "").unwrap();
+
+    // Use DirectoryScanner with gitignore support directly
+    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
+
+    // Should respect .gitignore
+    assert!(
+        !result
+            .files
+            .iter()
+            .any(|f| f.to_string_lossy().contains("build"))
+    );
+}
