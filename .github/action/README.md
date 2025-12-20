@@ -114,3 +114,142 @@ jobs:
     echo "Passed: ${{ steps.sloc-guard.outputs.passed }}"
     echo "Failed: ${{ steps.sloc-guard.outputs.failed }}"
 ```
+
+## Docker Image
+
+A lightweight Docker image (~10MB) is available for use in any CI/CD platform.
+
+```bash
+docker pull ghcr.io/<owner>/sloc-guard:latest
+```
+
+**Supported platforms:** linux/amd64, linux/arm64
+
+### Docker CLI Usage
+
+```bash
+# Check current directory
+docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard check .
+
+# With custom config
+docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard check --config sloc-guard.toml src
+
+# Generate SARIF output
+docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard check --format sarif src > sloc-guard.sarif
+
+# Get statistics
+docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard stats src
+```
+
+### GitLab CI
+
+```yaml
+sloc-guard:
+  image: ghcr.io/<owner>/sloc-guard:latest
+  stage: lint
+  script:
+    - sloc-guard check src
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+```
+
+**With SARIF artifact:**
+
+```yaml
+sloc-guard:
+  image: ghcr.io/<owner>/sloc-guard:latest
+  stage: lint
+  script:
+    - sloc-guard check --format sarif src > sloc-guard.sarif
+  artifacts:
+    reports:
+      sast: sloc-guard.sarif
+```
+
+### Jenkins
+
+**Declarative Pipeline:**
+
+```groovy
+pipeline {
+    agent {
+        docker {
+            image 'ghcr.io/<owner>/sloc-guard:latest'
+        }
+    }
+    stages {
+        stage('SLOC Check') {
+            steps {
+                sh 'sloc-guard check src'
+            }
+        }
+    }
+}
+```
+
+**Scripted Pipeline:**
+
+```groovy
+node {
+    stage('SLOC Check') {
+        docker.image('ghcr.io/<owner>/sloc-guard:latest').inside {
+            sh 'sloc-guard check src'
+        }
+    }
+}
+```
+
+### Azure Pipelines
+
+```yaml
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+container: ghcr.io/<owner>/sloc-guard:latest
+
+steps:
+  - checkout: self
+
+  - script: sloc-guard check src
+    displayName: 'Run sloc-guard'
+```
+
+**With artifact publishing:**
+
+```yaml
+steps:
+  - checkout: self
+
+  - script: sloc-guard check --format sarif src > $(Build.ArtifactStagingDirectory)/sloc-guard.sarif
+    displayName: 'Run sloc-guard'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathToPublish: '$(Build.ArtifactStagingDirectory)/sloc-guard.sarif'
+      artifactName: 'CodeAnalysisLogs'
+```
+
+### CircleCI
+
+```yaml
+version: 2.1
+
+jobs:
+  sloc-guard:
+    docker:
+      - image: ghcr.io/<owner>/sloc-guard:latest
+    steps:
+      - checkout
+      - run:
+          name: Check SLOC limits
+          command: sloc-guard check src
+
+workflows:
+  main:
+    jobs:
+      - sloc-guard
+```
