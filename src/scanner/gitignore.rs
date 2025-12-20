@@ -80,7 +80,9 @@ impl<F: FileFilter> GitAwareScanner<F> {
         let mut delegate = Collector::new(&prefix, &self.filter);
 
         // Convert prefix to BStr for pattern matching
-        let prefix_str = gix::bstr::BString::from(prefix.to_string_lossy().as_bytes());
+        // Normalize path separators to forward slashes for git pathspecs
+        let prefix_string = prefix.to_string_lossy().replace('\\', "/");
+        let prefix_str = gix::bstr::BString::from(prefix_string.as_bytes());
         let patterns: &[&BStr] = if prefix_str.is_empty() {
             &[]
         } else {
@@ -151,7 +153,10 @@ impl<F: FileFilter> GitAwareScanner<F> {
         let mut delegate =
             StructureAwareCollector::new(&prefix, &self.filter, structure_config, &workdir_abs);
 
-        let prefix_str = gix::bstr::BString::from(prefix.to_string_lossy().as_bytes());
+        // Convert prefix to BStr for pattern matching
+        // Normalize path separators to forward slashes for git pathspecs
+        let prefix_string = prefix.to_string_lossy().replace('\\', "/");
+        let prefix_str = gix::bstr::BString::from(prefix_string.as_bytes());
         let patterns: &[&BStr] = if prefix_str.is_empty() {
             &[]
         } else {

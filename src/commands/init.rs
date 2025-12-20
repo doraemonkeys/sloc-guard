@@ -20,6 +20,11 @@ pub fn run_init(args: &crate::cli::InitArgs) -> i32 {
 /// # Errors
 /// Returns an error if the file already exists (without --force) or cannot be written.
 pub(crate) fn run_init_impl(args: &crate::cli::InitArgs) -> Result<()> {
+    let cwd = std::env::current_dir()?;
+    run_init_with_cwd(args, &cwd)
+}
+
+pub(crate) fn run_init_with_cwd(args: &crate::cli::InitArgs, cwd: &std::path::Path) -> Result<()> {
     let output_path = &args.output;
 
     if output_path.exists() && !args.force {
@@ -30,8 +35,7 @@ pub(crate) fn run_init_impl(args: &crate::cli::InitArgs) -> Result<()> {
     }
 
     let template = if args.detect {
-        let cwd = std::env::current_dir()?;
-        detect::generate_detected_config_from_dir(&cwd)?
+        detect::generate_detected_config_from_dir(cwd)?
     } else {
         generate_config_template()
     };

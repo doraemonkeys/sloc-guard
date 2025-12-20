@@ -1,7 +1,7 @@
 use crate::cli::InitArgs;
 use tempfile::TempDir;
 
-use super::{generate_config_template, run_init, run_init_impl};
+use super::{generate_config_template, run_init, run_init_impl, run_init_with_cwd};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 #[test]
@@ -155,12 +155,13 @@ fn run_init_returns_error_exit_code_when_file_exists() {
 fn run_init_with_detect_creates_rust_config() {
     let temp_dir = TempDir::new().unwrap();
 
-    std::fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+    std::fs::write(
+        temp_dir.path().join("Cargo.toml"),
+        "[package]\nname = \"test\"",
+    )
+    .unwrap();
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");
-
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
 
     let args = InitArgs {
         output: config_path.clone(),
@@ -168,8 +169,7 @@ fn run_init_with_detect_creates_rust_config() {
         detect: true,
     };
 
-    let result = run_init_impl(&args);
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = run_init_with_cwd(&args, temp_dir.path());
 
     assert!(result.is_ok());
     assert!(config_path.exists());
@@ -185,17 +185,13 @@ fn run_init_with_detect_handles_unknown_project() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join(".sloc-guard.toml");
 
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(temp_dir.path()).unwrap();
-
     let args = InitArgs {
         output: config_path.clone(),
         force: false,
         detect: true,
     };
 
-    let result = run_init_impl(&args);
-    std::env::set_current_dir(original_dir).unwrap();
+    let result = run_init_with_cwd(&args, temp_dir.path());
 
     assert!(result.is_ok());
     assert!(config_path.exists());
