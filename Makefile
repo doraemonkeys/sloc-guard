@@ -1,4 +1,4 @@
-.PHONY: ci ci-verbose clippy tarpaulin sloc sloc-strict clean_tmp test
+.PHONY: ci verify clippy tarpaulin sloc sloc-strict clean_tmp test
 
 SHELL := /bin/bash
 .SHELLFLAGS := -o pipefail -c
@@ -12,7 +12,7 @@ ci:
 	@TEMP="$$(pwd -W)/.tmp" TMP="$$(pwd -W)/.tmp" cargo run -q -- check src 
 
 # 正常模式
-ci-verbose: tarpaulin clippy sloc
+verify: tarpaulin clippy sloc
 
 clippy:
 	cargo clippy --all-targets --all-features -- -D warnings
