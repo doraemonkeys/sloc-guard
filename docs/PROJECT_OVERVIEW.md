@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `explain` commands |
 | `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache) |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -27,7 +27,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `commands/*` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
+| `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `TrendHistory` - historical stats with delta computation |
 | `main` | CLI parsing, command dispatch to `commands/*` |
@@ -164,12 +164,6 @@ CLI args → load_config() → [if extends] resolve chain (local/remote/preset:*
 → [if --group-by] language/directory breakdown | [if --top N] top files
 → [if --trend] TrendHistory delta → save history
 → format (StatsText/Json/Markdown) → output
-```
-
-### baseline-specific (deprecated: use `check --update-baseline` instead)
-
-```
-→ collect Failed files → compute_file_hash() → Baseline::save()
 ```
 
 ### config validate/show

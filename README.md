@@ -30,7 +30,6 @@ sloc-guard stats
 | `init` | Generate a default configuration file |
 | `config validate` | Validate configuration file syntax |
 | `config show` | Display the effective configuration |
-| `baseline update` | Generate baseline for grandfathering violations |
 | `explain <PATH>` | Show which rules apply to a path |
 
 ## CLI Parameters
