@@ -21,7 +21,7 @@ warn_threshold = 0.8
 # warn_threshold = 0.9
 
 [structure]
-max_files = 50
+max_files = 20
 max_dirs = 20
 warn_threshold = 0.9
 count_exclude = ["*_tests.rs"]
