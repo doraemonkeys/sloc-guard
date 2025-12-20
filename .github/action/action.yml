@@ -75,25 +75,173 @@ runs:
         restore-keys: |
           ${{ runner.os }}-cargo-registry-
 
+    - name: Detect target triple
+      id: detect-target
+      shell: bash
+      run: |
+        case "${{ runner.os }}-${{ runner.arch }}" in
+          Linux-X64)   TARGET="x86_64-unknown-linux-gnu" ;;
+          Linux-ARM64) TARGET="aarch64-unknown-linux-gnu" ;;
+          macOS-X64)   TARGET="x86_64-apple-darwin" ;;
+          macOS-ARM64) TARGET="aarch64-apple-darwin" ;;
+          Windows-X64) TARGET="x86_64-pc-windows-msvc" ;;
+          *)           TARGET="" ;;
+        esac
+        echo "target=$TARGET" >> $GITHUB_OUTPUT
+
     - name: Cache sloc-guard binary
       id: cache-binary
       uses: actions/cache@v4
       with:
         path: ~/.cargo/bin/sloc-guard*
-        key: ${{ runner.os }}-sloc-guard-${{ inputs.version }}
+        key: ${{ runner.os }}-${{ runner.arch }}-sloc-guard-${{ inputs.version }}
 
     - name: Install sloc-guard
       if: steps.cache-binary.outputs.cache-hit != 'true'
       shell: bash
       env:
         ACTION_REPO: ${{ github.action_repository }}
+        TARGET: ${{ steps.detect-target.outputs.target }}
+        VERSION: ${{ inputs.version }}
       run: |
         REPO_URL="https://github.com/${ACTION_REPO}"
-        if [ "${{ inputs.version }}" = "latest" ]; then
-          cargo install --git "$REPO_URL" --locked
-        else
-          cargo install --git "$REPO_URL" --tag "v${{ inputs.version }}" --locked
+        INSTALL_DIR="$HOME/.cargo/bin"
+        mkdir -p "$INSTALL_DIR"
+
+        # Function: download with exponential backoff retry
+        download_with_retry() {
+          local url="$1" output="$2" max_retries=3 delay=2
+          for ((i=1; i<=max_retries; i++)); do
+            echo "Attempt $i: Downloading $url"
+            if curl -fsSL "$url" -o "$output" 2>/dev/null; then
+              return 0
+            fi
+            if [ $i -lt $max_retries ]; then
+              echo "Download failed, retrying in ${delay}s..."
+              sleep $delay
+              delay=$((delay * 2))
+            fi
+          done
+          return 1
+        }
+
+        # Function: verify SHA256 checksum
+        verify_checksum() {
+          local file="$1" sums_file="$2" filename
+          filename=$(basename "$file")
+          expected=$(grep "$filename" "$sums_file" | cut -d' ' -f1)
+          if [ -z "$expected" ]; then
+            echo "Checksum not found for $filename"
+            return 1
+          fi
+          echo "Verifying checksum for $filename..."
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            actual=$(sha256sum "$file" | cut -d' ' -f1)
+            if [ "$expected" = "$actual" ]; then
+              return 0
+            else
+              echo "Checksum mismatch: expected $expected, got $actual"
+              return 1
+            fi
+          else
+            echo "$expected  $file" | sha256sum -c -
+          fi
+        }
+
+        # Function: fallback to cargo install
+        fallback_cargo_install() {
+          echo "Falling back to cargo install..."
+          if [ "$VERSION" = "latest" ]; then
+            cargo install --git "$REPO_URL" --locked
+          else
+            cargo install --git "$REPO_URL" --tag "v$VERSION" --locked
+          fi
+        }
+
+        # Skip binary download if target is unknown
+        if [ -z "$TARGET" ]; then
+          echo "Unknown target: ${{ runner.os }}-${{ runner.arch }}"
+          fallback_cargo_install
+          exit 0
         fi
+
+        # Resolve version for "latest"
+        if [ "$VERSION" = "latest" ]; then
+          echo "Resolving latest version..."
+          LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${ACTION_REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' || echo "")
+          if [ -z "$LATEST_TAG" ]; then
+            echo "Could not determine latest version"
+            fallback_cargo_install
+            exit 0
+          fi
+          VERSION="${LATEST_TAG#v}"
+          echo "Latest version: $VERSION"
+        fi
+
+        # Determine archive extension
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          ARCHIVE_EXT="zip"
+        else
+          ARCHIVE_EXT="tar.gz"
+        fi
+
+        # Construct download URLs
+        BINARY_NAME="sloc-guard-${TARGET}.${ARCHIVE_EXT}"
+        BINARY_URL="${REPO_URL}/releases/download/v${VERSION}/${BINARY_NAME}"
+        SUMS_URL="${REPO_URL}/releases/download/v${VERSION}/SHA256SUMS"
+
+        # Create temp directory
+        TEMP_DIR=$(mktemp -d)
+        trap "rm -rf '$TEMP_DIR'" EXIT
+
+        # Download binary archive
+        ARCHIVE_PATH="$TEMP_DIR/$BINARY_NAME"
+        if ! download_with_retry "$BINARY_URL" "$ARCHIVE_PATH"; then
+          echo "Binary download failed"
+          fallback_cargo_install
+          exit 0
+        fi
+
+        # Download checksums
+        SUMS_PATH="$TEMP_DIR/SHA256SUMS"
+        if ! download_with_retry "$SUMS_URL" "$SUMS_PATH"; then
+          echo "Checksum file download failed"
+          fallback_cargo_install
+          exit 0
+        fi
+
+        # Verify checksum
+        if ! verify_checksum "$ARCHIVE_PATH" "$SUMS_PATH"; then
+          echo "Checksum verification failed"
+          fallback_cargo_install
+          exit 0
+        fi
+
+        # Extract archive
+        echo "Extracting binary..."
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          unzip -q "$ARCHIVE_PATH" -d "$TEMP_DIR/extracted"
+        else
+          mkdir -p "$TEMP_DIR/extracted"
+          tar -xzf "$ARCHIVE_PATH" -C "$TEMP_DIR/extracted"
+        fi
+
+        # Find and install binary
+        if [ "${{ runner.os }}" = "Windows" ]; then
+          BINARY=$(find "$TEMP_DIR/extracted" -name "sloc-guard.exe" -type f | head -1)
+        else
+          BINARY=$(find "$TEMP_DIR/extracted" -name "sloc-guard" -type f | head -1)
+        fi
+
+        if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
+          echo "Binary not found in archive"
+          fallback_cargo_install
+          exit 0
+        fi
+
+        cp "$BINARY" "$INSTALL_DIR/"
+        chmod +x "$INSTALL_DIR/sloc-guard"* 2>/dev/null || true
+        echo "Successfully installed sloc-guard from pre-built binary"
 
     - name: Generate cache key
       id: cache-key

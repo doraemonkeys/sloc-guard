@@ -36,6 +36,19 @@ Enforce source lines of code limits and directory structure constraints in your 
 
 ## Features
 
+### Fast Binary Downloads
+
+The action downloads pre-built binaries from GitHub Releases when available, significantly reducing installation time compared to compiling from source.
+
+**Supported platforms:**
+- Linux (x86_64, ARM64)
+- macOS (x86_64, ARM64)
+- Windows (x86_64)
+
+**Security:** All binaries are verified using SHA256 checksums before installation.
+
+**Fallback:** If pre-built binaries are unavailable or checksum verification fails, the action automatically falls back to `cargo install`.
+
 ### Job Summary
 
 The action automatically generates a Job Summary with check results that appears in the GitHub Actions workflow run page. The summary includes:
