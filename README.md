@@ -117,6 +117,130 @@ max_files = 30
 2. `[[structure.rules]]` - glob pattern (last match wins)
 3. `[structure]` defaults
 
+## GitHub Actions
+
+Use sloc-guard in GitHub Actions workflows with built-in caching, problem matchers, and SARIF output.
+
+### Basic Usage
+
+```yaml
+name: SLOC Check
+on: [push, pull_request]
+
+jobs:
+  sloc-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: doraemonkeys/sloc-guard@v0.1.0
+        with:
+          paths: src
+```
+
+### SARIF Output and Security Tab Integration
+
+Generate SARIF reports and upload to GitHub's Security tab for inline annotations:
+
+```yaml
+name: SLOC Check with Security Integration
+on: [push, pull_request]
+
+permissions:
+  security-events: write  # Required for SARIF upload
+
+jobs:
+  sloc-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run sloc-guard
+        id: sloc
+        uses: doraemonkeys/sloc-guard@v0.1.0
+        with:
+          sarif-output: sloc-guard.sarif
+          baseline: .sloc-guard-baseline.json
+        continue-on-error: true  # Allow SARIF upload even on failure
+
+      - name: Upload SARIF to Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.sloc.outputs.sarif-file }}
+          category: sloc-guard
+```
+
+### Action Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `paths` | Paths to check (space-separated) | `.` |
+| `config-path` | Path to config file | `sloc-guard.toml` |
+| `fail-on-warning` | Treat warnings as failures | `false` |
+| `version` | sloc-guard version to install | `latest` |
+| `cache` | Enable result caching | `true` |
+| `sarif-output` | Path for SARIF output file | _(disabled)_ |
+| `baseline` | Path to baseline file | _(disabled)_ |
+| `diff` | Only check files changed since ref | _(disabled)_ |
+
+### Action Outputs
+
+| Output | Description |
+|--------|-------------|
+| `total-files` | Total number of files checked |
+| `passed` | Number of files that passed |
+| `failed` | Number of files that failed |
+| `warnings` | Number of files with warnings |
+| `grandfathered` | Number of grandfathered violations |
+| `sarif-file` | Path to generated SARIF file |
+
+### PR-Only Checks with Diff Mode
+
+Check only changed files in pull requests:
+
+```yaml
+jobs:
+  sloc-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for diff
+
+      - uses: doraemonkeys/sloc-guard@v0.1.0
+        with:
+          diff: origin/${{ github.base_ref }}
+```
+
+## Docker
+
+sloc-guard is available as a lightweight (~10MB) Docker image:
+
+```bash
+# Pull from GitHub Container Registry
+docker pull ghcr.io/doraemonkeys/sloc-guard:latest
+
+# Run check
+docker run --rm -v $(pwd):/workspace ghcr.io/doraemonkeys/sloc-guard check /workspace
+```
+
+### CI Platform Examples
+
+**GitLab CI:**
+```yaml
+sloc-guard:
+  image: ghcr.io/doraemonkeys/sloc-guard:latest
+  script:
+    - sloc-guard check .
+```
+
+**Azure Pipelines:**
+```yaml
+- script: |
+    docker run --rm -v $(Build.SourcesDirectory):/workspace \
+      ghcr.io/doraemonkeys/sloc-guard check /workspace
+  displayName: 'SLOC Check'
+```
+
 ## Pre-commit Hook
 
 sloc-guard integrates with the [pre-commit](https://pre-commit.com/) framework for automatic SLOC checking on every commit.
