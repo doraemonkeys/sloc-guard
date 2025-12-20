@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use rayon::prelude::*;
@@ -6,8 +7,9 @@ use rayon::prelude::*;
 use crate::analyzer::generate_split_suggestions;
 use crate::baseline::{Baseline, StructureViolationType, compute_file_hash};
 use crate::cache::{Cache, compute_config_hash};
-use crate::checker::{CheckResult, Checker, StructureViolation, ThresholdChecker, ViolationType};
+use crate::checker::{CheckResult, Checker, DirStats, StructureViolation, ThresholdChecker, ViolationType};
 use crate::cli::{BaselineUpdateMode, CheckArgs, Cli};
+use crate::config::{ContentOverride, StructureOverride};
 use crate::counter::LineStats;
 use crate::git::{ChangedFiles, GitDiff};
 use crate::language::LanguageRegistry;
@@ -101,7 +103,15 @@ pub(crate) fn run_check_with_context(
             .scanner
             .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
 
-        // 2.1 Filter by git diff if --diff or --staged is specified
+        // 2.1 Validate override paths against scanned files/directories
+        validate_override_paths(
+            &config.content.overrides,
+            &config.structure.overrides,
+            &scan_result.files,
+            &scan_result.dir_stats,
+        )?;
+
+        // 2.2 Filter by git diff if --diff or --staged is specified
         let files = filter_by_git_diff(scan_result.files.clone(), args.diff.as_deref(), args.staged)?;
         (files, Some(scan_result), false)
     } else {
@@ -552,6 +562,76 @@ pub(crate) fn format_output(
             .with_suggestions(show_suggestions)
             .format(results),
     }
+}
+
+/// Validate that override paths are correctly configured.
+///
+/// - `ContentOverride` paths must point to files, not directories
+/// - `StructureOverride` paths must point to directories, not files
+///
+/// Returns an error if any override path is misconfigured.
+pub(crate) fn validate_override_paths(
+    content_overrides: &[ContentOverride],
+    structure_overrides: &[StructureOverride],
+    files: &[PathBuf],
+    directories: &HashMap<PathBuf, DirStats>,
+) -> crate::Result<()> {
+    // Check ContentOverrides don't match directories
+    for (i, ovr) in content_overrides.iter().enumerate() {
+        for dir_path in directories.keys() {
+            if path_matches_override(dir_path, &ovr.path) {
+                return Err(crate::SlocGuardError::Config(format!(
+                    "content.override[{}] path '{}' matches directory '{}', \
+                     but content overrides only apply to files. \
+                     Use [[structure.override]] for directory overrides.",
+                    i,
+                    ovr.path,
+                    dir_path.display()
+                )));
+            }
+        }
+    }
+
+    // Check StructureOverrides don't match files
+    for (i, ovr) in structure_overrides.iter().enumerate() {
+        for file_path in files {
+            if path_matches_override(file_path, &ovr.path) {
+                return Err(crate::SlocGuardError::Config(format!(
+                    "structure.override[{}] path '{}' matches file '{}', \
+                     but structure overrides only apply to directories. \
+                     Use [[content.override]] for file overrides.",
+                    i,
+                    ovr.path,
+                    file_path.display()
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if a path matches an override path using suffix matching.
+/// Replicates the matching logic from `ThresholdChecker` and `StructureChecker`.
+fn path_matches_override(actual_path: &Path, override_path: &str) -> bool {
+    let override_components: Vec<&str> = override_path
+        .split(['/', '\\'])
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let path_components: Vec<_> = actual_path.components().collect();
+
+    if override_components.is_empty() || override_components.len() > path_components.len() {
+        return false;
+    }
+
+    path_components
+        .iter()
+        .rev()
+        .zip(override_components.iter().rev())
+        .all(|(path_comp, override_comp)| {
+            path_comp.as_os_str().to_string_lossy() == *override_comp
+        })
 }
 
 #[cfg(test)]

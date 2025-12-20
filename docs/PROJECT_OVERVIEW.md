@@ -145,6 +145,7 @@ CLI args → load_config() → [if extends] resolve chain (local/remote/preset:*
 → [if --files] Pure incremental mode: skip directory scan, use provided files, disable structure checks
    [else] ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, allowlist_violations }
    (single WalkDir traversal collects both file list AND directory statistics)
+→ validate_override_paths(): error if ContentOverride matches directory or StructureOverride matches file
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → process_file_with_cache(ctx.file_reader) → ThresholdChecker::check() → CheckResult (parallel)
