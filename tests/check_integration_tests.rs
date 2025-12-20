@@ -344,9 +344,9 @@ fn check_structure_cli_override() {
 }
 
 #[test]
-fn check_structure_whitelist_violation() {
+fn check_structure_allowlist_violation() {
     let fixture = TestFixture::new();
-    // Config with whitelist rule: only .rs files allowed in src
+    // Config with allowlist rule: only .rs files allowed in src
     fixture.create_config(
         r#"
 version = "2"

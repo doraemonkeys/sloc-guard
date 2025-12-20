@@ -25,7 +25,7 @@ pub enum ViolationType {
     FileCount,
     DirCount,
     MaxDepth,
-    /// File type not allowed by whitelist (`allow_extensions`/`allow_patterns`).
+    /// File type not allowed by allowlist (`allow_extensions`/`allow_patterns`).
     DisallowedFile,
 }
 

@@ -32,7 +32,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, Binary Download Optimization, SARIF Guidance.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
-- **Phase 11 (Partial)**: 11.6 Config Presets.
+- **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
 
 ---
 
@@ -131,11 +131,11 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | Priority | Tasks |
 |----------|-------|
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
-| ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
+| ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 allowlist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
 | ~~**4. UX Improvements**~~ | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
 | ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
-| **6. Cleanup** | 11.8 Terminology Modernization |
+| ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **8. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **9. Visualization** | 7.1-7.2 HTML Charts/Trends |

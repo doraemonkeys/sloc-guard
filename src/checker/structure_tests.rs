@@ -1134,7 +1134,7 @@ fn override_with_max_depth_only() {
 }
 
 #[test]
-fn checker_enabled_with_whitelist_rule() {
+fn checker_enabled_with_allowlist_rule() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             pattern: "src/**".to_string(),

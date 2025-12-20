@@ -13,7 +13,7 @@ use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
-use crate::scanner::{CompositeScanner, FileScanner, StructureScanConfig, WhitelistRuleBuilder};
+use crate::scanner::{CompositeScanner, FileScanner, StructureScanConfig, AllowlistRuleBuilder};
 
 /// Default cache file path
 pub const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
@@ -289,23 +289,23 @@ impl CheckContext {
             return Ok(None);
         }
 
-        // Build whitelist rules from structure.rules
-        let mut whitelist_rules = Vec::new();
+        // Build allowlist rules from structure.rules
+        let mut allowlist_rules = Vec::new();
         for rule in &config.structure.rules {
-            // Only include rules that have whitelists
+            // Only include rules that have allowlists
             if !rule.allow_extensions.is_empty() || !rule.allow_patterns.is_empty() {
-                let whitelist_rule = WhitelistRuleBuilder::new(rule.pattern.clone())
+                let allowlist_rule = AllowlistRuleBuilder::new(rule.pattern.clone())
                     .with_extensions(rule.allow_extensions.clone())
                     .with_patterns(rule.allow_patterns.clone())
                     .build()?;
-                whitelist_rules.push(whitelist_rule);
+                allowlist_rules.push(allowlist_rule);
             }
         }
 
         let structure_scan_config = StructureScanConfig::new(
             &config.structure.count_exclude,
             exclude_patterns,
-            whitelist_rules,
+            allowlist_rules,
         )?;
 
         Ok(Some(structure_scan_config))

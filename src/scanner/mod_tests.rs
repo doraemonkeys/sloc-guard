@@ -174,7 +174,7 @@ fn composite_scanner_scan_all_with_gitignore_true() {
 #[test]
 fn structure_scan_config_new_creates_config() {
     let config = StructureScanConfig::new(&[], &[], Vec::new()).unwrap();
-    assert!(config.whitelist_rules.is_empty());
+    assert!(config.allowlist_rules.is_empty());
 }
 
 #[test]
@@ -206,12 +206,12 @@ fn structure_scan_config_invalid_pattern_returns_error() {
 }
 
 // =============================================================================
-// WhitelistRule Tests
+// AllowlistRule Tests
 // =============================================================================
 
 #[test]
-fn whitelist_rule_builder_creates_rule() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_builder_creates_rule() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
@@ -220,8 +220,8 @@ fn whitelist_rule_builder_creates_rule() {
 }
 
 #[test]
-fn whitelist_rule_builder_with_patterns() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_builder_with_patterns() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_patterns(vec!["*.config".to_string()])
         .build()
         .unwrap();
@@ -229,8 +229,8 @@ fn whitelist_rule_builder_with_patterns() {
 }
 
 #[test]
-fn whitelist_rule_matches_directory() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_matches_directory() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
@@ -239,8 +239,8 @@ fn whitelist_rule_matches_directory() {
 }
 
 #[test]
-fn whitelist_rule_file_matches_extension() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_file_matches_extension() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string(), ".toml".to_string()])
         .build()
         .unwrap();
@@ -250,8 +250,8 @@ fn whitelist_rule_file_matches_extension() {
 }
 
 #[test]
-fn whitelist_rule_file_matches_pattern() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_file_matches_pattern() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_patterns(vec!["Makefile".to_string()])
         .build()
         .unwrap();
@@ -260,8 +260,8 @@ fn whitelist_rule_file_matches_pattern() {
 }
 
 #[test]
-fn whitelist_rule_invalid_pattern_returns_error() {
-    let result = WhitelistRuleBuilder::new("[invalid".to_string())
+fn allowlist_rule_invalid_pattern_returns_error() {
+    let result = AllowlistRuleBuilder::new("[invalid".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build();
     assert!(result.is_err());
@@ -357,24 +357,24 @@ fn scan_with_structure_respects_count_exclude() {
 }
 
 #[test]
-fn scan_with_structure_detects_whitelist_violations() {
+fn scan_with_structure_detects_allowlist_violations() {
     let temp_dir = TempDir::new().unwrap();
     let src_dir = temp_dir.path().join("src");
     std::fs::create_dir_all(&src_dir).unwrap();
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("config.json"), "{}").unwrap();
 
-    let whitelist_rule = WhitelistRuleBuilder::new("**/src".to_string())
+    let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![whitelist_rule]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
 
-    // config.json should be a whitelist violation
-    assert_eq!(result.whitelist_violations.len(), 1);
-    assert!(result.whitelist_violations[0].path.ends_with("config.json"));
+    // config.json should be an allowlist violation
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(result.allowlist_violations[0].path.ends_with("config.json"));
 }
 
 #[test]
@@ -385,16 +385,16 @@ fn scan_with_structure_no_violation_for_matching_files() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("lib.rs"), "").unwrap();
 
-    let whitelist_rule = WhitelistRuleBuilder::new("**/src".to_string())
+    let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![whitelist_rule]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
 
     // All files are .rs, so no violations
-    assert!(result.whitelist_violations.is_empty());
+    assert!(result.allowlist_violations.is_empty());
 }
 
 #[test]
@@ -444,17 +444,17 @@ fn scan_result_default() {
     let result = ScanResult::default();
     assert!(result.files.is_empty());
     assert!(result.dir_stats.is_empty());
-    assert!(result.whitelist_violations.is_empty());
+    assert!(result.allowlist_violations.is_empty());
 }
 
 #[test]
-fn whitelist_rule_file_no_match_empty_whitelist() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_file_no_match_empty_allowlist() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![])
         .with_patterns(vec![])
         .build()
         .unwrap();
-    // Empty whitelist matches nothing
+    // Empty allowlist matches nothing
     assert!(!rule.file_matches(Path::new("src/main.rs")));
 }
 
@@ -473,15 +473,15 @@ fn structure_scan_config_is_count_excluded() {
 }
 
 #[test]
-fn structure_scan_config_find_matching_whitelist_rule() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn structure_scan_config_find_matching_allowlist_rule() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
     let config = StructureScanConfig::new(&[], &[], vec![rule]).unwrap();
 
-    assert!(config.whitelist_rules.iter().any(|r| r.matches_directory(Path::new("src/lib"))));
-    assert!(!config.whitelist_rules.iter().any(|r| r.matches_directory(Path::new("tests/lib"))));
+    assert!(config.allowlist_rules.iter().any(|r| r.matches_directory(Path::new("src/lib"))));
+    assert!(!config.allowlist_rules.iter().any(|r| r.matches_directory(Path::new("tests/lib"))));
 }
 
 #[test]
@@ -521,8 +521,8 @@ fn composite_scanner_scan_all_with_structure_with_gitignore() {
 }
 
 #[test]
-fn whitelist_rule_builder_invalid_allow_pattern() {
-    let result = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_builder_invalid_allow_pattern() {
+    let result = AllowlistRuleBuilder::new("src/**".to_string())
         .with_patterns(vec!["[invalid".to_string()])
         .build();
     assert!(result.is_err());
@@ -547,8 +547,8 @@ fn structure_scan_config_extract_dir_names_windows_paths() {
 }
 
 #[test]
-fn whitelist_rule_empty_extension_list() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_empty_extension_list() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![])
         .build()
         .unwrap();
@@ -596,8 +596,8 @@ fn structure_scan_config_is_scanner_excluded_by_dir_name() {
 }
 
 #[test]
-fn whitelist_rule_matches_pattern() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_matches_pattern() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_patterns(vec!["Makefile".to_string(), "*.config".to_string()])
         .build()
         .unwrap();
@@ -661,8 +661,8 @@ fn structure_scan_config_empty_patterns_match_nothing() {
 }
 
 #[test]
-fn whitelist_rule_file_matches_by_full_path() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_file_matches_by_full_path() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_patterns(vec!["**/special.txt".to_string()])
         .build()
         .unwrap();
@@ -743,8 +743,8 @@ fn scan_all_with_structure_merges_results() {
 }
 
 #[test]
-fn whitelist_rule_no_extension_match_when_file_has_no_extension() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_no_extension_match_when_file_has_no_extension() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
@@ -810,8 +810,8 @@ fn scan_with_structure_with_scanner_exclude_skips_entirely() {
 }
 
 #[test]
-fn whitelist_rule_matches_directory_partial() {
-    let rule = WhitelistRuleBuilder::new("**/src/**".to_string())
+fn allowlist_rule_matches_directory_partial() {
+    let rule = AllowlistRuleBuilder::new("**/src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
@@ -822,38 +822,38 @@ fn whitelist_rule_matches_directory_partial() {
 }
 
 #[test]
-fn find_matching_whitelist_rule_returns_first_match() {
-    let rule1 = WhitelistRuleBuilder::new("**/src/**".to_string())
+fn find_matching_allowlist_rule_returns_first_match() {
+    let rule1 = AllowlistRuleBuilder::new("**/src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let rule2 = WhitelistRuleBuilder::new("**/tests/**".to_string())
+    let rule2 = AllowlistRuleBuilder::new("**/tests/**".to_string())
         .with_extensions(vec![".rs".to_string(), ".txt".to_string()])
         .build()
         .unwrap();
 
     let config = StructureScanConfig::new(&[], &[], vec![rule1, rule2]).unwrap();
 
-    let src_rule = config.find_matching_whitelist_rule(Path::new("project/src/lib"));
+    let src_rule = config.find_matching_allowlist_rule(Path::new("project/src/lib"));
     assert!(src_rule.is_some());
     assert_eq!(src_rule.unwrap().pattern, "**/src/**");
 
-    let test_rule = config.find_matching_whitelist_rule(Path::new("project/tests/unit"));
+    let test_rule = config.find_matching_allowlist_rule(Path::new("project/tests/unit"));
     assert!(test_rule.is_some());
     assert_eq!(test_rule.unwrap().pattern, "**/tests/**");
 
-    let none_rule = config.find_matching_whitelist_rule(Path::new("project/docs"));
+    let none_rule = config.find_matching_allowlist_rule(Path::new("project/docs"));
     assert!(none_rule.is_none());
 }
 
 #[test]
-fn scan_with_structure_whitelist_violation_includes_rule_pattern() {
+fn scan_with_structure_allowlist_violation_includes_rule_pattern() {
     let temp_dir = TempDir::new().unwrap();
     let src_dir = temp_dir.path().join("src");
     std::fs::create_dir(&src_dir).unwrap();
     std::fs::write(src_dir.join("config.json"), "{}").unwrap();
 
-    let rule = WhitelistRuleBuilder::new("**/src".to_string())
+    let rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
@@ -861,8 +861,8 @@ fn scan_with_structure_whitelist_violation_includes_rule_pattern() {
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
 
-    assert_eq!(result.whitelist_violations.len(), 1);
-    assert_eq!(result.whitelist_violations[0].triggering_rule_pattern, Some("**/src".to_string()));
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert_eq!(result.allowlist_violations[0].triggering_rule_pattern, Some("**/src".to_string()));
 }
 
 #[test]
@@ -884,8 +884,8 @@ fn scan_with_structure_dir_excluded_by_name_match() {
 }
 
 #[test]
-fn whitelist_rule_extension_match_with_dot() {
-    let rule = WhitelistRuleBuilder::new("src/**".to_string())
+fn allowlist_rule_extension_match_with_dot() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string(), ".toml".to_string()])
         .build()
         .unwrap();
@@ -976,14 +976,14 @@ fn composite_scanner_scan_all_structure_no_gitignore_multiple_paths() {
 
 #[test]
 fn structure_scan_config_find_no_matching_rule() {
-    let rule = WhitelistRuleBuilder::new("**/src/**".to_string())
+    let rule = AllowlistRuleBuilder::new("**/src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
     let config = StructureScanConfig::new(&[], &[], vec![rule]).unwrap();
 
     // Path that doesn't match any rule
-    let result = config.find_matching_whitelist_rule(Path::new("docs/readme"));
+    let result = config.find_matching_allowlist_rule(Path::new("docs/readme"));
     assert!(result.is_none());
 }
 

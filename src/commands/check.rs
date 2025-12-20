@@ -152,13 +152,13 @@ pub(crate) fn run_check_with_context(
             .collect();
         results.extend(structure_results);
 
-        // Add whitelist violations collected during scan
-        let whitelist_results: Vec<_> = scan_result
-            .whitelist_violations
+        // Add allowlist violations collected during scan
+        let allowlist_results: Vec<_> = scan_result
+            .allowlist_violations
             .iter()
             .map(structure_violation_to_check_result)
             .collect();
-        results.extend(whitelist_results);
+        results.extend(allowlist_results);
     }
 
     // 6. Save cache if not disabled

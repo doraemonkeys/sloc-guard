@@ -388,13 +388,13 @@ pub struct StructureRule {
     #[serde(default)]
     pub warn_threshold: Option<f64>,
 
-    /// Whitelist of allowed file extensions (with leading dot, e.g., ".rs", ".go").
+    /// Allowlist of allowed file extensions (with leading dot, e.g., ".rs", ".go").
     /// Files NOT matching these extensions are violations.
     /// Combined with `allow_patterns` using OR logic.
     #[serde(default)]
     pub allow_extensions: Vec<String>,
 
-    /// Whitelist of allowed file patterns (glob patterns, e.g., "*.rs", "mod.*").
+    /// Allowlist of allowed file patterns (glob patterns, e.g., "*.rs", "mod.*").
     /// Files NOT matching these patterns are violations.
     /// Combined with `allow_extensions` using OR logic.
     #[serde(default)]

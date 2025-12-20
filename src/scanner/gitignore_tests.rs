@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use super::*;
-use crate::scanner::{StructureScanConfig, WhitelistRuleBuilder};
+use crate::scanner::{StructureScanConfig, AllowlistRuleBuilder};
 use tempfile::TempDir;
 
 struct AcceptAllFilter;
@@ -294,7 +294,7 @@ fn gitaware_scanner_scan_with_structure_respects_gitignore() {
 }
 
 #[test]
-fn gitaware_scanner_scan_with_structure_with_whitelist() {
+fn gitaware_scanner_scan_with_structure_with_allowlist() {
     let temp_dir = TempDir::new().unwrap();
     init_git_repo(temp_dir.path());
 
@@ -303,21 +303,21 @@ fn gitaware_scanner_scan_with_structure_with_whitelist() {
     std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
     std::fs::write(src_dir.join("config.json"), "{}").unwrap();
 
-    let whitelist_rule = WhitelistRuleBuilder::new("**/src".to_string())
+    let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![whitelist_rule]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule]).unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
 
-    // config.json should be a whitelist violation
-    assert!(!result.whitelist_violations.is_empty());
+    // config.json should be an allowlist violation
+    assert!(!result.allowlist_violations.is_empty());
     assert!(
         result
-            .whitelist_violations
+            .allowlist_violations
             .iter()
             .any(|v| v.path.to_string_lossy().contains("config.json"))
     );
@@ -563,16 +563,16 @@ fn gitaware_scanner_scan_with_structure_no_violations_when_files_match() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("lib.rs"), "").unwrap();
 
-    let whitelist_rule = WhitelistRuleBuilder::new("**/src".to_string())
+    let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![whitelist_rule]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule]).unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
 
     // All files are .rs, so no violations
-    assert!(result.whitelist_violations.is_empty());
+    assert!(result.allowlist_violations.is_empty());
 }

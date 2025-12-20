@@ -179,8 +179,8 @@ impl<F: FileFilter> GitAwareScanner<F> {
             .map(|(k, v)| (workdir_abs.join(k), v))
             .collect();
 
-        let whitelist_violations = delegate
-            .whitelist_violations
+        let allowlist_violations = delegate
+            .allowlist_violations
             .into_iter()
             .map(|mut v| {
                 v.path = workdir_abs.join(&v.path);
@@ -191,7 +191,7 @@ impl<F: FileFilter> GitAwareScanner<F> {
         Ok(ScanResult {
             files,
             dir_stats,
-            whitelist_violations,
+            allowlist_violations,
         })
     }
 }
@@ -256,7 +256,7 @@ struct StructureAwareCollector<'a, F: FileFilter> {
     workdir: &'a Path,
     files: Vec<PathBuf>,
     dir_stats: HashMap<PathBuf, DirStats>,
-    whitelist_violations: Vec<StructureViolation>,
+    allowlist_violations: Vec<StructureViolation>,
     /// Track directories we've already counted to avoid double-counting.
     /// gix dirwalk only emits files, so we infer directories from file paths.
     seen_dirs: std::collections::HashSet<PathBuf>,
@@ -276,7 +276,7 @@ impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
             workdir,
             files: Vec::new(),
             dir_stats: HashMap::new(),
-            whitelist_violations: Vec::new(),
+            allowlist_violations: Vec::new(),
             seen_dirs: std::collections::HashSet::new(),
         }
     }
@@ -392,14 +392,14 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                 // gix dirwalk only emits files, so we must count subdirectories this way
                 self.register_directory_chain(parent);
 
-                // Check whitelist violations
+                // Check allowlist violations
                 if let Some(cfg) = self.structure_config {
-                    // Convert to absolute path for whitelist matching
+                    // Convert to absolute path for allowlist matching
                     let abs_parent = self.workdir.join(parent);
-                    if let Some(rule) = cfg.find_matching_whitelist_rule(&abs_parent)
+                    if let Some(rule) = cfg.find_matching_allowlist_rule(&abs_parent)
                         && !rule.file_matches(&self.workdir.join(path_ref))
                     {
-                        self.whitelist_violations
+                        self.allowlist_violations
                             .push(StructureViolation::disallowed_file(
                                 path.clone().into_owned(),
                                 rule.pattern.clone(),

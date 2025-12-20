@@ -13,24 +13,24 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ## Module Map
 
-| Module | File(s) | Purpose |
-|--------|---------|---------|
-| `cli` | `cli.rs` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
-| `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache) |
-| `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
-| `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
-| `scanner/*` | `scanner/*.rs` | `FileScanner` trait (`scan()`, `scan_with_structure()`), `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback), `ScanResult`, `StructureScanConfig` |
-| `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
-| `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
-| `checker/explain` | `checker/explain.rs` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
-| `git/diff` | `git/diff.rs` | `GitDiff` - gix-based changed files detection (`--diff` mode) and staged files detection (`--staged` mode) |
-| `baseline`/`cache` | `*/types.rs` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
-| `output/*` | `output/*.rs` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
-| `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
-| `analyzer` | `analyzer/*.rs` | `FunctionParser` - multi-language split suggestions (--suggest) |
-| `stats` | `stats/trend.rs` | `TrendHistory` - historical stats with delta computation |
-| `main` | `main.rs` | CLI parsing, command dispatch to `commands/*` |
+| Module | Purpose |
+|--------|---------|
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
+| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache) |
+| `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
+| `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
+| `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`), `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback), `ScanResult`, `StructureScanConfig` |
+| `checker/threshold` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
+| `checker/structure` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
+| `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
+| `git/diff` | `GitDiff` - gix-based changed files detection (`--diff` mode) and staged files detection (`--staged` mode) |
+| `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
+| `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
+| `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
+| `commands/*` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
+| `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
+| `stats` | `TrendHistory` - historical stats with delta computation |
+| `main` | CLI parsing, command dispatch to `commands/*` |
 
 ## Key Types
 
@@ -105,9 +105,9 @@ FunctionParser: Rust, Go, Python, JS/TS, C/C++
 FileReader trait { read(), metadata() }  // IO abstraction for file reading
 RealFileReader  // Production impl using std::fs
 FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }  // IO abstraction for directory traversal
-ScanResult { files, dir_stats, whitelist_violations }  // Unified scan output
-StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, whitelist_rules }  // Config for structure-aware scanning
-WhitelistRule { pattern, allow_extensions, allow_patterns }  // Directory whitelist matching
+ScanResult { files, dir_stats, allowlist_violations }  // Unified scan output
+StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules }  // Config for structure-aware scanning
+AllowlistRule { pattern, allow_extensions, allow_patterns }  // Directory allowlist matching
 CompositeScanner  // Production impl with git/non-git fallback
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
 StatsContext { registry, allowed_extensions }  // from_config() or new()
@@ -143,13 +143,13 @@ CLI args → load_config() → [if extends] resolve chain (local/remote/preset:*
 → CheckContext::from_config(config, warn_threshold, exclude_patterns, use_gitignore)
    → creates injectable context with CompositeScanner + RealFileReader + StructureScanConfig
 → [if --files] Pure incremental mode: skip directory scan, use provided files, disable structure checks
-   [else] ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, whitelist_violations }
+   [else] ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, allowlist_violations }
    (single WalkDir traversal collects both file list AND directory statistics)
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → process_file_with_cache(ctx.file_reader) → ThresholdChecker::check() → CheckResult (parallel)
 → [if !--files] StructureChecker::check(dir_stats) → StructureViolation (uses pre-collected stats, no traversal)
-→ merge whitelist_violations from ScanResult
+→ merge allowlist_violations from ScanResult
 → [if baseline] mark Grandfathered | [if --update-baseline] save violations to baseline
 → [if --suggest] generate_split_suggestions()
 → [if --report-json] ProjectStatistics → StatsJsonFormatter → write to path

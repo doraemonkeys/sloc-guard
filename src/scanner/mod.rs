@@ -21,24 +21,24 @@ pub struct ScanResult {
     pub files: Vec<PathBuf>,
     /// Directory statistics: immediate children counts and depth.
     pub dir_stats: HashMap<PathBuf, DirStats>,
-    /// Whitelist violations detected during scanning.
-    pub whitelist_violations: Vec<StructureViolation>,
+    /// Allowlist violations detected during scanning.
+    pub allowlist_violations: Vec<StructureViolation>,
 }
 
-/// A compiled whitelist rule for checking allowed file types in a directory.
+/// A compiled allowlist rule for checking allowed file types in a directory.
 #[derive(Debug, Clone)]
-pub struct WhitelistRule {
+pub struct AllowlistRule {
     /// Glob pattern matching directories where this rule applies.
     pub pattern: String,
     matcher: globset::GlobMatcher,
     /// Validated extensions (with leading dot, e.g., ".rs").
     pub allow_extensions: Vec<String>,
-    /// Compiled patterns for whitelist matching.
+    /// Compiled patterns for allowlist matching.
     pub allow_patterns: GlobSet,
 }
 
-impl WhitelistRule {
-    /// Check if a file matches this whitelist (extensions OR patterns).
+impl AllowlistRule {
+    /// Check if a file matches this allowlist (extensions OR patterns).
     fn file_matches(&self, file_path: &Path) -> bool {
         // Check extensions first (OR logic)
         if !self.allow_extensions.is_empty()
@@ -74,8 +74,8 @@ pub struct StructureScanConfig {
     pub scanner_exclude: GlobSet,
     /// Directory names extracted from scanner.exclude patterns ending with "/**".
     pub scanner_exclude_dir_names: Vec<String>,
-    /// Whitelist rules from structure.rules with `allow_extensions`/`allow_patterns`.
-    pub whitelist_rules: Vec<WhitelistRule>,
+    /// Allowlist rules from structure.rules with `allow_extensions`/`allow_patterns`.
+    pub allowlist_rules: Vec<AllowlistRule>,
 }
 
 impl StructureScanConfig {
@@ -86,7 +86,7 @@ impl StructureScanConfig {
     pub fn new(
         count_exclude_patterns: &[String],
         scanner_exclude_patterns: &[String],
-        whitelist_rules: Vec<WhitelistRule>,
+        allowlist_rules: Vec<AllowlistRule>,
     ) -> Result<Self> {
         let count_exclude = Self::build_glob_set(count_exclude_patterns)?;
         let scanner_exclude = Self::build_glob_set(scanner_exclude_patterns)?;
@@ -96,7 +96,7 @@ impl StructureScanConfig {
             count_exclude,
             scanner_exclude,
             scanner_exclude_dir_names,
-            whitelist_rules,
+            allowlist_rules,
         })
     }
 
@@ -161,20 +161,20 @@ impl StructureScanConfig {
         self.count_exclude.is_match(file_name) || self.count_exclude.is_match(path)
     }
 
-    /// Find the first whitelist rule matching a directory.
-    fn find_matching_whitelist_rule(&self, dir: &Path) -> Option<&WhitelistRule> {
-        self.whitelist_rules.iter().find(|r| r.matches_directory(dir))
+    /// Find the first allowlist rule matching a directory.
+    fn find_matching_allowlist_rule(&self, dir: &Path) -> Option<&AllowlistRule> {
+        self.allowlist_rules.iter().find(|r| r.matches_directory(dir))
     }
 }
 
-/// Builder for creating `WhitelistRule` instances.
-pub struct WhitelistRuleBuilder {
+/// Builder for creating `AllowlistRule` instances.
+pub struct AllowlistRuleBuilder {
     pattern: String,
     allow_extensions: Vec<String>,
     allow_patterns: Vec<String>,
 }
 
-impl WhitelistRuleBuilder {
+impl AllowlistRuleBuilder {
     #[must_use]
     pub const fn new(pattern: String) -> Self {
         Self {
@@ -196,11 +196,11 @@ impl WhitelistRuleBuilder {
         self
     }
 
-    /// Build the `WhitelistRule`.
+    /// Build the `AllowlistRule`.
     ///
     /// # Errors
     /// Returns an error if any pattern is invalid.
-    pub fn build(self) -> Result<WhitelistRule> {
+    pub fn build(self) -> Result<AllowlistRule> {
         let glob = Glob::new(&self.pattern).map_err(|e| SlocGuardError::InvalidPattern {
             pattern: self.pattern.clone(),
             source: e,
@@ -221,7 +221,7 @@ impl WhitelistRuleBuilder {
                 source: e,
             })?;
 
-        Ok(WhitelistRule {
+        Ok(AllowlistRule {
             pattern: self.pattern,
             matcher: glob.compile_matcher(),
             allow_extensions: self.allow_extensions,
@@ -256,7 +256,7 @@ pub trait FileScanner: Send + Sync {
 
     /// Scan a directory with structure-aware statistics collection.
     ///
-    /// Returns files, directory statistics, and whitelist violations in a single traversal.
+    /// Returns files, directory statistics, and allowlist violations in a single traversal.
     ///
     /// # Errors
     /// Returns an error if the directory cannot be read.
@@ -280,7 +280,7 @@ pub trait FileScanner: Send + Sync {
             let result = self.scan_with_structure(path, structure_config)?;
             combined.files.extend(result.files);
             combined.dir_stats.extend(result.dir_stats);
-            combined.whitelist_violations.extend(result.whitelist_violations);
+            combined.allowlist_violations.extend(result.allowlist_violations);
         }
         Ok(combined)
     }
@@ -352,12 +352,12 @@ impl<F: FileFilter> DirectoryScanner<F> {
                         });
                     parent_stats.file_count += 1;
 
-                    // Check whitelist violations
+                    // Check allowlist violations
                     if let Some(cfg) = structure_config
-                        && let Some(rule) = cfg.find_matching_whitelist_rule(parent)
+                        && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
                         && !rule.file_matches(path)
                     {
-                        result.whitelist_violations.push(StructureViolation::disallowed_file(
+                        result.allowlist_violations.push(StructureViolation::disallowed_file(
                             path.to_path_buf(),
                             rule.pattern.clone(),
                         ));
@@ -515,7 +515,7 @@ impl FileScanner for CompositeScanner {
                     Ok(result) => {
                         combined.files.extend(result.files);
                         combined.dir_stats.extend(result.dir_stats);
-                        combined.whitelist_violations.extend(result.whitelist_violations);
+                        combined.allowlist_violations.extend(result.allowlist_violations);
                     }
                     Err(SlocGuardError::Git(_)) => {
                         // Fallback to non-git scanning for all paths
@@ -555,7 +555,7 @@ impl CompositeScanner {
             let result = scanner.scan_with_structure(path, structure_config)?;
             combined.files.extend(result.files);
             combined.dir_stats.extend(result.dir_stats);
-            combined.whitelist_violations.extend(result.whitelist_violations);
+            combined.allowlist_violations.extend(result.allowlist_violations);
         }
         Ok(combined)
     }
