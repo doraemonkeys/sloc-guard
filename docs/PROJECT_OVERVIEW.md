@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
+| `cli` | `cli.rs` | Clap CLI: `check` (with `--files` for pre-commit), `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
 | `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -141,12 +141,13 @@ CLI args → load_config() → [if extends] resolve chain (local/remote/preset:*
 ```
 → CheckContext::from_config(config, warn_threshold, exclude_patterns, use_gitignore)
    → creates injectable context with CompositeScanner + RealFileReader + StructureScanConfig
-→ ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, whitelist_violations }
+→ [if --files] Pure incremental mode: skip directory scan, use provided files, disable structure checks
+   [else] ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, whitelist_violations }
    (single WalkDir traversal collects both file list AND directory statistics)
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → process_file_with_cache(ctx.file_reader) → ThresholdChecker::check() → CheckResult (parallel)
-→ StructureChecker::check(dir_stats) → StructureViolation (uses pre-collected stats, no traversal)
+→ [if !--files] StructureChecker::check(dir_stats) → StructureViolation (uses pre-collected stats, no traversal)
 → merge whitelist_violations from ScanResult
 → [if baseline] mark Grandfathered | [if --update-baseline] save violations to baseline
 → [if --suggest] generate_split_suggestions()

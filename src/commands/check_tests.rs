@@ -180,6 +180,7 @@ fn apply_cli_overrides_max_lines() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -215,6 +216,7 @@ fn apply_cli_overrides_count_comments() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -250,6 +252,7 @@ fn apply_cli_overrides_count_blank() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     apply_cli_overrides(&mut config, &args);
@@ -283,6 +286,7 @@ fn apply_cli_overrides_warn_threshold() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     apply_cli_overrides(&mut config, &args);

@@ -217,6 +217,12 @@ pub struct CheckArgs {
     /// Write statistics report to JSON file (avoids separate stats run in CI)
     #[arg(long, value_name = "PATH")]
     pub report_json: Option<PathBuf>,
+
+    /// Explicit file list for pre-commit hooks. When provided, skips directory
+    /// scanning and processes only the specified files. Structure checks are
+    /// disabled in this mode. Files are separated by commas or spaces.
+    #[arg(long, value_delimiter = ',', num_args = 1..)]
+    pub files: Vec<PathBuf>,
 }
 
 #[derive(Parser, Debug)]

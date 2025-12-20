@@ -1,0 +1,17 @@
+# Pre-commit hook definition for sloc-guard
+# Users add this to their .pre-commit-config.yaml:
+#   repos:
+#     - repo: https://github.com/doraemonkeys/sloc-guard
+#       rev: v0.1.0  # Pin to specific version
+#       hooks:
+#         - id: sloc-guard
+
+- id: sloc-guard
+  name: sloc-guard
+  description: Check source lines of code limits
+  entry: scripts/install-sloc-guard.sh
+  language: script
+  types: [file]
+  pass_filenames: true
+  require_serial: false
+  verbose: true

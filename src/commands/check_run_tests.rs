@@ -48,6 +48,7 @@ fn run_check_impl_with_valid_directory() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -83,6 +84,7 @@ fn run_check_impl_with_warn_only() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -118,6 +120,7 @@ fn run_check_impl_with_threshold_exceeded() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -156,6 +159,7 @@ fn run_check_impl_with_json_output() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -194,6 +198,7 @@ fn run_check_impl_with_verbose() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Always, 1, true, true);
@@ -228,6 +233,7 @@ fn run_check_impl_with_count_flags() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -262,6 +268,7 @@ fn run_check_impl_with_include_paths() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -296,6 +303,7 @@ fn run_check_impl_strict_mode_fails_on_warnings() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -331,6 +339,7 @@ fn run_check_impl_strict_mode_disabled_warnings_pass() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -366,6 +375,7 @@ fn run_check_impl_warn_only_overrides_strict() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -405,6 +415,7 @@ fn run_check_returns_config_error_on_invalid_config() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
@@ -441,6 +452,7 @@ fn run_check_impl_with_sarif_output() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -482,6 +494,7 @@ fn run_check_impl_with_markdown_output() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, false, true);
@@ -523,6 +536,7 @@ fn run_check_impl_with_report_json_creates_stats_file() {
         max_dirs: None,
         max_depth: None,
         report_json: Some(stats_output.clone()),
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -579,6 +593,7 @@ fn run_check_impl_without_report_json_does_not_create_file() {
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
@@ -620,6 +635,7 @@ fn run_check_impl_report_json_does_not_affect_exit_code() {
         max_dirs: None,
         max_depth: None,
         report_json: Some(stats_output.clone()),
+        files: vec![],
     };
 
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);

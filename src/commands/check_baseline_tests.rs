@@ -57,6 +57,7 @@ fn make_check_args_with_baseline(
         max_dirs: None,
         max_depth: None,
         report_json: None,
+        files: vec![],
     }
 }
 

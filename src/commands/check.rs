@@ -90,16 +90,30 @@ pub(crate) fn run_check_with_context(
     cache: &Mutex<Cache>,
     baseline: Option<&Baseline>,
 ) -> crate::Result<i32> {
-    // 1. Determine paths to scan
-    let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
+    // Check if pure incremental mode (--files provided)
+    let (all_files, scan_result, skip_structure_checks) = if args.files.is_empty() {
+        // Normal mode: scan directories
+        // 1. Determine paths to scan
+        let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
 
-    // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
-    let scan_result = ctx
-        .scanner
-        .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
+        // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
+        let scan_result = ctx
+            .scanner
+            .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
 
-    // 2.1 Filter by git diff if --diff is specified
-    let all_files = filter_by_git_diff(scan_result.files, args.diff.as_deref())?;
+        // 2.1 Filter by git diff if --diff is specified
+        let files = filter_by_git_diff(scan_result.files.clone(), args.diff.as_deref())?;
+        (files, Some(scan_result), false)
+    } else {
+        // Pure incremental mode: process only listed files, skip structure checks
+        let files: Vec<_> = args
+            .files
+            .iter()
+            .filter(|f| f.exists())
+            .cloned()
+            .collect();
+        (files, None, true)
+    };
 
     // 3. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
@@ -124,7 +138,10 @@ pub(crate) fn run_check_with_context(
     let (mut results, file_stats): (Vec<_>, Vec<_>) = processed.into_iter().unzip();
 
     // 5. Run structure checks if enabled (using pre-collected dir_stats from unified scan)
-    if let Some(ref structure_checker) = ctx.structure_checker
+    // Skip in pure incremental mode (--files) since no directory scan was performed
+    if !skip_structure_checks
+        && let Some(ref scan_result) = scan_result
+        && let Some(ref structure_checker) = ctx.structure_checker
         && structure_checker.is_enabled()
     {
         // Use dir_stats collected during unified scan

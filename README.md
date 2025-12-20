@@ -117,6 +117,53 @@ max_files = 30
 2. `[[structure.rules]]` - glob pattern (last match wins)
 3. `[structure]` defaults
 
+## Pre-commit Hook
+
+sloc-guard integrates with the [pre-commit](https://pre-commit.com/) framework for automatic SLOC checking on every commit.
+
+### Setup
+
+Add to your `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/doraemonkeys/sloc-guard
+    rev: v0.1.0  # Pin to specific version
+    hooks:
+      - id: sloc-guard
+        # Optional: restrict to specific file types
+        # types_or: [rust, python, javascript, typescript]
+```
+
+Then run:
+
+```bash
+pre-commit install
+```
+
+### How it Works
+
+1. **Binary Download**: On first run, downloads the matching pre-built binary to `~/.cache/sloc-guard/`
+2. **Checksum Verification**: Verifies SHA256 checksum before installation
+3. **Incremental Mode**: Uses `--files` parameter to check only staged files (no full scan)
+4. **Version Pinning**: The `rev` in your config pins the sloc-guard version
+
+### Manual Installation Alternative
+
+If you prefer to install sloc-guard globally and use the system binary:
+
+```yaml
+repos:
+  - repo: local
+    hooks:
+      - id: sloc-guard
+        name: sloc-guard
+        entry: sloc-guard check --files
+        language: system
+        types: [file]
+        pass_filenames: true
+```
+
 ## Exit Codes
 
 | Code | Meaning |
