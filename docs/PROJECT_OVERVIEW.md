@@ -26,7 +26,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `git/diff` | `GitDiff` - gix-based changed files detection (`--diff` mode) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
-| `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
+| `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git/GitRepoNotFound |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `TrendHistory` - historical stats with delta computation |

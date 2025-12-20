@@ -443,8 +443,17 @@ impl FileScanner for CompositeScanner {
             let scanner = GitAwareScanner::new(filter);
             match scanner.scan(root) {
                 Ok(files) => Ok(files),
-                Err(SlocGuardError::Git(_)) => {
-                    // Fallback to directory scanner if not in git repo
+                Err(SlocGuardError::GitRepoNotFound(_)) => {
+                    // Silent fallback - not in a git repo
+                    let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
+                    let scanner = DirectoryScanner::new(filter);
+                    scanner.scan(root)
+                }
+                Err(SlocGuardError::Git(msg)) => {
+                    // Warn user about git error and fallback
+                    eprintln!(
+                        "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                    );
                     let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
                     let scanner = DirectoryScanner::new(filter);
                     scanner.scan(root)
@@ -468,8 +477,15 @@ impl FileScanner for CompositeScanner {
             for path in paths {
                 match scanner.scan(path) {
                     Ok(files) => all_files.extend(files),
-                    Err(SlocGuardError::Git(_)) => {
-                        // Fallback to non-git scanning for all paths
+                    Err(SlocGuardError::GitRepoNotFound(_)) => {
+                        // Silent fallback - not in a git repo
+                        return self.scan_all_without_git(paths);
+                    }
+                    Err(SlocGuardError::Git(msg)) => {
+                        // Warn user about git error and fallback
+                        eprintln!(
+                            "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                        );
                         return self.scan_all_without_git(paths);
                     }
                     Err(e) => return Err(e),
@@ -492,8 +508,17 @@ impl FileScanner for CompositeScanner {
             let scanner = GitAwareScanner::new(filter);
             match scanner.scan_with_structure(root, structure_config) {
                 Ok(result) => Ok(result),
-                Err(SlocGuardError::Git(_)) => {
-                    // Fallback to directory scanner if not in git repo
+                Err(SlocGuardError::GitRepoNotFound(_)) => {
+                    // Silent fallback - not in a git repo
+                    let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
+                    let scanner = DirectoryScanner::new(filter);
+                    scanner.scan_with_structure(root, structure_config)
+                }
+                Err(SlocGuardError::Git(msg)) => {
+                    // Warn user about git error and fallback
+                    eprintln!(
+                        "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                    );
                     let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
                     let scanner = DirectoryScanner::new(filter);
                     scanner.scan_with_structure(root, structure_config)
@@ -527,8 +552,15 @@ impl FileScanner for CompositeScanner {
                             .allowlist_violations
                             .extend(result.allowlist_violations);
                     }
-                    Err(SlocGuardError::Git(_)) => {
-                        // Fallback to non-git scanning for all paths
+                    Err(SlocGuardError::GitRepoNotFound(_)) => {
+                        // Silent fallback - not in a git repo
+                        return self.scan_all_with_structure_without_git(paths, structure_config);
+                    }
+                    Err(SlocGuardError::Git(msg)) => {
+                        // Warn user about git error and fallback
+                        eprintln!(
+                            "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                        );
                         return self.scan_all_with_structure_without_git(paths, structure_config);
                     }
                     Err(e) => return Err(e),
@@ -581,6 +613,8 @@ impl CompositeScanner {
 /// Uses `GitAwareScanner` (respects .gitignore) if `use_gitignore` is true and
 /// falls back to `DirectoryScanner` if not in a git repository.
 ///
+/// If git operations fail (other than "not a git repo"), emits a warning and falls back.
+///
 /// # Errors
 /// Returns an error if the directory cannot be read or if glob patterns are invalid.
 pub fn scan_files(
@@ -597,7 +631,15 @@ pub fn scan_files(
         for path in paths {
             match scanner.scan(path) {
                 Ok(files) => all_files.extend(files),
-                Err(SlocGuardError::Git(_)) => {
+                Err(SlocGuardError::GitRepoNotFound(_)) => {
+                    // Silent fallback - not in a git repo
+                    return scan_files(paths, exclude_patterns, false);
+                }
+                Err(SlocGuardError::Git(msg)) => {
+                    // Warn user about git error and fallback
+                    eprintln!(
+                        "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                    );
                     return scan_files(paths, exclude_patterns, false);
                 }
                 Err(e) => return Err(e),

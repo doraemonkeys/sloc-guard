@@ -32,6 +32,9 @@ pub enum SlocGuardError {
 
     #[error("Git error: {0}")]
     Git(String),
+
+    #[error("Not a git repository: {0}")]
+    GitRepoNotFound(String),
 }
 
 pub type Result<T> = std::result::Result<T, SlocGuardError>;

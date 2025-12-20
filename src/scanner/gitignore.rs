@@ -27,8 +27,9 @@ impl<F: FileFilter> GitAwareScanner<F> {
     }
 
     fn scan_with_gix(&self, root: &Path) -> Result<Vec<PathBuf>> {
-        let repo = gix::discover(root)
-            .map_err(|e| SlocGuardError::Git(format!("Failed to discover git repository: {e}")))?;
+        let repo = gix::discover(root).map_err(|e| {
+            SlocGuardError::GitRepoNotFound(format!("Failed to discover git repository: {e}"))
+        })?;
 
         let workdir = repo
             .workdir()
@@ -104,8 +105,9 @@ impl<F: FileFilter> GitAwareScanner<F> {
         root: &Path,
         structure_config: Option<&StructureScanConfig>,
     ) -> Result<ScanResult> {
-        let repo = gix::discover(root)
-            .map_err(|e| SlocGuardError::Git(format!("Failed to discover git repository: {e}")))?;
+        let repo = gix::discover(root).map_err(|e| {
+            SlocGuardError::GitRepoNotFound(format!("Failed to discover git repository: {e}"))
+        })?;
 
         let workdir = repo
             .workdir()

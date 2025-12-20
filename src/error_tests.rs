@@ -16,3 +16,18 @@ fn error_display_file_read() {
     };
     assert!(err.to_string().contains("test.rs"));
 }
+
+#[test]
+fn error_display_git() {
+    let err = SlocGuardError::Git("Failed to get git index".to_string());
+    assert_eq!(err.to_string(), "Git error: Failed to get git index");
+}
+
+#[test]
+fn error_display_git_repo_not_found() {
+    let err = SlocGuardError::GitRepoNotFound("not a git repository".to_string());
+    assert_eq!(
+        err.to_string(),
+        "Not a git repository: not a git repository"
+    );
+}
