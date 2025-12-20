@@ -252,6 +252,9 @@ struct StructureAwareCollector<'a, F: FileFilter> {
     files: Vec<PathBuf>,
     dir_stats: HashMap<PathBuf, DirStats>,
     whitelist_violations: Vec<StructureViolation>,
+    /// Track directories we've already counted to avoid double-counting.
+    /// gix dirwalk only emits files, so we infer directories from file paths.
+    seen_dirs: std::collections::HashSet<PathBuf>,
 }
 
 impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
@@ -269,6 +272,53 @@ impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
             files: Vec::new(),
             dir_stats: HashMap::new(),
             whitelist_violations: Vec::new(),
+            seen_dirs: std::collections::HashSet::new(),
+        }
+    }
+
+    /// Register a directory and all its ancestors, counting subdirectories.
+    /// gix dirwalk only emits files, so we must infer directory structure from file paths.
+    fn register_directory_chain(&mut self, dir_path: &Path) {
+        let mut current = dir_path.to_path_buf();
+
+        while !current.as_os_str().is_empty() {
+            let depth = self.get_depth(&current);
+
+            // Check if this directory should be excluded from counting
+            let is_count_excluded = self
+                .structure_config
+                .is_some_and(|cfg| cfg.is_count_excluded(&current));
+
+            // Initialize this directory's stats if not seen
+            self.dir_stats
+                .entry(current.clone())
+                .or_insert_with(|| DirStats {
+                    depth,
+                    ..Default::default()
+                });
+
+            // If this is a new directory, increment parent's dir_count
+            if !is_count_excluded
+                && self.seen_dirs.insert(current.clone())
+                && depth > 0
+                && let Some(parent) = current.parent()
+            {
+                let parent_depth = depth - 1;
+                let parent_stats =
+                    self.dir_stats
+                        .entry(parent.to_path_buf())
+                        .or_insert_with(|| DirStats {
+                            depth: parent_depth,
+                            ..Default::default()
+                        });
+                parent_stats.dir_count += 1;
+            }
+
+            // Move to parent
+            match current.parent() {
+                Some(p) if !p.as_os_str().is_empty() => current = p.to_path_buf(),
+                _ => break,
+            }
         }
     }
 
@@ -322,18 +372,20 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
             }
 
             // Count for parent directory (if not excluded)
-            if !is_count_excluded
-                && let Some(parent) = path_ref.parent()
-            {
+            if !is_count_excluded && let Some(parent) = path_ref.parent() {
                 let parent_depth = if depth > 0 { depth - 1 } else { 0 };
-                let parent_stats = self
-                    .dir_stats
-                    .entry(parent.to_path_buf())
-                    .or_insert_with(|| DirStats {
-                        depth: parent_depth,
-                        ..Default::default()
-                    });
+                let parent_stats =
+                    self.dir_stats
+                        .entry(parent.to_path_buf())
+                        .or_insert_with(|| DirStats {
+                            depth: parent_depth,
+                            ..Default::default()
+                        });
                 parent_stats.file_count += 1;
+
+                // Register the directory chain (infer directories from file paths)
+                // gix dirwalk only emits files, so we must count subdirectories this way
+                self.register_directory_chain(parent);
 
                 // Check whitelist violations
                 if let Some(cfg) = self.structure_config {
@@ -342,15 +394,17 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                     if let Some(rule) = cfg.find_matching_whitelist_rule(&abs_parent)
                         && !rule.file_matches(&self.workdir.join(path_ref))
                     {
-                        self.whitelist_violations.push(StructureViolation::disallowed_file(
-                            path.clone().into_owned(),
-                            rule.pattern.clone(),
-                        ));
+                        self.whitelist_violations
+                            .push(StructureViolation::disallowed_file(
+                                path.clone().into_owned(),
+                                rule.pattern.clone(),
+                            ));
                     }
                 }
             }
         } else if is_dir {
-            // Initialize this directory's stats
+            // Note: gix dirwalk typically doesn't emit directory entries,
+            // but we handle it for completeness
             self.dir_stats
                 .entry(path.clone().into_owned())
                 .or_insert_with(|| DirStats {
@@ -358,19 +412,8 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                     ..Default::default()
                 });
 
-            // Count as subdirectory for parent (if not excluded and not root)
-            if depth > 0 && !is_count_excluded
-                && let Some(parent) = path_ref.parent()
-            {
-                let parent_stats = self
-                    .dir_stats
-                    .entry(parent.to_path_buf())
-                    .or_insert_with(|| DirStats {
-                        depth: depth - 1,
-                        ..Default::default()
-                    });
-                parent_stats.dir_count += 1;
-            }
+            // Register directory chain for this directory
+            self.register_directory_chain(path_ref);
         }
 
         gix::dir::walk::Action::Continue

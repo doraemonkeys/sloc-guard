@@ -19,8 +19,8 @@ use crate::output::{
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::context::{
-    CheckContext, FileReader, color_choice_to_mode, load_cache, load_config, process_file_with_cache,
-    resolve_scan_paths, save_cache, write_output,
+    CheckContext, FileReader, color_choice_to_mode, load_cache, load_config,
+    process_file_with_cache, resolve_scan_paths, save_cache, write_output,
 };
 
 #[must_use]
@@ -94,10 +94,9 @@ pub(crate) fn run_check_with_context(
     let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
 
     // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
-    let scan_result = ctx.scanner.scan_all_with_structure(
-        &paths_to_scan,
-        ctx.structure_scan_config.as_ref(),
-    )?;
+    let scan_result = ctx
+        .scanner
+        .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
 
     // 2.1 Filter by git diff if --diff is specified
     let all_files = filter_by_git_diff(scan_result.files, args.diff.as_deref())?;
