@@ -1,5 +1,6 @@
 mod loader;
 mod model;
+pub mod presets;
 mod remote;
 
 pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};

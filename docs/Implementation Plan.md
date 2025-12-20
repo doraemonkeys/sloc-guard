@@ -48,6 +48,8 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **9.4**: Structure Whitelist Mode - `allow_extensions` / `allow_patterns` on `[[structure.rules]]`. Files not matching whitelist are `DisallowedFile` violations. Stricter than `count_exclude`. OR logic (extension OR pattern match).
   - **9.5**: Unified Directory Traversal - `scan_with_structure()` method on `FileScanner` trait. Single WalkDir pass collects files AND directory statistics. Eliminates redundant I/O from separate scanner and structure checker traversals.
 - **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
+- **Phase 11 (Partial)**:
+  - **11.6**: Configuration Presets - `extends = "preset:<name>"` syntax. Built-in presets: rust-strict, node-strict, python-strict, monorepo-base. Presets define ecosystem-specific defaults (extensions, max_lines, exclude patterns, structure limits). Lower priority than explicit config (child overrides preset).
 
 ---
 
@@ -128,15 +130,6 @@ Location: `src/commands/check.rs`, `src/baseline/mod.rs`
 - Prevents regression: error count can only decrease over time
 ```
 
-### Task 11.6: Configuration Presets
-Location: `src/config/loader.rs`, `src/config/presets.rs` (new)
-```
-- Support `extends = "preset:react-strict"` syntax
-- Built-in presets: rust-strict, node-strict, python-strict, monorepo-base
-- Presets define sensible defaults for each ecosystem
-- Presets are lower priority than explicit config (can be overridden)
-```
-
 ### Task 11.7: Deny Patterns
 Location: `src/config/structure.rs`, `src/checker/structure.rs`
 ```
@@ -163,7 +156,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
-| **4. UX Improvements** | ~~9.3 Smart init~~ ✅, 11.6 Presets |
+| **4. UX Improvements** | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
 | **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 | **6. Cleanup** | 11.8 Terminology Modernization |
 | **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |

@@ -5,6 +5,7 @@ use crate::error::{Result, SlocGuardError};
 
 use super::Config;
 use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentOverride, ContentRule, LanguageRule};
+use super::presets;
 use super::remote::{fetch_remote_config, is_remote_url};
 
 /// Trait for loading configuration from various sources.
@@ -314,7 +315,9 @@ impl<F: FileSystem> FileConfigLoader<F> {
             .map(String::from);
 
         if let Some(extends) = extends_value {
-            let base_value = if is_remote_url(&extends) {
+            let base_value = if let Some(preset_name) = extends.strip_prefix("preset:") {
+                presets::load_preset(preset_name)?
+            } else if is_remote_url(&extends) {
                 self.load_remote_with_extends(&extends, visited)?
             } else {
                 let extends_path = Path::new(&extends);

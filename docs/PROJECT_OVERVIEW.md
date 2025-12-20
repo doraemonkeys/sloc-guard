@@ -16,7 +16,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | File(s) | Purpose |
 |--------|---------|---------|
 | `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
-| `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
+| `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `scanner/*.rs` | `FileScanner` trait (`scan()`, `scan_with_structure()`), `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback), `ScanResult`, `StructureScanConfig` |
@@ -35,8 +35,9 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 ## Key Types
 
 ```rust
-// Config (priority: CLI > file > defaults; extends: local/remote with 1h TTL cache)
+// Config (priority: CLI > file > defaults; extends: local/remote/preset with 1h TTL cache for remote)
 // V2 schema separates scanner/content/structure concerns
+// Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
 Config { version, scanner, content, structure }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
@@ -122,7 +123,7 @@ ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testabi
 ### Common Pipeline (check/stats/baseline)
 
 ```
-CLI args → load_config() → [if extends] resolve chain (local/remote, cycle detection)
+CLI args → load_config() → [if extends] resolve chain (local/remote/preset:*, cycle detection)
          → [if v1 config] migrate_v1_to_v2() auto-conversion
          → expand_language_rules() → [content.languages.X] to [[content.rules]]
          → [if !--no-cache] load_cache(config_hash)
