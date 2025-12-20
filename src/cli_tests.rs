@@ -110,6 +110,18 @@ fn cli_check_with_diff_no_value() {
 }
 
 #[test]
+fn cli_check_with_staged() {
+    let cli = Cli::parse_from(["sloc-guard", "check", "--staged"]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert!(args.staged);
+            assert!(args.diff.is_none());
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
 fn cli_stats_command() {
     let cli = Cli::parse_from(["sloc-guard", "stats", "src"]);
     match cli.command {

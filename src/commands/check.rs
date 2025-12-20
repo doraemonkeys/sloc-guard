@@ -101,8 +101,8 @@ pub(crate) fn run_check_with_context(
             .scanner
             .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
 
-        // 2.1 Filter by git diff if --diff is specified
-        let files = filter_by_git_diff(scan_result.files.clone(), args.diff.as_deref())?;
+        // 2.1 Filter by git diff if --diff or --staged is specified
+        let files = filter_by_git_diff(scan_result.files.clone(), args.diff.as_deref(), args.staged)?;
         (files, Some(scan_result), false)
     } else {
         // Pure incremental mode: process only listed files, skip structure checks
@@ -409,14 +409,19 @@ pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args
 fn filter_by_git_diff(
     files: Vec<std::path::PathBuf>,
     diff_ref: Option<&str>,
+    staged_only: bool,
 ) -> crate::Result<Vec<std::path::PathBuf>> {
-    let Some(base_ref) = diff_ref else {
+    if !staged_only && diff_ref.is_none() {
         return Ok(files);
-    };
+    }
 
     // Discover git repository from current directory
     let git_diff = GitDiff::discover(Path::new("."))?;
-    let changed_files = git_diff.get_changed_files(base_ref)?;
+    let changed_files = if staged_only {
+        git_diff.get_staged_files()?
+    } else {
+        git_diff.get_changed_files(diff_ref.expect("diff_ref checked above"))?
+    };
 
     // Canonicalize paths for comparison
     let changed_canonical: std::collections::HashSet<_> = changed_files

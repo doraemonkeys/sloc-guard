@@ -47,6 +47,7 @@ fn make_check_args_with_baseline(
         output: None,
         warn_only: false,
         diff: None,
+        staged: false,
         strict: false,
         baseline,
         update_baseline,

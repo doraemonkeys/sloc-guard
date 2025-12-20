@@ -85,6 +85,47 @@ impl GitDiff {
         }
         Ok(())
     }
+
+    /// Get files staged for commit (index differs from HEAD).
+    ///
+    /// # Errors
+    /// Returns an error if the repository cannot be accessed.
+    pub fn get_staged_files(&self) -> Result<HashSet<PathBuf>> {
+        let repo = self.open_repo()?;
+
+        // Get index (staging area)
+        let index = repo
+            .open_index()
+            .map_err(|e| SlocGuardError::Git(format!("Failed to open git index: {e}")))?;
+
+        // Get HEAD tree (if exists) - new repos have no commits yet
+        let head_paths = match repo.head_commit() {
+            Ok(commit) => {
+                let head_tree = commit
+                    .tree()
+                    .map_err(|e| SlocGuardError::Git(format!("Failed to get HEAD tree: {e}")))?;
+                Self::collect_tree_paths(&head_tree, Path::new(""))?
+            }
+            Err(_) => HashSet::new(),
+        };
+
+        let mut staged_files = HashSet::new();
+        for entry in index.entries() {
+            let path_str = String::from_utf8_lossy(entry.path(&index)).to_string();
+            let path = PathBuf::from(&path_str);
+
+            let is_staged = head_paths
+                .iter()
+                .find(|(p, _)| p == &path)
+                .is_none_or(|(_, head_oid)| *head_oid != entry.id);
+
+            if is_staged {
+                staged_files.insert(self.workdir.join(path));
+            }
+        }
+
+        Ok(staged_files)
+    }
 }
 
 impl ChangedFiles for GitDiff {

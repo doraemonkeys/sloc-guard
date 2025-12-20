@@ -173,10 +173,14 @@ pub struct CheckArgs {
     pub warn_only: bool,
 
     /// Compare against a git reference (branch/commit). Defaults to HEAD when no
-    /// value provided. Only content (SLOC) checks are filtered; structure checks
-    /// still count full directory state.
+    /// value provided. Checks all uncommitted changes (staged + unstaged) relative
+    /// to ref. Use --staged for staged-only. Structure checks use full directory state.
     #[arg(long, num_args = 0..=1, default_missing_value = "HEAD")]
     pub diff: Option<String>,
+
+    /// Check only staged files (git staging area). Mutually exclusive with --diff.
+    #[arg(long, conflicts_with = "diff")]
+    pub staged: bool,
 
     /// Treat warnings as failures (exit code 1)
     #[arg(long)]

@@ -56,6 +56,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **8.1.3**: Binary Download Optimization - Download pre-built binaries from GitHub Releases (x86_64/ARM64 Linux, macOS, Windows). SHA256 checksum verification. Exponential backoff retry (3 retries). Fallback to cargo install if binary unavailable.
   - **8.2**: Pre-commit Hook - `.pre-commit-hooks.yaml` with `language: script`. Wrapper script `scripts/install-sloc-guard.sh` (OS/Arch detection, binary download with checksum, caching at `~/.cache/sloc-guard/`). New `--files` CLI parameter for pure incremental mode (skips directory scan, processes only listed files, disables structure checks).
   - **8.3**: Universal Docker Image - Multi-stage `Dockerfile` (rust:alpine builder → alpine:3.21 runtime, ~10MB). Multi-arch support (linux/amd64, linux/arm64) via `.github/workflows/docker.yml`. Publish to ghcr.io on release tags. CI platform examples in README (GitLab CI, Jenkins, Azure Pipelines, CircleCI).
+  - **8.4**: Diff Mode Enhancement - `--staged` parameter for staging area only (mutually exclusive with `--diff`). Clarified semantics: `--diff HEAD` = uncommitted (staged + unstaged), `--staged` = staged only, `--diff origin/main` = PR changes.
 
 ---
 
@@ -98,14 +99,8 @@ Location: `src/output/html.rs`
 ### Task 8.3: Universal Docker Image ✅
 (Completed - see Completed section)
 
-### Task 8.4: Diff Mode Enhancement
-Location: `src/commands/check.rs`, `src/cli.rs`
-```
-- --staged parameter: check only git staging area (git diff --cached)
-- Clarify semantics: --diff HEAD = uncommitted, --staged = staged only
-- PR workflow: --diff origin/main checks only changed files, reports only new violations
-- Full check vs PR check distinction in docs
-```
+### Task 8.4: Diff Mode Enhancement ✅
+(Completed - see Completed section)
 
 ### Task 8.5: SARIF Auto-Upload Guidance
 Location: `docs/`, GitHub Action
@@ -189,7 +184,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
 | **4. UX Improvements** | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
-| **5. CI/CD** | ~~8.1.1 Core Action~~ ✅, ~~8.1.2-8.1.3 GitHub Action~~ ✅, ~~8.2 Pre-commit Hook~~ ✅, ~~8.3 Docker Image~~ ✅, 8.4 Diff Mode Enhancement, 8.5 SARIF Guidance |
+| **5. CI/CD** | ~~8.1.1 Core Action~~ ✅, ~~8.1.2-8.1.3 GitHub Action~~ ✅, ~~8.2 Pre-commit Hook~~ ✅, ~~8.3 Docker Image~~ ✅, ~~8.4 Diff Mode Enhancement~~ ✅, 8.5 SARIF Guidance |
 | **6. Cleanup** | 11.8 Terminology Modernization |
 | **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **8. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |

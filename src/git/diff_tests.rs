@@ -188,3 +188,61 @@ fn changed_files_handles_subdirectory() {
             .any(|p| p.canonicalize().ok() == Some(lib_path.clone()))
     );
 }
+
+#[test]
+fn staged_files_detects_staged_file() {
+    let dir = create_git_repo();
+
+    // Create initial file and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Create a new file and stage it (but don't commit)
+    create_file(dir.path(), "staged.rs", "fn staged() {}");
+    git_add_all(dir.path());
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let staged = git_diff.get_staged_files().unwrap();
+
+    let staged_path = dir.path().join("staged.rs").canonicalize().unwrap();
+    assert!(
+        staged
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(staged_path.clone()))
+    );
+}
+
+#[test]
+fn staged_files_empty_when_nothing_staged() {
+    let dir = create_git_repo();
+
+    // Create file, stage, and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let staged = git_diff.get_staged_files().unwrap();
+
+    assert!(staged.is_empty());
+}
+
+#[test]
+fn staged_files_ignores_unstaged_changes() {
+    let dir = create_git_repo();
+
+    // Create file, stage, and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Modify file but don't stage it
+    create_file(dir.path(), "main.rs", "fn main() { println!(\"modified\"); }");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let staged = git_diff.get_staged_files().unwrap();
+
+    // Unstaged changes should not be included
+    assert!(staged.is_empty());
+}

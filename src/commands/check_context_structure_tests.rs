@@ -46,6 +46,7 @@ fn make_check_args(paths: Vec<PathBuf>) -> CheckArgs {
         output: None,
         warn_only: false,
         diff: None,
+        staged: false,
         strict: false,
         baseline: None,
         update_baseline: None,
