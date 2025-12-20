@@ -1,0 +1,191 @@
+name: 'sloc-guard'
+description: 'Enforce source lines of code limits and directory structure constraints'
+author: 'sloc-guard'
+branding:
+  icon: 'file-text'
+  color: 'blue'
+
+inputs:
+  paths:
+    description: 'Paths to check (space-separated). Defaults to current directory'
+    required: false
+    default: '.'
+  config-path:
+    description: 'Path to sloc-guard.toml configuration file'
+    required: false
+    default: ''
+  fail-on-warning:
+    description: 'Treat warnings as failures (exit code 1)'
+    required: false
+    default: 'false'
+  version:
+    description: 'sloc-guard version to install (e.g., "0.1.0"). Use "latest" for HEAD'
+    required: false
+    default: 'latest'
+  cache:
+    description: 'Enable caching of sloc-guard results (.sloc-guard-cache.json)'
+    required: false
+    default: 'true'
+  sarif-output:
+    description: 'Path for SARIF output file. Empty to disable'
+    required: false
+    default: ''
+  baseline:
+    description: 'Path to baseline file for grandfathering existing violations'
+    required: false
+    default: ''
+  diff:
+    description: 'Only check files changed since ref (e.g., "HEAD", "origin/main")'
+    required: false
+    default: ''
+
+outputs:
+  total-files:
+    description: 'Total number of files checked'
+    value: ${{ steps.run-check.outputs.total-files }}
+  passed:
+    description: 'Number of files that passed'
+    value: ${{ steps.run-check.outputs.passed }}
+  failed:
+    description: 'Number of files that failed'
+    value: ${{ steps.run-check.outputs.failed }}
+  warnings:
+    description: 'Number of files with warnings'
+    value: ${{ steps.run-check.outputs.warnings }}
+  sarif-file:
+    description: 'Path to generated SARIF file (if sarif-output was specified)'
+    value: ${{ steps.run-check.outputs.sarif-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+
+    - name: Cache sloc-guard binary
+      id: cache-binary
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/sloc-guard*
+        key: ${{ runner.os }}-sloc-guard-${{ inputs.version }}
+
+    - name: Install sloc-guard
+      if: steps.cache-binary.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        ACTION_REPO: ${{ github.action_repository }}
+      run: |
+        REPO_URL="https://github.com/${ACTION_REPO}"
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          cargo install --git "$REPO_URL" --locked
+        else
+          cargo install --git "$REPO_URL" --tag "v${{ inputs.version }}" --locked
+        fi
+
+    - name: Generate cache key
+      id: cache-key
+      shell: bash
+      run: |
+        CONFIG_PATH="${{ inputs.config-path }}"
+        if [ -z "$CONFIG_PATH" ]; then
+          CONFIG_PATH="sloc-guard.toml"
+        fi
+        if [ -f "$CONFIG_PATH" ]; then
+          CONFIG_HASH=$(sha256sum "$CONFIG_PATH" | cut -d' ' -f1 | head -c 16)
+        else
+          CONFIG_HASH="default"
+        fi
+        echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
+
+    - name: Cache sloc-guard results
+      if: inputs.cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: .sloc-guard-cache.json
+        key: sloc-guard-cache-${{ steps.cache-key.outputs.hash }}-${{ inputs.version }}-${{ github.sha }}
+        restore-keys: |
+          sloc-guard-cache-${{ steps.cache-key.outputs.hash }}-${{ inputs.version }}-
+
+    - name: Run sloc-guard check
+      id: run-check
+      shell: bash
+      run: |
+        ARGS=""
+
+        # Config path
+        if [ -n "${{ inputs.config-path }}" ]; then
+          ARGS="$ARGS --config ${{ inputs.config-path }}"
+        fi
+
+        # Fail on warning
+        if [ "${{ inputs.fail-on-warning }}" = "true" ]; then
+          ARGS="$ARGS --fail-on-warning"
+        fi
+
+        # SARIF output
+        SARIF_FILE=""
+        if [ -n "${{ inputs.sarif-output }}" ]; then
+          SARIF_FILE="${{ inputs.sarif-output }}"
+          ARGS="$ARGS --format sarif"
+        fi
+
+        # Baseline
+        if [ -n "${{ inputs.baseline }}" ]; then
+          ARGS="$ARGS --baseline ${{ inputs.baseline }}"
+        fi
+
+        # Diff mode
+        if [ -n "${{ inputs.diff }}" ]; then
+          ARGS="$ARGS --diff ${{ inputs.diff }}"
+        fi
+
+        # Run check and capture output
+        set +e
+        if [ -n "$SARIF_FILE" ]; then
+          OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS 2>&1)
+          echo "$OUTPUT" > "$SARIF_FILE"
+          # Run again for text output to parse stats
+          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text 2>&1)
+          EXIT_CODE=$?
+        else
+          OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format json 2>&1)
+          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text 2>&1)
+          EXIT_CODE=$?
+        fi
+        set -e
+
+        # Parse statistics from JSON output
+        if command -v jq &> /dev/null; then
+          TOTAL=$(echo "$OUTPUT" | jq -r '.summary.total_files // 0' 2>/dev/null || echo "0")
+          PASSED=$(echo "$OUTPUT" | jq -r '.summary.passed // 0' 2>/dev/null || echo "0")
+          FAILED=$(echo "$OUTPUT" | jq -r '.summary.failed // 0' 2>/dev/null || echo "0")
+          WARNINGS=$(echo "$OUTPUT" | jq -r '.summary.warnings // 0' 2>/dev/null || echo "0")
+        else
+          TOTAL="0"
+          PASSED="0"
+          FAILED="0"
+          WARNINGS="0"
+        fi
+
+        # Set outputs
+        echo "total-files=$TOTAL" >> $GITHUB_OUTPUT
+        echo "passed=$PASSED" >> $GITHUB_OUTPUT
+        echo "failed=$FAILED" >> $GITHUB_OUTPUT
+        echo "warnings=$WARNINGS" >> $GITHUB_OUTPUT
+        echo "sarif-file=$SARIF_FILE" >> $GITHUB_OUTPUT
+
+        # Print text output for workflow logs
+        echo "$TEXT_OUTPUT"
+
+        # Exit with original code
+        exit $EXIT_CODE

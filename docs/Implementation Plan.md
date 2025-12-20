@@ -50,6 +50,8 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
 - **Phase 11 (Partial)**:
   - **11.6**: Configuration Presets - `extends = "preset:<name>"` syntax. Built-in presets: rust-strict, node-strict, python-strict, monorepo-base. Presets define ecosystem-specific defaults (extensions, max_lines, exclude patterns, structure limits). Lower priority than explicit config (child overrides preset).
+- **Phase 8 (Partial)**:
+  - **8.1.1**: Core GitHub Action - `.github/action/action.yml` composite action. Inputs: paths, config-path, fail-on-warning, version, cache, sarif-output, baseline, diff. Outputs: total-files, passed, failed, warnings, sarif-file. Installation via cargo install from action repository. Cache integration for cargo registry, binary, and results.
 
 ---
 
@@ -76,16 +78,66 @@ Location: `src/output/html.rs`
 ## Phase 8: CI/CD Support (Pending)
 
 ### Task 8.1: GitHub Action
+
+#### 8.1.1: Core Action with Cache ✅
+(Completed - see Completed section)
+
+#### 8.1.2: Problem Matchers and Job Summary (Pending)
+Location: `.github/action/`
 ```
-- Create reusable GitHub Action
-- Input: paths, config-path, fail-on-warning
-- Output: total-files, passed, failed, warnings
+- Problem Matcher JSON for PR annotations (::error file={file},line={line}::{message})
+- Job Summary markdown with stats (new violations, delta from baseline)
+- SARIF output path for chaining with upload-sarif
+```
+
+#### 8.1.3: Binary Download Optimization (Pending)
+Location: `.github/action/`
+```
+- Download pre-built binaries from GitHub Releases by OS/Arch
+- SHA256 checksum verification for supply chain security
+- Retry mechanism: exponential backoff (3 retries) for API rate limits
+- Fallback to cargo install if binary unavailable
 ```
 
 ### Task 8.2: Pre-commit Hook
+Location: `.pre-commit-hooks.yaml`, `scripts/install-sloc-guard.sh`
 ```
-- Document .pre-commit-config.yaml setup
-- Support staged files only mode
+- Official .pre-commit-hooks.yaml in repo root (users reference repo URL directly)
+- Hook definition with language: script (NOT system - avoids global install dependency)
+- Wrapper script (scripts/install-sloc-guard.sh):
+  - Auto-detect OS/Arch at runtime
+  - Download matching pre-built binary from GitHub Releases to cache dir (~/.cache/sloc-guard/)
+  - Version pinning via .pre-commit-config.yaml rev
+  - Checksum verification for downloaded binaries
+- Pure incremental mode: --files parameter skips full directory scan, processes only listed files
+- Document .pre-commit-config.yaml setup in README
+```
+
+### Task 8.3: Universal Docker Image
+Location: `Dockerfile`, CI workflow
+```
+- Lightweight Docker image (alpine-based, ~10MB target)
+- Multi-arch: linux/amd64, linux/arm64
+- Publish to ghcr.io and/or Docker Hub
+- No Rust toolchain required at runtime
+- Example usage for GitLab CI, Jenkins, Azure Pipelines in docs
+```
+
+### Task 8.4: Diff Mode Enhancement
+Location: `src/commands/check.rs`, `src/cli.rs`
+```
+- --staged parameter: check only git staging area (git diff --cached)
+- Clarify semantics: --diff HEAD = uncommitted, --staged = staged only
+- PR workflow: --diff origin/main checks only changed files, reports only new violations
+- Full check vs PR check distinction in docs
+```
+
+### Task 8.5: SARIF Auto-Upload Guidance
+Location: `docs/`, GitHub Action
+```
+- Document integration with github/codeql-action/upload-sarif
+- GitHub Action output: sarif-file path for chaining
+- Example workflow showing SARIF upload to Security tab
 ```
 
 ---
@@ -126,8 +178,13 @@ Location: `src/config/*.rs`, `src/checker/*.rs`
 Location: `src/commands/check.rs`, `src/baseline/mod.rs`
 ```
 - CI mode flag: --ratchet (or config: baseline.ratchet = true)
-- When current violations < baseline count, auto-update baseline
+- Ratchet behavior when current violations < baseline count:
+  - Default: emit warning "Baseline can be tightened: N violations removed"
+  - With --ratchet=auto: auto-update baseline file silently
+  - With --ratchet=strict: fail CI if baseline not updated (forces team to commit improvement)
 - Prevents regression: error count can only decrease over time
+- CI integration: GitHub Action output `baseline-outdated: true` for workflow conditionals
+- Optional: suggest PR bot integration for automatic baseline update PRs
 ```
 
 ### Task 11.7: Deny Patterns
@@ -157,7 +214,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
 | **4. UX Improvements** | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
-| **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| **5. CI/CD** | ~~8.1.1 Core Action~~ ✅, 8.1.2-8.1.3 GitHub Action, 8.2 Pre-commit Hook, 8.3 Docker Image, 8.4 Diff Mode Enhancement, 8.5 SARIF Guidance |
 | **6. Cleanup** | 11.8 Terminology Modernization |
 | **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **8. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
