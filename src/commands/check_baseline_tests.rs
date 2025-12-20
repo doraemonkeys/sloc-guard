@@ -11,6 +11,7 @@ use crate::output::OutputFormat;
 use crate::{EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::*;
+use crate::commands::check::run_check_impl;
 
 fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: bool) -> Cli {
     Cli {
