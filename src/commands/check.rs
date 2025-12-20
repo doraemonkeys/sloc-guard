@@ -93,11 +93,14 @@ pub(crate) fn run_check_with_context(
     // 1. Determine paths to scan
     let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
 
-    // 2. Scan directories using injected scanner (respects .gitignore and exclude patterns)
-    let all_files = ctx.scanner.scan_all(&paths_to_scan)?;
+    // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
+    let scan_result = ctx.scanner.scan_all_with_structure(
+        &paths_to_scan,
+        ctx.structure_scan_config.as_ref(),
+    )?;
 
     // 2.1 Filter by git diff if --diff is specified
-    let all_files = filter_by_git_diff(all_files, args.diff.as_deref())?;
+    let all_files = filter_by_git_diff(scan_result.files, args.diff.as_deref())?;
 
     // 3. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
@@ -121,20 +124,25 @@ pub(crate) fn run_check_with_context(
     // Separate check results and file statistics
     let (mut results, file_stats): (Vec<_>, Vec<_>) = processed.into_iter().unzip();
 
-    // 5. Run structure checks if enabled (using injected structure_checker)
+    // 5. Run structure checks if enabled (using pre-collected dir_stats from unified scan)
     if let Some(ref structure_checker) = ctx.structure_checker
         && structure_checker.is_enabled()
     {
-        for path in &paths_to_scan {
-            if path.is_dir() {
-                let violations = structure_checker.check_directory(path)?;
-                let structure_results: Vec<_> = violations
-                    .iter()
-                    .map(structure_violation_to_check_result)
-                    .collect();
-                results.extend(structure_results);
-            }
-        }
+        // Use dir_stats collected during unified scan
+        let violations = structure_checker.check(&scan_result.dir_stats);
+        let structure_results: Vec<_> = violations
+            .iter()
+            .map(structure_violation_to_check_result)
+            .collect();
+        results.extend(structure_results);
+
+        // Add whitelist violations collected during scan
+        let whitelist_results: Vec<_> = scan_result
+            .whitelist_violations
+            .iter()
+            .map(structure_violation_to_check_result)
+            .collect();
+        results.extend(whitelist_results);
     }
 
     // 6. Save cache if not disabled

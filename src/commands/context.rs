@@ -13,7 +13,7 @@ use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
-use crate::scanner::{CompositeScanner, FileScanner};
+use crate::scanner::{CompositeScanner, FileScanner, StructureScanConfig, WhitelistRuleBuilder};
 
 /// Default cache file path
 pub const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
@@ -233,6 +233,8 @@ pub struct CheckContext {
     pub registry: LanguageRegistry,
     pub threshold_checker: ThresholdChecker,
     pub structure_checker: Option<StructureChecker>,
+    /// Configuration for structure-aware scanning.
+    pub structure_scan_config: Option<StructureScanConfig>,
     /// Injectable file scanner for directory traversal.
     pub scanner: Box<dyn FileScanner>,
     /// Injectable file reader for content access.
@@ -243,7 +245,7 @@ impl CheckContext {
     /// Create context from config (production factory).
     ///
     /// # Errors
-    /// Returns error if structure checker initialization fails with invalid patterns.
+    /// Returns error if structure checker or structure scan config initialization fails.
     pub fn from_config(
         config: &Config,
         warn_threshold: f64,
@@ -253,8 +255,11 @@ impl CheckContext {
         let registry = LanguageRegistry::with_custom_languages(&config.languages);
         let threshold_checker =
             ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
-        let structure_checker =
-            StructureChecker::with_scanner_exclude(&config.structure, &config.scanner.exclude).ok();
+        let structure_checker = StructureChecker::new(&config.structure).ok();
+
+        // Build structure scan config for unified traversal
+        let structure_scan_config = Self::build_structure_scan_config(config, &exclude_patterns)?;
+
         let scanner = Box::new(CompositeScanner::new(exclude_patterns, use_gitignore));
         let file_reader = Box::new(RealFileReader);
 
@@ -262,9 +267,48 @@ impl CheckContext {
             registry,
             threshold_checker,
             structure_checker,
+            structure_scan_config,
             scanner,
             file_reader,
         })
+    }
+
+    /// Build `StructureScanConfig` from config components.
+    fn build_structure_scan_config(
+        config: &Config,
+        exclude_patterns: &[String],
+    ) -> crate::Result<Option<StructureScanConfig>> {
+        // Only build if structure checking is enabled
+        let has_structure_config = config.structure.max_files.is_some()
+            || config.structure.max_dirs.is_some()
+            || config.structure.max_depth.is_some()
+            || !config.structure.rules.is_empty()
+            || !config.structure.overrides.is_empty();
+
+        if !has_structure_config {
+            return Ok(None);
+        }
+
+        // Build whitelist rules from structure.rules
+        let mut whitelist_rules = Vec::new();
+        for rule in &config.structure.rules {
+            // Only include rules that have whitelists
+            if !rule.allow_extensions.is_empty() || !rule.allow_patterns.is_empty() {
+                let whitelist_rule = WhitelistRuleBuilder::new(rule.pattern.clone())
+                    .with_extensions(rule.allow_extensions.clone())
+                    .with_patterns(rule.allow_patterns.clone())
+                    .build()?;
+                whitelist_rules.push(whitelist_rule);
+            }
+        }
+
+        let structure_scan_config = StructureScanConfig::new(
+            &config.structure.count_exclude,
+            exclude_patterns,
+            whitelist_rules,
+        )?;
+
+        Ok(Some(structure_scan_config))
     }
 
     /// Create context with custom components (for testing).
@@ -273,6 +317,7 @@ impl CheckContext {
         registry: LanguageRegistry,
         threshold_checker: ThresholdChecker,
         structure_checker: Option<StructureChecker>,
+        structure_scan_config: Option<StructureScanConfig>,
         scanner: Box<dyn FileScanner>,
         file_reader: Box<dyn FileReader>,
     ) -> Self {
@@ -280,6 +325,7 @@ impl CheckContext {
             registry,
             threshold_checker,
             structure_checker,
+            structure_scan_config,
             scanner,
             file_reader,
         }

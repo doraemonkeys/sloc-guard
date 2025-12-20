@@ -72,3 +72,28 @@ fn filter_complex_exclude_patterns() {
     assert!(!filter.should_include(Path::new("target/release/build/main.rs")));
     assert!(!filter.should_include(Path::new(".git/hooks/pre-commit.rs")));
 }
+
+#[test]
+fn filter_file_without_extension_accepted_when_empty_extensions() {
+    let filter = GlobFilter::new(vec![], &[]).unwrap();
+
+    assert!(filter.should_include(Path::new("Makefile")));
+    assert!(filter.should_include(Path::new("Dockerfile")));
+    assert!(filter.should_include(Path::new(".gitignore")));
+}
+
+#[test]
+fn filter_file_without_extension_rejected_when_extensions_set() {
+    let filter = GlobFilter::new(vec!["rs".to_string()], &[]).unwrap();
+
+    assert!(!filter.should_include(Path::new("Makefile")));
+    assert!(!filter.should_include(Path::new("Dockerfile")));
+}
+
+#[test]
+fn filter_exclude_by_filename() {
+    let filter = GlobFilter::new(vec![], &["*.lock".to_string()]).unwrap();
+
+    assert!(filter.should_include(Path::new("Cargo.toml")));
+    assert!(!filter.should_include(Path::new("Cargo.lock")));
+}

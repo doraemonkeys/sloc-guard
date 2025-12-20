@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::*;
+use crate::scanner::{StructureScanConfig, WhitelistRuleBuilder};
 use tempfile::TempDir;
 
 struct AcceptAllFilter;
@@ -232,4 +233,180 @@ fn gitaware_scanner_respects_wildcards_and_spaces() {
     assert!(files.iter().any(|f| f.ends_with("other.txt")));
     assert!(!files.iter().any(|f| f.ends_with("file with spaces.txt")));
     assert!(files.iter().any(|f| f.ends_with("normal.txt")));
+}
+
+// =============================================================================
+// scan_with_structure Tests
+// =============================================================================
+
+#[test]
+fn gitaware_scanner_scan_with_structure_collects_stats() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(src_dir.join("lib.rs"), "pub fn foo() {}").unwrap();
+
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
+
+    assert!(result.files.len() >= 2);
+    // Check that dir_stats contains a path ending with "src"
+    assert!(result.dir_stats.keys().any(|k| k.ends_with("src")));
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_respects_gitignore() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    std::fs::write(temp_dir.path().join(".gitignore"), "*.log\n").unwrap();
+
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(src_dir.join("debug.log"), "log").unwrap();
+
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
+
+    assert!(result.files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(!result.files.iter().any(|f| f.ends_with("debug.log")));
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_with_whitelist() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(src_dir.join("config.json"), "{}").unwrap();
+
+    let whitelist_rule = WhitelistRuleBuilder::new("**/src".to_string())
+        .with_extensions(vec![".rs".to_string()])
+        .build()
+        .unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![whitelist_rule]).unwrap();
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+
+    // config.json should be a whitelist violation
+    assert!(!result.whitelist_violations.is_empty());
+    assert!(result.whitelist_violations.iter().any(|v| v.path.to_string_lossy().contains("config.json")));
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_respects_count_exclude() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(src_dir.join("generated.txt"), "generated").unwrap();
+
+    let config = StructureScanConfig::new(&["*.txt".to_string()], &[], Vec::new()).unwrap();
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+
+    // Both files should be found
+    assert!(result.files.len() >= 2);
+    // The src dir should have stats with only 1 file counted (txt excluded from count)
+    let src_stats = result.dir_stats.iter().find(|(k, _)| k.ends_with("src"));
+    assert!(src_stats.is_some());
+    assert_eq!(src_stats.unwrap().1.file_count, 1);
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_respects_scanner_exclude() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let src_dir = temp_dir.path().join("src");
+    let vendor_dir = temp_dir.path().join("vendor");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::create_dir(&vendor_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "").unwrap();
+    std::fs::write(vendor_dir.join("lib.rs"), "").unwrap();
+
+    let config = StructureScanConfig::new(&[], &["**/vendor/**".to_string()], Vec::new()).unwrap();
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+
+    // vendor files should be excluded
+    assert!(result.files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(!result.files.iter().any(|f| f.ends_with("vendor") && f.ends_with("lib.rs")));
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_counts_subdirectories() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let src_dir = temp_dir.path().join("src");
+    let sub1 = src_dir.join("sub1");
+    let sub2 = src_dir.join("sub2");
+    std::fs::create_dir_all(&sub1).unwrap();
+    std::fs::create_dir_all(&sub2).unwrap();
+    std::fs::write(sub1.join("a.rs"), "").unwrap();
+    std::fs::write(sub2.join("b.rs"), "").unwrap();
+
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
+
+    // Should find both files
+    assert_eq!(result.files.len(), 2);
+    assert!(result.files.iter().any(|f| f.ends_with("a.rs")));
+    assert!(result.files.iter().any(|f| f.ends_with("b.rs")));
+    // sub1 and sub2 dirs should have file counts
+    let sub1_stats = result.dir_stats.iter().find(|(k, _)| k.ends_with("sub1"));
+    let sub2_stats = result.dir_stats.iter().find(|(k, _)| k.ends_with("sub2"));
+    assert!(sub1_stats.is_some());
+    assert!(sub2_stats.is_some());
+    assert_eq!(sub1_stats.unwrap().1.file_count, 1);
+    assert_eq!(sub2_stats.unwrap().1.file_count, 1);
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_tracks_depth() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let deep = temp_dir.path().join("a").join("b").join("c");
+    std::fs::create_dir_all(&deep).unwrap();
+    std::fs::write(deep.join("file.rs"), "").unwrap();
+
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
+
+    // The deepest directory should have depth 3
+    let deep_stats = result.dir_stats.iter().find(|(k, _)| k.ends_with("c"));
+    assert!(deep_stats.is_some());
+    assert_eq!(deep_stats.unwrap().1.depth, 3);
+}
+
+#[test]
+fn gitaware_scanner_scan_with_structure_no_violations_when_files_match() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "").unwrap();
+    std::fs::write(src_dir.join("lib.rs"), "").unwrap();
+
+    let whitelist_rule = WhitelistRuleBuilder::new("**/src".to_string())
+        .with_extensions(vec![".rs".to_string()])
+        .build()
+        .unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![whitelist_rule]).unwrap();
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+
+    // All files are .rs, so no violations
+    assert!(result.whitelist_violations.is_empty());
 }

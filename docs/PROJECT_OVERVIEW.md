@@ -19,7 +19,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
-| `scanner/*` | `scanner/*.rs` | `FileScanner` trait, `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback) |
+| `scanner/*` | `scanner/*.rs` | `FileScanner` trait (`scan()`, `scan_with_structure()`), `GlobFilter`, `DirectoryScanner` (walkdir), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback), `ScanResult`, `StructureScanConfig` |
 | `checker/threshold` | `checker/threshold.rs` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
 | `checker/structure` | `checker/structure.rs` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
 | `checker/explain` | `checker/explain.rs` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
@@ -102,9 +102,12 @@ FunctionParser: Rust, Go, Python, JS/TS, C/C++
 // Context for DI (commands/context.rs)
 FileReader trait { read(), metadata() }  // IO abstraction for file reading
 RealFileReader  // Production impl using std::fs
-FileScanner trait { scan(), scan_all() }  // IO abstraction for directory traversal
+FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }  // IO abstraction for directory traversal
+ScanResult { files, dir_stats, whitelist_violations }  // Unified scan output
+StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, whitelist_rules }  // Config for structure-aware scanning
+WhitelistRule { pattern, allow_extensions, allow_patterns }  // Directory whitelist matching
 CompositeScanner  // Production impl with git/non-git fallback
-CheckContext { registry, threshold_checker, structure_checker, scanner, file_reader }  // from_config() or new()
+CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
 StatsContext { registry, allowed_extensions }  // from_config() or new()
 ```
 
@@ -130,12 +133,14 @@ CLI args → load_config() → [if extends] resolve chain (local/remote, cycle d
 
 ```
 → CheckContext::from_config(config, warn_threshold, exclude_patterns, use_gitignore)
-   → creates injectable context with CompositeScanner + RealFileReader
-→ ctx.scanner.scan_all() → file list
+   → creates injectable context with CompositeScanner + RealFileReader + StructureScanConfig
+→ ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, whitelist_violations }
+   (single WalkDir traversal collects both file list AND directory statistics)
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → process_file_with_cache(ctx.file_reader) → ThresholdChecker::check() → CheckResult (parallel)
-→ StructureChecker::check_directory() → StructureViolation → CheckResult (per-dir)
+→ StructureChecker::check(dir_stats) → StructureViolation (uses pre-collected stats, no traversal)
+→ merge whitelist_violations from ScanResult
 → [if baseline] mark Grandfathered | [if --update-baseline] save violations to baseline
 → [if --suggest] generate_split_suggestions()
 → [if --report-json] ProjectStatistics → StatsJsonFormatter → write to path

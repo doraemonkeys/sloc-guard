@@ -350,9 +350,15 @@ fn check_structure_whitelist_violation() {
     fixture.create_config(
         r#"
 version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
 [content]
 max_lines = 100
-extensions = [".rs"]
+extensions = ["rs"]
+
 [[structure.rules]]
 pattern = "**/src"
 allow_extensions = [".rs"]

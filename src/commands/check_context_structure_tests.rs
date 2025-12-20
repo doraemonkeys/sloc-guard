@@ -93,7 +93,7 @@ fn check_context_new_allows_custom_injection() {
     let scanner: Box<dyn FileScanner> = Box::new(CompositeScanner::new(Vec::new(), false));
     let file_reader: Box<dyn FileReader> = Box::new(RealFileReader);
 
-    let ctx = CheckContext::new(registry, threshold_checker, None, scanner, file_reader);
+    let ctx = CheckContext::new(registry, threshold_checker, None, None, scanner, file_reader);
 
     assert!(ctx.structure_checker.is_none());
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
-use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobMatcher};
 
 use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
 use crate::error::{Result, SlocGuardError};
@@ -105,12 +105,6 @@ struct CompiledStructureRule {
     max_dirs: Option<i64>,
     max_depth: Option<i64>,
     warn_threshold: Option<f64>,
-    /// Validated extensions (with leading dot).
-    allow_extensions: Vec<String>,
-    /// Compiled patterns for whitelist matching.
-    allow_patterns: GlobSet,
-    /// True if this rule has a whitelist (`allow_extensions` or `allow_patterns`).
-    has_whitelist: bool,
 }
 
 /// Resolved limits for a directory path.
@@ -129,13 +123,6 @@ pub struct StructureChecker {
     max_dirs: Option<i64>,
     max_depth: Option<i64>,
     warn_threshold: Option<f64>,
-    /// Patterns from scanner.exclude - directories matching these are completely skipped.
-    scanner_exclude: GlobSet,
-    /// Base directory names extracted from scanner.exclude patterns ending with "/**".
-    /// Used to match directories like ".git" when pattern is ".git/**".
-    scanner_exclude_dir_names: Vec<String>,
-    /// Patterns from `structure.count_exclude` - items matching these are not counted.
-    ignore_patterns: GlobSet,
     rules: Vec<CompiledStructureRule>,
     overrides: Vec<StructureOverride>,
 }
@@ -144,25 +131,10 @@ impl StructureChecker {
     /// Create a new structure checker from config.
     ///
     /// # Errors
-    /// Returns an error if any ignore or rule pattern is invalid,
+    /// Returns an error if any rule pattern is invalid,
     /// or if any limit value is less than -1.
     pub fn new(config: &StructureConfig) -> Result<Self> {
-        Self::with_scanner_exclude(config, &[])
-    }
-
-    /// Create a new structure checker with scanner exclude patterns.
-    ///
-    /// Scanner exclude patterns cause directories to be completely skipped during traversal.
-    /// This is separate from `count_exclude` which only affects counting.
-    ///
-    /// # Errors
-    /// Returns an error if any pattern is invalid or any limit value is less than -1.
-    pub fn with_scanner_exclude(config: &StructureConfig, scanner_exclude: &[String]) -> Result<Self> {
         Self::validate_limits(config)?;
-
-        let scanner_exclude_set = Self::build_ignore_patterns(scanner_exclude)?;
-        let scanner_exclude_dir_names = Self::extract_dir_names_from_patterns(scanner_exclude);
-        let ignore_patterns = Self::build_ignore_patterns(&config.count_exclude)?;
         let rules = Self::build_rules(&config.rules)?;
 
         Ok(Self {
@@ -170,36 +142,33 @@ impl StructureChecker {
             max_dirs: config.max_dirs,
             max_depth: config.max_depth,
             warn_threshold: config.warn_threshold,
-            scanner_exclude: scanner_exclude_set,
-            scanner_exclude_dir_names,
-            ignore_patterns,
             rules,
             overrides: config.overrides.clone(),
         })
     }
 
-    /// Extract directory names from patterns ending with "/**".
+    /// Create a new structure checker with scanner exclude patterns.
     ///
-    /// For pattern ".git/**", extracts ".git".
-    /// For pattern "target/**", extracts "target".
-    fn extract_dir_names_from_patterns(patterns: &[String]) -> Vec<String> {
-        patterns
-            .iter()
-            .filter_map(|p| {
-                // Handle patterns ending with /** or \**
-                let trimmed = p.trim_end_matches("/**").trim_end_matches("\\**");
-                if trimmed.len() < p.len() {
-                    // Pattern was trimmed, extract the last component
-                    let last_component = trimmed
-                        .rsplit(['/', '\\'])
-                        .next()
-                        .filter(|s| !s.is_empty() && !s.contains('*'));
-                    last_component.map(String::from)
-                } else {
-                    None
-                }
-            })
-            .collect()
+    /// Note: Scanner exclude patterns are now handled by the scanner during traversal,
+    /// not by the `StructureChecker`. This method is kept for backward compatibility
+    /// and simply ignores the `scanner_exclude` parameter.
+    ///
+    /// # Errors
+    /// Returns an error if any pattern is invalid or any limit value is less than -1.
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn with_scanner_exclude(config: &StructureConfig, _scanner_exclude: &[String]) -> Result<Self> {
+        Self::new(config)
+    }
+
+    /// Returns true if structure checking is enabled (any limit is set).
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Vec::is_empty() is not const
+    pub fn is_enabled(&self) -> bool {
+        self.max_files.is_some()
+            || self.max_dirs.is_some()
+            || self.max_depth.is_some()
+            || !self.rules.is_empty()
+            || !self.overrides.is_empty()
     }
 
     /// Validate that all limit values are >= -1.
@@ -292,77 +261,15 @@ impl StructureChecker {
         Ok(())
     }
 
-    /// Returns true if structure checking is enabled (any limit is set).
-    #[must_use]
-    #[allow(clippy::missing_const_for_fn)] // Vec::is_empty() is not const
-    pub fn is_enabled(&self) -> bool {
-        self.max_files.is_some()
-            || self.max_dirs.is_some()
-            || self.max_depth.is_some()
-            || !self.rules.is_empty()
-            || !self.overrides.is_empty()
-    }
-
-    fn build_ignore_patterns(patterns: &[String]) -> Result<GlobSet> {
-        let mut builder = GlobSetBuilder::new();
-        for pattern in patterns {
-            let glob = Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: pattern.clone(),
-                source: e,
-            })?;
-            builder.add(glob);
-        }
-        builder.build().map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: "combined ignore patterns".to_string(),
-            source: e,
-        })
-    }
-
-    /// Validate that all extensions start with a dot.
-    fn validate_extensions(extensions: &[String], rule_index: usize) -> Result<Vec<String>> {
-        for ext in extensions {
-            if !ext.starts_with('.') {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid extension '{}' in rule {}: must start with '.' (e.g., '.rs')",
-                    ext,
-                    rule_index + 1
-                )));
-            }
-        }
-        Ok(extensions.to_vec())
-    }
-
-    /// Build a `GlobSet` from `allow_patterns`.
-    fn build_allow_patterns(patterns: &[String], rule_index: usize) -> Result<GlobSet> {
-        let mut builder = GlobSetBuilder::new();
-        for pattern in patterns {
-            let glob = Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: format!("allow_patterns[{}] in rule {}", pattern, rule_index + 1),
-                source: e,
-            })?;
-            builder.add(glob);
-        }
-        builder.build().map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: format!("combined allow_patterns in rule {}", rule_index + 1),
-            source: e,
-        })
-    }
-
     fn build_rules(rules: &[crate::config::StructureRule]) -> Result<Vec<CompiledStructureRule>> {
         rules
             .iter()
-            .enumerate()
-            .map(|(i, rule)| {
+            .map(|rule| {
                 let glob =
                     Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
                         pattern: rule.pattern.clone(),
                         source: e,
                     })?;
-
-                let allow_extensions = Self::validate_extensions(&rule.allow_extensions, i)?;
-                let allow_patterns = Self::build_allow_patterns(&rule.allow_patterns, i)?;
-                let has_whitelist =
-                    !rule.allow_extensions.is_empty() || !rule.allow_patterns.is_empty();
 
                 Ok(CompiledStructureRule {
                     pattern: rule.pattern.clone(),
@@ -371,149 +278,9 @@ impl StructureChecker {
                     max_dirs: rule.max_dirs,
                     max_depth: rule.max_depth,
                     warn_threshold: rule.warn_threshold,
-                    allow_extensions,
-                    allow_patterns,
-                    has_whitelist,
                 })
             })
             .collect()
-    }
-
-    /// Find the rule with whitelist that matches a directory.
-    fn find_matching_rule_with_whitelist(&self, dir: &Path) -> Option<&CompiledStructureRule> {
-        self.rules
-            .iter()
-            .find(|r| r.has_whitelist && r.matcher.is_match(dir))
-    }
-
-    /// Check if a file matches a whitelist rule (extensions OR patterns).
-    fn file_matches_whitelist(file_path: &Path, rule: &CompiledStructureRule) -> bool {
-        // Check extensions first (OR logic)
-        if !rule.allow_extensions.is_empty() && let Some(ext) = file_path.extension() {
-            let ext_with_dot = format!(".{}", ext.to_string_lossy());
-            if rule.allow_extensions.contains(&ext_with_dot) {
-                return true;
-            }
-        }
-
-        // Check patterns (OR logic with extensions)
-        let file_name = file_path.file_name().unwrap_or_default();
-        if rule.allow_patterns.is_match(file_name) || rule.allow_patterns.is_match(file_path) {
-            return true;
-        }
-
-        // No match - only fail if whitelist was actually specified
-        // (has_whitelist is already true at this point, so this returns false)
-        false
-    }
-
-    /// Scan directories and collect stats for each, along with whitelist violations.
-    ///
-    /// # Errors
-    /// Returns an error if a directory cannot be read.
-    pub fn collect_dir_stats(
-        &self,
-        root: &Path,
-    ) -> Result<(HashMap<PathBuf, DirStats>, Vec<StructureViolation>)> {
-        let mut stats = HashMap::new();
-        let mut whitelist_violations = Vec::new();
-        self.collect_dir_stats_recursive(root, &mut stats, &mut whitelist_violations, 0)?;
-        Ok((stats, whitelist_violations))
-    }
-
-    fn collect_dir_stats_recursive(
-        &self,
-        dir: &Path,
-        stats: &mut HashMap<PathBuf, DirStats>,
-        whitelist_violations: &mut Vec<StructureViolation>,
-        depth: usize,
-    ) -> Result<()> {
-        let entries = std::fs::read_dir(dir).map_err(|e| SlocGuardError::FileRead {
-            path: dir.to_path_buf(),
-            source: e,
-        })?;
-
-        let mut dir_stats = DirStats {
-            depth,
-            ..Default::default()
-        };
-
-        // Find whitelist rule for this directory (if any)
-        let whitelist_rule = self.find_matching_rule_with_whitelist(dir);
-
-        for entry in entries {
-            let entry = entry.map_err(SlocGuardError::Io)?;
-            let path = entry.path();
-            let file_name = path.file_name().unwrap_or_default();
-            let file_type = entry.file_type().map_err(SlocGuardError::Io)?;
-
-            // Check scanner.exclude patterns - completely skip matching entries
-            // For directory patterns like ".git/**", we check both the path and
-            // a synthetic child path to catch the directory itself
-            if self.is_scanner_excluded(&path, file_type.is_dir()) {
-                continue;
-            }
-
-            // Check structure.count_exclude patterns - don't count AND skip whitelist check
-            if self.ignore_patterns.is_match(file_name) || self.ignore_patterns.is_match(&path) {
-                // Still recurse into directories for stats collection, just don't count this entry
-                if file_type.is_dir() {
-                    self.collect_dir_stats_recursive(
-                        &path,
-                        stats,
-                        whitelist_violations,
-                        depth + 1,
-                    )?;
-                }
-                continue;
-            }
-
-            if file_type.is_file() {
-                dir_stats.file_count += 1;
-
-                // Check whitelist if applicable
-                if let Some(rule) = whitelist_rule
-                    && !Self::file_matches_whitelist(&path, rule)
-                {
-                    whitelist_violations.push(StructureViolation::disallowed_file(
-                        path.clone(),
-                        rule.pattern.clone(),
-                    ));
-                }
-            } else if file_type.is_dir() {
-                dir_stats.dir_count += 1;
-                // Recurse into subdirectory
-                self.collect_dir_stats_recursive(&path, stats, whitelist_violations, depth + 1)?;
-            }
-        }
-
-        stats.insert(dir.to_path_buf(), dir_stats);
-        Ok(())
-    }
-
-    /// Check if a path should be excluded based on scanner.exclude patterns.
-    ///
-    /// For directory patterns like ".git/**", this also matches the ".git" directory itself,
-    /// not just its contents.
-    fn is_scanner_excluded(&self, path: &Path, is_dir: bool) -> bool {
-        let file_name = path.file_name().unwrap_or_default();
-        let file_name_str = file_name.to_string_lossy();
-
-        // Direct match on filename or full path
-        if self.scanner_exclude.is_match(file_name) || self.scanner_exclude.is_match(path) {
-            return true;
-        }
-
-        // For directories, check if the name matches any extracted dir names from "dir/**" patterns
-        if is_dir {
-            for dir_name in &self.scanner_exclude_dir_names {
-                if file_name_str == *dir_name {
-                    return true;
-                }
-            }
-        }
-
-        false
     }
 
     /// Check if a directory path matches an override path.
@@ -700,19 +467,6 @@ impl StructureChecker {
         // Sort by path for consistent output
         violations.sort_by(|a, b| a.path.cmp(&b.path));
         violations
-    }
-
-    /// Convenience method: collect stats and check in one call.
-    ///
-    /// # Errors
-    /// Returns an error if directories cannot be read.
-    pub fn check_directory(&self, root: &Path) -> Result<Vec<StructureViolation>> {
-        let (stats, mut whitelist_violations) = self.collect_dir_stats(root)?;
-        let mut violations = self.check(&stats);
-        violations.append(&mut whitelist_violations);
-        // Sort by path for consistent output
-        violations.sort_by(|a, b| a.path.cmp(&b.path));
-        Ok(violations)
     }
 
     /// Explain which rule matches a given directory path.

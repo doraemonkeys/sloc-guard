@@ -11,7 +11,7 @@ Lint: make ci
 
 ## Performance Notes
 
-> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB), metadata-based cache validation (mtime + size check avoids file read on cache hit).
+> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB), metadata-based cache validation (mtime + size check avoids file read on cache hit), unified directory traversal (single WalkDir pass for both file discovery and structure checking).
 >
 > **Future considerations**: When adding new features, maintain these patterns:
 > - Use `par_iter()` for file processing loops
@@ -45,6 +45,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
   - **9.2**: `max_depth` - limits directory nesting depth in `[structure]`, `[[structure.rules]]`, and `[[structure.override]]`. CLI `--max-depth` parameter. `StructureChecker` tracks depth during traversal.
   - **9.4**: Structure Whitelist Mode - `allow_extensions` / `allow_patterns` on `[[structure.rules]]`. Files not matching whitelist are `DisallowedFile` violations. Stricter than `count_exclude`. OR logic (extension OR pattern match).
+  - **9.5**: Unified Directory Traversal - `scan_with_structure()` method on `FileScanner` trait. Single WalkDir pass collects files AND directory statistics. Eliminates redundant I/O from separate scanner and structure checker traversals.
 - **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
 
 ---
@@ -105,9 +106,10 @@ Location: `src/commands/init.rs`
 |----------|-------|
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
-| **3. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **4. UX Improvements** | 9.3 Smart init |
-| **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
+| ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
+| **4. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **5. UX Improvements** | 9.3 Smart init |
+| **6. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 
 ---
 

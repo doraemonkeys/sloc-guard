@@ -259,3 +259,29 @@ fn test_trend_delta_default() {
     assert!(delta.previous_timestamp.is_none());
     assert!(!delta.has_changes());
 }
+
+#[test]
+fn test_trend_history_load_nonexistent_returns_error() {
+    let result = TrendHistory::load(Path::new("this_file_does_not_exist_12345.json"));
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_trend_history_load_or_default_invalid_json() {
+    use std::io::Write;
+
+    let temp_dir = std::env::temp_dir();
+    let invalid_path = temp_dir.join("test_invalid_history.json");
+
+    // Write invalid JSON to the file
+    let mut file = std::fs::File::create(&invalid_path).unwrap();
+    file.write_all(b"{ invalid json }").unwrap();
+    drop(file);
+
+    // load_or_default should return default (empty) history when file is invalid
+    let history = TrendHistory::load_or_default(&invalid_path);
+    assert!(history.is_empty());
+
+    // Cleanup
+    std::fs::remove_file(&invalid_path).ok();
+}
