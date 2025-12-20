@@ -10,6 +10,7 @@ fn make_cli_for_baseline(quiet: bool, no_config: bool) -> Cli {
         command: Commands::Init(InitArgs {
             output: PathBuf::from(".sloc-guard.toml"),
             force: false,
+            detect: false,
         }),
         verbose: 0,
         quiet,

@@ -283,6 +283,10 @@ pub struct InitArgs {
     /// Overwrite existing configuration
     #[arg(long)]
     pub force: bool,
+
+    /// Auto-detect project type and generate appropriate config
+    #[arg(long)]
+    pub detect: bool,
 }
 
 #[derive(Parser, Debug)]

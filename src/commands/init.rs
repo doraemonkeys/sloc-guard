@@ -2,6 +2,8 @@ use std::fs;
 
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
+use super::detect;
+
 #[must_use]
 pub fn run_init(args: &crate::cli::InitArgs) -> i32 {
     match run_init_impl(args) {
@@ -27,7 +29,12 @@ pub(crate) fn run_init_impl(args: &crate::cli::InitArgs) -> Result<()> {
         )));
     }
 
-    let template = generate_config_template();
+    let template = if args.detect {
+        let cwd = std::env::current_dir()?;
+        detect::generate_detected_config_from_dir(&cwd)?
+    } else {
+        generate_config_template()
+    };
 
     fs::write(output_path, template)?;
 

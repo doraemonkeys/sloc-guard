@@ -1,7 +1,8 @@
 use crate::cli::InitArgs;
 use tempfile::TempDir;
 
-use super::{generate_config_template, run_init_impl};
+use super::{generate_config_template, run_init, run_init_impl};
+use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 #[test]
 fn generate_config_template_contains_default_section() {
@@ -42,6 +43,7 @@ fn run_init_creates_config_file() {
     let args = InitArgs {
         output: config_path.clone(),
         force: false,
+        detect: false,
     };
 
     let result = run_init_impl(&args);
@@ -62,6 +64,7 @@ fn run_init_fails_if_file_exists_without_force() {
     let args = InitArgs {
         output: config_path,
         force: false,
+        detect: false,
     };
 
     let result = run_init_impl(&args);
@@ -80,6 +83,7 @@ fn run_init_overwrites_with_force() {
     let args = InitArgs {
         output: config_path.clone(),
         force: true,
+        detect: false,
     };
 
     let result = run_init_impl(&args);
@@ -100,6 +104,7 @@ fn run_init_creates_parent_directories() {
     let args = InitArgs {
         output: config_path.clone(),
         force: false,
+        detect: false,
     };
 
     let result = run_init_impl(&args);
@@ -112,4 +117,90 @@ fn generate_config_template_contains_strict() {
     let template = generate_config_template();
     assert!(template.contains("strict"));
     assert!(template.contains("Strict mode"));
+}
+
+#[test]
+fn run_init_returns_success_exit_code() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+
+    let args = InitArgs {
+        output: config_path,
+        force: false,
+        detect: false,
+    };
+
+    let exit_code = run_init(&args);
+    assert_eq!(exit_code, EXIT_SUCCESS);
+}
+
+#[test]
+fn run_init_returns_error_exit_code_when_file_exists() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+
+    std::fs::write(&config_path, "existing").unwrap();
+
+    let args = InitArgs {
+        output: config_path,
+        force: false,
+        detect: false,
+    };
+
+    let exit_code = run_init(&args);
+    assert_eq!(exit_code, EXIT_CONFIG_ERROR);
+}
+
+#[test]
+fn run_init_with_detect_creates_rust_config() {
+    let temp_dir = TempDir::new().unwrap();
+
+    std::fs::write(temp_dir.path().join("Cargo.toml"), "[package]\nname = \"test\"").unwrap();
+
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
+
+    let args = InitArgs {
+        output: config_path.clone(),
+        force: false,
+        detect: true,
+    };
+
+    let result = run_init_impl(&args);
+    std::env::set_current_dir(original_dir).unwrap();
+
+    assert!(result.is_ok());
+    assert!(config_path.exists());
+
+    let content = std::fs::read_to_string(&config_path).unwrap();
+    assert!(content.contains("version = \"2\""));
+    assert!(content.contains("\"rs\""));
+    assert!(content.contains("Detected"));
+}
+
+#[test]
+fn run_init_with_detect_handles_unknown_project() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
+
+    let args = InitArgs {
+        output: config_path.clone(),
+        force: false,
+        detect: true,
+    };
+
+    let result = run_init_impl(&args);
+    std::env::set_current_dir(original_dir).unwrap();
+
+    assert!(result.is_ok());
+    assert!(config_path.exists());
+
+    let content = std::fs::read_to_string(&config_path).unwrap();
+    assert!(content.contains("version = \"2\""));
+    assert!(content.contains("Unknown project type"));
 }

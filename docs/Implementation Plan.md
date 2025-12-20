@@ -44,6 +44,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9 (Partial)**:
   - **9.1**: `explain` command - shows which rules/overrides apply to a path, displays rule chain with match status.
   - **9.2**: `max_depth` - limits directory nesting depth in `[structure]`, `[[structure.rules]]`, and `[[structure.override]]`. CLI `--max-depth` parameter. `StructureChecker` tracks depth during traversal.
+  - **9.3**: `init --detect` - Auto-detect project type (Cargo.toml→Rust, package.json→Node, go.mod→Go, etc.). Generates language-appropriate V2 config with suitable `max_lines`, extensions, and exclude patterns. Monorepo support: detects subprojects and generates scoped `[[content.rules]]`.
   - **9.4**: Structure Whitelist Mode - `allow_extensions` / `allow_patterns` on `[[structure.rules]]`. Files not matching whitelist are `DisallowedFile` violations. Stricter than `count_exclude`. OR logic (extension OR pattern match).
   - **9.5**: Unified Directory Traversal - `scan_with_structure()` method on `FileScanner` trait. Single WalkDir pass collects files AND directory statistics. Eliminates redundant I/O from separate scanner and structure checker traversals.
 - **Phase 10**: IO Abstraction for Pure Unit Testing, Replace unwrap() with expect().
@@ -89,15 +90,7 @@ Location: `src/output/html.rs`
 
 ## Phase 9: Advanced Features (Pending)
 
-### Task 9.3: init --detect (Smart Init)
-Location: `src/commands/init.rs`
-```
-- Add --detect flag to init command
-- Auto-detect project type (Cargo.toml→Rust, package.json→Node, etc.)
-- Generate language-appropriate default rules
-- For monorepo: generate scoped [[content.rules]] per detected project subdirectory
-- Reduces configuration barrier for new users
-```
+(All Phase 9 tasks completed - see Completed section above)
 
 ---
 
@@ -170,7 +163,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
 | ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 whitelist mode~~ ✅ |
 | ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
-| **4. UX Improvements** | 9.3 Smart init, 11.6 Presets |
+| **4. UX Improvements** | ~~9.3 Smart init~~ ✅, 11.6 Presets |
 | **5. CI/CD** | 8.1-8.2 GitHub Action & Pre-commit |
 | **6. Cleanup** | 11.8 Terminology Modernization |
 | **7. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |

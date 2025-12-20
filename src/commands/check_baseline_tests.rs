@@ -17,6 +17,7 @@ fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         command: Commands::Init(InitArgs {
             output: PathBuf::from(".sloc-guard.toml"),
             force: false,
+            detect: false,
         }),
         verbose,
         quiet,

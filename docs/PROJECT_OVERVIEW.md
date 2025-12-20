@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | File(s) | Purpose |
 |--------|---------|---------|
-| `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init`, `config`, `baseline`, `explain` commands |
+| `cli` | `cli.rs` | Clap CLI: `check`, `stats`, `init` (with `--detect`), `config`, `baseline`, `explain` commands |
 | `config/*` | `config/*.rs` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance; remote fetching (1h TTL cache) |
 | `language/registry` | `language/registry.rs` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `counter/*.rs` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -27,7 +27,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `baseline`/`cache` | `*/types.rs` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
 | `output/*` | `output/*.rs` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `error.rs` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git |
-| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI |
+| `commands/*` | `commands/*.rs` | `run_check`, `run_stats`, `run_baseline`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
 | `analyzer` | `analyzer/*.rs` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `stats/trend.rs` | `TrendHistory` - historical stats with delta computation |
 | `main` | `main.rs` | CLI parsing, command dispatch to `commands/*` |
@@ -109,6 +109,12 @@ WhitelistRule { pattern, allow_extensions, allow_patterns }  // Directory whitel
 CompositeScanner  // Production impl with git/non-git fallback
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
 StatsContext { registry, allowed_extensions }  // from_config() or new()
+
+// Project Detection (init --detect)
+ProjectType::Rust | Node | Go | Python | Java | CSharp | Unknown  // auto-detected from marker files
+DetectedProject { path, project_type }  // subproject in monorepo
+DetectionResult { root, subprojects, is_monorepo }  // detection output
+ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testability
 ```
 
 ## Data Flow
