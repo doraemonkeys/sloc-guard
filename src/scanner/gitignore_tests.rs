@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use super::*;
-use crate::scanner::{StructureScanConfig, AllowlistRuleBuilder};
+use crate::scanner::{AllowlistRuleBuilder, StructureScanConfig};
 use tempfile::TempDir;
 
 struct AcceptAllFilter;

@@ -515,4 +515,3 @@ fn update_baseline_mode_new_preserves_existing_entries() {
         BaselineEntry::Structure { .. } => panic!("Expected Content entry"),
     }
 }
-

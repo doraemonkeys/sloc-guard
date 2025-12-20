@@ -664,4 +664,3 @@ fn run_check_impl_report_json_does_not_affect_exit_code() {
     // Stats file should still be created even with failures
     assert!(stats_output.exists());
 }
-

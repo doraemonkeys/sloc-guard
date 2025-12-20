@@ -317,7 +317,10 @@ fn path_matches_override_suffix_match() {
     assert!(path_matches_override(&path, "button.rs"));
     assert!(path_matches_override(&path, "components/button.rs"));
     assert!(path_matches_override(&path, "src/components/button.rs"));
-    assert!(path_matches_override(&path, "project/src/components/button.rs"));
+    assert!(path_matches_override(
+        &path,
+        "project/src/components/button.rs"
+    ));
 }
 
 #[test]
@@ -340,9 +343,9 @@ fn path_matches_override_partial_component_no_match() {
 
 #[test]
 fn validate_override_paths_valid_content_override() {
+    use super::validate_override_paths;
     use crate::checker::DirStats;
     use crate::config::{ContentOverride, StructureOverride};
-    use super::validate_override_paths;
 
     let content_overrides = vec![ContentOverride {
         path: "src/main.rs".to_string(),
@@ -364,9 +367,9 @@ fn validate_override_paths_valid_content_override() {
 
 #[test]
 fn validate_override_paths_content_override_matches_directory() {
+    use super::validate_override_paths;
     use crate::checker::DirStats;
     use crate::config::{ContentOverride, StructureOverride};
-    use super::validate_override_paths;
 
     let content_overrides = vec![ContentOverride {
         path: "src/components".to_string(),
@@ -378,7 +381,11 @@ fn validate_override_paths_content_override_matches_directory() {
     let mut directories: HashMap<PathBuf, DirStats> = HashMap::new();
     directories.insert(
         PathBuf::from("src/components"),
-        DirStats { file_count: 5, dir_count: 0, depth: 1 },
+        DirStats {
+            file_count: 5,
+            dir_count: 0,
+            depth: 1,
+        },
     );
 
     let result = validate_override_paths(
@@ -396,9 +403,9 @@ fn validate_override_paths_content_override_matches_directory() {
 
 #[test]
 fn validate_override_paths_valid_structure_override() {
+    use super::validate_override_paths;
     use crate::checker::DirStats;
     use crate::config::{ContentOverride, StructureOverride};
-    use super::validate_override_paths;
 
     let content_overrides: Vec<ContentOverride> = vec![];
     let structure_overrides = vec![StructureOverride {
@@ -412,7 +419,11 @@ fn validate_override_paths_valid_structure_override() {
     let mut directories: HashMap<PathBuf, DirStats> = HashMap::new();
     directories.insert(
         PathBuf::from("src/components"),
-        DirStats { file_count: 50, dir_count: 2, depth: 1 },
+        DirStats {
+            file_count: 50,
+            dir_count: 2,
+            depth: 1,
+        },
     );
 
     let result = validate_override_paths(
@@ -426,9 +437,9 @@ fn validate_override_paths_valid_structure_override() {
 
 #[test]
 fn validate_override_paths_structure_override_matches_file() {
+    use super::validate_override_paths;
     use crate::checker::DirStats;
     use crate::config::{ContentOverride, StructureOverride};
-    use super::validate_override_paths;
 
     let content_overrides: Vec<ContentOverride> = vec![];
     let structure_overrides = vec![StructureOverride {
@@ -456,9 +467,9 @@ fn validate_override_paths_structure_override_matches_file() {
 
 #[test]
 fn validate_override_paths_suffix_matching() {
+    use super::validate_override_paths;
     use crate::checker::DirStats;
     use crate::config::{ContentOverride, StructureOverride};
-    use super::validate_override_paths;
 
     // ContentOverride path "legacy" should match directory "project/src/legacy"
     let content_overrides = vec![ContentOverride {
@@ -471,7 +482,11 @@ fn validate_override_paths_suffix_matching() {
     let mut directories: HashMap<PathBuf, DirStats> = HashMap::new();
     directories.insert(
         PathBuf::from("project/src/legacy"),
-        DirStats { file_count: 10, dir_count: 0, depth: 2 },
+        DirStats {
+            file_count: 10,
+            dir_count: 0,
+            depth: 2,
+        },
     );
 
     let result = validate_override_paths(

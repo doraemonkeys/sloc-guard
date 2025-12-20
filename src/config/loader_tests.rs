@@ -818,7 +818,13 @@ max_lines = 1000
     let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
     // Child adds rules on top of preset
-    assert!(config.content.rules.iter().any(|r| r.pattern == "src/legacy/**"));
+    assert!(
+        config
+            .content
+            .rules
+            .iter()
+            .any(|r| r.pattern == "src/legacy/**")
+    );
     assert_eq!(config.content.max_lines, 400); // From node-strict
 }
 

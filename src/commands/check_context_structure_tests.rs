@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use tempfile::TempDir;
 
+use crate::EXIT_THRESHOLD_EXCEEDED;
 use crate::cache::Cache;
 use crate::checker::ThresholdChecker;
 use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, InitArgs};
@@ -11,7 +12,6 @@ use crate::config::Config;
 use crate::language::LanguageRegistry;
 use crate::output::OutputFormat;
 use crate::scanner::{CompositeScanner, FileScanner};
-use crate::EXIT_THRESHOLD_EXCEEDED;
 
 use super::*;
 use crate::commands::context::{CheckContext, FileReader, RealFileReader};
@@ -96,7 +96,14 @@ fn check_context_new_allows_custom_injection() {
     let scanner: Box<dyn FileScanner> = Box::new(CompositeScanner::new(Vec::new(), false));
     let file_reader: Box<dyn FileReader> = Box::new(RealFileReader);
 
-    let ctx = CheckContext::new(registry, threshold_checker, None, None, scanner, file_reader);
+    let ctx = CheckContext::new(
+        registry,
+        threshold_checker,
+        None,
+        None,
+        scanner,
+        file_reader,
+    );
 
     assert!(ctx.structure_checker.is_none());
 }
@@ -262,4 +269,3 @@ fn run_check_with_cli_max_dirs_overrides_config() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
 }
-

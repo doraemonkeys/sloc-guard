@@ -156,7 +156,10 @@ impl StructureChecker {
     /// # Errors
     /// Returns an error if any pattern is invalid or any limit value is less than -1.
     #[allow(clippy::needless_pass_by_value)]
-    pub fn with_scanner_exclude(config: &StructureConfig, _scanner_exclude: &[String]) -> Result<Self> {
+    pub fn with_scanner_exclude(
+        config: &StructureConfig,
+        _scanner_exclude: &[String],
+    ) -> Result<Self> {
         Self::new(config)
     }
 

@@ -163,7 +163,9 @@ impl StructureScanConfig {
 
     /// Find the first allowlist rule matching a directory.
     fn find_matching_allowlist_rule(&self, dir: &Path) -> Option<&AllowlistRule> {
-        self.allowlist_rules.iter().find(|r| r.matches_directory(dir))
+        self.allowlist_rules
+            .iter()
+            .find(|r| r.matches_directory(dir))
     }
 }
 
@@ -214,12 +216,13 @@ impl AllowlistRuleBuilder {
             })?;
             pattern_builder.add(g);
         }
-        let allow_patterns = pattern_builder
-            .build()
-            .map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: "allow_patterns".to_string(),
-                source: e,
-            })?;
+        let allow_patterns =
+            pattern_builder
+                .build()
+                .map_err(|e| SlocGuardError::InvalidPattern {
+                    pattern: "allow_patterns".to_string(),
+                    source: e,
+                })?;
 
         Ok(AllowlistRule {
             pattern: self.pattern,
@@ -280,7 +283,9 @@ pub trait FileScanner: Send + Sync {
             let result = self.scan_with_structure(path, structure_config)?;
             combined.files.extend(result.files);
             combined.dir_stats.extend(result.dir_stats);
-            combined.allowlist_violations.extend(result.allowlist_violations);
+            combined
+                .allowlist_violations
+                .extend(result.allowlist_violations);
         }
         Ok(combined)
     }
@@ -341,15 +346,14 @@ impl<F: FileFilter> DirectoryScanner<F> {
                 }
 
                 // Count for parent directory (if not excluded)
-                if !is_count_excluded
-                    && let Some(parent) = path.parent()
-                {
-                    let parent_stats = dir_entries
-                        .entry(parent.to_path_buf())
-                        .or_insert_with(|| DirStats {
-                            depth: if depth > 0 { depth - 1 } else { 0 },
-                            ..Default::default()
-                        });
+                if !is_count_excluded && let Some(parent) = path.parent() {
+                    let parent_stats =
+                        dir_entries
+                            .entry(parent.to_path_buf())
+                            .or_insert_with(|| DirStats {
+                                depth: if depth > 0 { depth - 1 } else { 0 },
+                                ..Default::default()
+                            });
                     parent_stats.file_count += 1;
 
                     // Check allowlist violations
@@ -357,10 +361,12 @@ impl<F: FileFilter> DirectoryScanner<F> {
                         && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
                         && !rule.file_matches(path)
                     {
-                        result.allowlist_violations.push(StructureViolation::disallowed_file(
-                            path.to_path_buf(),
-                            rule.pattern.clone(),
-                        ));
+                        result
+                            .allowlist_violations
+                            .push(StructureViolation::disallowed_file(
+                                path.to_path_buf(),
+                                rule.pattern.clone(),
+                            ));
                     }
                 }
             } else if file_type.is_dir() {
@@ -373,15 +379,17 @@ impl<F: FileFilter> DirectoryScanner<F> {
                     });
 
                 // Count as subdirectory for parent (if not excluded and not root)
-                if depth > 0 && !is_count_excluded
+                if depth > 0
+                    && !is_count_excluded
                     && let Some(parent) = path.parent()
                 {
-                    let parent_stats = dir_entries
-                        .entry(parent.to_path_buf())
-                        .or_insert_with(|| DirStats {
-                            depth: depth - 1,
-                            ..Default::default()
-                        });
+                    let parent_stats =
+                        dir_entries
+                            .entry(parent.to_path_buf())
+                            .or_insert_with(|| DirStats {
+                                depth: depth - 1,
+                                ..Default::default()
+                            });
                     parent_stats.dir_count += 1;
                 }
             }
@@ -515,7 +523,9 @@ impl FileScanner for CompositeScanner {
                     Ok(result) => {
                         combined.files.extend(result.files);
                         combined.dir_stats.extend(result.dir_stats);
-                        combined.allowlist_violations.extend(result.allowlist_violations);
+                        combined
+                            .allowlist_violations
+                            .extend(result.allowlist_violations);
                     }
                     Err(SlocGuardError::Git(_)) => {
                         // Fallback to non-git scanning for all paths
@@ -555,7 +565,9 @@ impl CompositeScanner {
             let result = scanner.scan_with_structure(path, structure_config)?;
             combined.files.extend(result.files);
             combined.dir_stats.extend(result.dir_stats);
-            combined.allowlist_violations.extend(result.allowlist_violations);
+            combined
+                .allowlist_violations
+                .extend(result.allowlist_violations);
         }
         Ok(combined)
     }

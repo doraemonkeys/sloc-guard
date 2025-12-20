@@ -4,10 +4,8 @@ use crate::checker::{StructureViolation, ViolationType};
 
 #[test]
 fn structure_violation_to_check_result_disallowed_file() {
-    let violation = StructureViolation::disallowed_file(
-        PathBuf::from("src/config.json"),
-        "**/src".to_string(),
-    );
+    let violation =
+        StructureViolation::disallowed_file(PathBuf::from("src/config.json"), "**/src".to_string());
 
     let result = super::structure_violation_to_check_result(&violation);
 
@@ -18,9 +16,11 @@ fn structure_violation_to_check_result_disallowed_file() {
             ..
         } => {
             assert_eq!(path, PathBuf::from("src/config.json"));
-            assert!(override_reason
-                .unwrap()
-                .contains("structure: disallowed file"));
+            assert!(
+                override_reason
+                    .unwrap()
+                    .contains("structure: disallowed file")
+            );
         }
         _ => panic!("Expected Failed result"),
     }
@@ -28,13 +28,8 @@ fn structure_violation_to_check_result_disallowed_file() {
 
 #[test]
 fn structure_violation_to_check_result_file_count_warning() {
-    let violation = StructureViolation::warning(
-        PathBuf::from("src"),
-        ViolationType::FileCount,
-        45,
-        50,
-        None,
-    );
+    let violation =
+        StructureViolation::warning(PathBuf::from("src"), ViolationType::FileCount, 45, 50, None);
 
     let result = super::structure_violation_to_check_result(&violation);
 
@@ -55,13 +50,8 @@ fn structure_violation_to_check_result_file_count_warning() {
 
 #[test]
 fn structure_violation_to_check_result_dir_count() {
-    let violation = StructureViolation::new(
-        PathBuf::from("src"),
-        ViolationType::DirCount,
-        15,
-        10,
-        None,
-    );
+    let violation =
+        StructureViolation::new(PathBuf::from("src"), ViolationType::DirCount, 15, 10, None);
 
     let result = super::structure_violation_to_check_result(&violation);
 
@@ -96,4 +86,3 @@ fn structure_violation_to_check_result_max_depth() {
         _ => panic!("Expected Failed result"),
     }
 }
-

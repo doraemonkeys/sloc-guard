@@ -154,7 +154,9 @@ impl ProjectDetector for RealProjectDetector {
         let mut files = Vec::new();
         for entry in std::fs::read_dir(path)? {
             let entry = entry?;
-            if entry.file_type()?.is_file() && let Some(name) = entry.file_name().to_str() {
+            if entry.file_type()?.is_file()
+                && let Some(name) = entry.file_name().to_str()
+            {
                 files.push(name.to_string());
             }
         }

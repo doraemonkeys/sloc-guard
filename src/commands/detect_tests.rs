@@ -220,24 +220,42 @@ fn project_type_max_lines() {
 
 #[test]
 fn project_type_exclude_patterns() {
-    assert!(ProjectType::Rust
-        .exclude_patterns()
-        .contains(&"**/target/**"));
-    assert!(ProjectType::Node
-        .exclude_patterns()
-        .contains(&"**/node_modules/**"));
+    assert!(
+        ProjectType::Rust
+            .exclude_patterns()
+            .contains(&"**/target/**")
+    );
+    assert!(
+        ProjectType::Node
+            .exclude_patterns()
+            .contains(&"**/node_modules/**")
+    );
     assert!(ProjectType::Go.exclude_patterns().contains(&"**/vendor/**"));
-    assert!(ProjectType::Python
-        .exclude_patterns()
-        .contains(&"**/__pycache__/**"));
-    assert!(ProjectType::Java
-        .exclude_patterns()
-        .contains(&"**/target/**"));
-    assert!(ProjectType::Java
-        .exclude_patterns()
-        .contains(&"**/build/**"));
-    assert!(ProjectType::CSharp.exclude_patterns().contains(&"**/bin/**"));
-    assert!(ProjectType::CSharp.exclude_patterns().contains(&"**/obj/**"));
+    assert!(
+        ProjectType::Python
+            .exclude_patterns()
+            .contains(&"**/__pycache__/**")
+    );
+    assert!(
+        ProjectType::Java
+            .exclude_patterns()
+            .contains(&"**/target/**")
+    );
+    assert!(
+        ProjectType::Java
+            .exclude_patterns()
+            .contains(&"**/build/**")
+    );
+    assert!(
+        ProjectType::CSharp
+            .exclude_patterns()
+            .contains(&"**/bin/**")
+    );
+    assert!(
+        ProjectType::CSharp
+            .exclude_patterns()
+            .contains(&"**/obj/**")
+    );
     assert!(ProjectType::Unknown.exclude_patterns().is_empty());
 }
 

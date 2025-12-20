@@ -1475,4 +1475,3 @@ fn explain_reports_last_matching_rule() {
     // Effective limit should be from the last rule (50)
     assert_eq!(explanation.effective_max_files, Some(50));
 }
-

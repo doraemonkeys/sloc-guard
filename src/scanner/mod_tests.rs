@@ -102,7 +102,10 @@ fn composite_scanner_scan_all_combines_results() {
     std::fs::write(temp_dir2.path().join("b.rs"), "").unwrap();
 
     let scanner = CompositeScanner::new(Vec::new(), false);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let files = scanner.scan_all(&paths).unwrap();
 
     assert_eq!(files.len(), 2);
@@ -143,7 +146,10 @@ fn file_scanner_default_scan_all_uses_scan() {
 
     let filter = GlobFilter::new(Vec::new(), &[]).unwrap();
     let scanner = DirectoryScanner::new(filter);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
 
     // Uses the default scan_all implementation from FileScanner trait
     let files = scanner.scan_all(&paths).unwrap();
@@ -160,7 +166,10 @@ fn composite_scanner_scan_all_with_gitignore_true() {
 
     // use_gitignore = true
     let scanner = CompositeScanner::new(Vec::new(), true);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let result = scanner.scan_all(&paths);
 
     // Should not error regardless of git status
@@ -193,10 +202,22 @@ fn structure_scan_config_with_scanner_exclude() {
 
 #[test]
 fn structure_scan_config_extracts_dir_names() {
-    let config =
-        StructureScanConfig::new(&[], &["target/**".to_string(), "node_modules/**".to_string()], Vec::new()).unwrap();
-    assert!(config.scanner_exclude_dir_names.contains(&"target".to_string()));
-    assert!(config.scanner_exclude_dir_names.contains(&"node_modules".to_string()));
+    let config = StructureScanConfig::new(
+        &[],
+        &["target/**".to_string(), "node_modules/**".to_string()],
+        Vec::new(),
+    )
+    .unwrap();
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"target".to_string())
+    );
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"node_modules".to_string())
+    );
 }
 
 #[test]
@@ -330,12 +351,19 @@ fn scan_with_structure_respects_scanner_exclude() {
     // Use **/target/** which matches files inside target directory
     let config = StructureScanConfig::new(&[], &["**/target/**".to_string()], Vec::new()).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // target files should be excluded
     assert_eq!(result.files.len(), 1);
     // target dir should not be counted since it's excluded
-    assert!(result.dir_stats.get(temp_dir.path()).is_none_or(|s| s.dir_count <= 1));
+    assert!(
+        result
+            .dir_stats
+            .get(temp_dir.path())
+            .is_none_or(|s| s.dir_count <= 1)
+    );
 }
 
 #[test]
@@ -348,7 +376,9 @@ fn scan_with_structure_respects_count_exclude() {
 
     let config = StructureScanConfig::new(&["*.txt".to_string()], &[], Vec::new()).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // txt files should be found but not counted
     assert_eq!(result.files.len(), 2);
@@ -370,7 +400,9 @@ fn scan_with_structure_detects_allowlist_violations() {
         .unwrap();
     let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // config.json should be an allowlist violation
     assert_eq!(result.allowlist_violations.len(), 1);
@@ -391,7 +423,9 @@ fn scan_with_structure_no_violation_for_matching_files() {
         .unwrap();
     let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // All files are .rs, so no violations
     assert!(result.allowlist_violations.is_empty());
@@ -433,7 +467,10 @@ fn composite_scanner_scan_all_with_structure() {
     std::fs::write(temp_dir2.path().join("b.rs"), "").unwrap();
 
     let scanner = CompositeScanner::new(Vec::new(), false);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let result = scanner.scan_all_with_structure(&paths, None).unwrap();
 
     assert_eq!(result.files.len(), 2);
@@ -467,8 +504,13 @@ fn structure_scan_config_is_scanner_excluded_file() {
 
 #[test]
 fn structure_scan_config_is_count_excluded() {
-    let config = StructureScanConfig::new(&["*.generated.rs".to_string()], &[], Vec::new()).unwrap();
-    assert!(config.count_exclude.is_match(Path::new("types.generated.rs")));
+    let config =
+        StructureScanConfig::new(&["*.generated.rs".to_string()], &[], Vec::new()).unwrap();
+    assert!(
+        config
+            .count_exclude
+            .is_match(Path::new("types.generated.rs"))
+    );
     assert!(!config.count_exclude.is_match(Path::new("types.rs")));
 }
 
@@ -480,8 +522,18 @@ fn structure_scan_config_find_matching_allowlist_rule() {
         .unwrap();
     let config = StructureScanConfig::new(&[], &[], vec![rule]).unwrap();
 
-    assert!(config.allowlist_rules.iter().any(|r| r.matches_directory(Path::new("src/lib"))));
-    assert!(!config.allowlist_rules.iter().any(|r| r.matches_directory(Path::new("tests/lib"))));
+    assert!(
+        config
+            .allowlist_rules
+            .iter()
+            .any(|r| r.matches_directory(Path::new("src/lib")))
+    );
+    assert!(
+        !config
+            .allowlist_rules
+            .iter()
+            .any(|r| r.matches_directory(Path::new("tests/lib")))
+    );
 }
 
 #[test]
@@ -501,7 +553,12 @@ fn scan_files_with_exclude() {
     std::fs::create_dir(temp_dir.path().join("vendor")).unwrap();
     std::fs::write(temp_dir.path().join("vendor/lib.rs"), "").unwrap();
 
-    let files = scan_files(&[temp_dir.path().to_path_buf()], &["**/vendor/**".to_string()], false).unwrap();
+    let files = scan_files(
+        &[temp_dir.path().to_path_buf()],
+        &["**/vendor/**".to_string()],
+        false,
+    )
+    .unwrap();
     assert_eq!(files.len(), 1);
 }
 
@@ -513,7 +570,10 @@ fn composite_scanner_scan_all_with_structure_with_gitignore() {
     std::fs::write(temp_dir2.path().join("b.rs"), "").unwrap();
 
     let scanner = CompositeScanner::new(Vec::new(), true);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let result = scanner.scan_all_with_structure(&paths, None);
 
     // Should not error
@@ -541,9 +601,12 @@ fn scan_files_with_gitignore_true_fallback() {
 
 #[test]
 fn structure_scan_config_extract_dir_names_windows_paths() {
-    let config =
-        StructureScanConfig::new(&[], &["target\\**".to_string()], Vec::new()).unwrap();
-    assert!(config.scanner_exclude_dir_names.contains(&"target".to_string()));
+    let config = StructureScanConfig::new(&[], &["target\\**".to_string()], Vec::new()).unwrap();
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"target".to_string())
+    );
 }
 
 #[test]
@@ -589,10 +652,13 @@ fn composite_scanner_excludes_dir_by_name() {
 
 #[test]
 fn structure_scan_config_is_scanner_excluded_by_dir_name() {
-    let config =
-        StructureScanConfig::new(&[], &["target/**".to_string()], Vec::new()).unwrap();
+    let config = StructureScanConfig::new(&[], &["target/**".to_string()], Vec::new()).unwrap();
     // Should match directory name
-    assert!(config.scanner_exclude_dir_names.contains(&"target".to_string()));
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"target".to_string())
+    );
 }
 
 #[test]
@@ -695,7 +761,11 @@ fn structure_scan_config_is_scanner_excluded_directory_by_name() {
         StructureScanConfig::new(&[], &["node_modules/**".to_string()], Vec::new()).unwrap();
 
     // For directories, check if the name matches
-    assert!(config.scanner_exclude_dir_names.contains(&"node_modules".to_string()));
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"node_modules".to_string())
+    );
 }
 
 #[test]
@@ -734,7 +804,10 @@ fn scan_all_with_structure_merges_results() {
     std::fs::write(temp_dir2.path().join("b.rs"), "").unwrap();
 
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let result = scanner.scan_all_with_structure(&paths, None).unwrap();
 
     assert_eq!(result.files.len(), 2);
@@ -761,16 +834,29 @@ fn structure_scan_config_extract_dir_names_complex() {
         &[
             "**/node_modules/**".to_string(),
             "build/**".to_string(),
-            "**/*.tmp".to_string(),  // Not a dir pattern
+            "**/*.tmp".to_string(), // Not a dir pattern
         ],
         Vec::new(),
     )
     .unwrap();
 
-    assert!(config.scanner_exclude_dir_names.contains(&"node_modules".to_string()));
-    assert!(config.scanner_exclude_dir_names.contains(&"build".to_string()));
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"node_modules".to_string())
+    );
+    assert!(
+        config
+            .scanner_exclude_dir_names
+            .contains(&"build".to_string())
+    );
     // *.tmp is not a directory pattern (contains *)
-    assert!(!config.scanner_exclude_dir_names.iter().any(|n| n.contains("tmp")));
+    assert!(
+        !config
+            .scanner_exclude_dir_names
+            .iter()
+            .any(|n| n.contains("tmp"))
+    );
 }
 
 #[test]
@@ -784,7 +870,9 @@ fn scan_with_structure_with_count_exclude_does_not_affect_file_list() {
     // Exclude .gen from counting but not from file list
     let config = StructureScanConfig::new(&["*.gen".to_string()], &[], Vec::new()).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // Both files in file list
     assert_eq!(result.files.len(), 2);
@@ -802,11 +890,18 @@ fn scan_with_structure_with_scanner_exclude_skips_entirely() {
 
     let config = StructureScanConfig::new(&[], &["**/vendor/**".to_string()], Vec::new()).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // vendor files completely excluded
     assert_eq!(result.files.len(), 1);
-    assert!(!result.files.iter().any(|f| f.to_string_lossy().contains("vendor")));
+    assert!(
+        !result
+            .files
+            .iter()
+            .any(|f| f.to_string_lossy().contains("vendor"))
+    );
 }
 
 #[test]
@@ -859,10 +954,15 @@ fn scan_with_structure_allowlist_violation_includes_rule_pattern() {
         .unwrap();
     let config = StructureScanConfig::new(&[], &[], vec![rule]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     assert_eq!(result.allowlist_violations.len(), 1);
-    assert_eq!(result.allowlist_violations[0].triggering_rule_pattern, Some("**/src".to_string()));
+    assert_eq!(
+        result.allowlist_violations[0].triggering_rule_pattern,
+        Some("**/src".to_string())
+    );
 }
 
 #[test]
@@ -876,7 +976,9 @@ fn scan_with_structure_dir_excluded_by_name_match() {
     // Use pattern that matches files inside target - use **/target/** for both dir name and file matching
     let config = StructureScanConfig::new(&[], &["**/target/**".to_string()], Vec::new()).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner.scan_with_structure(temp_dir.path(), Some(&config)).unwrap();
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
 
     // target directory files should be excluded
     assert_eq!(result.files.len(), 1);
@@ -954,7 +1056,10 @@ fn composite_scanner_scan_all_no_gitignore_multiple_paths() {
     std::fs::write(temp_dir2.path().join("b.rs"), "").unwrap();
 
     let scanner = CompositeScanner::new(Vec::new(), false);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let files = scanner.scan_all(&paths).unwrap();
 
     assert_eq!(files.len(), 2);
@@ -968,7 +1073,10 @@ fn composite_scanner_scan_all_structure_no_gitignore_multiple_paths() {
     std::fs::write(temp_dir2.path().join("b.rs"), "").unwrap();
 
     let scanner = CompositeScanner::new(Vec::new(), false);
-    let paths = vec![temp_dir1.path().to_path_buf(), temp_dir2.path().to_path_buf()];
+    let paths = vec![
+        temp_dir1.path().to_path_buf(),
+        temp_dir2.path().to_path_buf(),
+    ];
     let result = scanner.scan_all_with_structure(&paths, None).unwrap();
 
     assert_eq!(result.files.len(), 2);

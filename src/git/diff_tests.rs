@@ -238,7 +238,11 @@ fn staged_files_ignores_unstaged_changes() {
     git_commit(dir.path(), "Initial commit");
 
     // Modify file but don't stage it
-    create_file(dir.path(), "main.rs", "fn main() { println!(\"modified\"); }");
+    create_file(
+        dir.path(),
+        "main.rs",
+        "fn main() { println!(\"modified\"); }",
+    );
 
     let git_diff = GitDiff::discover(dir.path()).unwrap();
     let staged = git_diff.get_staged_files().unwrap();

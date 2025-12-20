@@ -24,7 +24,7 @@ pub fn load_preset(name: &str) -> Result<Value> {
                 "Unknown preset: '{}'. Available presets: {}",
                 name,
                 AVAILABLE_PRESETS.join(", ")
-            )))
+            )));
         }
     };
 

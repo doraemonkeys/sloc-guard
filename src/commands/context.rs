@@ -13,7 +13,7 @@ use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
-use crate::scanner::{CompositeScanner, FileScanner, StructureScanConfig, AllowlistRuleBuilder};
+use crate::scanner::{AllowlistRuleBuilder, CompositeScanner, FileScanner, StructureScanConfig};
 
 /// Default cache file path
 pub const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";

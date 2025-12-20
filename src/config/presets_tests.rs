@@ -9,27 +9,26 @@ fn load_rust_strict_preset() {
     assert_eq!(table.get("version").and_then(Value::as_str), Some("2"));
 
     let content = table.get("content").and_then(Value::as_table).unwrap();
-    let extensions = content
-        .get("extensions")
-        .and_then(Value::as_array)
-        .unwrap();
-    assert!(extensions
-        .iter()
-        .any(|v| v.as_str() == Some("rs")));
-    assert_eq!(content.get("max_lines").and_then(Value::as_integer), Some(500));
+    let extensions = content.get("extensions").and_then(Value::as_array).unwrap();
+    assert!(extensions.iter().any(|v| v.as_str() == Some("rs")));
+    assert_eq!(
+        content.get("max_lines").and_then(Value::as_integer),
+        Some(500)
+    );
 
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
-    let exclude = scanner
-        .get("exclude")
-        .and_then(Value::as_array)
-        .unwrap();
-    assert!(exclude
-        .iter()
-        .any(|v| v.as_str() == Some("target/**")));
+    let exclude = scanner.get("exclude").and_then(Value::as_array).unwrap();
+    assert!(exclude.iter().any(|v| v.as_str() == Some("target/**")));
 
     let structure = table.get("structure").and_then(Value::as_table).unwrap();
-    assert_eq!(structure.get("max_files").and_then(Value::as_integer), Some(20));
-    assert_eq!(structure.get("max_dirs").and_then(Value::as_integer), Some(10));
+    assert_eq!(
+        structure.get("max_files").and_then(Value::as_integer),
+        Some(20)
+    );
+    assert_eq!(
+        structure.get("max_dirs").and_then(Value::as_integer),
+        Some(10)
+    );
 }
 
 #[test]
@@ -38,28 +37,24 @@ fn load_node_strict_preset() {
 
     let table = value.as_table().expect("should be a table");
     let content = table.get("content").and_then(Value::as_table).unwrap();
-    let extensions = content
-        .get("extensions")
-        .and_then(Value::as_array)
-        .unwrap();
+    let extensions = content.get("extensions").and_then(Value::as_array).unwrap();
 
-    let ext_strs: Vec<&str> = extensions
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
+    let ext_strs: Vec<&str> = extensions.iter().filter_map(Value::as_str).collect();
     assert!(ext_strs.contains(&"js"));
     assert!(ext_strs.contains(&"ts"));
     assert!(ext_strs.contains(&"tsx"));
-    assert_eq!(content.get("max_lines").and_then(Value::as_integer), Some(400));
+    assert_eq!(
+        content.get("max_lines").and_then(Value::as_integer),
+        Some(400)
+    );
 
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
-    let exclude = scanner
-        .get("exclude")
-        .and_then(Value::as_array)
-        .unwrap();
-    assert!(exclude
-        .iter()
-        .any(|v| v.as_str() == Some("node_modules/**")));
+    let exclude = scanner.get("exclude").and_then(Value::as_array).unwrap();
+    assert!(
+        exclude
+            .iter()
+            .any(|v| v.as_str() == Some("node_modules/**"))
+    );
 }
 
 #[test]
@@ -68,27 +63,19 @@ fn load_python_strict_preset() {
 
     let table = value.as_table().expect("should be a table");
     let content = table.get("content").and_then(Value::as_table).unwrap();
-    let extensions = content
-        .get("extensions")
-        .and_then(Value::as_array)
-        .unwrap();
+    let extensions = content.get("extensions").and_then(Value::as_array).unwrap();
 
-    let ext_strs: Vec<&str> = extensions
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
+    let ext_strs: Vec<&str> = extensions.iter().filter_map(Value::as_str).collect();
     assert!(ext_strs.contains(&"py"));
     assert!(ext_strs.contains(&"pyi"));
-    assert_eq!(content.get("max_lines").and_then(Value::as_integer), Some(400));
+    assert_eq!(
+        content.get("max_lines").and_then(Value::as_integer),
+        Some(400)
+    );
 
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
-    let exclude = scanner
-        .get("exclude")
-        .and_then(Value::as_array)
-        .unwrap();
-    assert!(exclude
-        .iter()
-        .any(|v| v.as_str() == Some("__pycache__/**")));
+    let exclude = scanner.get("exclude").and_then(Value::as_array).unwrap();
+    assert!(exclude.iter().any(|v| v.as_str() == Some("__pycache__/**")));
 }
 
 #[test]
@@ -97,24 +84,27 @@ fn load_monorepo_base_preset() {
 
     let table = value.as_table().expect("should be a table");
     let content = table.get("content").and_then(Value::as_table).unwrap();
-    let extensions = content
-        .get("extensions")
-        .and_then(Value::as_array)
-        .unwrap();
+    let extensions = content.get("extensions").and_then(Value::as_array).unwrap();
 
-    let ext_strs: Vec<&str> = extensions
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
+    let ext_strs: Vec<&str> = extensions.iter().filter_map(Value::as_str).collect();
     assert!(ext_strs.contains(&"rs"));
     assert!(ext_strs.contains(&"js"));
     assert!(ext_strs.contains(&"py"));
     assert!(ext_strs.contains(&"go"));
-    assert_eq!(content.get("max_lines").and_then(Value::as_integer), Some(600));
+    assert_eq!(
+        content.get("max_lines").and_then(Value::as_integer),
+        Some(600)
+    );
 
     let structure = table.get("structure").and_then(Value::as_table).unwrap();
-    assert_eq!(structure.get("max_files").and_then(Value::as_integer), Some(30));
-    assert_eq!(structure.get("max_dirs").and_then(Value::as_integer), Some(20));
+    assert_eq!(
+        structure.get("max_files").and_then(Value::as_integer),
+        Some(30)
+    );
+    assert_eq!(
+        structure.get("max_dirs").and_then(Value::as_integer),
+        Some(20)
+    );
 }
 
 #[test]
