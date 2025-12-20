@@ -2,23 +2,11 @@
 
 > **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
 
-## Quick Reference
+## Lint
 
 ```
-Lint: make ci
+make ci
 ```
-
-## Performance Notes
-
-> **Completed optimizations**: Parallel processing (rayon), HashSet for extensions, pre-indexed rule lookup, streaming file reading for large files (>10MB), metadata-based cache validation (mtime + size check avoids file read on cache hit), unified directory traversal (single WalkDir pass for both file discovery and structure checking).
->
-> **Future considerations**: When adding new features, maintain these patterns:
-> - Use `par_iter()` for file processing loops
-> - Prefer O(1) lookups (HashMap/HashSet) over linear searches
-> - Use `BufReader` for large file handling
-> - **Structure Checks**: Perform directory entry counting using metadata only (no file opening).
-
----
 
 ## Completed (Compressed)
 
@@ -33,6 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority.
 
 ---
 
@@ -54,30 +43,9 @@ Location: `src/output/html.rs`
 - Delta indicators (+/-) from previous run
 ```
 
----
 
-## Phase 8: CI/CD Support (Completed)
-
-(All Phase 8 tasks completed - see Completed section above)
-
----
-
-## Phase 9: Advanced Features (Completed)
-
-(All Phase 9 tasks completed - see Completed section above)
-
----
 
 ## Phase 12: Bug Fixes & Cleanup (Partial)
-
-### Task 12.1: Fix Structure Rule Priority (Bug) ✅
-Location: `src/checker/structure.rs`
-```
-- Content rules use `.rev()` (last match wins) but Structure rules iterate forward (first match wins)
-- Changed Structure rules to use `.rev()` for consistency with Content rules
-- Updated `explain()` function to correctly report last matching rule
-- Added edge case tests for rule priority
-```
 
 ### Task 12.2: Remove Deprecated Baseline Command
 Location: `src/commands/baseline_cmd.rs`, `src/main.rs`
@@ -206,14 +174,6 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 - New violation type: DeniedFile { pattern_or_extension }
 ```
 
-### Task 11.8: Terminology Modernization
-```
-- Rename internal: "whitelist" → "allowlist" in code, docs, config field names
-- Config: allow_extensions/allow_patterns already named correctly
-- Update CLI help, error messages, documentation
-- No functional change, pure naming cleanup
-```
-
 ---
 
 ## Priority Order
@@ -226,28 +186,10 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**4. UX Improvements**~~ | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
 | ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
-| **7. Bug Fixes** | 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline |
+| **7. Bug Fixes** | ~~12.1 Structure Rule Priority~~, 12.2 Remove Deprecated Baseline |
 | **8. Config Validation** | 12.3 Override Path Validation, 12.5 Git Fallback Warning, 12.8 FS .gitignore Support, 12.9 Remote Config Security |
 | **9. State File Cleanup** | 12.4 Consolidate State Files, 12.6 max_depth Example, 12.7 Remove V1 path_rules |
 | **10. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **11. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **12. Visualization** | 7.1-7.2 HTML Charts/Trends |
 
----
-
-## Architecture Notes
-
-### Dependency Flow
-
-```
-main.rs (CLI parsing + dispatch)
-  -> commands/check | stats | baseline_cmd | init | config
-  -> context (shared: load_config, cache)
-  -> config/loader (load config)
-  -> scanner (find files)
-  -> language/registry (get comment syntax)
-  -> counter/sloc (count lines)
-  -> checker/threshold (check limits)
-  -> checker/structure (check structure limits)
-  -> output/* (format results)
-```
