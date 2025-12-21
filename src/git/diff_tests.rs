@@ -250,3 +250,159 @@ fn staged_files_ignores_unstaged_changes() {
     // Unstaged changes should not be included
     assert!(staged.is_empty());
 }
+
+// ============================================================================
+// Range Comparison Tests (for --diff base..target syntax)
+// ============================================================================
+
+fn git_create_branch(dir: &Path, name: &str) {
+    Command::new("git")
+        .args(["branch", name])
+        .current_dir(dir)
+        .output()
+        .expect("Failed to create branch");
+}
+
+fn git_checkout(dir: &Path, name: &str) {
+    Command::new("git")
+        .args(["checkout", name])
+        .current_dir(dir)
+        .output()
+        .expect("Failed to checkout branch");
+}
+
+#[test]
+fn changed_files_range_between_branches() {
+    let dir = create_git_repo();
+
+    // Create initial file and commit on main
+    create_file(dir.path(), "initial.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Create a feature branch
+    git_create_branch(dir.path(), "feature");
+    git_checkout(dir.path(), "feature");
+
+    // Add a new file on feature branch
+    create_file(dir.path(), "feature.rs", "fn feature() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Add feature file");
+
+    // Stay on feature branch for the test (so feature.rs exists)
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+
+    // Compare master..feature should show feature.rs as changed
+    let changed = git_diff
+        .get_changed_files_range("master", "feature")
+        .unwrap();
+
+    // Check that feature.rs is in the changed files by looking at path endings
+    let has_feature_rs = changed
+        .iter()
+        .any(|p| p.file_name().is_some_and(|name| name == "feature.rs"));
+    assert!(has_feature_rs, "Expected feature.rs to be in changed files");
+}
+
+#[test]
+fn changed_files_range_between_tags() {
+    let dir = create_git_repo();
+
+    // Create initial file and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Create v1.0 tag
+    Command::new("git")
+        .args(["tag", "v1.0"])
+        .current_dir(dir.path())
+        .output()
+        .expect("Failed to create tag");
+
+    // Add another file
+    create_file(dir.path(), "lib.rs", "pub fn lib() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Add lib");
+
+    // Create v2.0 tag
+    Command::new("git")
+        .args(["tag", "v2.0"])
+        .current_dir(dir.path())
+        .output()
+        .expect("Failed to create tag");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+
+    // Compare v1.0..v2.0 should show lib.rs as changed
+    let changed = git_diff.get_changed_files_range("v1.0", "v2.0").unwrap();
+
+    let lib_path = dir.path().join("lib.rs").canonicalize().unwrap();
+    assert!(
+        changed
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(lib_path.clone())),
+        "Expected lib.rs to be in changed files between tags"
+    );
+}
+
+#[test]
+fn changed_files_range_same_ref_returns_empty() {
+    let dir = create_git_repo();
+
+    // Create file and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+
+    // Compare HEAD..HEAD should return empty
+    let changed = git_diff.get_changed_files_range("HEAD", "HEAD").unwrap();
+    assert!(changed.is_empty());
+}
+
+#[test]
+fn changed_files_range_invalid_ref_returns_error() {
+    let dir = create_git_repo();
+
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+
+    // Invalid base ref
+    let result = git_diff.get_changed_files_range("nonexistent", "HEAD");
+    assert!(result.is_err());
+
+    // Invalid target ref
+    let result = git_diff.get_changed_files_range("HEAD", "nonexistent");
+    assert!(result.is_err());
+}
+
+#[test]
+fn changed_files_range_matches_trait_behavior() {
+    let dir = create_git_repo();
+
+    // Create initial file and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Modify and commit
+    create_file(dir.path(), "main.rs", "fn main() { println!(\"hello\"); }");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Modify main");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+
+    // These should produce the same result
+    let from_trait = git_diff.get_changed_files("HEAD~1").unwrap();
+    let from_range = git_diff.get_changed_files_range("HEAD~1", "HEAD").unwrap();
+
+    assert_eq!(
+        from_trait, from_range,
+        "Trait method and range method should produce same results"
+    );
+}

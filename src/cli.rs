@@ -174,7 +174,9 @@ pub struct CheckArgs {
     #[arg(long)]
     pub warn_only: bool,
 
-    /// Compare files changed between a git reference and HEAD (committed states).
+    /// Compare files changed between git references.
+    /// Supports single ref (compared to HEAD) or explicit range (base..target).
+    /// Examples: --diff main, --diff origin/main..HEAD, --diff v1.0..v2.0
     /// Defaults to HEAD when no value provided. Note: compares committed trees only,
     /// not the working directory. Use --staged for uncommitted staged files.
     /// Structure checks use full directory state.

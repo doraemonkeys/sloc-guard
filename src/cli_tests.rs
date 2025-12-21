@@ -321,3 +321,56 @@ fn cli_config_show() {
         _ => panic!("Expected Config command"),
     }
 }
+
+#[test]
+fn cli_check_with_diff_range_syntax() {
+    // Explicit range: base..target
+    let cli = Cli::parse_from(["sloc-guard", "check", "--diff", "main..feature"]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.diff, Some("main..feature".to_string()));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
+fn cli_check_with_diff_range_tags() {
+    // Tag range: v1.0..v2.0
+    let cli = Cli::parse_from(["sloc-guard", "check", "--diff", "v1.0..v2.0"]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.diff, Some("v1.0..v2.0".to_string()));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
+fn cli_check_with_diff_range_origin() {
+    // Origin refs: origin/main..origin/feature
+    let cli = Cli::parse_from([
+        "sloc-guard",
+        "check",
+        "--diff",
+        "origin/main..origin/feature",
+    ]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.diff, Some("origin/main..origin/feature".to_string()));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
+fn cli_check_with_diff_trailing_dots() {
+    // Trailing dots: main.. (should be parsed as main..HEAD by the check command)
+    let cli = Cli::parse_from(["sloc-guard", "check", "--diff", "main.."]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.diff, Some("main..".to_string()));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}

@@ -21,7 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
-- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.7 Remove V1 path_rules, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.7 Remove V1 path_rules, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth, 12.13 --diff A..B Range Syntax.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 
 ---
@@ -42,26 +42,6 @@ Location: `src/output/html.rs`
 - Integrate with .sloc-guard-history.json (if exists)
 - Line chart showing SLOC over time
 - Delta indicators (+/-) from previous run
-```
-
-
-
-## Phase 12: Bug Fixes & Cleanup (Partial)
-
-### Task 12.13: --diff A..B Explicit Range Syntax
-Location: `src/cli.rs`, `src/git/diff.rs`
-```
-- Support explicit two-endpoint syntax: --diff base..target
-- Single arg form: --diff main → equivalent to --diff main..HEAD (current behavior)
-- Explicit form: --diff main..feature → compare two arbitrary refs
-- Benefits:
-  - Git mental model consistency (git diff A..B)
-  - Compare historical tags: --diff v1.0..v2.0
-  - Reproducible CI builds without checkout
-- Edge cases:
-  - --diff main.. → error or treat as main..HEAD
-  - --diff ..feature → error (base required)
-  - --diff + --staged → mutual exclusion error
 ```
 
 ---
@@ -121,7 +101,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | Priority | Tasks |
 |----------|-------|
 | ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
-| **2. Git Diff Enhancement** | 12.13 --diff A..B Explicit Range Syntax |
+| ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
 | **3. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **4. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **5. Visualization** | 7.1-7.2 HTML Charts/Trends |

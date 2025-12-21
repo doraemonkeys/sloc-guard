@@ -128,8 +128,16 @@ impl GitDiff {
     }
 }
 
-impl ChangedFiles for GitDiff {
-    fn get_changed_files(&self, base_ref: &str) -> Result<HashSet<PathBuf>> {
+impl GitDiff {
+    /// Get files changed between two git references.
+    ///
+    /// # Errors
+    /// Returns an error if either reference cannot be parsed or the repository cannot be accessed.
+    pub fn get_changed_files_range(
+        &self,
+        base_ref: &str,
+        target_ref: &str,
+    ) -> Result<HashSet<PathBuf>> {
         let repo = self.open_repo()?;
 
         // Parse the base reference
@@ -147,28 +155,38 @@ impl ChangedFiles for GitDiff {
                 SlocGuardError::Git(format!("Failed to peel to commit '{base_ref}': {e}"))
             })?;
 
-        // Get HEAD commit
-        let head_commit = repo
-            .head_commit()
-            .map_err(|e| SlocGuardError::Git(format!("Failed to get HEAD commit: {e}")))?;
+        // Parse the target reference
+        let target_commit = repo
+            .rev_parse_single(target_ref)
+            .map_err(|e| {
+                SlocGuardError::Git(format!("Failed to parse reference '{target_ref}': {e}"))
+            })?
+            .object()
+            .map_err(|e| {
+                SlocGuardError::Git(format!("Failed to get object for '{target_ref}': {e}"))
+            })?
+            .peel_to_commit()
+            .map_err(|e| {
+                SlocGuardError::Git(format!("Failed to peel to commit '{target_ref}': {e}"))
+            })?;
 
         // Get trees
-        let base_tree = base_commit
-            .tree()
-            .map_err(|e| SlocGuardError::Git(format!("Failed to get tree for base: {e}")))?;
-        let head_tree = head_commit
-            .tree()
-            .map_err(|e| SlocGuardError::Git(format!("Failed to get tree for HEAD: {e}")))?;
+        let base_tree = base_commit.tree().map_err(|e| {
+            SlocGuardError::Git(format!("Failed to get tree for '{base_ref}': {e}"))
+        })?;
+        let target_tree = target_commit.tree().map_err(|e| {
+            SlocGuardError::Git(format!("Failed to get tree for '{target_ref}': {e}"))
+        })?;
 
         // Collect all file paths from both trees
         let base_paths = Self::collect_tree_paths(&base_tree, Path::new(""))?;
-        let head_paths = Self::collect_tree_paths(&head_tree, Path::new(""))?;
+        let target_paths = Self::collect_tree_paths(&target_tree, Path::new(""))?;
 
         // Find changed files: files that exist in only one tree or have different OIDs
         let mut changed_files = HashSet::new();
 
-        // Files in HEAD but not in base, or changed
-        for (path, oid) in &head_paths {
+        // Files in target but not in base, or changed
+        for (path, oid) in &target_paths {
             let is_changed = base_paths
                 .iter()
                 .find(|(p, _)| p == path)
@@ -178,9 +196,9 @@ impl ChangedFiles for GitDiff {
             }
         }
 
-        // Files deleted (in base but not in HEAD) - include them as they might still exist locally
+        // Files deleted (in base but not in target) - include them as they might still exist locally
         for (path, _) in &base_paths {
-            if !head_paths.iter().any(|(p, _)| p == path) {
+            if !target_paths.iter().any(|(p, _)| p == path) {
                 let full_path = self.workdir.join(path);
                 if full_path.exists() {
                     changed_files.insert(full_path);
@@ -189,5 +207,12 @@ impl ChangedFiles for GitDiff {
         }
 
         Ok(changed_files)
+    }
+}
+
+impl ChangedFiles for GitDiff {
+    fn get_changed_files(&self, base_ref: &str) -> Result<HashSet<PathBuf>> {
+        // Default behavior: compare base_ref to HEAD
+        self.get_changed_files_range(base_ref, "HEAD")
     }
 }
