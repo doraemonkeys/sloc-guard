@@ -95,3 +95,77 @@ fn ensure_parent_dir_handles_root_path() {
     let result = ensure_parent_dir(Path::new("file.json"));
     assert!(result.is_ok());
 }
+
+#[test]
+fn discover_project_root_finds_git_directory() {
+    let temp_dir = TempDir::new().unwrap();
+    let git_dir = temp_dir.path().join(".git");
+    fs::create_dir(&git_dir).unwrap();
+
+    // Create a subdirectory
+    let sub_dir = temp_dir.path().join("src").join("lib");
+    fs::create_dir_all(&sub_dir).unwrap();
+
+    let result = discover_project_root(&sub_dir);
+    assert_eq!(result, fs::canonicalize(temp_dir.path()).unwrap());
+}
+
+#[test]
+fn discover_project_root_finds_config_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_file = temp_dir.path().join(".sloc-guard.toml");
+    fs::write(&config_file, "").unwrap();
+
+    // Create a subdirectory
+    let sub_dir = temp_dir.path().join("src");
+    fs::create_dir(&sub_dir).unwrap();
+
+    let result = discover_project_root(&sub_dir);
+    assert_eq!(result, fs::canonicalize(temp_dir.path()).unwrap());
+}
+
+#[test]
+fn discover_project_root_prefers_git_over_config() {
+    let temp_dir = TempDir::new().unwrap();
+    let git_dir = temp_dir.path().join(".git");
+    fs::create_dir(&git_dir).unwrap();
+    let config_file = temp_dir.path().join(".sloc-guard.toml");
+    fs::write(&config_file, "").unwrap();
+
+    let sub_dir = temp_dir.path().join("src");
+    fs::create_dir(&sub_dir).unwrap();
+
+    // Both markers exist, should find .git first
+    let result = discover_project_root(&sub_dir);
+    assert_eq!(result, fs::canonicalize(temp_dir.path()).unwrap());
+}
+
+#[test]
+fn discover_project_root_stops_at_first_marker() {
+    // Test that discovery stops at the first marker found, not the outermost
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create outer project with .git
+    let git_dir = temp_dir.path().join(".git");
+    fs::create_dir(&git_dir).unwrap();
+
+    // Create inner project with only .sloc-guard.toml (no .git)
+    let inner_project = temp_dir.path().join("packages").join("inner");
+    fs::create_dir_all(&inner_project).unwrap();
+    fs::write(inner_project.join(".sloc-guard.toml"), "").unwrap();
+
+    // Create a subdirectory in inner project
+    let sub_dir = inner_project.join("src");
+    fs::create_dir(&sub_dir).unwrap();
+
+    let result = discover_project_root(&sub_dir);
+    // Should stop at inner project (config marker), not outer project (git marker)
+    assert_eq!(result, fs::canonicalize(&inner_project).unwrap());
+}
+
+#[test]
+fn baseline_path_construction() {
+    let temp_dir = TempDir::new().unwrap();
+    let result = baseline_path(temp_dir.path());
+    assert_eq!(result, temp_dir.path().join(".sloc-guard-baseline.json"));
+}

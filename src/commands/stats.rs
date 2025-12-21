@@ -40,9 +40,11 @@ pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> 
         cli.offline,
     )?;
 
+    // 1.0.1 Discover project root for consistent state file resolution
+    let project_root = state::discover_project_root(Path::new("."));
+
     // 1.1 Load cache if not disabled
-    let project_root = Path::new(".");
-    let cache_path = state::cache_path(project_root);
+    let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
     let cache = if args.no_cache {
         None
@@ -60,7 +62,7 @@ pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> 
     let ctx = StatsContext::from_config(&config);
 
     // 3. Run stats with context
-    run_stats_with_context(args, cli, &config, &ctx, &cache)
+    run_stats_with_context(args, cli, &config, &ctx, &cache, &project_root)
 }
 
 /// Internal implementation accepting injectable context (for testing).
@@ -73,6 +75,7 @@ pub(crate) fn run_stats_with_context(
     config: &crate::config::Config,
     ctx: &StatsContext,
     cache: &Mutex<Cache>,
+    project_root: &Path,
 ) -> crate::Result<i32> {
     // 1. Prepare exclude patterns from scanner config
     let mut exclude_patterns = config.scanner.exclude.clone();
@@ -113,7 +116,7 @@ pub(crate) fn run_stats_with_context(
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
-        let cache_path = state::cache_path(Path::new("."));
+        let cache_path = state::cache_path(project_root);
         save_cache(&cache_path, &cache_guard);
     }
 
@@ -131,7 +134,7 @@ pub(crate) fn run_stats_with_context(
 
     // 5.2 Trend tracking if enabled
     let project_stats = if args.trend {
-        let default_path = state::history_path(Path::new("."));
+        let default_path = state::history_path(project_root);
         let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
         let trend = history.compute_delta(&project_stats);

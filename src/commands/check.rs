@@ -46,6 +46,9 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     // 0. Validate structure params require explicit path
     let paths = validate_and_resolve_paths(args)?;
 
+    // 0.1 Discover project root for consistent state file resolution
+    let project_root = state::discover_project_root(Path::new("."));
+
     // 1. Load configuration
     let mut config = load_config(
         args.config.as_deref(),
@@ -66,8 +69,7 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     };
 
     // 3.1 Load cache if not disabled
-    let project_root = Path::new(".");
-    let cache_path = state::cache_path(project_root);
+    let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
     let cache = if args.no_cache {
         None
@@ -89,13 +91,23 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     let ctx = CheckContext::from_config(&config, warn_threshold, exclude_patterns, use_gitignore)?;
 
     // 5. Run check with context
-    run_check_with_context(args, cli, &paths, &config, &ctx, &cache, baseline.as_ref())
+    run_check_with_context(
+        args,
+        cli,
+        &paths,
+        &config,
+        &ctx,
+        &cache,
+        baseline.as_ref(),
+        &project_root,
+    )
 }
 
 /// Internal implementation accepting injectable context (for testing).
 ///
 /// This function contains the core check logic and accepts pre-built dependencies,
 /// enabling unit testing with custom/mock components.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_check_with_context(
     args: &CheckArgs,
     cli: &Cli,
@@ -104,6 +116,7 @@ pub(crate) fn run_check_with_context(
     ctx: &CheckContext,
     cache: &Mutex<Cache>,
     baseline: Option<&Baseline>,
+    project_root: &Path,
 ) -> crate::Result<i32> {
     // Check if pure incremental mode (--files provided)
     let (all_files, scan_result, skip_structure_checks) = if args.files.is_empty() {
@@ -125,8 +138,12 @@ pub(crate) fn run_check_with_context(
         )?;
 
         // 2.2 Filter by git diff if --diff or --staged is specified
-        let files =
-            filter_by_git_diff(scan_result.files.clone(), args.diff.as_deref(), args.staged)?;
+        let files = filter_by_git_diff(
+            scan_result.files.clone(),
+            args.diff.as_deref(),
+            args.staged,
+            project_root,
+        )?;
         (files, Some(scan_result), false)
     } else {
         // Pure incremental mode: process only listed files, skip structure checks
@@ -184,7 +201,7 @@ pub(crate) fn run_check_with_context(
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
-        let cache_path = state::cache_path(Path::new("."));
+        let cache_path = state::cache_path(project_root);
         save_cache(&cache_path, &cache_guard);
     }
 
@@ -197,9 +214,9 @@ pub(crate) fn run_check_with_context(
     if let Some(mode) = args.update_baseline {
         let baseline_path = args
             .baseline
-            .as_deref()
-            .unwrap_or_else(|| Path::new(".sloc-guard-baseline.json"));
-        update_baseline_from_results(&results, mode, baseline_path, baseline)?;
+            .clone()
+            .unwrap_or_else(|| state::baseline_path(project_root));
+        update_baseline_from_results(&results, mode, &baseline_path, baseline)?;
     }
 
     // 7.1 Generate split suggestions for failed files if --suggest is enabled
@@ -295,13 +312,14 @@ fn filter_by_git_diff(
     files: Vec<std::path::PathBuf>,
     diff_ref: Option<&str>,
     staged_only: bool,
+    project_root: &Path,
 ) -> crate::Result<Vec<std::path::PathBuf>> {
     if !staged_only && diff_ref.is_none() {
         return Ok(files);
     }
 
-    // Discover git repository from current directory
-    let git_diff = GitDiff::discover(Path::new("."))?;
+    // Discover git repository from project root
+    let git_diff = GitDiff::discover(project_root)?;
     let changed_files = if staged_only {
         git_diff.get_staged_files()?
     } else {

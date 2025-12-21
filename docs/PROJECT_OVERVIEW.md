@@ -25,7 +25,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` compares ref..HEAD) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
-| `state` | State file path resolution: `cache_path()`, `history_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback) |
+| `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git/GitRepoNotFound/RemoteConfigHashMismatch |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |

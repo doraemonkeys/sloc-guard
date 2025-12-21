@@ -12,6 +12,8 @@ const STATE_DIR_NAME: &str = "sloc-guard";
 const FALLBACK_STATE_DIR: &str = ".sloc-guard";
 const CACHE_FILENAME: &str = "cache.json";
 const HISTORY_FILENAME: &str = "history.json";
+const BASELINE_FILENAME: &str = ".sloc-guard-baseline.json";
+const CONFIG_FILENAME: &str = ".sloc-guard.toml";
 
 /// Detect the state directory for cache and history files.
 ///
@@ -53,6 +55,36 @@ pub fn ensure_parent_dir(path: &Path) -> io::Result<()> {
         fs::create_dir_all(parent)?;
     }
     Ok(())
+}
+
+/// Discover the project root by walking up from `start` looking for markers.
+///
+/// Markers (checked in order at each directory level):
+///   1. `.git/` directory - git repository root
+///   2. `.sloc-guard.toml` - explicit sloc-guard config
+///
+/// Returns `start` if no markers found (backward compatible).
+/// If `start` cannot be canonicalized, returns it as-is.
+#[must_use]
+pub fn discover_project_root(start: &Path) -> PathBuf {
+    let abs_start = fs::canonicalize(start).unwrap_or_else(|_| start.to_path_buf());
+
+    for ancestor in abs_start.ancestors() {
+        if ancestor.join(".git").is_dir() {
+            return ancestor.to_path_buf();
+        }
+        if ancestor.join(CONFIG_FILENAME).is_file() {
+            return ancestor.to_path_buf();
+        }
+    }
+
+    abs_start
+}
+
+/// Get the baseline file path for the given project root.
+#[must_use]
+pub fn baseline_path(project_root: &Path) -> PathBuf {
+    project_root.join(BASELINE_FILENAME)
 }
 
 #[cfg(test)]
