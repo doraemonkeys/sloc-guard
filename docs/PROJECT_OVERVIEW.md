@@ -46,7 +46,7 @@ ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, rules, overrides }
-StructureRule { pattern, max_files, max_dirs, max_depth, warn_threshold, allow_extensions, allow_patterns }  // [[structure.rules]]
+StructureRule { pattern, max_files, max_dirs, max_depth, relative_depth, warn_threshold, allow_extensions, allow_patterns }  // [[structure.rules]]
 StructureOverride { path, max_files, max_dirs, max_depth, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 

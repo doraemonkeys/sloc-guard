@@ -21,7 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
-- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth.
 
 ---
 
@@ -54,17 +54,6 @@ Location: `src/config/*.rs`, `src/checker/threshold.rs`
 - Per CLAUDE.md: "No Backward Compatibility" - prioritize clean architecture
 - Update config loader to reject V1 format with clear error message
 - Remove auto-migration code if any
-```
-
-### Task 12.11: Relative max_depth for Structure Rules
-Location: `src/checker/structure.rs`, `src/config/structure.rs`
-```
-- Current: max_depth measures absolute depth from scan root
-- Problem: Moving `src/features` to `packages/core/src/features` breaks depth rules
-- Add `relative_depth: bool` field to StructureRule (default: false for backward compat)
-- When true: depth is measured from the matched pattern's base directory
-- Example: pattern="src/features/**", relative_depth=true, max_depth=2
-  → checks depth within src/features/, not from project root
 ```
 
 ### Task 12.12: --diff Semantic Consistency
@@ -201,7 +190,7 @@ Location: `src/config/remote_tests.rs`
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
 | ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
-| **9. Architecture Fixes** | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, 12.11 Relative max_depth |
+| **9. Architecture Fixes** | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, ~~12.11 Relative max_depth~~ ✅ |
 | **10. Doc/Impl Consistency** | 12.12 --diff Semantic Consistency |
 | **11. State Robustness** | 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation |
 | **12. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |

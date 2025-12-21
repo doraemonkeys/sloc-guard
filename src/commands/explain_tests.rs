@@ -204,6 +204,7 @@ fn explain_structure_rule_matches() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            relative_depth: false,
         }],
         ..Default::default()
     };
@@ -252,6 +253,7 @@ fn explain_structure_rule_chain_statuses() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                relative_depth: false,
             },
             StructureRule {
                 pattern: "test/*".to_string(),
@@ -261,6 +263,7 @@ fn explain_structure_rule_chain_statuses() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                relative_depth: false,
             },
         ],
         overrides: vec![StructureOverride {

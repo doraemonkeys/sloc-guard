@@ -104,6 +104,11 @@ struct CompiledStructureRule {
     max_files: Option<i64>,
     max_dirs: Option<i64>,
     max_depth: Option<i64>,
+    /// When true, `max_depth` is relative to the pattern's base directory.
+    relative_depth: bool,
+    /// Depth of the pattern's base directory (components before first glob).
+    /// Only meaningful when `relative_depth` is true.
+    base_depth: usize,
     warn_threshold: Option<f64>,
 }
 
@@ -113,6 +118,10 @@ struct StructureLimits {
     max_files: Option<i64>,
     max_dirs: Option<i64>,
     max_depth: Option<i64>,
+    /// When true, `max_depth` is relative to `base_depth`.
+    relative_depth: bool,
+    /// Depth of the matched rule's base directory.
+    base_depth: usize,
     warn_threshold: Option<f64>,
     override_reason: Option<String>,
 }
@@ -274,16 +283,43 @@ impl StructureChecker {
                         source: e,
                     })?;
 
+                // Calculate base_depth: count path components before first glob metacharacter
+                let base_depth = Self::calculate_base_depth(&rule.pattern);
+
                 Ok(CompiledStructureRule {
                     pattern: rule.pattern.clone(),
                     matcher: glob.compile_matcher(),
                     max_files: rule.max_files,
                     max_dirs: rule.max_dirs,
                     max_depth: rule.max_depth,
+                    relative_depth: rule.relative_depth,
+                    base_depth,
                     warn_threshold: rule.warn_threshold,
                 })
             })
             .collect()
+    }
+
+    /// Calculate the depth of the pattern's base directory.
+    /// This is the number of path components before the first glob metacharacter.
+    /// Examples:
+    /// - "src/features/**" → 2 (src, features)
+    /// - "src/*/utils" → 1 (src)
+    /// - "**/*.rs" → 0
+    /// - "exact/path" → 2
+    fn calculate_base_depth(pattern: &str) -> usize {
+        let mut depth = 0;
+        for component in pattern.split(['/', '\\']) {
+            if component.is_empty() {
+                continue;
+            }
+            // Check if this component contains any glob metacharacters
+            if component.contains(['*', '?', '[', '{']) {
+                break;
+            }
+            depth += 1;
+        }
+        depth
     }
 
     /// Check if a directory path matches an override path.
@@ -330,12 +366,15 @@ impl StructureChecker {
     /// - `src/features`      — exact directory match only
     fn get_limits(&self, path: &Path) -> StructureLimits {
         // 1. Check overrides first (highest priority)
+        // Note: Overrides don't support relative_depth (they use absolute limits)
         for ovr in &self.overrides {
             if Self::path_matches_override(path, &ovr.path) {
                 return StructureLimits {
                     max_files: ovr.max_files.or(self.max_files),
                     max_dirs: ovr.max_dirs.or(self.max_dirs),
                     max_depth: ovr.max_depth.or(self.max_depth),
+                    relative_depth: false,
+                    base_depth: 0,
                     warn_threshold: self.warn_threshold,
                     override_reason: Some(ovr.reason.clone()),
                 };
@@ -350,6 +389,8 @@ impl StructureChecker {
                     max_files: rule.max_files.or(self.max_files),
                     max_dirs: rule.max_dirs.or(self.max_dirs),
                     max_depth: rule.max_depth.or(self.max_depth),
+                    relative_depth: rule.relative_depth,
+                    base_depth: rule.base_depth,
                     warn_threshold: rule.warn_threshold.or(self.warn_threshold),
                     override_reason: None,
                 };
@@ -361,6 +402,8 @@ impl StructureChecker {
             max_files: self.max_files,
             max_dirs: self.max_dirs,
             max_depth: self.max_depth,
+            relative_depth: false,
+            base_depth: 0,
             warn_threshold: self.warn_threshold,
             override_reason: None,
         }
@@ -448,19 +491,26 @@ impl StructureChecker {
                     .warn_threshold
                     .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
 
-                if stats.depth > limit_usize {
+                // Calculate effective depth: relative to base if relative_depth is set
+                let effective_depth = if limits.relative_depth {
+                    stats.depth.saturating_sub(limits.base_depth)
+                } else {
+                    stats.depth
+                };
+
+                if effective_depth > limit_usize {
                     violations.push(StructureViolation::new(
                         path.clone(),
                         ViolationType::MaxDepth,
-                        stats.depth,
+                        effective_depth,
                         limit_usize,
                         limits.override_reason.clone(),
                     ));
-                } else if stats.depth > warn_limit {
+                } else if effective_depth > warn_limit {
                     violations.push(StructureViolation::warning(
                         path.clone(),
                         ViolationType::MaxDepth,
-                        stats.depth,
+                        effective_depth,
                         limit_usize,
                         limits.override_reason.clone(),
                     ));

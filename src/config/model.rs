@@ -389,6 +389,13 @@ pub struct StructureRule {
     #[serde(default)]
     pub max_depth: Option<i64>,
 
+    /// When true, `max_depth` is measured relative to the pattern's base directory
+    /// instead of from the scan root.
+    /// Example: `pattern="src/features/**"`, `relative_depth=true`, `max_depth=2`
+    /// → checks depth within src/features/, not from project root.
+    #[serde(default)]
+    pub relative_depth: bool,
+
     /// Override threshold for warnings in matched directories.
     #[serde(default)]
     pub warn_threshold: Option<f64>,
