@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use regex::Regex;
 use walkdir::WalkDir;
 
 use crate::SlocGuardError;
@@ -35,9 +36,18 @@ pub struct AllowlistRule {
     pub allow_extensions: Vec<String>,
     /// Compiled patterns for allowlist matching.
     pub allow_patterns: GlobSet,
+    /// Compiled regex for filename validation (optional).
+    naming_pattern: Option<Regex>,
+    /// Original regex string for error messages.
+    pub naming_pattern_str: Option<String>,
 }
 
 impl AllowlistRule {
+    /// Check if allowlist is configured (extensions or patterns).
+    fn has_allowlist(&self) -> bool {
+        !self.allow_extensions.is_empty() || !self.allow_patterns.is_empty()
+    }
+
     /// Check if a file matches this allowlist (extensions OR patterns).
     fn file_matches(&self, file_path: &Path) -> bool {
         // Check extensions first (OR logic)
@@ -62,6 +72,21 @@ impl AllowlistRule {
     /// Check if a directory path matches this rule's pattern.
     fn matches_directory(&self, dir: &Path) -> bool {
         self.matcher.is_match(dir)
+    }
+
+    /// Check if a filename matches the naming convention pattern.
+    /// Returns `true` if no pattern is set or if the filename matches.
+    fn filename_matches_naming_pattern(&self, file_path: &Path) -> bool {
+        let Some(ref regex) = self.naming_pattern else {
+            return true; // No naming pattern = always valid
+        };
+
+        let file_name = file_path
+            .file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default();
+
+        regex.is_match(&file_name)
     }
 }
 
@@ -174,6 +199,7 @@ pub struct AllowlistRuleBuilder {
     pattern: String,
     allow_extensions: Vec<String>,
     allow_patterns: Vec<String>,
+    naming_pattern: Option<String>,
 }
 
 impl AllowlistRuleBuilder {
@@ -183,6 +209,7 @@ impl AllowlistRuleBuilder {
             pattern,
             allow_extensions: Vec::new(),
             allow_patterns: Vec::new(),
+            naming_pattern: None,
         }
     }
 
@@ -195,6 +222,12 @@ impl AllowlistRuleBuilder {
     #[must_use]
     pub fn with_patterns(mut self, patterns: Vec<String>) -> Self {
         self.allow_patterns = patterns;
+        self
+    }
+
+    #[must_use]
+    pub fn with_naming_pattern(mut self, pattern: Option<String>) -> Self {
+        self.naming_pattern = pattern;
         self
     }
 
@@ -224,11 +257,26 @@ impl AllowlistRuleBuilder {
                     source: e,
                 })?;
 
+        // Compile naming pattern regex if provided
+        let (naming_pattern, naming_pattern_str) = match self.naming_pattern {
+            Some(pattern_str) => {
+                let regex = Regex::new(&pattern_str).map_err(|e| {
+                    SlocGuardError::Config(format!(
+                        "Invalid naming pattern regex '{pattern_str}': {e}"
+                    ))
+                })?;
+                (Some(regex), Some(pattern_str))
+            }
+            None => (None, None),
+        };
+
         Ok(AllowlistRule {
             pattern: self.pattern,
             matcher: glob.compile_matcher(),
             allow_extensions: self.allow_extensions,
             allow_patterns,
+            naming_pattern,
+            naming_pattern_str,
         })
     }
 }
@@ -406,17 +454,32 @@ impl<F: FileFilter> DirectoryScanner<F> {
                             });
                     parent_stats.file_count += 1;
 
-                    // Check allowlist violations
+                    // Check allowlist and naming violations
                     if let Some(cfg) = structure_config
                         && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
-                        && !rule.file_matches(path)
                     {
-                        result
-                            .allowlist_violations
-                            .push(StructureViolation::disallowed_file(
-                                path.to_path_buf(),
-                                rule.pattern.clone(),
-                            ));
+                        // Check allowlist (extensions/patterns) - only if configured
+                        if rule.has_allowlist() && !rule.file_matches(path) {
+                            result
+                                .allowlist_violations
+                                .push(StructureViolation::disallowed_file(
+                                    path.to_path_buf(),
+                                    rule.pattern.clone(),
+                                ));
+                        }
+
+                        // Check naming convention
+                        if !rule.filename_matches_naming_pattern(path)
+                            && let Some(ref pattern_str) = rule.naming_pattern_str
+                        {
+                            result
+                                .allowlist_violations
+                                .push(StructureViolation::naming_convention(
+                                    path.to_path_buf(),
+                                    rule.pattern.clone(),
+                                    pattern_str.clone(),
+                                ));
+                        }
                     }
                 }
             } else if file_type.is_dir() {
@@ -504,17 +567,32 @@ impl<F: FileFilter> DirectoryScanner<F> {
                             });
                     parent_stats.file_count += 1;
 
-                    // Check allowlist violations
+                    // Check allowlist and naming violations
                     if let Some(cfg) = structure_config
                         && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
-                        && !rule.file_matches(path)
                     {
-                        result
-                            .allowlist_violations
-                            .push(StructureViolation::disallowed_file(
-                                path.to_path_buf(),
-                                rule.pattern.clone(),
-                            ));
+                        // Check allowlist (extensions/patterns) - only if configured
+                        if rule.has_allowlist() && !rule.file_matches(path) {
+                            result
+                                .allowlist_violations
+                                .push(StructureViolation::disallowed_file(
+                                    path.to_path_buf(),
+                                    rule.pattern.clone(),
+                                ));
+                        }
+
+                        // Check naming convention
+                        if !rule.filename_matches_naming_pattern(path)
+                            && let Some(ref pattern_str) = rule.naming_pattern_str
+                        {
+                            result
+                                .allowlist_violations
+                                .push(StructureViolation::naming_convention(
+                                    path.to_path_buf(),
+                                    rule.pattern.clone(),
+                                    pattern_str.clone(),
+                                ));
+                        }
                     }
                 }
             } else if ft.is_dir() {

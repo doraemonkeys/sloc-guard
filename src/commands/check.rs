@@ -458,7 +458,7 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
         ignored: 0,
     };
 
-    let override_reason = match violation.violation_type {
+    let override_reason = match &violation.violation_type {
         ViolationType::FileCount => Some("structure: files count exceeded".to_string()),
         ViolationType::DirCount => Some("structure: subdirs count exceeded".to_string()),
         ViolationType::MaxDepth => Some("structure: depth count exceeded".to_string()),
@@ -468,6 +468,15 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
                 .as_deref()
                 .unwrap_or("unknown");
             Some(format!("structure: disallowed file (rule: {rule})"))
+        }
+        ViolationType::NamingConvention { expected_pattern } => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("unknown");
+            Some(format!(
+                "structure: naming convention violation (expected: {expected_pattern}, rule: {rule})"
+            ))
         }
     };
 

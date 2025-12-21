@@ -10,13 +10,18 @@ pub struct DirStats {
 }
 
 /// Type of structure violation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ViolationType {
     FileCount,
     DirCount,
     MaxDepth,
     /// File type not allowed by allowlist (`allow_extensions`/`allow_patterns`).
     DisallowedFile,
+    /// File name does not match required naming pattern (`file_naming_pattern`).
+    NamingConvention {
+        /// The regex pattern that the filename should have matched.
+        expected_pattern: String,
+    },
 }
 
 /// A structure limit violation.
@@ -79,6 +84,26 @@ impl StructureViolation {
         Self {
             path,
             violation_type: ViolationType::DisallowedFile,
+            actual: 1,
+            limit: 0,
+            is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a naming convention violation.
+    #[must_use]
+    pub const fn naming_convention(
+        path: PathBuf,
+        rule_pattern: String,
+        expected_naming_pattern: String,
+    ) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::NamingConvention {
+                expected_pattern: expected_naming_pattern,
+            },
             actual: 1,
             limit: 0,
             is_warning: false,

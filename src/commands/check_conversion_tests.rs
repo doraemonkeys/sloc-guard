@@ -86,3 +86,29 @@ fn structure_violation_to_check_result_max_depth() {
         _ => panic!("Expected Failed result"),
     }
 }
+
+#[test]
+fn structure_violation_to_check_result_naming_convention() {
+    let violation = StructureViolation::naming_convention(
+        PathBuf::from("src/userCard.tsx"),
+        "**/src".to_string(),
+        "^[A-Z][a-zA-Z0-9]*\\.tsx$".to_string(),
+    );
+
+    let result = super::structure_violation_to_check_result(&violation);
+
+    match result {
+        crate::checker::CheckResult::Failed {
+            path,
+            override_reason,
+            ..
+        } => {
+            assert_eq!(path, PathBuf::from("src/userCard.tsx"));
+            let reason = override_reason.unwrap();
+            assert!(reason.contains("structure: naming convention violation"));
+            assert!(reason.contains("^[A-Z][a-zA-Z0-9]*\\.tsx$"));
+            assert!(reason.contains("**/src"));
+        }
+        _ => panic!("Expected Failed result"),
+    }
+}

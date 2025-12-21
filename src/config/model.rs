@@ -416,6 +416,12 @@ pub struct StructureRule {
     /// Combined with `allow_extensions` using OR logic.
     #[serde(default)]
     pub allow_patterns: Vec<String>,
+
+    /// Regex pattern for filename validation.
+    /// Files not matching this pattern trigger a `NamingConvention` violation.
+    /// Example: `^[A-Z][a-zA-Z0-9]*\.tsx$` for `PascalCase` React components.
+    #[serde(default)]
+    pub file_naming_pattern: Option<String>,
 }
 
 /// Structure override for specific directories [[structure.override]].

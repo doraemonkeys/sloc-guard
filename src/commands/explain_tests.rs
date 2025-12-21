@@ -204,6 +204,7 @@ fn explain_structure_rule_matches() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -253,6 +254,7 @@ fn explain_structure_rule_chain_statuses() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -263,6 +265,7 @@ fn explain_structure_rule_chain_statuses() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
         ],

@@ -295,11 +295,15 @@ impl CheckContext {
         // Build allowlist rules from structure.rules
         let mut allowlist_rules = Vec::new();
         for rule in &config.structure.rules {
-            // Only include rules that have allowlists
-            if !rule.allow_extensions.is_empty() || !rule.allow_patterns.is_empty() {
+            // Only include rules that have allowlists or naming patterns
+            if !rule.allow_extensions.is_empty()
+                || !rule.allow_patterns.is_empty()
+                || rule.file_naming_pattern.is_some()
+            {
                 let allowlist_rule = AllowlistRuleBuilder::new(rule.pattern.clone())
                     .with_extensions(rule.allow_extensions.clone())
                     .with_patterns(rule.allow_patterns.clone())
+                    .with_naming_pattern(rule.file_naming_pattern.clone())
                     .build()?;
                 allowlist_rules.push(allowlist_rule);
             }

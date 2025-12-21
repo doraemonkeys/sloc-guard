@@ -51,6 +51,7 @@ fn checker_enabled_with_rules() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -166,6 +167,7 @@ fn rule_overrides_global_limit() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -199,6 +201,7 @@ fn rule_inherits_unset_limit_from_global() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -295,6 +298,7 @@ fn invalid_rule_pattern_returns_error() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -419,6 +423,7 @@ fn warn_threshold_rule_overrides_global() {
             warn_threshold: Some(0.5), // Rule: warn at 25
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -525,6 +530,7 @@ fn rule_can_set_unlimited_to_override_global() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -589,6 +595,7 @@ fn invalid_rule_max_files_returns_error() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -613,6 +620,7 @@ fn invalid_rule_max_dirs_returns_error() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -686,6 +694,7 @@ fn override_takes_priority_over_rules() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         overrides: vec![StructureOverride {
@@ -1043,6 +1052,7 @@ fn rule_overrides_global_depth_limit() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -1112,6 +1122,7 @@ fn invalid_rule_max_depth_returns_error() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -1155,6 +1166,7 @@ fn checker_enabled_with_allowlist_rule() {
             warn_threshold: None,
             allow_extensions: vec![".rs".to_string()],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false,
         }],
         ..Default::default()
@@ -1261,6 +1273,7 @@ fn multiple_matching_rules_last_match_wins() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -1271,6 +1284,7 @@ fn multiple_matching_rules_last_match_wins() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
         ],
@@ -1307,6 +1321,7 @@ fn last_match_wins_more_restrictive_rule_last() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -1317,6 +1332,7 @@ fn last_match_wins_more_restrictive_rule_last() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
         ],
@@ -1353,6 +1369,7 @@ fn three_rules_last_matching_wins() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -1363,6 +1380,7 @@ fn three_rules_last_matching_wins() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -1373,6 +1391,7 @@ fn three_rules_last_matching_wins() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
         ],
@@ -1408,6 +1427,7 @@ fn non_matching_rules_skipped_in_priority() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -1418,6 +1438,7 @@ fn non_matching_rules_skipped_in_priority() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
         ],
@@ -1455,6 +1476,7 @@ fn explain_reports_last_matching_rule() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
             StructureRule {
@@ -1465,6 +1487,7 @@ fn explain_reports_last_matching_rule() {
                 warn_threshold: None,
                 allow_extensions: vec![],
                 allow_patterns: vec![],
+                file_naming_pattern: None,
                 relative_depth: false,
             },
         ],
@@ -1515,6 +1538,7 @@ fn calculate_base_depth_simple_pattern() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1550,6 +1574,7 @@ fn relative_depth_allows_deep_nesting_within_base() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1584,6 +1609,7 @@ fn relative_depth_violates_when_too_deep() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1619,6 +1645,7 @@ fn relative_depth_false_uses_absolute_depth() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: false, // Default behavior
         }],
         ..Default::default()
@@ -1655,6 +1682,7 @@ fn relative_depth_with_wildcard_in_middle() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1690,6 +1718,7 @@ fn relative_depth_with_double_star_at_start() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1723,6 +1752,7 @@ fn relative_depth_warn_threshold() {
             warn_threshold: Some(0.6), // Warn at depth 3
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1761,6 +1791,7 @@ fn relative_depth_moving_base_works() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()
@@ -1797,6 +1828,7 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
             warn_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            file_naming_pattern: None,
             relative_depth: true,
         }],
         ..Default::default()

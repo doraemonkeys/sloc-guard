@@ -394,18 +394,32 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                 // gix dirwalk only emits files, so we must count subdirectories this way
                 self.register_directory_chain(parent);
 
-                // Check allowlist violations
+                // Check allowlist and naming violations
                 if let Some(cfg) = self.structure_config {
                     // Convert to absolute path for allowlist matching
                     let abs_parent = self.workdir.join(parent);
-                    if let Some(rule) = cfg.find_matching_allowlist_rule(&abs_parent)
-                        && !rule.file_matches(&self.workdir.join(path_ref))
-                    {
-                        self.allowlist_violations
-                            .push(StructureViolation::disallowed_file(
-                                path.clone().into_owned(),
-                                rule.pattern.clone(),
-                            ));
+                    let abs_file = self.workdir.join(path_ref);
+                    if let Some(rule) = cfg.find_matching_allowlist_rule(&abs_parent) {
+                        // Check allowlist (extensions/patterns) - only if configured
+                        if rule.has_allowlist() && !rule.file_matches(&abs_file) {
+                            self.allowlist_violations
+                                .push(StructureViolation::disallowed_file(
+                                    path.clone().into_owned(),
+                                    rule.pattern.clone(),
+                                ));
+                        }
+
+                        // Check naming convention
+                        if !rule.filename_matches_naming_pattern(&abs_file)
+                            && let Some(ref pattern_str) = rule.naming_pattern_str
+                        {
+                            self.allowlist_violations
+                                .push(StructureViolation::naming_convention(
+                                    path.clone().into_owned(),
+                                    rule.pattern.clone(),
+                                    pattern_str.clone(),
+                                ));
+                        }
                     }
                 }
             }
