@@ -14,6 +14,7 @@ use crate::output::OutputFormat;
 use crate::scanner::{CompositeScanner, FileScanner};
 
 use super::*;
+use crate::commands::check::CheckOptions;
 use crate::commands::context::{CheckContext, FileReader, RealFileReader};
 
 fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: bool) -> Cli {
@@ -128,16 +129,17 @@ fn run_check_with_context_uses_injected_threshold_checker() {
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
     let paths = args.paths.clone();
 
-    let result = run_check_with_context(
-        &args,
-        &cli,
-        &paths,
-        &config,
-        &ctx,
-        &cache,
-        None,
-        temp_dir.path(),
-    );
+    let options = CheckOptions {
+        args: &args,
+        cli: &cli,
+        paths: &paths,
+        config: &config,
+        ctx: &ctx,
+        cache: &cache,
+        baseline: None,
+        project_root: temp_dir.path(),
+    };
+    let result = run_check_with_context(&options);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), crate::EXIT_SUCCESS);
 }
@@ -167,16 +169,17 @@ fn run_check_with_context_uses_injected_structure_checker() {
     let cli = make_cli_for_check(ColorChoice::Never, 0, true, true);
     let paths = vec![sub_dir];
 
-    let result = run_check_with_context(
-        &args,
-        &cli,
-        &paths,
-        &config,
-        &ctx,
-        &cache,
-        None,
-        temp_dir.path(),
-    );
+    let options = CheckOptions {
+        args: &args,
+        cli: &cli,
+        paths: &paths,
+        config: &config,
+        ctx: &ctx,
+        cache: &cache,
+        baseline: None,
+        project_root: temp_dir.path(),
+    };
+    let result = run_check_with_context(&options);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
 }

@@ -28,9 +28,7 @@ pub fn path_matches_override(actual_path: &Path, override_path: &str) -> bool {
         .iter()
         .rev()
         .zip(override_components.iter().rev())
-        .all(|(path_comp, override_comp)| {
-            path_comp.as_os_str().to_string_lossy() == *override_comp
-        })
+        .all(|(path_comp, override_comp)| path_comp.as_os_str().to_string_lossy() == *override_comp)
 }
 
 #[cfg(test)]

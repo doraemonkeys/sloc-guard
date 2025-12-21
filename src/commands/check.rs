@@ -32,6 +32,21 @@ use super::context::{
     process_file_with_cache, resolve_scan_paths, save_cache, write_output,
 };
 
+/// Options for running a check with injected context.
+///
+/// Encapsulates all parameters needed by `run_check_with_context` to improve
+/// readability and maintainability.
+pub(crate) struct CheckOptions<'a> {
+    pub args: &'a CheckArgs,
+    pub cli: &'a Cli,
+    pub paths: &'a [PathBuf],
+    pub config: &'a crate::config::Config,
+    pub ctx: &'a CheckContext,
+    pub cache: &'a Mutex<Cache>,
+    pub baseline: Option<&'a Baseline>,
+    pub project_root: &'a Path,
+}
+
 #[must_use]
 pub fn run_check(args: &CheckArgs, cli: &Cli) -> i32 {
     match run_check_impl(args, cli) {
@@ -92,33 +107,33 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     let ctx = CheckContext::from_config(&config, warn_threshold, exclude_patterns, use_gitignore)?;
 
     // 5. Run check with context
-    run_check_with_context(
+    let options = CheckOptions {
         args,
         cli,
-        &paths,
-        &config,
-        &ctx,
-        &cache,
-        baseline.as_ref(),
-        &project_root,
-    )
+        paths: &paths,
+        config: &config,
+        ctx: &ctx,
+        cache: &cache,
+        baseline: baseline.as_ref(),
+        project_root: &project_root,
+    };
+    run_check_with_context(&options)
 }
 
 /// Internal implementation accepting injectable context (for testing).
 ///
 /// This function contains the core check logic and accepts pre-built dependencies,
 /// enabling unit testing with custom/mock components.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn run_check_with_context(
-    args: &CheckArgs,
-    cli: &Cli,
-    paths: &[std::path::PathBuf],
-    config: &crate::config::Config,
-    ctx: &CheckContext,
-    cache: &Mutex<Cache>,
-    baseline: Option<&Baseline>,
-    project_root: &Path,
-) -> crate::Result<i32> {
+pub(crate) fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
+    // Destructure options for convenient access
+    let args = opts.args;
+    let cli = opts.cli;
+    let paths = opts.paths;
+    let config = opts.config;
+    let ctx = opts.ctx;
+    let cache = opts.cache;
+    let baseline = opts.baseline;
+    let project_root = opts.project_root;
     // Check if pure incremental mode (--files provided)
     let (all_files, scan_result, skip_structure_checks) = if args.files.is_empty() {
         // Normal mode: scan directories

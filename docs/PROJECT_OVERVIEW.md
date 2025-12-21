@@ -117,6 +117,7 @@ StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names,
 AllowlistRule { pattern, allow_extensions, allow_patterns, naming_pattern_str }  // Directory allowlist matching
 CompositeScanner  // Production impl with git/non-git fallback
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
+CheckOptions { args, cli, paths, config, ctx, cache, baseline, project_root }  // Encapsulates run_check_with_context params
 StatsContext { registry, allowed_extensions }  // from_config() or new()
 
 // Project Detection (init --detect)
