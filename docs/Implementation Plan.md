@@ -23,7 +23,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.6 Config Presets, 11.8 Terminology Modernization.
 - **Phase 12**: Structure Rule Priority, State File Consolidation, .gitignore Support, Remote Config (Fetch Warning, Offline Mode, Hash Lock), Rule Matching Override, Relative max_depth, --diff A..B Range.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
-- **Phase 14 (Partial)**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
+- **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
 
 ---
 
