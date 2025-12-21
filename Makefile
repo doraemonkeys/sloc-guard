@@ -22,7 +22,7 @@ ci:
 	@$(TEMP_ENV) cargo run -q -- check src
 
 # 正常模式
-verify: tarpaulin clippy sloc
+verify: tarpaulin clippy sloc fmt
 
 clippy:
 	cargo clippy --all-targets --all-features -- -D warnings
