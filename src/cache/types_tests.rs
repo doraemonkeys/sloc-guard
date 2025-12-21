@@ -242,8 +242,14 @@ fn test_compute_config_hash_ignores_non_counting_settings() {
     assert_eq!(hash1, hash2, "max_lines change should not affect hash");
     assert_eq!(hash1, hash3, "warn_threshold change should not affect hash");
     assert_eq!(hash1, hash4, "extensions change should not affect hash");
-    assert_eq!(hash1, hash5, "exclude patterns change should not affect hash");
-    assert_eq!(hash1, hash6, "structure rules change should not affect hash");
+    assert_eq!(
+        hash1, hash5,
+        "exclude patterns change should not affect hash"
+    );
+    assert_eq!(
+        hash1, hash6,
+        "structure rules change should not affect hash"
+    );
 }
 
 #[test]

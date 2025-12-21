@@ -1818,4 +1818,3 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
     // relative = 2 - 2 = 0, within limit of 1
     assert!(violations.is_empty());
 }
-
