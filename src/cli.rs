@@ -174,9 +174,10 @@ pub struct CheckArgs {
     #[arg(long)]
     pub warn_only: bool,
 
-    /// Compare against a git reference (branch/commit). Defaults to HEAD when no
-    /// value provided. Checks all uncommitted changes (staged + unstaged) relative
-    /// to ref. Use --staged for staged-only. Structure checks use full directory state.
+    /// Compare files changed between a git reference and HEAD (committed states).
+    /// Defaults to HEAD when no value provided. Note: compares committed trees only,
+    /// not the working directory. Use --staged for uncommitted staged files.
+    /// Structure checks use full directory state.
     #[arg(long, num_args = 0..=1, default_missing_value = "HEAD")]
     pub diff: Option<String>,
 

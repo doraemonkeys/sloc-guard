@@ -59,11 +59,12 @@ sloc-guard check --max-lines 200
 
 ### Diff Mode
 
-`--diff` filters content checks to changed files only. Defaults to HEAD when no value provided:
+`--diff` filters content checks to files changed between a git reference and HEAD. Compares **committed** trees only (not the working directory). Defaults to HEAD when no value provided:
 
 ```bash
-sloc-guard check --diff          # Same as --diff HEAD
-sloc-guard check --diff main     # Compare against main branch
+sloc-guard check --diff          # Same as --diff HEAD (no changed files)
+sloc-guard check --diff main     # Files changed between main and HEAD
+sloc-guard check --staged        # Uncommitted staged files only
 ```
 
 **Structure checks** are NOT filtered by `--diff` - they always count full directory state. The `--diff` flag only limits which files are checked for SLOC violations.

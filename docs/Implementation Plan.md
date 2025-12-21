@@ -16,7 +16,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 4**: Path-Based Rules, Inline Ignore, Strict Mode, Baseline, SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Override with Reason, Custom Language Definition, Config Inheritance, Split Suggestions, Remote Config.
 - **Phase 5 (Partial)**: Language Breakdown, Top-N & Metrics, Markdown Output, Directory Statistics, Trend Tracking, HTML Report, Structure Guard.
 - **Phase 5.5 (Refactoring & V2 Config)**: Scanner/Structure separation, `Config` V2 (auto-migration), `CheckResult` refactor, DI Context, Extension-based rule sugar, Explicit Rule Priority, Structure `warn_threshold`.
-- **Phase 6 (Partial)**: CLI updates (`--max-files/dirs`, `--diff/--staged`, `--history-file`, `--update-baseline`, `--report-json`), parameter renames (`--suggest`, `--count-*`), documentation updates.
+- **Phase 6 (Partial)**: CLI updates (`--max-files/dirs`, `--diff/--staged`, `--history-file`, `--update-baseline`, `--report-json`), parameter renames (`--suggest`, `--count-*`), documentation updates, 12.12 `--diff` Semantic Consistency.
 - **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, Binary Download Optimization, SARIF Guidance.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
@@ -54,16 +54,6 @@ Location: `src/config/*.rs`, `src/checker/threshold.rs`
 - Per CLAUDE.md: "No Backward Compatibility" - prioritize clean architecture
 - Update config loader to reject V1 format with clear error message
 - Remove auto-migration code if any
-```
-
-### Task 12.12: --diff Semantic Consistency
-Location: `src/cli.rs`, `src/git/diff.rs`, docs
-```
-- Bug: CLI help says "Checks all uncommitted changes" but implementation compares two commits
-- Current: GitDiff::get_changed_files() compares base_ref tree vs HEAD tree (both committed)
-- Fix: Update documentation to accurately describe behavior (comparing two commits)
-- CLI help should say: "Compare against a git reference (branch/commit/tag)"
-- Document that --diff compares committed states, not working tree
 ```
 
 ### Task 12.13: --diff A..B Explicit Range Syntax
@@ -190,8 +180,8 @@ Location: `src/config/remote_tests.rs`
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
 | ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
-| **9. Architecture Fixes** | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, ~~12.11 Relative max_depth~~ ✅ |
-| **10. Doc/Impl Consistency** | 12.12 --diff Semantic Consistency |
+| ~~**9. Architecture Fixes**~~ | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, ~~12.11 Relative max_depth~~ ✅ |
+| ~~**10. Doc/Impl Consistency**~~ | ~~12.12 --diff Semantic Consistency~~ ✅ |
 | **11. State Robustness** | 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation |
 | **12. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |
 | **13. Git Diff Enhancement** | 12.13 --diff A..B Explicit Range Syntax |

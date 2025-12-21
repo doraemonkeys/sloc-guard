@@ -23,7 +23,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/threshold` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
 | `checker/structure` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
 | `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
-| `git/diff` | `GitDiff` - gix-based changed files detection (`--diff` mode) and staged files detection (`--staged` mode) |
+| `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` compares ref..HEAD) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
 | `state` | State file path resolution: `cache_path()`, `history_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
