@@ -79,6 +79,14 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 - New violation type: DeniedFile { pattern_or_extension }
 ```
 
+### Task 11.8: Deny File Patterns
+Location: `src/config/structure.rs`, `src/checker/structure.rs`
+```
+- Add `deny_file_patterns` to [structure] and [[structure.rules]]
+- Pattern matches file names only (not directories)
+- Example: deny_file_patterns = ["temp_*", "*.bak", "secrets.*"]
+```
+
 ---
 
 ## Priority Order
@@ -88,7 +96,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
 | ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
 | ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
-| **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, ~~11.2 Co-location~~ ✅, 11.7 Deny Patterns |
+| **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, ~~11.2 Co-location~~ ✅, 11.7 Deny Patterns, 11.8 Deny File Patterns |
 | **5. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **6. Visualization** | 7.1-7.2 HTML Charts/Trends |
 
