@@ -24,13 +24,13 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/structure` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
 | `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` compares ref..HEAD) and staged files detection (`--staged` mode) |
-| `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
-| `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback) |
+| `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation, file locking for concurrent access) |
+| `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git/GitRepoNotFound/RemoteConfigHashMismatch |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
-| `stats` | `TrendHistory` - historical stats with delta computation |
+| `stats` | `TrendHistory` - historical stats with delta computation, file locking for concurrent access |
 | `main` | CLI parsing, command dispatch to `commands/*` |
 
 ## Key Types
@@ -98,6 +98,8 @@ StructureViolationType::Files | Dirs
 BaselineUpdateMode::All | Content | Structure | New  // --update-baseline mode
 // Cache (state::cache_path() → .git/sloc-guard/cache.json or .sloc-guard/cache.json)
 Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime, size}> }
+// File locking (state module) - prevents concurrent access corruption
+LockError::Timeout | Io(io::Error)  // try_lock_*_with_timeout returns Result<(), LockError>
 
 // Split suggestions (--suggest)
 FunctionInfo { name, start_line, end_line, line_count }

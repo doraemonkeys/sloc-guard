@@ -169,3 +169,113 @@ fn baseline_path_construction() {
     let result = baseline_path(temp_dir.path());
     assert_eq!(result, temp_dir.path().join(".sloc-guard-baseline.json"));
 }
+
+// =============================================================================
+// File Locking Tests
+// =============================================================================
+
+#[test]
+fn lock_error_display_timeout() {
+    let err = LockError::Timeout;
+    assert_eq!(format!("{err}"), "lock acquisition timed out");
+}
+
+#[test]
+fn lock_error_display_io() {
+    let io_err = io::Error::new(io::ErrorKind::PermissionDenied, "access denied");
+    let err = LockError::Io(io_err);
+    assert!(format!("{err}").contains("lock I/O error"));
+}
+
+#[test]
+fn exclusive_lock_succeeds_on_uncontested_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let file = fs::File::create(&file_path).unwrap();
+
+    let result = try_lock_exclusive_with_timeout(&file, 100);
+    assert!(result.is_ok());
+
+    unlock_file(&file);
+}
+
+#[test]
+fn shared_lock_succeeds_on_uncontested_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let file = fs::File::create(&file_path).unwrap();
+
+    let result = try_lock_shared_with_timeout(&file, 100);
+    assert!(result.is_ok());
+
+    unlock_file(&file);
+}
+
+#[test]
+fn exclusive_lock_times_out_when_held() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+
+    // Create and lock file from first handle
+    let file1 = fs::File::create(&file_path).unwrap();
+    file1.lock().unwrap();
+
+    // Try to acquire exclusive lock from second handle with short timeout
+    let file2 = fs::File::open(&file_path).unwrap();
+    let result = try_lock_exclusive_with_timeout(&file2, 100);
+
+    assert!(matches!(result, Err(LockError::Timeout)));
+
+    file1.unlock().unwrap();
+}
+
+#[test]
+fn shared_lock_times_out_when_exclusive_lock_held() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+
+    // Create and exclusively lock file
+    let file1 = fs::File::create(&file_path).unwrap();
+    file1.lock().unwrap();
+
+    // Try to acquire shared lock from second handle with short timeout
+    let file2 = fs::File::open(&file_path).unwrap();
+    let result = try_lock_shared_with_timeout(&file2, 100);
+
+    assert!(matches!(result, Err(LockError::Timeout)));
+
+    file1.unlock().unwrap();
+}
+
+#[test]
+fn multiple_shared_locks_allowed() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+
+    // Create file
+    let file1 = fs::File::create(&file_path).unwrap();
+
+    // Acquire first shared lock
+    let result1 = try_lock_shared_with_timeout(&file1, 100);
+    assert!(result1.is_ok());
+
+    // Acquire second shared lock from another handle
+    let file2 = fs::File::open(&file_path).unwrap();
+    let result2 = try_lock_shared_with_timeout(&file2, 100);
+    assert!(result2.is_ok());
+
+    unlock_file(&file1);
+    unlock_file(&file2);
+}
+
+#[test]
+fn unlock_file_is_idempotent() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let file = fs::File::create(&file_path).unwrap();
+
+    // Lock and unlock multiple times should not panic
+    file.lock().unwrap();
+    unlock_file(&file);
+    unlock_file(&file); // Should not panic on double unlock
+}

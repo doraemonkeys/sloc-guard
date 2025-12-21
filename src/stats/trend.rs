@@ -5,6 +5,10 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::output::ProjectStatistics;
+use crate::state::{
+    DEFAULT_LOCK_TIMEOUT_MS, try_lock_exclusive_with_timeout, try_lock_shared_with_timeout,
+    unlock_file,
+};
 use crate::{Result, SlocGuardError};
 
 const HISTORY_VERSION: u32 = 1;
@@ -118,6 +122,8 @@ impl TrendHistory {
 
     /// Load history from a JSON file.
     ///
+    /// Acquires a shared lock on the file before reading.
+    ///
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     pub fn load(path: &Path) -> Result<Self> {
@@ -125,9 +131,22 @@ impl TrendHistory {
             path: path.to_path_buf(),
             source: e,
         })?;
-        let reader = BufReader::new(file);
-        let history: Self = serde_json::from_reader(reader)?;
-        Ok(history)
+
+        // Acquire shared lock for reading (allows multiple readers)
+        if let Err(e) = try_lock_shared_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
+            eprintln!(
+                "Warning: Failed to acquire read lock on history file '{}': {e}",
+                path.display()
+            );
+            // Continue without lock - better than failing
+        }
+
+        let reader = BufReader::new(&file);
+        let result = serde_json::from_reader(reader);
+
+        unlock_file(&file);
+
+        Ok(result?)
     }
 
     /// Load history if file exists, otherwise return empty history.
@@ -142,15 +161,33 @@ impl TrendHistory {
 
     /// Save history to a JSON file.
     ///
+    /// Acquires an exclusive lock on the file before writing.
+    /// If lock acquisition times out, logs a warning and skips the save.
+    ///
     /// # Errors
     /// Returns an error if the file cannot be written.
     pub fn save(&self, path: &Path) -> Result<()> {
         let json = serde_json::to_string_pretty(self)?;
-        let mut file = fs::File::create(path).map_err(|e| SlocGuardError::FileRead {
+        let file = fs::File::create(path).map_err(|e| SlocGuardError::FileRead {
             path: path.to_path_buf(),
             source: e,
         })?;
-        file.write_all(json.as_bytes())?;
+
+        // Acquire exclusive lock for writing
+        if let Err(e) = try_lock_exclusive_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
+            eprintln!(
+                "Warning: Failed to acquire write lock on history file '{}': {e}. Skipping history save.",
+                path.display()
+            );
+            // Drop file without writing to avoid corruption
+            return Ok(());
+        }
+
+        let mut writer = std::io::BufWriter::new(&file);
+        writer.write_all(json.as_bytes())?;
+        writer.flush()?;
+
+        unlock_file(&file);
         Ok(())
     }
 

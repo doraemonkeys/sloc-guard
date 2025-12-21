@@ -4,9 +4,11 @@
 //! When running in a git repository root, state files are stored in `.git/sloc-guard/`
 //! (automatically gitignored). Otherwise, they fall back to `.sloc-guard/`.
 
-use std::fs;
+use std::fs::{self, File, TryLockError};
 use std::io;
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::{Duration, Instant};
 
 const STATE_DIR_NAME: &str = "sloc-guard";
 const FALLBACK_STATE_DIR: &str = ".sloc-guard";
@@ -14,6 +16,12 @@ const CACHE_FILENAME: &str = "cache.json";
 const HISTORY_FILENAME: &str = "history.json";
 const BASELINE_FILENAME: &str = ".sloc-guard-baseline.json";
 const CONFIG_FILENAME: &str = ".sloc-guard.toml";
+
+/// Default lock timeout in milliseconds.
+pub const DEFAULT_LOCK_TIMEOUT_MS: u64 = 5000;
+
+/// Polling interval for lock acquisition in milliseconds.
+const LOCK_POLL_INTERVAL_MS: u64 = 50;
 
 /// Detect the state directory for cache and history files.
 ///
@@ -85,6 +93,105 @@ pub fn discover_project_root(start: &Path) -> PathBuf {
 #[must_use]
 pub fn baseline_path(project_root: &Path) -> PathBuf {
     project_root.join(BASELINE_FILENAME)
+}
+
+// =============================================================================
+// File Locking Utilities
+// =============================================================================
+
+/// Error type for lock acquisition failures.
+#[derive(Debug)]
+pub enum LockError {
+    /// Lock acquisition timed out.
+    Timeout,
+    /// I/O error during lock operation.
+    Io(io::Error),
+}
+
+impl From<io::Error> for LockError {
+    fn from(e: io::Error) -> Self {
+        Self::Io(e)
+    }
+}
+
+impl std::fmt::Display for LockError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Timeout => write!(f, "lock acquisition timed out"),
+            Self::Io(e) => write!(f, "lock I/O error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for LockError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Timeout => None,
+            Self::Io(e) => Some(e),
+        }
+    }
+}
+
+/// Try to acquire an exclusive (write) lock on the file with timeout.
+///
+/// Uses polling with [`LOCK_POLL_INTERVAL_MS`] interval.
+/// Returns `Ok(())` on success, `Err(LockError::Timeout)` if timeout exceeded.
+///
+/// # Errors
+/// - `LockError::Timeout` if lock cannot be acquired within `timeout_ms`
+/// - `LockError::Io` for other I/O errors
+pub fn try_lock_exclusive_with_timeout(file: &File, timeout_ms: u64) -> Result<(), LockError> {
+    let start = Instant::now();
+    let timeout = Duration::from_millis(timeout_ms);
+    let poll_interval = Duration::from_millis(LOCK_POLL_INTERVAL_MS);
+
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(()),
+            Err(TryLockError::WouldBlock) => {
+                if start.elapsed() >= timeout {
+                    return Err(LockError::Timeout);
+                }
+                thread::sleep(poll_interval);
+            }
+            Err(TryLockError::Error(e)) => return Err(LockError::Io(e)),
+        }
+    }
+}
+
+/// Try to acquire a shared (read) lock on the file with timeout.
+///
+/// Uses polling with [`LOCK_POLL_INTERVAL_MS`] interval.
+/// Returns `Ok(())` on success, `Err(LockError::Timeout)` if timeout exceeded.
+///
+/// # Errors
+/// - `LockError::Timeout` if lock cannot be acquired within `timeout_ms`
+/// - `LockError::Io` for other I/O errors
+pub fn try_lock_shared_with_timeout(file: &File, timeout_ms: u64) -> Result<(), LockError> {
+    let start = Instant::now();
+    let timeout = Duration::from_millis(timeout_ms);
+    let poll_interval = Duration::from_millis(LOCK_POLL_INTERVAL_MS);
+
+    loop {
+        match file.try_lock_shared() {
+            Ok(()) => return Ok(()),
+            Err(TryLockError::WouldBlock) => {
+                if start.elapsed() >= timeout {
+                    return Err(LockError::Timeout);
+                }
+                thread::sleep(poll_interval);
+            }
+            Err(TryLockError::Error(e)) => return Err(LockError::Io(e)),
+        }
+    }
+}
+
+/// Unlock a file, releasing any held lock.
+///
+/// This should be called after finishing with a locked file.
+/// Errors are silently ignored as unlock failures are non-critical.
+pub fn unlock_file(file: &File) {
+    let _ = file.unlock();
 }
 
 #[cfg(test)]
