@@ -16,7 +16,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | Purpose |
 |--------|---------|
 | `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
-| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode) |
+| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification) |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`), `GlobFilter`, `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback), `ScanResult`, `StructureScanConfig` |
@@ -26,7 +26,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `git/diff` | `GitDiff` - gix-based changed files detection (`--diff` mode) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
-| `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git/GitRepoNotFound |
+| `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git/GitRepoNotFound/RemoteConfigHashMismatch |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `TrendHistory` - historical stats with delta computation |
@@ -38,7 +38,8 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Config (priority: CLI > file > defaults; extends: local/remote/preset with 1h TTL cache for remote)
 // V2 schema separates scanner/content/structure concerns
 // Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
-Config { version, scanner, content, structure }
+// Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
+Config { version, extends, extends_sha256, scanner, content, structure }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
@@ -126,6 +127,7 @@ ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testabi
 ```
 CLI args → load_config() → [if --offline] use cache only, error on miss
          → [if extends] resolve chain (local/remote/preset:*, cycle detection)
+         → [if extends_sha256] verify remote config hash, error on mismatch
          → [if v1 config] migrate_v1_to_v2() auto-conversion
          → expand_language_rules() → [content.languages.X] to [[content.rules]]
          → [if !--no-cache] load_cache(config_hash)

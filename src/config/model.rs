@@ -161,6 +161,11 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extends: Option<String>,
 
+    /// SHA-256 hash of the remote config content for integrity verification.
+    /// When provided, the fetched content's hash must match this value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends_sha256: Option<String>,
+
     // ========== V2 Fields ==========
     /// Scanner configuration (file discovery).
     #[serde(default)]

@@ -72,6 +72,27 @@ fn hash_url(url: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+/// Compute SHA-256 hash of content for integrity verification.
+#[must_use]
+pub fn compute_content_hash(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// Verify that content hash matches expected value.
+fn verify_content_hash(content: &str, expected: &str, url: &str) -> Result<()> {
+    let actual = compute_content_hash(content);
+    if actual != expected {
+        return Err(SlocGuardError::RemoteConfigHashMismatch {
+            url: url.to_string(),
+            expected: expected.to_string(),
+            actual,
+        });
+    }
+    Ok(())
+}
+
 /// Get the cache directory path (project-local).
 #[allow(clippy::single_option_map)] // Intentional for readability
 fn cache_dir(project_root: Option<&Path>) -> Option<PathBuf> {
@@ -134,8 +155,9 @@ fn write_to_cache(url: &str, content: &str, project_root: Option<&Path>) -> Opti
 ///
 /// This function:
 /// 1. Checks the local cache first (1 hour TTL)
-/// 2. If cache miss, fetches from the URL using the provided client
-/// 3. Caches the result for future use
+/// 2. If `expected_hash` is provided, verifies cached content matches
+/// 3. If cache miss or hash mismatch, fetches from remote
+/// 4. Caches the result for future use (only after verification passes)
 ///
 /// # Errors
 ///
@@ -144,10 +166,12 @@ fn write_to_cache(url: &str, content: &str, project_root: Option<&Path>) -> Opti
 /// - The request times out (30 seconds)
 /// - The server returns a non-2xx status code
 /// - Network errors occur
+/// - Hash verification fails (if `expected_hash` is provided)
 pub fn fetch_remote_config_with_client(
     url: &str,
     client: &impl HttpClient,
     project_root: Option<&Path>,
+    expected_hash: Option<&str>,
 ) -> Result<String> {
     // Validate URL
     if !is_remote_url(url) {
@@ -158,7 +182,16 @@ pub fn fetch_remote_config_with_client(
 
     // Try cache first
     if let Some(cached) = read_from_cache(url, project_root) {
-        return Ok(cached);
+        // If hash is specified, verify cached content matches
+        if let Some(hash) = expected_hash {
+            if compute_content_hash(&cached) == hash {
+                return Ok(cached);
+            }
+            // Hash mismatch - cache is stale, fall through to fetch fresh content
+        } else {
+            // No hash specified - use cache as-is
+            return Ok(cached);
+        }
     }
 
     // Emit warning on first remote fetch per session
@@ -170,6 +203,11 @@ pub fn fetch_remote_config_with_client(
 
     // Fetch from remote
     let content = client.get(url)?;
+
+    // Verify hash BEFORE caching (don't cache bad content)
+    if let Some(hash) = expected_hash {
+        verify_content_hash(&content, hash, url)?;
+    }
 
     // Cache the result (ignore cache write errors)
     let _ = write_to_cache(url, &content, project_root);
@@ -188,8 +226,13 @@ pub fn fetch_remote_config_with_client(
 /// - The request times out
 /// - The server returns a non-2xx status code
 /// - Network errors occur
-pub fn fetch_remote_config(url: &str, project_root: Option<&Path>) -> Result<String> {
-    fetch_remote_config_with_client(url, &ReqwestClient, project_root)
+/// - Hash verification fails (if `expected_hash` is provided)
+pub fn fetch_remote_config(
+    url: &str,
+    project_root: Option<&Path>,
+    expected_hash: Option<&str>,
+) -> Result<String> {
+    fetch_remote_config_with_client(url, &ReqwestClient, project_root, expected_hash)
 }
 
 /// Fetch remote configuration from cache only (offline mode).
@@ -202,18 +245,30 @@ pub fn fetch_remote_config(url: &str, project_root: Option<&Path>) -> Result<Str
 /// Returns an error if:
 /// - The URL is invalid
 /// - The cache is missing or expired
-pub fn fetch_remote_config_offline(url: &str, project_root: Option<&Path>) -> Result<String> {
+/// - Hash verification fails (if `expected_hash` is provided)
+pub fn fetch_remote_config_offline(
+    url: &str,
+    project_root: Option<&Path>,
+    expected_hash: Option<&str>,
+) -> Result<String> {
     if !is_remote_url(url) {
         return Err(SlocGuardError::Config(format!(
             "Invalid remote config URL (must start with http:// or https://): {url}"
         )));
     }
 
-    read_from_cache(url, project_root).ok_or_else(|| {
+    let content = read_from_cache(url, project_root).ok_or_else(|| {
         SlocGuardError::Config(format!(
             "Remote config cache miss in offline mode. Run without --offline first to cache: {url}"
         ))
-    })
+    })?;
+
+    // Verify cached content if hash is specified
+    if let Some(hash) = expected_hash {
+        verify_content_hash(&content, hash, url)?;
+    }
+
+    Ok(content)
 }
 
 /// Clear the remote config cache.

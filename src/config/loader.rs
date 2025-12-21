@@ -308,6 +308,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
     fn load_remote_with_extends(
         &self,
         url: &str,
+        expected_hash: Option<&str>,
         visited: &mut HashSet<String>,
     ) -> Result<toml::Value> {
         if !visited.insert(url.to_string()) {
@@ -317,9 +318,9 @@ impl<F: FileSystem> FileConfigLoader<F> {
         }
 
         let content = if self.offline {
-            fetch_remote_config_offline(url, self.project_root.as_deref())?
+            fetch_remote_config_offline(url, self.project_root.as_deref(), expected_hash)?
         } else {
-            fetch_remote_config(url, self.project_root.as_deref())?
+            fetch_remote_config(url, self.project_root.as_deref(), expected_hash)?
         };
         self.process_config_content(&content, None, visited)
     }
@@ -338,11 +339,16 @@ impl<F: FileSystem> FileConfigLoader<F> {
             .and_then(toml::Value::as_str)
             .map(String::from);
 
+        let extends_sha256 = config_value
+            .get("extends_sha256")
+            .and_then(toml::Value::as_str)
+            .map(String::from);
+
         if let Some(extends) = extends_value {
             let base_value = if let Some(preset_name) = extends.strip_prefix("preset:") {
                 presets::load_preset(preset_name)?
             } else if is_remote_url(&extends) {
-                self.load_remote_with_extends(&extends, visited)?
+                self.load_remote_with_extends(&extends, extends_sha256.as_deref(), visited)?
             } else {
                 let extends_path = Path::new(&extends);
                 let resolved_path = if extends_path.is_absolute() {
@@ -363,6 +369,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
 
         if let Some(table) = config_value.as_table_mut() {
             table.remove("extends");
+            table.remove("extends_sha256");
         }
 
         Ok(config_value)

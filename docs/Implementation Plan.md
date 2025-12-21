@@ -21,7 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
-- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.5 Git Scanner Fallback Warning, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.5 Git Scanner Fallback Warning, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock.
 
 ---
 
@@ -70,15 +70,6 @@ Location: `src/config/*.rs`, `src/checker/threshold.rs`
 - Per CLAUDE.md: "No Backward Compatibility" - prioritize clean architecture
 - Update config loader to reject V1 format with clear error message
 - Remove auto-migration code if any
-```
-
-### Task 12.9.3: Hash Lock (extends_sha256)
-Location: `src/config/model.rs`, `src/config/loader.rs`, `src/config/remote.rs`
-```
-- Add `extends_sha256` field to config model
-- Compute SHA256 of fetched content, compare with expected hash
-- Hash mismatch → error with expected vs actual hash
-- Prevents silent config drift
 ```
 
 ---
@@ -144,7 +135,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
-| **8. Config Validation** | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, 12.9.3 Hash Lock |
+| ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
 | **9. State File Cleanup** | 12.4 Consolidate State Files, 12.6 max_depth Example, 12.7 Remove V1 path_rules |
 | **10. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
 | **11. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |

@@ -35,6 +35,13 @@ pub enum SlocGuardError {
 
     #[error("Not a git repository: {0}")]
     GitRepoNotFound(String),
+
+    #[error("Remote config hash mismatch for {url}: expected {expected}, got {actual}")]
+    RemoteConfigHashMismatch {
+        url: String,
+        expected: String,
+        actual: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, SlocGuardError>;
