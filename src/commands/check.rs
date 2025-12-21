@@ -20,6 +20,7 @@ use crate::output::{
     ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
     TextFormatter,
 };
+use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::check_baseline_ops::{
@@ -65,11 +66,13 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     };
 
     // 3.1 Load cache if not disabled
+    let project_root = Path::new(".");
+    let cache_path = state::cache_path(project_root);
     let config_hash = compute_config_hash(&config);
     let cache = if args.no_cache {
         None
     } else {
-        load_cache(&config_hash)
+        load_cache(&cache_path, &config_hash)
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
@@ -181,7 +184,8 @@ pub(crate) fn run_check_with_context(
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
-        save_cache(&cache_guard);
+        let cache_path = state::cache_path(Path::new("."));
+        save_cache(&cache_path, &cache_guard);
     }
 
     // 7. Apply baseline comparison: mark failures as grandfathered if in baseline

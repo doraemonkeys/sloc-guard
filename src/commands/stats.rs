@@ -11,12 +11,13 @@ use crate::output::{
     StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 use crate::scanner::scan_files;
+use crate::state;
 use crate::stats::TrendHistory;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::context::{
-    DEFAULT_HISTORY_PATH, FileReader, RealFileReader, StatsContext, load_cache, load_config,
-    process_file_with_cache, resolve_scan_paths, save_cache, write_output,
+    FileReader, RealFileReader, StatsContext, load_cache, load_config, process_file_with_cache,
+    resolve_scan_paths, save_cache, write_output,
 };
 
 #[must_use]
@@ -40,11 +41,13 @@ pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> 
     )?;
 
     // 1.1 Load cache if not disabled
+    let project_root = Path::new(".");
+    let cache_path = state::cache_path(project_root);
     let config_hash = compute_config_hash(&config);
     let cache = if args.no_cache {
         None
     } else {
-        load_cache(&config_hash)
+        load_cache(&cache_path, &config_hash)
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
@@ -110,7 +113,8 @@ pub(crate) fn run_stats_with_context(
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
-        save_cache(&cache_guard);
+        let cache_path = state::cache_path(Path::new("."));
+        save_cache(&cache_path, &cache_guard);
     }
 
     let project_stats = ProjectStatistics::new(file_stats);
@@ -127,11 +131,15 @@ pub(crate) fn run_stats_with_context(
 
     // 5.2 Trend tracking if enabled
     let project_stats = if args.trend {
-        let default_path = Path::new(DEFAULT_HISTORY_PATH).to_path_buf();
+        let default_path = state::history_path(Path::new("."));
         let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
         let trend = history.compute_delta(&project_stats);
         history.add(&project_stats);
+        // Ensure parent directory exists before saving
+        if let Some(parent) = history_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
         // Save history (silently ignore errors)
         let _ = history.save(history_path);
         if let Some(delta) = trend {

@@ -25,6 +25,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `GitDiff` - gix-based changed files detection (`--diff` mode) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation) |
+| `state` | State file path resolution: `cache_path()`, `history_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `error` | `SlocGuardError` enum: Config/FileRead/InvalidPattern/Io/TomlParse/JsonSerialize/Git/GitRepoNotFound/RemoteConfigHashMismatch |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
@@ -83,19 +84,20 @@ FileStatistics { path, stats, language }
 ProjectStatistics { files, total_*, by_language, by_directory, top_files, average_code_lines, trend }
 GroupBy::None | Lang | Dir
 
-// Trend (.sloc-guard-history.json)
+// Trend (state::history_path() → .git/sloc-guard/history.json or .sloc-guard/history.json)
 TrendEntry { timestamp, total_files, total_lines, code, comment, blank }
 TrendDelta { *_delta, previous_timestamp }
 
 // Git/Baseline/Cache
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff mode
 GitDiff::get_staged_files() → HashSet<PathBuf>  // --staged mode
-// Baseline V2 (.sloc-guard-baseline.json) - auto-migrates V1 format
+// Baseline V2 (.sloc-guard-baseline.json in project root)
 Baseline { version: 2, files: HashMap<path, BaselineEntry> }
 BaselineEntry::Content { lines, hash } | Structure { violation_type, count }
 StructureViolationType::Files | Dirs
 BaselineUpdateMode::All | Content | Structure | New  // --update-baseline mode
-Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime, size}> }  // .sloc-guard-cache.json
+// Cache (state::cache_path() → .git/sloc-guard/cache.json or .sloc-guard/cache.json)
+Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime, size}> }
 
 // Split suggestions (--suggest)
 FunctionInfo { name, start_line, end_line, line_count }

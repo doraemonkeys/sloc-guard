@@ -11,6 +11,7 @@ pub mod git;
 pub mod language;
 pub mod output;
 pub mod scanner;
+pub mod state;
 pub mod stats;
 
 pub use error::{Result, SlocGuardError};

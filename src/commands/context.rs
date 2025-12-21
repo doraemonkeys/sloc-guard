@@ -15,12 +15,6 @@ use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
 use crate::scanner::{AllowlistRuleBuilder, CompositeScanner, FileScanner, StructureScanConfig};
 
-/// Default cache file path
-pub const DEFAULT_CACHE_PATH: &str = ".sloc-guard-cache.json";
-
-/// Default history file path for trend tracking
-pub const DEFAULT_HISTORY_PATH: &str = ".sloc-guard-history.json";
-
 #[must_use]
 pub(crate) const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
     match choice {
@@ -58,8 +52,7 @@ pub(crate) fn load_config(
 }
 
 #[must_use]
-pub fn load_cache(config_hash: &str) -> Option<Cache> {
-    let cache_path = Path::new(DEFAULT_CACHE_PATH);
+pub fn load_cache(cache_path: &Path, config_hash: &str) -> Option<Cache> {
     if !cache_path.exists() {
         return None;
     }
@@ -69,8 +62,11 @@ pub fn load_cache(config_hash: &str) -> Option<Cache> {
         .filter(|cache| cache.is_valid(config_hash))
 }
 
-pub fn save_cache(cache: &Cache) {
-    let cache_path = Path::new(DEFAULT_CACHE_PATH);
+pub fn save_cache(cache_path: &Path, cache: &Cache) {
+    // Create parent directory if needed
+    if let Some(parent) = cache_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     // Silently ignore errors when saving cache
     let _ = cache.save(cache_path);
 }

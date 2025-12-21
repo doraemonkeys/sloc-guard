@@ -271,7 +271,8 @@ fn stats_trend_creates_history_file() {
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
 
-    let history_path = fixture.path().join(".sloc-guard-history.json");
+    // History file is now created in .sloc-guard/ directory (or .git/sloc-guard/ if in git repo)
+    let history_path = fixture.path().join(".sloc-guard").join("history.json");
 
     sloc_guard!()
         .current_dir(fixture.path())
