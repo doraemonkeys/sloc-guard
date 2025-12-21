@@ -368,7 +368,7 @@ impl StructureChecker {
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
         clippy::cast_precision_loss
-    )]
+    )] // Limits are validated to be non-negative (if not UNLIMITED), so casting is safe.
     pub fn check(&self, dir_stats: &HashMap<PathBuf, DirStats>) -> Vec<StructureViolation> {
         let mut violations = Vec::new();
 

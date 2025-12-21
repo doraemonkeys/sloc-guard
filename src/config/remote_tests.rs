@@ -155,24 +155,22 @@ fn fetch_remote_config_rejects_non_http_scheme() {
 #[test]
 fn cache_dir_returns_path_with_project_root() {
     let temp_dir = create_temp_project();
-    let result = cache_dir(Some(temp_dir.path()));
-    assert!(result.is_some());
-    assert!(result.unwrap().starts_with(temp_dir.path()));
+    let result = cache_dir(temp_dir.path());
+    assert!(result.starts_with(temp_dir.path()));
 }
 
 #[test]
-fn cache_dir_returns_none_without_project_root() {
-    let result = cache_dir(None);
-    assert!(result.is_none());
+fn cache_dir_structure_matches_expected() {
+    let temp_dir = create_temp_project();
+    let result = cache_dir(temp_dir.path());
+    assert!(result.ends_with(".sloc-guard/remote-cache"));
 }
 
 #[test]
 fn cache_file_path_includes_url_hash() {
     let temp_dir = create_temp_project();
     let url = "https://example.com/config.toml";
-    let path = cache_file_path(url, Some(temp_dir.path()));
-    assert!(path.is_some());
-    let path = path.unwrap();
+    let path = cache_file_path(url, temp_dir.path());
     let expected_hash = hash_url(url);
     assert!(path.to_string_lossy().contains(&expected_hash));
     assert!(path.to_string_lossy().ends_with(".toml"));
@@ -197,8 +195,8 @@ fn clear_cache_removes_cached_files() {
     }
 
     // Verify file was created
-    let cache_path = cache_file_path(test_url, Some(temp_dir.path()));
-    if !cache_path.as_ref().is_some_and(|p| p.exists()) {
+    let cache_path = cache_file_path(test_url, temp_dir.path());
+    if !cache_path.exists() {
         // File wasn't persisted (edge case under tarpaulin), skip test
         return;
     }
@@ -207,7 +205,7 @@ fn clear_cache_removes_cached_files() {
     let deleted = clear_cache(Some(temp_dir.path()));
 
     // Verify file was deleted - this is the observable outcome we care about
-    let file_deleted = cache_path.as_ref().is_none_or(|p| !p.exists());
+    let file_deleted = !cache_path.exists();
 
     // On some systems (Windows under coverage tools), fs::remove_file may fail
     // due to file locking, but this is a system limitation, not a code issue.
@@ -271,12 +269,10 @@ fn write_to_cache_and_read_back() {
 #[test]
 fn cache_file_path_different_urls_produce_different_paths() {
     let temp_dir = create_temp_project();
-    let path1 = cache_file_path("https://example1.com/config.toml", Some(temp_dir.path()));
-    let path2 = cache_file_path("https://example2.com/config.toml", Some(temp_dir.path()));
+    let path1 = cache_file_path("https://example1.com/config.toml", temp_dir.path());
+    let path2 = cache_file_path("https://example2.com/config.toml", temp_dir.path());
 
-    assert!(path1.is_some());
-    assert!(path2.is_some());
-    assert_ne!(path1.unwrap(), path2.unwrap());
+    assert_ne!(path1, path2);
 }
 
 // Tests using MockHttpClient
@@ -327,7 +323,7 @@ fn fetch_with_mock_client_uses_cache_on_second_call() {
     assert_eq!(client.call_count(), 1);
 
     // Check if cache was written successfully
-    let cache_exists = cache_file_path(url, Some(temp_dir.path())).is_some_and(|p| p.exists());
+    let cache_exists = cache_file_path(url, temp_dir.path()).exists();
     if !cache_exists {
         return;
     }
@@ -512,7 +508,7 @@ fn warning_not_shown_when_cache_hit() {
     let _ = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
 
     // Check if cache was created
-    let cache_exists = cache_file_path(url, Some(temp_dir.path())).is_some_and(|p| p.exists());
+    let cache_exists = cache_file_path(url, temp_dir.path()).exists();
     if !cache_exists {
         return;
     }

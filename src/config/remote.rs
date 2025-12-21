@@ -94,14 +94,13 @@ fn verify_content_hash(content: &str, expected: &str, url: &str) -> Result<()> {
 }
 
 /// Get the cache directory path (project-local).
-#[allow(clippy::single_option_map)] // Intentional for readability
-fn cache_dir(project_root: Option<&Path>) -> Option<PathBuf> {
-    project_root.map(|root| root.join(LOCAL_CACHE_DIR))
+fn cache_dir(project_root: &Path) -> PathBuf {
+    project_root.join(LOCAL_CACHE_DIR)
 }
 
 /// Get the cache file path for a given URL.
-fn cache_file_path(url: &str, project_root: Option<&Path>) -> Option<PathBuf> {
-    cache_dir(project_root).map(|dir| dir.join(format!("{}.toml", hash_url(url))))
+fn cache_file_path(url: &str, project_root: &Path) -> PathBuf {
+    cache_dir(project_root).join(format!("{}.toml", hash_url(url)))
 }
 
 /// Check if cache file is still valid (within TTL).
@@ -127,7 +126,8 @@ fn is_cache_valid(cache_path: &PathBuf) -> bool {
 
 /// Try to read config from cache.
 fn read_from_cache(url: &str, project_root: Option<&Path>) -> Option<String> {
-    let cache_path = cache_file_path(url, project_root)?;
+    let root = project_root?;
+    let cache_path = cache_file_path(url, root);
     if is_cache_valid(&cache_path) {
         fs::read_to_string(&cache_path).ok()
     } else {
@@ -137,7 +137,8 @@ fn read_from_cache(url: &str, project_root: Option<&Path>) -> Option<String> {
 
 /// Write config to cache.
 fn write_to_cache(url: &str, content: &str, project_root: Option<&Path>) -> Option<()> {
-    let cache_path = cache_file_path(url, project_root)?;
+    let root = project_root?;
+    let cache_path = cache_file_path(url, root);
 
     // Create cache directory if it doesn't exist
     if let Some(parent) = cache_path.parent() {
@@ -276,9 +277,10 @@ pub fn fetch_remote_config_offline(
 /// Returns the number of files deleted.
 #[must_use]
 pub fn clear_cache(project_root: Option<&Path>) -> usize {
-    let Some(dir) = cache_dir(project_root) else {
+    let Some(root) = project_root else {
         return 0;
     };
+    let dir = cache_dir(root);
 
     if !dir.exists() {
         return 0;

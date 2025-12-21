@@ -118,15 +118,20 @@ impl DetectionResult {
 }
 
 /// Trait for detecting project types (for testability).
-#[allow(clippy::missing_errors_doc)]
 pub trait ProjectDetector {
     /// Check if a file exists at the given path.
     fn exists(&self, path: &Path) -> bool;
 
     /// List immediate subdirectories of a path.
+    ///
+    /// # Errors
+    /// Returns an error if the directory cannot be read (e.g., permission denied, not a directory).
     fn list_subdirs(&self, path: &Path) -> std::io::Result<Vec<PathBuf>>;
 
     /// List files in a directory (for C# detection).
+    ///
+    /// # Errors
+    /// Returns an error if the directory cannot be read.
     fn list_files(&self, path: &Path) -> std::io::Result<Vec<String>>;
 }
 
