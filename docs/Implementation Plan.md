@@ -106,6 +106,18 @@ Location: `src/commands/check.rs`
 - Improves readability and maintainability
 ```
 
+### Task 14.3: Split Scanner Module
+Location: `src/scanner/`
+```
+Current: mod.rs (~900 lines) mixes types, traits, and implementations
+Split into:
+- types.rs: ScanResult, AllowlistRule, StructureScanConfig
+- directory.rs: DirectoryScanner (walkdir-based)
+- composite.rs: CompositeScanner (git/non-git fallback)
+- mod.rs: FileScanner trait + module re-exports only
+Bonus: Extract shared logic from scan_with_structure_walkdir() vs scan_with_structure_gitignore() (~130 lines duplicate)
+```
+
 ---
 
 ## Priority Order
@@ -114,7 +126,7 @@ Location: `src/commands/check.rs`
 |----------|-------|
 | ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
 | ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
-| **3. Code Quality** | 14.1 Extract Path Matching, 14.2 CheckOptions Struct |
+| **3. Code Quality** | 14.1 Extract Path Matching, 14.2 CheckOptions Struct, 14.3 Scanner Module Split |
 | **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, 11.2 Co-location, 11.7 Deny Patterns |
 | **5. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **6. Visualization** | 7.1-7.2 HTML Charts/Trends |
