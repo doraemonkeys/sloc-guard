@@ -1224,14 +1224,6 @@ fn checker_enabled_with_allowlist_rule() {
 }
 
 #[test]
-fn with_scanner_exclude_creates_checker() {
-    let config = config_with_file_limit(10);
-    let exclude_patterns = vec!["node_modules".to_string()];
-    let checker = StructureChecker::with_scanner_exclude(&config, &exclude_patterns).unwrap();
-    assert!(checker.is_enabled());
-}
-
-#[test]
 fn invalid_override_max_depth_returns_error() {
     let config = StructureConfig {
         overrides: vec![StructureOverride {

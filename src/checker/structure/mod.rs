@@ -1,56 +1,32 @@
+//! Structure checker for directory file/subdir/depth limits.
+//!
+//! This module provides [`StructureChecker`] which enforces directory structure
+//! constraints including:
+//! - Maximum files per directory
+//! - Maximum subdirectories per directory
+//! - Maximum directory depth
+//! - File co-location (sibling) requirements
+
+mod builder;
+mod compiled_rules;
+mod validation;
+pub mod violation;
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use globset::{Glob, GlobMatcher};
-
 use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
-use crate::error::{Result, SlocGuardError};
+use crate::error::Result;
 use crate::path_utils::path_matches_override;
 
 use super::explain::{
     MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
 };
-pub use super::structure_types::{DirStats, StructureViolation, ViolationType};
+pub use violation::{DirStats, StructureViolation, ViolationType};
 
-struct CompiledStructureRule {
-    pattern: String,
-    matcher: GlobMatcher,
-    max_files: Option<i64>,
-    max_dirs: Option<i64>,
-    max_depth: Option<i64>,
-    /// When true, `max_depth` is relative to the pattern's base directory.
-    relative_depth: bool,
-    /// Depth of the pattern's base directory (components before first glob).
-    /// Only meaningful when `relative_depth` is true.
-    base_depth: usize,
-    warn_threshold: Option<f64>,
-}
-
-/// Compiled sibling rule for file co-location checking.
-struct CompiledSiblingRule {
-    /// Original directory pattern string (for violation messages).
-    dir_pattern: String,
-    /// Matcher for directory (parent of files).
-    dir_matcher: GlobMatcher,
-    /// Matcher for files that require a sibling.
-    file_matcher: GlobMatcher,
-    /// Template for deriving sibling filename (e.g., "{stem}.test.tsx").
-    sibling_template: String,
-}
-
-/// Resolved limits for a directory path.
-#[derive(Debug, Clone, Default)]
-struct StructureLimits {
-    max_files: Option<i64>,
-    max_dirs: Option<i64>,
-    max_depth: Option<i64>,
-    /// When true, `max_depth` is relative to `base_depth`.
-    relative_depth: bool,
-    /// Depth of the matched rule's base directory.
-    base_depth: usize,
-    warn_threshold: Option<f64>,
-    override_reason: Option<String>,
-}
+use builder::{build_rules, build_sibling_rules};
+use compiled_rules::{CompiledSiblingRule, CompiledStructureRule, StructureLimits};
+use validation::{validate_limits, validate_sibling_rules};
 
 /// Checker for directory structure limits.
 pub struct StructureChecker {
@@ -70,10 +46,10 @@ impl StructureChecker {
     /// Returns an error if any rule pattern is invalid,
     /// or if any limit value is less than -1.
     pub fn new(config: &StructureConfig) -> Result<Self> {
-        Self::validate_limits(config)?;
-        Self::validate_sibling_rules(&config.rules)?;
-        let rules = Self::build_rules(&config.rules)?;
-        let sibling_rules = Self::build_sibling_rules(&config.rules)?;
+        validate_limits(config)?;
+        validate_sibling_rules(&config.rules)?;
+        let rules = build_rules(&config.rules)?;
+        let sibling_rules = build_sibling_rules(&config.rules)?;
 
         Ok(Self {
             max_files: config.max_files,
@@ -86,22 +62,6 @@ impl StructureChecker {
         })
     }
 
-    /// Create a new structure checker with scanner exclude patterns.
-    ///
-    /// Note: Scanner exclude patterns are now handled by the scanner during traversal,
-    /// not by the `StructureChecker`. This method is kept for backward compatibility
-    /// and simply ignores the `scanner_exclude` parameter.
-    ///
-    /// # Errors
-    /// Returns an error if any pattern is invalid or any limit value is less than -1.
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn with_scanner_exclude(
-        config: &StructureConfig,
-        _scanner_exclude: &[String],
-    ) -> Result<Self> {
-        Self::new(config)
-    }
-
     /// Returns true if structure checking is enabled (any limit is set).
     #[must_use]
     #[allow(clippy::missing_const_for_fn)] // Vec::is_empty() is not const
@@ -111,191 +71,6 @@ impl StructureChecker {
             || self.max_depth.is_some()
             || !self.rules.is_empty()
             || !self.overrides.is_empty()
-    }
-
-    /// Validate that all limit values are >= -1.
-    fn validate_limits(config: &StructureConfig) -> Result<()> {
-        if let Some(limit) = config.max_files
-            && limit < UNLIMITED
-        {
-            return Err(SlocGuardError::Config(format!(
-                "Invalid max_files value: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number."
-            )));
-        }
-        if let Some(limit) = config.max_dirs
-            && limit < UNLIMITED
-        {
-            return Err(SlocGuardError::Config(format!(
-                "Invalid max_dirs value: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number."
-            )));
-        }
-        if let Some(limit) = config.max_depth
-            && limit < UNLIMITED
-        {
-            return Err(SlocGuardError::Config(format!(
-                "Invalid max_depth value: {limit}. Use -1 for unlimited, or a positive number."
-            )));
-        }
-
-        for (i, rule) in config.rules.iter().enumerate() {
-            if let Some(limit) = rule.max_files
-                && limit < UNLIMITED
-            {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid max_files value in rule {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
-                    i + 1
-                )));
-            }
-            if let Some(limit) = rule.max_dirs
-                && limit < UNLIMITED
-            {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid max_dirs value in rule {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
-                    i + 1
-                )));
-            }
-            if let Some(limit) = rule.max_depth
-                && limit < UNLIMITED
-            {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid max_depth value in rule {}: {limit}. Use -1 for unlimited, or a positive number.",
-                    i + 1
-                )));
-            }
-        }
-
-        // Validate overrides
-        for (i, ovr) in config.overrides.iter().enumerate() {
-            if let Some(limit) = ovr.max_files
-                && limit < UNLIMITED
-            {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid max_files value in override {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
-                    i + 1
-                )));
-            }
-            if let Some(limit) = ovr.max_dirs
-                && limit < UNLIMITED
-            {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid max_dirs value in override {}: {limit}. Use -1 for unlimited, 0 for prohibited, or a positive number.",
-                    i + 1
-                )));
-            }
-            if let Some(limit) = ovr.max_depth
-                && limit < UNLIMITED
-            {
-                return Err(SlocGuardError::Config(format!(
-                    "Invalid max_depth value in override {}: {limit}. Use -1 for unlimited, or a positive number.",
-                    i + 1
-                )));
-            }
-            // Require at least one limit to be set
-            if ovr.max_files.is_none() && ovr.max_dirs.is_none() && ovr.max_depth.is_none() {
-                return Err(SlocGuardError::Config(format!(
-                    "Override {} for path '{}' must specify at least one of max_files, max_dirs, or max_depth.",
-                    i + 1,
-                    ovr.path
-                )));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn build_rules(rules: &[crate::config::StructureRule]) -> Result<Vec<CompiledStructureRule>> {
-        rules
-            .iter()
-            .map(|rule| {
-                let glob =
-                    Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                        pattern: rule.pattern.clone(),
-                        source: e,
-                    })?;
-
-                // Calculate base_depth: count path components before first glob metacharacter
-                let base_depth = Self::calculate_base_depth(&rule.pattern);
-
-                Ok(CompiledStructureRule {
-                    pattern: rule.pattern.clone(),
-                    matcher: glob.compile_matcher(),
-                    max_files: rule.max_files,
-                    max_dirs: rule.max_dirs,
-                    max_depth: rule.max_depth,
-                    relative_depth: rule.relative_depth,
-                    base_depth,
-                    warn_threshold: rule.warn_threshold,
-                })
-            })
-            .collect()
-    }
-
-    /// Calculate the depth of the pattern's base directory.
-    /// This is the number of path components before the first glob metacharacter.
-    /// Examples:
-    /// - "src/features/**" → 2 (src, features)
-    /// - "src/*/utils" → 1 (src)
-    /// - "**/*.rs" → 0
-    /// - "exact/path" → 2
-    fn calculate_base_depth(pattern: &str) -> usize {
-        let mut depth = 0;
-        for component in pattern.split(['/', '\\']) {
-            if component.is_empty() {
-                continue;
-            }
-            // Check if this component contains any glob metacharacters
-            if component.contains(['*', '?', '[', '{']) {
-                break;
-            }
-            depth += 1;
-        }
-        depth
-    }
-
-    /// Validate sibling rule configuration.
-    /// `require_sibling` requires `file_pattern` to be set.
-    fn validate_sibling_rules(rules: &[crate::config::StructureRule]) -> Result<()> {
-        for (i, rule) in rules.iter().enumerate() {
-            if rule.require_sibling.is_some() && rule.file_pattern.is_none() {
-                return Err(SlocGuardError::Config(format!(
-                    "Rule {} has 'require_sibling' but no 'file_pattern'. \
-                     Both must be set together to specify which files need siblings.",
-                    i + 1
-                )));
-            }
-        }
-        Ok(())
-    }
-
-    /// Build sibling rules from config rules that have `require_sibling` set.
-    fn build_sibling_rules(
-        rules: &[crate::config::StructureRule],
-    ) -> Result<Vec<CompiledSiblingRule>> {
-        rules
-            .iter()
-            .filter(|rule| rule.require_sibling.is_some() && rule.file_pattern.is_some())
-            .map(|rule| {
-                let dir_glob =
-                    Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                        pattern: rule.pattern.clone(),
-                        source: e,
-                    })?;
-
-                let file_pattern = rule.file_pattern.as_ref().unwrap();
-                let file_glob =
-                    Glob::new(file_pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                        pattern: file_pattern.clone(),
-                        source: e,
-                    })?;
-
-                Ok(CompiledSiblingRule {
-                    dir_pattern: rule.pattern.clone(),
-                    dir_matcher: dir_glob.compile_matcher(),
-                    file_matcher: file_glob.compile_matcher(),
-                    sibling_template: rule.require_sibling.clone().unwrap(),
-                })
-            })
-            .collect()
     }
 
     /// Get limits for a directory path.
@@ -313,7 +88,12 @@ impl StructureChecker {
     /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
+    #[cfg(test)]
     fn get_limits(&self, path: &Path) -> StructureLimits {
+        self.resolve_limits(path)
+    }
+
+    fn resolve_limits(&self, path: &Path) -> StructureLimits {
         // 1. Check overrides first (highest priority)
         // Note: Overrides don't support relative_depth (they use absolute limits)
         for ovr in &self.overrides {
@@ -373,7 +153,7 @@ impl StructureChecker {
         let mut violations = Vec::new();
 
         for (path, stats) in dir_stats {
-            let limits = self.get_limits(path);
+            let limits = self.resolve_limits(path);
 
             // Check file count (skip if unlimited)
             if let Some(limit) = limits.max_files
@@ -628,8 +408,8 @@ impl StructureChecker {
             },
         });
 
-        // Get effective limits using the same logic as get_limits
-        let limits = self.get_limits(path);
+        // Get effective limits using the same logic as resolve_limits
+        let limits = self.resolve_limits(path);
 
         StructureExplanation {
             path: path.to_path_buf(),
@@ -645,5 +425,5 @@ impl StructureChecker {
 }
 
 #[cfg(test)]
-#[path = "structure_tests.rs"]
+#[path = "tests.rs"]
 mod tests;

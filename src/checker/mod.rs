@@ -1,6 +1,5 @@
 mod explain;
 mod structure;
-mod structure_types;
 mod threshold;
 
 pub use explain::{
@@ -8,7 +7,7 @@ pub use explain::{
     StructureRuleCandidate, StructureRuleMatch,
 };
 pub use structure::StructureChecker;
-pub use structure_types::{DirStats, StructureViolation, ViolationType};
+pub use structure::violation::{DirStats, StructureViolation, ViolationType};
 pub use threshold::{CheckResult, ThresholdChecker};
 
 use std::path::Path;
