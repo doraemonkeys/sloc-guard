@@ -20,6 +20,7 @@ use crate::output::{
     ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
     TextFormatter,
 };
+use crate::path_utils::path_matches_override;
 use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
@@ -570,27 +571,6 @@ pub(crate) fn validate_override_paths(
     }
 
     Ok(())
-}
-
-/// Check if a path matches an override path using suffix matching.
-/// Replicates the matching logic from `ThresholdChecker` and `StructureChecker`.
-fn path_matches_override(actual_path: &Path, override_path: &str) -> bool {
-    let override_components: Vec<&str> = override_path
-        .split(['/', '\\'])
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    let path_components: Vec<_> = actual_path.components().collect();
-
-    if override_components.is_empty() || override_components.len() > path_components.len() {
-        return false;
-    }
-
-    path_components
-        .iter()
-        .rev()
-        .zip(override_components.iter().rev())
-        .all(|(path_comp, override_comp)| path_comp.as_os_str().to_string_lossy() == *override_comp)
 }
 
 #[cfg(test)]

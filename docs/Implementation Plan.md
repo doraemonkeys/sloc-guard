@@ -23,6 +23,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.6 Config Presets, 11.8 Terminology Modernization.
 - **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.7 Remove V1 path_rules, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth, 12.13 --diff A..B Range Syntax.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
+- **Phase 14 (Partial)**: 14.1 Extract Path Matching Utility.
 
 ---
 
@@ -90,14 +91,6 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 ## Phase 14: Code Quality (Pending)
 
-### Task 14.1: Extract Path Matching Utility
-Location: `src/path_utils.rs` (new), `src/commands/check.rs`, `src/checker/threshold.rs`, `src/checker/structure.rs`
-```
-- Extract `path_matches_override` to shared `src/path_utils.rs`
-- Deduplicate from: check.rs (568-585), threshold.rs (305-324), structure.rs (240-263)
-- Consider Windows/Unix path separator normalization
-```
-
 ### Task 14.2: Introduce CheckOptions Struct
 Location: `src/commands/check.rs`
 ```
@@ -126,7 +119,7 @@ Bonus: Extract shared logic from scan_with_structure_walkdir() vs scan_with_stru
 |----------|-------|
 | ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
 | ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
-| **3. Code Quality** | 14.1 Extract Path Matching, 14.2 CheckOptions Struct, 14.3 Scanner Module Split |
+| **3. Code Quality** | ~~14.1 Extract Path Matching~~ ✅, 14.2 CheckOptions Struct, 14.3 Scanner Module Split |
 | **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, 11.2 Co-location, 11.7 Deny Patterns |
 | **5. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **6. Visualization** | 7.1-7.2 HTML Charts/Trends |

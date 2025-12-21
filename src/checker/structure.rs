@@ -1,10 +1,11 @@
 use std::collections::HashMap;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobMatcher};
 
 use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
 use crate::error::{Result, SlocGuardError};
+use crate::path_utils::path_matches_override;
 
 use super::explain::{
     MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
@@ -235,33 +236,6 @@ impl StructureChecker {
         depth
     }
 
-    /// Check if a directory path matches an override path.
-    /// Uses suffix matching similar to `ThresholdChecker`.
-    fn path_matches_override(dir_path: &Path, override_path: &str) -> bool {
-        let override_components: Vec<&str> = override_path
-            .split(['/', '\\'])
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        let dir_components: Vec<_> = dir_path.components().collect();
-
-        if override_components.is_empty() || override_components.len() > dir_components.len() {
-            return false;
-        }
-
-        dir_components
-            .iter()
-            .rev()
-            .zip(override_components.iter().rev())
-            .all(|(dir_comp, override_comp)| {
-                if let Component::Normal(os_str) = dir_comp {
-                    os_str.to_string_lossy() == *override_comp
-                } else {
-                    false
-                }
-            })
-    }
-
     /// Get limits for a directory path.
     /// Returns a `StructureLimits` struct with all applicable limits.
     /// A limit of `-1` (UNLIMITED) means no check should be performed.
@@ -281,7 +255,7 @@ impl StructureChecker {
         // 1. Check overrides first (highest priority)
         // Note: Overrides don't support relative_depth (they use absolute limits)
         for ovr in &self.overrides {
-            if Self::path_matches_override(path, &ovr.path) {
+            if path_matches_override(path, &ovr.path) {
                 return StructureLimits {
                     max_files: ovr.max_files.or(self.max_files),
                     max_dirs: ovr.max_dirs.or(self.max_dirs),
@@ -448,7 +422,7 @@ impl StructureChecker {
 
         // 1. Check overrides first (highest priority)
         for (i, ovr) in self.overrides.iter().enumerate() {
-            let matches = Self::path_matches_override(path, &ovr.path);
+            let matches = path_matches_override(path, &ovr.path);
             let status = if matches && !found_match {
                 found_match = true;
                 override_reason = Some(ovr.reason.clone());

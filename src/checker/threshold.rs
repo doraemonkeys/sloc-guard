@@ -6,6 +6,7 @@ use globset::{Glob, GlobMatcher};
 use crate::analyzer::SplitSuggestion;
 use crate::config::Config;
 use crate::counter::LineStats;
+use crate::path_utils::path_matches_override;
 
 use super::Checker;
 use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
@@ -261,14 +262,14 @@ impl ThresholdChecker {
 
         // Check if file matches any content override
         for override_config in &self.config.content.overrides {
-            if Self::path_matches_override(path, &override_config.path) {
+            if path_matches_override(path, &override_config.path) {
                 return true;
             }
         }
 
         // Check if file matches any legacy override
         for override_config in &self.config.overrides {
-            if Self::path_matches_override(path, &override_config.path) {
+            if path_matches_override(path, &override_config.path) {
                 return true;
             }
         }
@@ -302,32 +303,11 @@ impl ThresholdChecker {
         rules
     }
 
-    fn path_matches_override(file_path: &Path, override_path: &str) -> bool {
-        let override_components: Vec<&str> = override_path
-            .split(['/', '\\'])
-            .filter(|s| !s.is_empty())
-            .collect();
-
-        let file_components: Vec<_> = file_path.components().collect();
-
-        if override_components.is_empty() || override_components.len() > file_components.len() {
-            return false;
-        }
-
-        file_components
-            .iter()
-            .rev()
-            .zip(override_components.iter().rev())
-            .all(|(file_comp, override_comp)| {
-                file_comp.as_os_str().to_string_lossy() == *override_comp
-            })
-    }
-
     /// Returns (`max_lines`, `override_reason`) for a path.
     fn get_limit_for_path(&self, path: &Path) -> (usize, Option<String>) {
         // 1. Check content.overrides first (highest priority, V2)
         for override_config in &self.config.content.overrides {
-            if Self::path_matches_override(path, &override_config.path) {
+            if path_matches_override(path, &override_config.path) {
                 return (
                     override_config.max_lines,
                     Some(override_config.reason.clone()),
@@ -337,7 +317,7 @@ impl ThresholdChecker {
 
         // 2. Check legacy overrides (for V1 migration)
         for override_config in &self.config.overrides {
-            if Self::path_matches_override(path, &override_config.path) {
+            if path_matches_override(path, &override_config.path) {
                 return (override_config.max_lines, override_config.reason.clone());
             }
         }
@@ -404,7 +384,7 @@ impl ThresholdChecker {
 
         // 1. Check content.overrides (highest priority)
         for (i, ovr) in self.config.content.overrides.iter().enumerate() {
-            let matches = Self::path_matches_override(path, &ovr.path);
+            let matches = path_matches_override(path, &ovr.path);
             let status = if matches && !found_match {
                 found_match = true;
                 matched_rule = ContentRuleMatch::Override {
@@ -428,7 +408,7 @@ impl ThresholdChecker {
 
         // 2. Check legacy overrides (for V1 migration)
         for (i, ovr) in self.config.overrides.iter().enumerate() {
-            let matches = Self::path_matches_override(path, &ovr.path);
+            let matches = path_matches_override(path, &ovr.path);
             let status = if matches && !found_match {
                 found_match = true;
                 matched_rule = ContentRuleMatch::Override {
