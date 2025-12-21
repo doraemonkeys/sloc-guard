@@ -213,15 +213,63 @@ fn test_compute_config_hash() {
 }
 
 #[test]
-fn test_compute_config_hash_different_configs() {
+fn test_compute_config_hash_ignores_non_counting_settings() {
     let config1 = Config::default();
     let mut config2 = Config::default();
-    config2.content.max_lines = 1000;
+    config2.content.max_lines = 1000; // Threshold change
+
+    let mut config3 = Config::default();
+    config3.content.warn_threshold = 0.5; // Warn threshold change
+
+    let mut config4 = Config::default();
+    config4.content.extensions = vec!["xyz".to_string()]; // Extensions change
+
+    let mut config5 = Config::default();
+    config5.scanner.exclude = vec!["*.log".to_string()]; // Exclude patterns change
+
+    let mut config6 = Config::default();
+    config6.structure.max_files = Some(100); // Structure rules change
+
+    let hash1 = compute_config_hash(&config1);
+    let hash2 = compute_config_hash(&config2);
+    let hash3 = compute_config_hash(&config3);
+    let hash4 = compute_config_hash(&config4);
+    let hash5 = compute_config_hash(&config5);
+    let hash6 = compute_config_hash(&config6);
+
+    // Changing thresholds, extensions, exclude patterns, or structure rules
+    // should NOT invalidate the cache (hash stays the same)
+    assert_eq!(hash1, hash2, "max_lines change should not affect hash");
+    assert_eq!(hash1, hash3, "warn_threshold change should not affect hash");
+    assert_eq!(hash1, hash4, "extensions change should not affect hash");
+    assert_eq!(hash1, hash5, "exclude patterns change should not affect hash");
+    assert_eq!(hash1, hash6, "structure rules change should not affect hash");
+}
+
+#[test]
+fn test_compute_config_hash_changes_with_custom_languages() {
+    use crate::config::CustomLanguageConfig;
+
+    let config1 = Config::default();
+    let mut config2 = Config::default();
+    config2.languages.insert(
+        "custom".to_string(),
+        CustomLanguageConfig {
+            extensions: vec!["cst".to_string()],
+            single_line_comments: vec!["#".to_string()],
+            multi_line_comments: vec![],
+        },
+    );
 
     let hash1 = compute_config_hash(&config1);
     let hash2 = compute_config_hash(&config2);
 
-    assert_ne!(hash1, hash2);
+    // Changing custom language definitions SHOULD change the hash
+    // because comment syntax affects how lines are counted
+    assert_ne!(
+        hash1, hash2,
+        "custom language definition should change hash"
+    );
 }
 
 #[test]

@@ -217,10 +217,20 @@ impl Cache {
 
 /// Compute a hash of the config that affects line counting.
 ///
-/// This hash is used to invalidate the cache when config changes.
+/// Only hashes the parts of config that affect `LineStats` computation:
+/// - Custom language definitions (comment syntax)
+///
+/// Excludes (changes to these do NOT invalidate cache):
+/// - `warn_threshold`, `max_lines` (thresholds are checked after counting)
+/// - structure rules (directory limits don't affect line counting)
+/// - exclude patterns (affect file discovery, not line parsing)
+/// - extensions filter (affects which files are processed, not how)
 #[must_use]
 pub fn compute_config_hash(config: &Config) -> String {
-    let json = serde_json::to_string(config).unwrap_or_default();
+    // Only hash custom language definitions - these define comment syntax
+    // which directly affects how LineStats are computed.
+    // Predefined languages in LanguageRegistry are constant across versions.
+    let json = serde_json::to_string(&config.languages).unwrap_or_default();
     let mut hasher = Sha256::new();
     hasher.update(json.as_bytes());
     format!("{:x}", hasher.finalize())
