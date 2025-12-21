@@ -136,7 +136,7 @@ CLI args → load_config() → [if --offline] use cache only, error on miss
          → LanguageRegistry
          → [if gitignore] GitAwareScanner else DirectoryScanner
             Scanner returns ALL files (exclude patterns only, no extension filter)
-         → ThresholdChecker::should_process() filters by content.extensions
+         → ThresholdChecker::should_process() filters by content.extensions OR rule match
          → parallel file processing (rayon):
               cache lookup by mtime+size → [miss] SlocCounter::count() → update cache
          → save_cache()

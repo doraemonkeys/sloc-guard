@@ -235,17 +235,52 @@ impl ThresholdChecker {
         self
     }
 
-    /// Check if a file should be processed based on its extension.
-    /// Files with extensions not in `content.extensions` are skipped.
+    /// Check if a file should be processed based on extension or rule match.
+    ///
+    /// A file is processed if:
+    /// - `content.extensions` is empty (no filter), OR
+    /// - File extension is in `content.extensions`, OR
+    /// - File matches any content override or rule pattern
+    ///
+    /// This ensures extension-less files (Dockerfile, Jenkinsfile, etc.) can be
+    /// checked if there's an explicit rule targeting them.
     #[must_use]
     pub fn should_process(&self, path: &Path) -> bool {
         if self.allowed_extensions.is_empty() {
             return true; // No filter = process all files
         }
 
-        path.extension()
+        // Check if extension matches
+        if path
+            .extension()
             .and_then(|ext| ext.to_str())
             .is_some_and(|ext| self.allowed_extensions.contains(ext))
+        {
+            return true;
+        }
+
+        // Check if file matches any content override
+        for override_config in &self.config.content.overrides {
+            if Self::path_matches_override(path, &override_config.path) {
+                return true;
+            }
+        }
+
+        // Check if file matches any legacy override
+        for override_config in &self.config.overrides {
+            if Self::path_matches_override(path, &override_config.path) {
+                return true;
+            }
+        }
+
+        // Check if file matches any rule pattern
+        for rule in &self.path_rules {
+            if rule.matcher.is_match(path) {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn build_path_rules(config: &Config) -> Vec<CompiledPathRule> {

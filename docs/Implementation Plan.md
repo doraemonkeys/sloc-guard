@@ -21,7 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
-- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter.
 
 ---
 
@@ -54,16 +54,6 @@ Location: `src/config/*.rs`, `src/checker/threshold.rs`
 - Per CLAUDE.md: "No Backward Compatibility" - prioritize clean architecture
 - Update config loader to reject V1 format with clear error message
 - Remove auto-migration code if any
-```
-
-### Task 12.10: Rule Matching Overrides Extension Filter
-Location: `src/commands/check.rs`, `src/checker/threshold.rs`
-```
-- Current: Global `content.extensions` filter runs BEFORE rule matching
-- Problem: Rules for extension-less files (Jenkinsfile, Dockerfile) never apply
-- Fix: Change logic to `(matches_extension OR matches_any_rule)`
-- ThresholdChecker::should_process() must check rule patterns, not just extensions
-- Ensures rules can target any file regardless of extension list
 ```
 
 ### Task 12.11: Relative max_depth for Structure Rules
@@ -185,7 +175,7 @@ Location: `src/config/remote_tests.rs`
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
 | ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
-| **9. Architecture Fixes** | 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth |
+| **9. Architecture Fixes** | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, 12.11 Relative max_depth |
 | **10. State Robustness** | 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation |
 | **11. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |
 | **12. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
