@@ -112,6 +112,7 @@ max_lines = 800
 # Fallback limits (applied to directories without specific rules)
 max_files = 50
 max_dirs = 10
+max_depth = 5         # Max nesting depth from scan root (prevents deeply nested code)
 warn_threshold = 0.9  # Warn at 45 files / 9 dirs
 
 # Files that exist but don't count towards the quota.
@@ -146,6 +147,11 @@ pattern = "src/generated/**"
 max_files = 100
 max_dirs = -1   # Unlimited subdirectories (no check)
 
+# Deeply nested is OK for tests (override global max_depth)
+[[structure.rules]]
+pattern = "tests/**"
+max_depth = 10  # Allow deeper nesting for test fixtures
+
 # ------------------------------------------------------------------------------
 # 4. Grandfathering / Overrides
 # ------------------------------------------------------------------------------
@@ -171,4 +177,5 @@ reason = "Algorithm implementation, irreducible complexity."
 path = "src/legacy_module"
 max_files = 500
 max_dirs = 100
+max_depth = 8     # Allow deeper nesting for legacy code
 reason = "Legacy monolith, gradual migration in progress."
