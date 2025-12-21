@@ -644,11 +644,14 @@ fn should_process_extension_less_file_with_content_rule() {
 fn should_process_extension_less_file_with_content_override() {
     let mut config = default_config();
     config.content.extensions = vec!["rs".to_string()];
-    config.content.overrides.push(crate::config::ContentOverride {
-        path: "Jenkinsfile".to_string(),
-        max_lines: 200,
-        reason: "CI pipeline".to_string(),
-    });
+    config
+        .content
+        .overrides
+        .push(crate::config::ContentOverride {
+            path: "Jenkinsfile".to_string(),
+            max_lines: 200,
+            reason: "CI pipeline".to_string(),
+        });
 
     let checker = ThresholdChecker::new(config);
 

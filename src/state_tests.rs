@@ -27,7 +27,10 @@ fn cache_path_construction() {
     let temp_dir = TempDir::new().unwrap();
     let result = cache_path(temp_dir.path());
     // Should be fallback since not a git repo
-    assert_eq!(result, temp_dir.path().join(".sloc-guard").join("cache.json"));
+    assert_eq!(
+        result,
+        temp_dir.path().join(".sloc-guard").join("cache.json")
+    );
 }
 
 #[test]
@@ -64,7 +67,12 @@ fn history_path_in_git_repo() {
 #[test]
 fn ensure_parent_dir_creates_nested_directory() {
     let temp_dir = TempDir::new().unwrap();
-    let nested_path = temp_dir.path().join("a").join("b").join("c").join("file.json");
+    let nested_path = temp_dir
+        .path()
+        .join("a")
+        .join("b")
+        .join("c")
+        .join("file.json");
 
     ensure_parent_dir(&nested_path).unwrap();
 
