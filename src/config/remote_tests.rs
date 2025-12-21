@@ -1,33 +1,19 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use tempfile::TempDir;
 
 use crate::error::{Result, SlocGuardError};
 
 use super::*;
 
-static FS_LOCK: Mutex<()> = Mutex::new(());
-
-/// Acquire filesystem lock, recovering from poisoned state
-fn acquire_fs_lock() -> std::sync::MutexGuard<'static, ()> {
-    FS_LOCK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
-/// Create a temporary project root for testing cache
-fn temp_project_root() -> PathBuf {
-    let temp_dir = std::env::temp_dir();
-    let test_dir = temp_dir.join(format!("sloc-guard-test-{}", std::process::id()));
-    let _ = fs::create_dir_all(&test_dir);
-    test_dir
-}
-
-/// Clean up cache in project root
-fn cleanup_cache(project_root: &Path) {
-    let cache_dir = project_root.join(LOCAL_CACHE_DIR);
-    let _ = fs::remove_dir_all(&cache_dir);
+/// Create a temporary project root for testing cache.
+/// Each test gets its own isolated directory via `TempDir`.
+/// The directory is automatically cleaned up when `TempDir` is dropped.
+fn create_temp_project() -> TempDir {
+    tempfile::tempdir().expect("Failed to create temp directory")
 }
 
 // Mock HTTP client for testing
@@ -150,31 +136,28 @@ fn hash_url_handles_special_characters() {
 
 #[test]
 fn fetch_remote_config_rejects_invalid_url() {
-    let project_root = temp_project_root();
-    let result = fetch_remote_config("/local/path", Some(&project_root), None);
+    let temp_dir = create_temp_project();
+    let result = fetch_remote_config("/local/path", Some(temp_dir.path()), None);
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("Invalid remote config URL"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_remote_config_rejects_non_http_scheme() {
-    let project_root = temp_project_root();
-    let result = fetch_remote_config("ftp://example.com/config.toml", Some(&project_root), None);
+    let temp_dir = create_temp_project();
+    let result = fetch_remote_config("ftp://example.com/config.toml", Some(temp_dir.path()), None);
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("Invalid remote config URL"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn cache_dir_returns_path_with_project_root() {
-    let project_root = temp_project_root();
-    let result = cache_dir(Some(&project_root));
+    let temp_dir = create_temp_project();
+    let result = cache_dir(Some(temp_dir.path()));
     assert!(result.is_some());
-    assert!(result.unwrap().starts_with(&project_root));
-    cleanup_cache(&project_root);
+    assert!(result.unwrap().starts_with(temp_dir.path()));
 }
 
 #[test]
@@ -185,15 +168,14 @@ fn cache_dir_returns_none_without_project_root() {
 
 #[test]
 fn cache_file_path_includes_url_hash() {
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let url = "https://example.com/config.toml";
-    let path = cache_file_path(url, Some(&project_root));
+    let path = cache_file_path(url, Some(temp_dir.path()));
     assert!(path.is_some());
     let path = path.unwrap();
     let expected_hash = hash_url(url);
     assert!(path.to_string_lossy().contains(&expected_hash));
     assert!(path.to_string_lossy().ends_with(".toml"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
@@ -204,31 +186,25 @@ fn clear_cache_returns_zero_when_no_project_root() {
 
 #[test]
 fn clear_cache_removes_cached_files() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
 
     // Write a test file to cache
-    let test_url = format!(
-        "https://clear-cache-test-{}.example.com/config.toml",
-        std::process::id()
-    );
+    let test_url = "https://clear-cache-test.example.com/config.toml";
     let test_content = "[default]\nmax_lines = 100\n";
 
-    if write_to_cache(&test_url, test_content, Some(&project_root)).is_none() {
-        cleanup_cache(&project_root);
+    if write_to_cache(test_url, test_content, Some(temp_dir.path())).is_none() {
         return;
     }
 
     // Verify file was created
-    let cache_path = cache_file_path(&test_url, Some(&project_root));
+    let cache_path = cache_file_path(test_url, Some(temp_dir.path()));
     if !cache_path.as_ref().is_some_and(|p| p.exists()) {
         // File wasn't persisted (edge case under tarpaulin), skip test
-        cleanup_cache(&project_root);
         return;
     }
 
     // Clear cache
-    let deleted = clear_cache(Some(&project_root));
+    let deleted = clear_cache(Some(temp_dir.path()));
 
     // Verify file was deleted - this is the observable outcome we care about
     let file_deleted = cache_path.as_ref().is_none_or(|p| !p.exists());
@@ -237,7 +213,6 @@ fn clear_cache_removes_cached_files() {
     // due to file locking, but this is a system limitation, not a code issue.
     // Skip test in this edge case.
     if deleted == 0 && !file_deleted {
-        cleanup_cache(&project_root);
         return;
     }
 
@@ -247,8 +222,6 @@ fn clear_cache_removes_cached_files() {
         "clear_cache failed: deleted={deleted}, file_exists={}",
         !file_deleted
     );
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
@@ -278,77 +251,58 @@ fn read_from_cache_returns_none_when_no_project_root() {
 
 #[test]
 fn write_to_cache_and_read_back() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
 
-    let test_url = format!(
-        "https://test-{}.example.com/config.toml",
-        std::process::id()
-    );
+    let test_url = "https://test.example.com/config.toml";
     let test_content = "[default]\nmax_lines = 100\n";
 
     // Write to cache
-    let write_result = write_to_cache(&test_url, test_content, Some(&project_root));
+    let write_result = write_to_cache(test_url, test_content, Some(temp_dir.path()));
     if write_result.is_none() {
-        cleanup_cache(&project_root);
         return;
     }
 
     // Read back from cache
-    let read_result = read_from_cache(&test_url, Some(&project_root));
+    let read_result = read_from_cache(test_url, Some(temp_dir.path()));
     assert!(read_result.is_some());
     assert_eq!(read_result.unwrap(), test_content);
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn cache_file_path_different_urls_produce_different_paths() {
-    let project_root = temp_project_root();
-    let path1 = cache_file_path("https://example1.com/config.toml", Some(&project_root));
-    let path2 = cache_file_path("https://example2.com/config.toml", Some(&project_root));
+    let temp_dir = create_temp_project();
+    let path1 = cache_file_path("https://example1.com/config.toml", Some(temp_dir.path()));
+    let path2 = cache_file_path("https://example2.com/config.toml", Some(temp_dir.path()));
 
     assert!(path1.is_some());
     assert!(path2.is_some());
     assert_ne!(path1.unwrap(), path2.unwrap());
-    cleanup_cache(&project_root);
 }
 
 // Tests using MockHttpClient
 
 #[test]
 fn fetch_with_mock_client_success() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 200\n";
     let client = MockHttpClient::success(content);
 
-    // Use a unique URL to avoid cache hits from other tests
-    let url = format!(
-        "https://mock-test-{}-success.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-success.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
     assert_eq!(client.call_count(), 1);
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_error() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Connection refused");
 
-    let url = format!(
-        "https://mock-test-{}-error.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-error.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(
         result
@@ -357,49 +311,41 @@ fn fetch_with_mock_client_error() {
             .contains("Connection refused")
     );
     assert_eq!(client.call_count(), 1);
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_uses_cache_on_second_call() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 300\n";
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "https://mock-test-{}-{:?}-cache.example.com/config.toml",
-        std::process::id(),
-        std::thread::current().id()
-    );
+    let url = "https://mock-test-cache.example.com/config.toml";
 
     // First call should hit the client
-    let result1 = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result1 = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result1.is_ok());
     assert_eq!(client.call_count(), 1);
 
     // Check if cache was written successfully
-    let cache_exists = cache_file_path(&url, Some(&project_root)).is_some_and(|p| p.exists());
+    let cache_exists = cache_file_path(url, Some(temp_dir.path())).is_some_and(|p| p.exists());
     if !cache_exists {
-        cleanup_cache(&project_root);
         return;
     }
 
     // Second call should use cache, not hit client
-    let result2 = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result2 = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result2.is_ok());
     assert_eq!(result2.unwrap(), content);
     assert_eq!(client.call_count(), 1); // Still 1, cache was used
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_invalid_url_never_calls_client() {
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client = MockHttpClient::success("should not be called");
 
-    let result = fetch_remote_config_with_client("/local/path", &client, Some(&project_root), None);
+    let result =
+        fetch_remote_config_with_client("/local/path", &client, Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(
         result
@@ -408,111 +354,83 @@ fn fetch_with_mock_client_invalid_url_never_calls_client() {
             .contains("Invalid remote config URL")
     );
     assert_eq!(client.call_count(), 0); // Client should never be called
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_ftp_url_never_calls_client() {
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client = MockHttpClient::success("should not be called");
 
     let result = fetch_remote_config_with_client(
         "ftp://example.com/config.toml",
         &client,
-        Some(&project_root),
+        Some(temp_dir.path()),
         None,
     );
     assert!(result.is_err());
     assert_eq!(client.call_count(), 0);
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_http_url_accepted() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 400\n";
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "http://mock-test-{}-http.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "http://mock-test-http.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_timeout_error() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Request timeout fetching remote config");
 
-    let url = format!(
-        "https://mock-test-{}-timeout.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-timeout.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("timeout"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_http_404_error() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Failed to fetch remote config: HTTP 404 Not Found");
 
-    let url = format!(
-        "https://mock-test-{}-404.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-404.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("404"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_http_500_error() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client =
         MockHttpClient::error("Failed to fetch remote config: HTTP 500 Internal Server Error");
 
-    let url = format!(
-        "https://mock-test-{}-500.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-500.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("500"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn fetch_with_mock_client_network_error() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Failed to connect to remote config URL");
 
-    let url = format!(
-        "https://mock-test-{}-network.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-network.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("connect"));
-    cleanup_cache(&project_root);
 }
 
 #[test]
@@ -542,80 +460,60 @@ fn warning_flag_initially_false() {
 
 #[test]
 fn warning_shown_on_first_remote_fetch() {
-    let _fs_lock = acquire_fs_lock();
     let _warn_lock = acquire_warning_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     reset_warning_flag();
 
     let content = "[default]\nmax_lines = 500\n";
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "https://mock-test-{}-warning.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-warning.example.com/config.toml";
 
     assert!(!was_warning_shown());
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_ok());
     assert!(was_warning_shown());
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn warning_shown_only_once_per_session() {
-    let _fs_lock = acquire_fs_lock();
     let _warn_lock = acquire_warning_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     reset_warning_flag();
 
     let content = "[default]\nmax_lines = 600\n";
     let client = MockHttpClient::success(content);
 
-    let url1 = format!(
-        "https://mock-test-{}-warning-once-1.example.com/config.toml",
-        std::process::id()
-    );
-    let url2 = format!(
-        "https://mock-test-{}-warning-once-2.example.com/config.toml",
-        std::process::id()
-    );
+    let url1 = "https://mock-test-warning-once-1.example.com/config.toml";
+    let url2 = "https://mock-test-warning-once-2.example.com/config.toml";
 
     // First fetch - warning shown
     assert!(!was_warning_shown());
-    let _ = fetch_remote_config_with_client(&url1, &client, Some(&project_root), None);
+    let _ = fetch_remote_config_with_client(url1, &client, Some(temp_dir.path()), None);
     assert!(was_warning_shown());
 
     // Second fetch - warning already shown, flag still true
-    let _ = fetch_remote_config_with_client(&url2, &client, Some(&project_root), None);
+    let _ = fetch_remote_config_with_client(url2, &client, Some(temp_dir.path()), None);
     assert!(was_warning_shown());
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn warning_not_shown_when_cache_hit() {
-    let _fs_lock = acquire_fs_lock();
     let _warn_lock = acquire_warning_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     reset_warning_flag();
 
     let content = "[default]\nmax_lines = 700\n";
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "https://mock-test-{}-warning-cache.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-warning-cache.example.com/config.toml";
 
     // First fetch - populates cache, shows warning
-    let _ = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let _ = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
 
     // Check if cache was created
-    let cache_exists = cache_file_path(&url, Some(&project_root)).is_some_and(|p| p.exists());
+    let cache_exists = cache_file_path(url, Some(temp_dir.path())).is_some_and(|p| p.exists());
     if !cache_exists {
-        cleanup_cache(&project_root);
         return;
     }
 
@@ -624,62 +522,48 @@ fn warning_not_shown_when_cache_hit() {
     assert!(!was_warning_shown());
 
     // Second fetch - should use cache, no warning
-    let _ = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let _ = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(!was_warning_shown()); // Warning not shown because cache was used
-
-    cleanup_cache(&project_root);
 }
 
 // Offline mode tests
 
 #[test]
 fn offline_mode_returns_cached_content() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 800\n";
 
-    let url = format!(
-        "https://mock-test-{}-offline-cached.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-offline-cached.example.com/config.toml";
 
     // Populate cache first
-    let write_result = write_to_cache(&url, content, Some(&project_root));
+    let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
     // Fetch in offline mode should succeed
-    let result = fetch_remote_config_offline(&url, Some(&project_root), None);
+    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), None);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn offline_mode_returns_error_on_cache_miss() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
 
-    let url = format!(
-        "https://mock-test-{}-offline-miss.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-offline-miss.example.com/config.toml";
 
     // No cache populated, should error
-    let result = fetch_remote_config_offline(&url, Some(&project_root), None);
+    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), None);
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("cache miss"));
     assert!(err_msg.contains("offline"));
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn offline_mode_rejects_invalid_url() {
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
 
-    let result = fetch_remote_config_offline("/local/path", Some(&project_root), None);
+    let result = fetch_remote_config_offline("/local/path", Some(temp_dir.path()), None);
     assert!(result.is_err());
     assert!(
         result
@@ -687,7 +571,6 @@ fn offline_mode_rejects_invalid_url() {
             .to_string()
             .contains("Invalid remote config URL")
     );
-    cleanup_cache(&project_root);
 }
 
 #[test]
@@ -725,46 +608,36 @@ fn compute_content_hash_different_for_different_content() {
 
 #[test]
 fn hash_verification_success_on_match() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 900\n";
     let expected_hash = compute_content_hash(content);
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "https://mock-test-{}-hash-success.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-success.example.com/config.toml";
 
     let result =
-        fetch_remote_config_with_client(&url, &client, Some(&project_root), Some(&expected_hash));
+        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&expected_hash));
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_verification_fails_on_mismatch() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 1000\n";
     let wrong_hash = "0".repeat(64); // Intentionally wrong hash
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "https://mock-test-{}-hash-fail.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-fail.example.com/config.toml";
 
     let result =
-        fetch_remote_config_with_client(&url, &client, Some(&project_root), Some(&wrong_hash));
+        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&wrong_hash));
     assert!(result.is_err());
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
     assert!(err_msg.contains("hash mismatch"));
-    assert!(err_msg.contains(&url));
+    assert!(err_msg.contains(url));
 
     // Verify error contains expected and actual hash
     if let SlocGuardError::RemoteConfigHashMismatch {
@@ -776,53 +649,41 @@ fn hash_verification_fails_on_mismatch() {
     } else {
         panic!("Expected RemoteConfigHashMismatch error");
     }
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_verification_with_cached_content_success() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 1100\n";
     let expected_hash = compute_content_hash(content);
 
-    let url = format!(
-        "https://mock-test-{}-hash-cache-success.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-cache-success.example.com/config.toml";
 
     // Populate cache first
-    let write_result = write_to_cache(&url, content, Some(&project_root));
+    let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
     // Create a client that should NOT be called (cache hit)
     let client = MockHttpClient::error("Should not be called");
 
     let result =
-        fetch_remote_config_with_client(&url, &client, Some(&project_root), Some(&expected_hash));
+        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&expected_hash));
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
     assert_eq!(client.call_count(), 0); // Cache was used
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_verification_with_cached_content_fails_on_mismatch() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let cached_content = "[default]\nmax_lines = 1200\n";
     let fresh_content = "[default]\nmax_lines = 1201\n";
     let expected_hash = compute_content_hash(fresh_content);
 
-    let url = format!(
-        "https://mock-test-{}-hash-cache-fail.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-cache-fail.example.com/config.toml";
 
     // Populate cache with different content
-    let write_result = write_to_cache(&url, cached_content, Some(&project_root));
+    let write_result = write_to_cache(url, cached_content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
     // Mock client returns fresh content that matches expected hash
@@ -830,29 +691,23 @@ fn hash_verification_with_cached_content_fails_on_mismatch() {
 
     // Should skip stale cache and fetch fresh content
     let result =
-        fetch_remote_config_with_client(&url, &client, Some(&project_root), Some(&expected_hash));
+        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&expected_hash));
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), fresh_content);
     assert_eq!(client.call_count(), 1); // Fetched fresh content
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_mismatch_on_both_cache_and_remote_fails() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let cached_content = "[default]\nmax_lines = 1200\n";
     let remote_content = "[default]\nmax_lines = 1201\n";
     let wrong_hash = "f".repeat(64); // Doesn't match either
 
-    let url = format!(
-        "https://mock-test-{}-hash-both-fail.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-both-fail.example.com/config.toml";
 
     // Populate cache with content that doesn't match hash
-    let write_result = write_to_cache(&url, cached_content, Some(&project_root));
+    let write_result = write_to_cache(url, cached_content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
     // Mock client returns content that also doesn't match hash
@@ -860,76 +715,56 @@ fn hash_mismatch_on_both_cache_and_remote_fails() {
 
     // Should skip cache, fetch remote, and fail on hash verification
     let result =
-        fetch_remote_config_with_client(&url, &client, Some(&project_root), Some(&wrong_hash));
+        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&wrong_hash));
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("hash mismatch"));
     assert_eq!(client.call_count(), 1); // Tried to fetch
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_verification_offline_mode_success() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 1300\n";
     let expected_hash = compute_content_hash(content);
 
-    let url = format!(
-        "https://mock-test-{}-hash-offline-success.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-offline-success.example.com/config.toml";
 
     // Populate cache first
-    let write_result = write_to_cache(&url, content, Some(&project_root));
+    let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
-    let result = fetch_remote_config_offline(&url, Some(&project_root), Some(&expected_hash));
+    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), Some(&expected_hash));
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_verification_offline_mode_fails_on_mismatch() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 1400\n";
     let wrong_hash = "a".repeat(64);
 
-    let url = format!(
-        "https://mock-test-{}-hash-offline-fail.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-hash-offline-fail.example.com/config.toml";
 
     // Populate cache first
-    let write_result = write_to_cache(&url, content, Some(&project_root));
+    let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
-    let result = fetch_remote_config_offline(&url, Some(&project_root), Some(&wrong_hash));
+    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), Some(&wrong_hash));
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("hash mismatch"));
-
-    cleanup_cache(&project_root);
 }
 
 #[test]
 fn hash_not_required_when_none() {
-    let _lock = acquire_fs_lock();
-    let project_root = temp_project_root();
+    let temp_dir = create_temp_project();
     let content = "[default]\nmax_lines = 1500\n";
     let client = MockHttpClient::success(content);
 
-    let url = format!(
-        "https://mock-test-{}-no-hash.example.com/config.toml",
-        std::process::id()
-    );
+    let url = "https://mock-test-no-hash.example.com/config.toml";
 
     // No hash provided - should succeed
-    let result = fetch_remote_config_with_client(&url, &client, Some(&project_root), None);
+    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
-
-    cleanup_cache(&project_root);
 }

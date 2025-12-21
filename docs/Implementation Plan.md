@@ -22,7 +22,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
 - **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth.
-- **Phase 13 (Partial)**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking.
+- **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 
 ---
 
@@ -125,20 +125,6 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 ---
 
-## Phase 13: State Management Robustness
-
-### Task 13.4: Test Isolation Improvement
-Location: `src/config/remote_tests.rs`
-```
-- Current: `acquire_fs_lock` serializes tests, blocking parallelism
-- Replace shared temp directory with per-test `tempfile::TempDir`
-- Each test creates unique `sloc-guard-test-{random}/` in OS temp
-- Remove `FS_LOCK` global; tests run fully parallel
-- Already using tempfile crate - minimal change required
-```
-
----
-
 ## Priority Order
 
 | Priority | Tasks |
@@ -153,7 +139,7 @@ Location: `src/config/remote_tests.rs`
 | ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
 | ~~**9. Architecture Fixes**~~ | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, ~~12.11 Relative max_depth~~ ✅ |
 | ~~**10. Doc/Impl Consistency**~~ | ~~12.12 --diff Semantic Consistency~~ ✅ |
-| **11. State Robustness** | ~~13.1 Project Root Discovery~~ ✅, ~~13.2 Cache Hash Optimization~~ ✅, ~~13.3 File Locking~~ ✅, 13.4 Test Isolation |
+| ~~**11. State Robustness**~~ | ~~13.1 Project Root Discovery~~ ✅, ~~13.2 Cache Hash Optimization~~ ✅, ~~13.3 File Locking~~ ✅, ~~13.4 Test Isolation~~ ✅ |
 | **12. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |
 | **13. Git Diff Enhancement** | 12.13 --diff A..B Explicit Range Syntax |
 | **14. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |

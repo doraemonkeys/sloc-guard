@@ -216,8 +216,8 @@ fn test_trend_history_entries() {
 
 #[test]
 fn test_trend_history_save_and_load() {
-    let temp_dir = std::env::temp_dir();
-    let history_path = temp_dir.join("test_sloc_guard_history.json");
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp directory");
+    let history_path = temp_dir.path().join("history.json");
 
     // Create and save history
     let mut history = TrendHistory::new();
@@ -236,9 +236,6 @@ fn test_trend_history_save_and_load() {
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded.latest().unwrap().timestamp, 12345);
     assert_eq!(loaded.latest().unwrap().code, 500);
-
-    // Cleanup
-    std::fs::remove_file(&history_path).ok();
 }
 
 #[test]
@@ -270,8 +267,8 @@ fn test_trend_history_load_nonexistent_returns_error() {
 fn test_trend_history_load_or_default_invalid_json() {
     use std::io::Write;
 
-    let temp_dir = std::env::temp_dir();
-    let invalid_path = temp_dir.join("test_invalid_history.json");
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp directory");
+    let invalid_path = temp_dir.path().join("invalid_history.json");
 
     // Write invalid JSON to the file
     let mut file = std::fs::File::create(&invalid_path).unwrap();
@@ -281,7 +278,4 @@ fn test_trend_history_load_or_default_invalid_json() {
     // load_or_default should return default (empty) history when file is invalid
     let history = TrendHistory::load_or_default(&invalid_path);
     assert!(history.is_empty());
-
-    // Cleanup
-    std::fs::remove_file(&invalid_path).ok();
 }
