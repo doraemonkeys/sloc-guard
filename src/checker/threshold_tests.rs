@@ -246,16 +246,18 @@ fn check_result_is_methods() {
 #[test]
 fn path_rule_matches_glob_pattern() {
     let mut config = default_config();
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 1000,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(800);
 
-    // File matching the glob pattern should use path_rule max_lines
+    // File matching the glob pattern should use content.rules max_lines
     let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 1000);
@@ -264,10 +266,12 @@ fn path_rule_matches_glob_pattern() {
 #[test]
 fn path_rule_does_not_match_unrelated_path() {
     let mut config = default_config();
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 1000,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -282,10 +286,12 @@ fn path_rule_does_not_match_unrelated_path() {
 #[test]
 fn path_rule_has_lower_priority_than_override() {
     let mut config = default_config();
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 1000,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
     config.overrides.push(crate::config::FileOverride {
         path: "special.rs".to_string(),
@@ -296,7 +302,7 @@ fn path_rule_has_lower_priority_than_override() {
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(1500);
 
-    // Override should take priority over path_rule
+    // Override should take priority over content.rules
     let result = checker.check(Path::new("src/generated/special.rs"), &stats);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 2000);
@@ -339,10 +345,12 @@ fn path_rule_has_higher_priority_than_extension_rule() {
 #[test]
 fn path_rule_warn_threshold_overrides_default() {
     let mut config = default_config();
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 1000,
         warn_threshold: Some(1.0), // Disable warnings
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -356,10 +364,12 @@ fn path_rule_warn_threshold_overrides_default() {
 #[test]
 fn path_rule_without_warn_threshold_uses_default() {
     let mut config = default_config();
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 1000,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
@@ -373,15 +383,19 @@ fn path_rule_without_warn_threshold_uses_default() {
 #[test]
 fn multiple_path_rules_last_match_wins() {
     let mut config = default_config();
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/**".to_string(),
         max_lines: 600,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
-    config.path_rules.push(crate::config::PathRule {
+    config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
         max_lines: 1000,
         warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
     });
 
     let checker = ThresholdChecker::new(config);

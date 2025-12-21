@@ -74,7 +74,8 @@ skip_blank = true # Don't count blank lines
 
 # --- Specific Content Rules ---
 
-# Replaces old [[path_rules]] - Symmetry with [structure.rules]
+# Path-based rules for specific directories or patterns
+# (Note: The old [[path_rules]] format is no longer supported)
 [[content.rules]]
 pattern = "src/ui/**" # UI Components
 max_lines = 250       # Stricter limit for UI

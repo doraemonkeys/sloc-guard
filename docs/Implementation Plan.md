@@ -21,7 +21,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
 - **Phase 11 (Partial)**: 11.6 Config Presets, 11.8 Terminology Modernization.
-- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth.
+- **Phase 12 (Partial)**: 12.1 Structure Rule Priority, 12.2 Remove Deprecated Baseline Command, 12.3 Override Path Validation, 12.4 Consolidate State Files, 12.5 Git Scanner Fallback Warning, 12.6 max_depth Example, 12.7 Remove V1 path_rules, 12.8 FS .gitignore Support, 12.9.1 Remote Fetch Warning, 12.9.2 Offline Mode, 12.9.3 Hash Lock, 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 
 ---
@@ -47,15 +47,6 @@ Location: `src/output/html.rs`
 
 
 ## Phase 12: Bug Fixes & Cleanup (Partial)
-
-### Task 12.7: Remove V1 Legacy path_rules
-Location: `src/config/*.rs`, `src/checker/threshold.rs`
-```
-- Remove deprecated `path_rules` (V1 format) - now superseded by `content.rules`
-- Per CLAUDE.md: "No Backward Compatibility" - prioritize clean architecture
-- Update config loader to reject V1 format with clear error message
-- Remove auto-migration code if any
-```
 
 ### Task 12.13: --diff A..B Explicit Range Syntax
 Location: `src/cli.rs`, `src/git/diff.rs`
@@ -129,20 +120,9 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 
 | Priority | Tasks |
 |----------|-------|
-| ~~**1. Code Quality**~~ | ~~10.1 IO Abstraction, 10.2 expect() cleanup~~ ✅ |
-| ~~**2. Structure Enhancements**~~ | ~~9.2 max_depth, 9.4 allowlist mode~~ ✅ |
-| ~~**3. Performance**~~ | ~~9.5 Eliminate Redundant Directory Traversal~~ ✅ |
-| ~~**4. UX Improvements**~~ | ~~9.3 Smart init~~ ✅, ~~11.6 Presets~~ ✅ |
-| ~~**5. CI/CD**~~ | ~~8.1-8.5 All tasks completed~~ ✅ |
-| ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
-| ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
-| ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
-| ~~**9. Architecture Fixes**~~ | ~~12.10 Rule Matching Overrides Extension Filter~~ ✅, ~~12.11 Relative max_depth~~ ✅ |
-| ~~**10. Doc/Impl Consistency**~~ | ~~12.12 --diff Semantic Consistency~~ ✅ |
-| ~~**11. State Robustness**~~ | ~~13.1 Project Root Discovery~~ ✅, ~~13.2 Cache Hash Optimization~~ ✅, ~~13.3 File Locking~~ ✅, ~~13.4 Test Isolation~~ ✅ |
-| **12. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |
-| **13. Git Diff Enhancement** | 12.13 --diff A..B Explicit Range Syntax |
-| **14. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
-| **15. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
-| **16. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
+| **2. Git Diff Enhancement** | 12.13 --diff A..B Explicit Range Syntax |
+| **3. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
+| **4. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
+| **5. Visualization** | 7.1-7.2 HTML Charts/Trends |
 

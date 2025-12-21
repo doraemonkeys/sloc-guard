@@ -190,9 +190,10 @@ pub struct Config {
     #[serde(default, skip_serializing)]
     pub rules: std::collections::HashMap<String, RuleConfig>,
 
-    /// Legacy: path-based rules (migrated to content.rules).
+    /// Legacy: path-based rules (DEPRECATED - use content.rules instead).
+    /// This field is only used for detection to emit a clear error message.
     #[serde(default, skip_serializing)]
-    pub path_rules: Vec<PathRule>,
+    pub path_rules: Vec<PathRuleDeprecated>,
 
     /// Legacy: exclude config (migrated to scanner.exclude).
     #[serde(default, skip_serializing)]
@@ -294,9 +295,13 @@ pub struct FileOverride {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct PathRule {
+/// Deprecated: use `ContentRule` in `[[content.rules]]` instead.
+/// This type exists only for deserializing V1 configs to emit clear error messages.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct PathRuleDeprecated {
+    #[serde(default)]
     pub pattern: String,
+    #[serde(default)]
     pub max_lines: usize,
     #[serde(default)]
     pub warn_threshold: Option<f64>,

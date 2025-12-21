@@ -286,20 +286,7 @@ impl ThresholdChecker {
     fn build_path_rules(config: &Config) -> Vec<CompiledPathRule> {
         let mut rules = Vec::new();
 
-        // First, process legacy path_rules (lower priority)
-        for rule in &config.path_rules {
-            if let Ok(glob) = Glob::new(&rule.pattern) {
-                rules.push(CompiledPathRule {
-                    matcher: glob.compile_matcher(),
-                    max_lines: rule.max_lines,
-                    warn_threshold: rule.warn_threshold,
-                    skip_comments: None,
-                    skip_blank: None,
-                });
-            }
-        }
-
-        // Then, process content.rules (higher priority for V2)
+        // Process content.rules (V2 format)
         for rule in &config.content.rules {
             if let Ok(glob) = Glob::new(&rule.pattern) {
                 rules.push(CompiledPathRule {
@@ -466,7 +453,7 @@ impl ThresholdChecker {
             });
         }
 
-        // 3. Check path_rules (last match wins - iterate in reverse for display,
+        // 3. Check content.rules (last match wins - iterate in reverse for display,
         //    but track the actual last match)
         // First, find the last matching rule index
         let mut last_match_idx: Option<usize> = None;
@@ -477,7 +464,6 @@ impl ThresholdChecker {
         }
 
         // Now build the chain with correct status
-        let legacy_count = self.config.path_rules.len();
         for (i, rule) in self.path_rules.iter().enumerate() {
             let matches = rule.matcher.is_match(path);
             let is_selected = !found_match && last_match_idx == Some(i);
@@ -491,23 +477,12 @@ impl ThresholdChecker {
                 MatchStatus::NoMatch
             };
 
-            // Determine source name based on whether it's legacy or V2
-            let (source, pattern) = if i < legacy_count {
-                let pattern = self.config.path_rules[i].pattern.clone();
-                (format!("path_rules[{i}] (legacy)"), pattern)
-            } else {
-                let idx = i - legacy_count;
-                let pattern = self.config.content.rules[idx].pattern.clone();
-                (format!("content.rules[{idx}]"), pattern)
-            };
+            let pattern = self.config.content.rules[i].pattern.clone();
+            let source = format!("content.rules[{i}]");
 
             if is_selected {
                 matched_rule = ContentRuleMatch::Rule {
-                    index: if i < legacy_count {
-                        i
-                    } else {
-                        i - legacy_count
-                    },
+                    index: i,
                     pattern: pattern.clone(),
                 };
             }

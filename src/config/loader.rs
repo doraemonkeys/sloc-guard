@@ -42,6 +42,23 @@ const USER_CONFIG_NAME: &str = "config.toml";
 /// Validate config version. Returns an error if version is unsupported.
 /// Returns `true` if version is missing or V1 (requires migration).
 fn validate_config_version(config: &Config) -> Result<bool> {
+    // Reject deprecated path_rules - must use content.rules instead
+    if !config.path_rules.is_empty() {
+        return Err(SlocGuardError::Config(
+            "Deprecated: [[path_rules]] is no longer supported. \
+             Please migrate to [[content.rules]] format. Example:\n\n\
+             # Old format (no longer supported):\n\
+             # [[path_rules]]\n\
+             # pattern = \"src/generated/**\"\n\
+             # max_lines = 1000\n\n\
+             # New format:\n\
+             [[content.rules]]\n\
+             pattern = \"src/generated/**\"\n\
+             max_lines = 1000"
+                .to_string(),
+        ));
+    }
+
     match &config.version {
         None => Ok(true),                              // Missing version - needs migration
         Some(v) if v == CONFIG_VERSION => Ok(false),   // V2 - no migration
@@ -72,16 +89,8 @@ fn migrate_v1_to_v2(config: &mut Config) {
     config.content.skip_blank = config.default.skip_blank;
     config.content.strict = config.default.strict;
 
-    // Migrate path_rules -> content.rules
-    for rule in &config.path_rules {
-        config.content.rules.push(ContentRule {
-            pattern: rule.pattern.clone(),
-            max_lines: rule.max_lines,
-            warn_threshold: rule.warn_threshold,
-            skip_comments: None,
-            skip_blank: None,
-        });
-    }
+    // Note: path_rules migration removed - V1 path_rules are now rejected with an error.
+    // Users must manually migrate to [[content.rules]] format.
 
     // Migrate overrides -> content.overrides
     for ovr in &config.overrides {

@@ -132,7 +132,7 @@ ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testabi
 CLI args → load_config() → [if --offline] use cache only, error on miss
          → [if extends] resolve chain (local/remote/preset:*, cycle detection)
          → [if extends_sha256] verify remote config hash, error on mismatch
-         → [if v1 config] migrate_v1_to_v2() auto-conversion
+         → [if v1 config] migrate_v1_to_v2() auto-conversion (path_rules rejected with error)
          → expand_language_rules() → [content.languages.X] to [[content.rules]]
          → [if !--no-cache] load_cache(config_hash)
          → LanguageRegistry

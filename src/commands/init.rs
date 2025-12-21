@@ -84,7 +84,7 @@ warn_threshold = 0.9
 # max_lines = 400
 
 # Path-based rules (higher priority than extension rules)
-# [[path_rules]]
+# [[content.rules]]
 # pattern = "src/generated/**"
 # max_lines = 1000
 # warn_threshold = 1.0  # Disable warnings for generated code
