@@ -1381,7 +1381,11 @@ fn scan_with_structure_detects_naming_violations() {
 
     // userCard.tsx should be a naming violation
     assert_eq!(result.allowlist_violations.len(), 1);
-    assert!(result.allowlist_violations[0].path.ends_with("userCard.tsx"));
+    assert!(
+        result.allowlist_violations[0]
+            .path
+            .ends_with("userCard.tsx")
+    );
     assert!(matches!(
         result.allowlist_violations[0].violation_type,
         crate::checker::ViolationType::NamingConvention { .. }
@@ -1460,4 +1464,3 @@ fn scan_with_structure_combined_allowlist_and_naming_violations() {
     // Two violations: config.json (disallowed) and button.tsx (naming)
     assert_eq!(result.allowlist_violations.len(), 2);
 }
-

@@ -472,13 +472,13 @@ impl<F: FileFilter> DirectoryScanner<F> {
                         if !rule.filename_matches_naming_pattern(path)
                             && let Some(ref pattern_str) = rule.naming_pattern_str
                         {
-                            result
-                                .allowlist_violations
-                                .push(StructureViolation::naming_convention(
+                            result.allowlist_violations.push(
+                                StructureViolation::naming_convention(
                                     path.to_path_buf(),
                                     rule.pattern.clone(),
                                     pattern_str.clone(),
-                                ));
+                                ),
+                            );
                         }
                     }
                 }
@@ -585,13 +585,13 @@ impl<F: FileFilter> DirectoryScanner<F> {
                         if !rule.filename_matches_naming_pattern(path)
                             && let Some(ref pattern_str) = rule.naming_pattern_str
                         {
-                            result
-                                .allowlist_violations
-                                .push(StructureViolation::naming_convention(
+                            result.allowlist_violations.push(
+                                StructureViolation::naming_convention(
                                     path.to_path_buf(),
                                     rule.pattern.clone(),
                                     pattern_str.clone(),
-                                ));
+                                ),
+                            );
                         }
                     }
                 }

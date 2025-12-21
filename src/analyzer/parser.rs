@@ -334,3 +334,23 @@ pub fn get_parser(language: &str) -> Option<Box<dyn FunctionParser>> {
 #[cfg(test)]
 #[path = "parser_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "rust_parser_tests.rs"]
+mod rust_tests;
+
+#[cfg(test)]
+#[path = "go_parser_tests.rs"]
+mod go_tests;
+
+#[cfg(test)]
+#[path = "python_parser_tests.rs"]
+mod python_tests;
+
+#[cfg(test)]
+#[path = "js_parser_tests.rs"]
+mod js_tests;
+
+#[cfg(test)]
+#[path = "c_parser_tests.rs"]
+mod c_tests;
