@@ -34,12 +34,19 @@ pub(crate) fn load_config(
     config_path: Option<&Path>,
     no_config: bool,
     no_extends: bool,
+    offline: bool,
 ) -> crate::Result<Config> {
     if no_config {
         return Ok(Config::default());
     }
 
-    let loader = FileConfigLoader::new();
+    // Determine project root from config path or current directory
+    let project_root = config_path
+        .and_then(|p| p.parent())
+        .map(Path::to_path_buf)
+        .or_else(|| std::env::current_dir().ok());
+
+    let loader = FileConfigLoader::with_options(offline, project_root);
     if no_extends {
         config_path.map_or_else(
             || loader.load_without_extends(),

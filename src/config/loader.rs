@@ -6,7 +6,7 @@ use crate::error::{Result, SlocGuardError};
 use super::Config;
 use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentOverride, ContentRule, LanguageRule};
 use super::presets;
-use super::remote::{fetch_remote_config, is_remote_url};
+use super::remote::{fetch_remote_config, fetch_remote_config_offline, is_remote_url};
 
 /// Trait for loading configuration from various sources.
 pub trait ConfigLoader {
@@ -212,6 +212,8 @@ fn dirs_home() -> Option<PathBuf> {
 #[derive(Debug)]
 pub struct FileConfigLoader<F: FileSystem = RealFileSystem> {
     fs: F,
+    offline: bool,
+    project_root: Option<PathBuf>,
 }
 
 impl Default for FileConfigLoader<RealFileSystem> {
@@ -223,14 +225,32 @@ impl Default for FileConfigLoader<RealFileSystem> {
 impl FileConfigLoader<RealFileSystem> {
     #[must_use]
     pub const fn new() -> Self {
-        Self { fs: RealFileSystem }
+        Self {
+            fs: RealFileSystem,
+            offline: false,
+            project_root: None,
+        }
+    }
+
+    /// Create a loader with offline mode and project root options.
+    #[must_use]
+    pub const fn with_options(offline: bool, project_root: Option<PathBuf>) -> Self {
+        Self {
+            fs: RealFileSystem,
+            offline,
+            project_root,
+        }
     }
 }
 
 impl<F: FileSystem> FileConfigLoader<F> {
     #[must_use]
     pub const fn with_fs(fs: F) -> Self {
-        Self { fs }
+        Self {
+            fs,
+            offline: false,
+            project_root: None,
+        }
     }
 
     fn local_config_path(&self) -> Option<PathBuf> {
@@ -296,7 +316,11 @@ impl<F: FileSystem> FileConfigLoader<F> {
             )));
         }
 
-        let content = fetch_remote_config(url)?;
+        let content = if self.offline {
+            fetch_remote_config_offline(url, self.project_root.as_deref())?
+        } else {
+            fetch_remote_config(url, self.project_root.as_deref())?
+        };
         self.process_config_content(&content, None, visited)
     }
 

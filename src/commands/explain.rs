@@ -20,7 +20,12 @@ pub fn run_explain(args: &ExplainArgs, cli: &Cli) -> i32 {
 }
 
 pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<()> {
-    let config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
+    let config = load_config(
+        args.config.as_deref(),
+        cli.no_config,
+        cli.no_extends,
+        cli.offline,
+    )?;
 
     let path = &args.path;
 

@@ -1,15 +1,15 @@
 use std::fs;
 use std::path::Path;
 
-use crate::cli::{ConfigAction, ConfigOutputFormat};
+use crate::cli::{Cli, ConfigAction, ConfigOutputFormat};
 use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
 #[must_use]
-pub fn run_config(args: &crate::cli::ConfigArgs) -> i32 {
+pub fn run_config(args: &crate::cli::ConfigArgs, cli: &Cli) -> i32 {
     match &args.action {
         ConfigAction::Validate { config } => run_config_validate(config),
-        ConfigAction::Show { config, format } => run_config_show(config.as_deref(), *format),
+        ConfigAction::Show { config, format } => run_config_show(config.as_deref(), *format, cli),
     }
 }
 
@@ -85,8 +85,8 @@ pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
     Ok(())
 }
 
-fn run_config_show(config_path: Option<&Path>, format: ConfigOutputFormat) -> i32 {
-    match run_config_show_impl(config_path, format) {
+fn run_config_show(config_path: Option<&Path>, format: ConfigOutputFormat, cli: &Cli) -> i32 {
+    match run_config_show_impl(config_path, format, cli) {
         Ok(output) => {
             print!("{output}");
             EXIT_SUCCESS
@@ -105,8 +105,9 @@ fn run_config_show(config_path: Option<&Path>, format: ConfigOutputFormat) -> i3
 pub(crate) fn run_config_show_impl(
     config_path: Option<&Path>,
     format: ConfigOutputFormat,
+    cli: &Cli,
 ) -> Result<String> {
-    let config = load_config(config_path)?;
+    let config = load_config(config_path, cli)?;
 
     match format {
         ConfigOutputFormat::Json => {
@@ -117,8 +118,14 @@ pub(crate) fn run_config_show_impl(
     }
 }
 
-fn load_config(config_path: Option<&Path>) -> Result<Config> {
-    let loader = FileConfigLoader::new();
+fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
+    // Determine project root from config path or current directory
+    let project_root = config_path
+        .and_then(|p| p.parent())
+        .map(std::path::Path::to_path_buf)
+        .or_else(|| std::env::current_dir().ok());
+
+    let loader = FileConfigLoader::with_options(cli.offline, project_root);
     config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
 }
 

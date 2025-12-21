@@ -71,6 +71,7 @@ pub enum BaselineUpdateMode {
     long_about = "Enforce source lines of code (SLOC) limits per file and directory structure \
     limits (file/folder counts). Counts code lines excluding comments and blanks by default."
 )]
+#[allow(clippy::struct_excessive_bools)] // CLI flags are inherently boolean
 pub struct Cli {
     /// Increase output verbosity (-v, -vv for more)
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]
@@ -91,6 +92,10 @@ pub struct Cli {
     /// Skip resolving extends in configuration (ignore remote/local inheritance)
     #[arg(long, global = true)]
     pub no_extends: bool,
+
+    /// Use cached remote configs only, error if cache miss
+    #[arg(long, global = true)]
+    pub offline: bool,
 
     #[command(subcommand)]
     pub command: Commands,

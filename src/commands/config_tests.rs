@@ -1,8 +1,26 @@
-use crate::cli::ConfigOutputFormat;
+use std::path::PathBuf;
+
+use crate::cli::{Cli, ColorChoice, Commands, ConfigOutputFormat, InitArgs};
 use crate::config::{Config, FileOverride, RuleConfig};
 use tempfile::TempDir;
 
 use super::*;
+
+fn make_cli() -> Cli {
+    Cli {
+        command: Commands::Init(InitArgs {
+            output: PathBuf::from(".sloc-guard.toml"),
+            force: false,
+            detect: false,
+        }),
+        verbose: 0,
+        quiet: false,
+        color: ColorChoice::Never,
+        no_config: false,
+        no_extends: false,
+        offline: false,
+    }
+}
 
 #[test]
 fn validate_config_nonexistent_file_returns_error() {
@@ -154,7 +172,8 @@ fn config_show_default_returns_text() {
     let config_path = temp_dir.path().join("test.toml");
     std::fs::write(&config_path, "# empty config uses defaults\n").unwrap();
 
-    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Text);
+    let cli = make_cli();
+    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Text, &cli);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("Effective Configuration"));
@@ -168,7 +187,8 @@ fn config_show_json_format() {
     let config_path = temp_dir.path().join("test.toml");
     std::fs::write(&config_path, "# empty config uses defaults\n").unwrap();
 
-    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Json);
+    let cli = make_cli();
+    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Json, &cli);
     assert!(result.is_ok());
     let output = result.unwrap();
     // V2 schema has scanner, content, structure sections
@@ -190,7 +210,8 @@ patterns = ["**/vendor/**"]
 "#;
     std::fs::write(&config_path, content).unwrap();
 
-    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Text);
+    let cli = make_cli();
+    let result = run_config_show_impl(Some(&config_path), ConfigOutputFormat::Text, &cli);
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("max_lines = 300"));
@@ -200,7 +221,8 @@ patterns = ["**/vendor/**"]
 #[test]
 fn config_show_nonexistent_file_returns_error() {
     let path = std::path::Path::new("nonexistent_config.toml");
-    let result = run_config_show_impl(Some(path), ConfigOutputFormat::Text);
+    let cli = make_cli();
+    let result = run_config_show_impl(Some(path), ConfigOutputFormat::Text, &cli);
     assert!(result.is_err());
 }
 

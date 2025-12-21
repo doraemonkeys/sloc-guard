@@ -46,7 +46,12 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
     let paths = validate_and_resolve_paths(args)?;
 
     // 1. Load configuration
-    let mut config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
+    let mut config = load_config(
+        args.config.as_deref(),
+        cli.no_config,
+        cli.no_extends,
+        cli.offline,
+    )?;
 
     // 2. Apply CLI argument overrides
     apply_cli_overrides(&mut config, args);

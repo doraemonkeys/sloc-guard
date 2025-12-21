@@ -10,7 +10,7 @@ fn main() {
         Commands::Check(args) => run_check(args, &cli),
         Commands::Stats(args) => run_stats(args, &cli),
         Commands::Init(args) => run_init(args),
-        Commands::Config(args) => run_config(args),
+        Commands::Config(args) => run_config(args, &cli),
         Commands::Explain(args) => run_explain(args, &cli),
     };
 

@@ -32,7 +32,12 @@ pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
 
 pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> {
     // 1. Load configuration (for exclude patterns)
-    let mut config = load_config(args.config.as_deref(), cli.no_config, cli.no_extends)?;
+    let mut config = load_config(
+        args.config.as_deref(),
+        cli.no_config,
+        cli.no_extends,
+        cli.offline,
+    )?;
 
     // 1.1 Load cache if not disabled
     let config_hash = compute_config_hash(&config);

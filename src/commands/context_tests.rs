@@ -16,19 +16,24 @@ fn exit_codes_documented() {
 
 #[test]
 fn load_config_no_config_returns_default() {
-    let config = load_config(None, true, false).unwrap();
+    let config = load_config(None, true, false, false).unwrap();
     assert_eq!(config.default.max_lines, 500);
 }
 
 #[test]
 fn load_config_with_nonexistent_path_returns_error() {
-    let result = load_config(Some(std::path::Path::new("nonexistent.toml")), false, false);
+    let result = load_config(
+        Some(std::path::Path::new("nonexistent.toml")),
+        false,
+        false,
+        false,
+    );
     assert!(result.is_err());
 }
 
 #[test]
 fn load_config_without_no_config_searches_defaults() {
-    let config = load_config(None, false, false).unwrap();
+    let config = load_config(None, false, false, false).unwrap();
     assert!(config.default.max_lines > 0);
 }
 
@@ -90,7 +95,7 @@ max_lines = 200
 "#;
     std::fs::write(&config_path, content).unwrap();
 
-    let config = load_config(Some(&config_path), false, true).unwrap();
+    let config = load_config(Some(&config_path), false, true, false).unwrap();
     assert_eq!(config.default.max_lines, 200);
     assert_eq!(
         config.extends,

@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
@@ -8,7 +8,7 @@ use sha2::{Digest, Sha256};
 
 use crate::error::{Result, SlocGuardError};
 
-const CACHE_DIR: &str = "sloc-guard/configs";
+const LOCAL_CACHE_DIR: &str = ".sloc-guard/remote-cache";
 const CACHE_TTL_SECS: u64 = 3600; // 1 hour
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
@@ -72,25 +72,15 @@ fn hash_url(url: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Get the cache directory path.
-fn cache_dir() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        std::env::var_os("LOCALAPPDATA")
-            .map(PathBuf::from)
-            .map(|p| p.join(CACHE_DIR))
-    }
-    #[cfg(not(windows))]
-    {
-        std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .map(|p| p.join(".cache").join(CACHE_DIR))
-    }
+/// Get the cache directory path (project-local).
+#[allow(clippy::single_option_map)] // Intentional for readability
+fn cache_dir(project_root: Option<&Path>) -> Option<PathBuf> {
+    project_root.map(|root| root.join(LOCAL_CACHE_DIR))
 }
 
 /// Get the cache file path for a given URL.
-fn cache_file_path(url: &str) -> Option<PathBuf> {
-    cache_dir().map(|dir| dir.join(format!("{}.toml", hash_url(url))))
+fn cache_file_path(url: &str, project_root: Option<&Path>) -> Option<PathBuf> {
+    cache_dir(project_root).map(|dir| dir.join(format!("{}.toml", hash_url(url))))
 }
 
 /// Check if cache file is still valid (within TTL).
@@ -115,8 +105,8 @@ fn is_cache_valid(cache_path: &PathBuf) -> bool {
 }
 
 /// Try to read config from cache.
-fn read_from_cache(url: &str) -> Option<String> {
-    let cache_path = cache_file_path(url)?;
+fn read_from_cache(url: &str, project_root: Option<&Path>) -> Option<String> {
+    let cache_path = cache_file_path(url, project_root)?;
     if is_cache_valid(&cache_path) {
         fs::read_to_string(&cache_path).ok()
     } else {
@@ -125,8 +115,8 @@ fn read_from_cache(url: &str) -> Option<String> {
 }
 
 /// Write config to cache.
-fn write_to_cache(url: &str, content: &str) -> Option<()> {
-    let cache_path = cache_file_path(url)?;
+fn write_to_cache(url: &str, content: &str, project_root: Option<&Path>) -> Option<()> {
+    let cache_path = cache_file_path(url, project_root)?;
 
     // Create cache directory if it doesn't exist
     if let Some(parent) = cache_path.parent() {
@@ -154,7 +144,11 @@ fn write_to_cache(url: &str, content: &str) -> Option<()> {
 /// - The request times out (30 seconds)
 /// - The server returns a non-2xx status code
 /// - Network errors occur
-pub fn fetch_remote_config_with_client(url: &str, client: &impl HttpClient) -> Result<String> {
+pub fn fetch_remote_config_with_client(
+    url: &str,
+    client: &impl HttpClient,
+    project_root: Option<&Path>,
+) -> Result<String> {
     // Validate URL
     if !is_remote_url(url) {
         return Err(SlocGuardError::Config(format!(
@@ -163,7 +157,7 @@ pub fn fetch_remote_config_with_client(url: &str, client: &impl HttpClient) -> R
     }
 
     // Try cache first
-    if let Some(cached) = read_from_cache(url) {
+    if let Some(cached) = read_from_cache(url, project_root) {
         return Ok(cached);
     }
 
@@ -178,7 +172,7 @@ pub fn fetch_remote_config_with_client(url: &str, client: &impl HttpClient) -> R
     let content = client.get(url)?;
 
     // Cache the result (ignore cache write errors)
-    let _ = write_to_cache(url, &content);
+    let _ = write_to_cache(url, &content, project_root);
 
     Ok(content)
 }
@@ -194,16 +188,40 @@ pub fn fetch_remote_config_with_client(url: &str, client: &impl HttpClient) -> R
 /// - The request times out
 /// - The server returns a non-2xx status code
 /// - Network errors occur
-pub fn fetch_remote_config(url: &str) -> Result<String> {
-    fetch_remote_config_with_client(url, &ReqwestClient)
+pub fn fetch_remote_config(url: &str, project_root: Option<&Path>) -> Result<String> {
+    fetch_remote_config_with_client(url, &ReqwestClient, project_root)
+}
+
+/// Fetch remote configuration from cache only (offline mode).
+///
+/// Returns cached content if available and valid (within TTL).
+/// Does NOT fetch from the network.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The URL is invalid
+/// - The cache is missing or expired
+pub fn fetch_remote_config_offline(url: &str, project_root: Option<&Path>) -> Result<String> {
+    if !is_remote_url(url) {
+        return Err(SlocGuardError::Config(format!(
+            "Invalid remote config URL (must start with http:// or https://): {url}"
+        )));
+    }
+
+    read_from_cache(url, project_root).ok_or_else(|| {
+        SlocGuardError::Config(format!(
+            "Remote config cache miss in offline mode. Run without --offline first to cache: {url}"
+        ))
+    })
 }
 
 /// Clear the remote config cache.
 ///
 /// Returns the number of files deleted.
 #[must_use]
-pub fn clear_cache() -> usize {
-    let Some(dir) = cache_dir() else {
+pub fn clear_cache(project_root: Option<&Path>) -> usize {
+    let Some(dir) = cache_dir(project_root) else {
         return 0;
     };
 

@@ -52,6 +52,7 @@ fn make_cli_for_stats(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         color,
         no_config,
         no_extends: false,
+        offline: false,
     }
 }
 

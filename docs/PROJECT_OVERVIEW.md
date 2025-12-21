@@ -15,8 +15,8 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `explain` commands |
-| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache) |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode) |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`), `GlobFilter`, `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate), `GitAwareScanner` (gix with .gitignore), `CompositeScanner` (git/non-git fallback), `ScanResult`, `StructureScanConfig` |
@@ -124,7 +124,8 @@ ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testabi
 ### Common Pipeline (check/stats/baseline)
 
 ```
-CLI args → load_config() → [if extends] resolve chain (local/remote/preset:*, cycle detection)
+CLI args → load_config() → [if --offline] use cache only, error on miss
+         → [if extends] resolve chain (local/remote/preset:*, cycle detection)
          → [if v1 config] migrate_v1_to_v2() auto-conversion
          → expand_language_rules() → [content.languages.X] to [[content.rules]]
          → [if !--no-cache] load_cache(config_hash)

@@ -9,7 +9,10 @@ pub use model::{
     CustomLanguageConfig, DefaultConfig, ExcludeConfig, FileOverride, LanguageRule, PathRule,
     RuleConfig, ScannerConfig, StructureConfig, StructureOverride, StructureRule, UNLIMITED,
 };
-pub use remote::{clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url};
+pub use remote::{
+    clear_cache as clear_remote_cache, fetch_remote_config, fetch_remote_config_offline,
+    is_remote_url,
+};
 
 #[cfg(test)]
 mod tests {
