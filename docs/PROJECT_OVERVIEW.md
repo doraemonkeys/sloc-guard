@@ -21,7 +21,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `types.rs`: `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `gitignore.rs`: `GitAwareScanner` (gix with .gitignore); `composite.rs`: `CompositeScanner` (git/non-git fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
 | `checker/threshold` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
-| `checker/structure` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules |
+| `checker/structure` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules, naming convention enforcement, sibling file co-location checks |
 | `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation, file locking for concurrent access) |
@@ -47,7 +47,7 @@ ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, rules, overrides }
-StructureRule { pattern, max_files, max_dirs, max_depth, relative_depth, warn_threshold, allow_extensions, allow_patterns, file_naming_pattern }  // [[structure.rules]]
+StructureRule { pattern, max_files, max_dirs, max_depth, relative_depth, warn_threshold, allow_extensions, allow_patterns, file_naming_pattern, file_pattern, require_sibling }  // [[structure.rules]]
 StructureOverride { path, max_files, max_dirs, max_depth, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
@@ -66,7 +66,7 @@ CheckResult::Passed { path, stats, limit, override_reason }
 
 // Structure checking
 DirStats { file_count, dir_count, depth }  // immediate children counts + depth from scan root
-ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | NamingConvention { expected_pattern }
+ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern }
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
 // Explain (rule chain debugging)

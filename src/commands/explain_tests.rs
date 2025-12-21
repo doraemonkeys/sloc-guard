@@ -206,6 +206,8 @@ fn explain_structure_rule_matches() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -256,6 +258,8 @@ fn explain_structure_rule_chain_statuses() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "test/*".to_string(),
@@ -267,6 +271,8 @@ fn explain_structure_rule_chain_statuses() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
         ],
         overrides: vec![StructureOverride {

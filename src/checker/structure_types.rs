@@ -22,6 +22,11 @@ pub enum ViolationType {
         /// The regex pattern that the filename should have matched.
         expected_pattern: String,
     },
+    /// Required sibling file is missing (`require_sibling`).
+    MissingSibling {
+        /// The sibling pattern template that was expected (e.g., "{stem}.test.tsx").
+        expected_sibling_pattern: String,
+    },
 }
 
 /// A structure limit violation.
@@ -106,6 +111,26 @@ impl StructureViolation {
             },
             actual: 1,
             limit: 0,
+            is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a missing sibling violation.
+    #[must_use]
+    pub const fn missing_sibling(
+        path: PathBuf,
+        rule_pattern: String,
+        expected_sibling_pattern: String,
+    ) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::MissingSibling {
+                expected_sibling_pattern,
+            },
+            actual: 1,
+            limit: 1,
             is_warning: false,
             override_reason: None,
             triggering_rule_pattern: Some(rule_pattern),

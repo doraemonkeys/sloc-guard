@@ -211,6 +211,14 @@ pub(crate) fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i
             .map(structure_violation_to_check_result)
             .collect();
         results.extend(allowlist_results);
+
+        // Check for missing sibling files (co-location enforcement)
+        let sibling_violations = structure_checker.check_siblings(&scan_result.files);
+        let sibling_results: Vec<_> = sibling_violations
+            .iter()
+            .map(structure_violation_to_check_result)
+            .collect();
+        results.extend(sibling_results);
     }
 
     // 6. Save cache if not disabled
@@ -492,6 +500,17 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
                 .unwrap_or("unknown");
             Some(format!(
                 "structure: naming convention violation (expected: {expected_pattern}, rule: {rule})"
+            ))
+        }
+        ViolationType::MissingSibling {
+            expected_sibling_pattern,
+        } => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("unknown");
+            Some(format!(
+                "structure: missing sibling (expected: {expected_sibling_pattern}, rule: {rule})"
             ))
         }
     };

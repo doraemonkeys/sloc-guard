@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobMatcher};
@@ -26,6 +26,18 @@ struct CompiledStructureRule {
     warn_threshold: Option<f64>,
 }
 
+/// Compiled sibling rule for file co-location checking.
+struct CompiledSiblingRule {
+    /// Original directory pattern string (for violation messages).
+    dir_pattern: String,
+    /// Matcher for directory (parent of files).
+    dir_matcher: GlobMatcher,
+    /// Matcher for files that require a sibling.
+    file_matcher: GlobMatcher,
+    /// Template for deriving sibling filename (e.g., "{stem}.test.tsx").
+    sibling_template: String,
+}
+
 /// Resolved limits for a directory path.
 #[derive(Debug, Clone, Default)]
 struct StructureLimits {
@@ -48,6 +60,7 @@ pub struct StructureChecker {
     warn_threshold: Option<f64>,
     rules: Vec<CompiledStructureRule>,
     overrides: Vec<StructureOverride>,
+    sibling_rules: Vec<CompiledSiblingRule>,
 }
 
 impl StructureChecker {
@@ -58,7 +71,9 @@ impl StructureChecker {
     /// or if any limit value is less than -1.
     pub fn new(config: &StructureConfig) -> Result<Self> {
         Self::validate_limits(config)?;
+        Self::validate_sibling_rules(&config.rules)?;
         let rules = Self::build_rules(&config.rules)?;
+        let sibling_rules = Self::build_sibling_rules(&config.rules)?;
 
         Ok(Self {
             max_files: config.max_files,
@@ -67,6 +82,7 @@ impl StructureChecker {
             warn_threshold: config.warn_threshold,
             rules,
             overrides: config.overrides.clone(),
+            sibling_rules,
         })
     }
 
@@ -234,6 +250,52 @@ impl StructureChecker {
             depth += 1;
         }
         depth
+    }
+
+    /// Validate sibling rule configuration.
+    /// `require_sibling` requires `file_pattern` to be set.
+    fn validate_sibling_rules(rules: &[crate::config::StructureRule]) -> Result<()> {
+        for (i, rule) in rules.iter().enumerate() {
+            if rule.require_sibling.is_some() && rule.file_pattern.is_none() {
+                return Err(SlocGuardError::Config(format!(
+                    "Rule {} has 'require_sibling' but no 'file_pattern'. \
+                     Both must be set together to specify which files need siblings.",
+                    i + 1
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Build sibling rules from config rules that have `require_sibling` set.
+    fn build_sibling_rules(
+        rules: &[crate::config::StructureRule],
+    ) -> Result<Vec<CompiledSiblingRule>> {
+        rules
+            .iter()
+            .filter(|rule| rule.require_sibling.is_some() && rule.file_pattern.is_some())
+            .map(|rule| {
+                let dir_glob =
+                    Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
+                        pattern: rule.pattern.clone(),
+                        source: e,
+                    })?;
+
+                let file_pattern = rule.file_pattern.as_ref().unwrap();
+                let file_glob =
+                    Glob::new(file_pattern).map_err(|e| SlocGuardError::InvalidPattern {
+                        pattern: file_pattern.clone(),
+                        source: e,
+                    })?;
+
+                Ok(CompiledSiblingRule {
+                    dir_pattern: rule.pattern.clone(),
+                    dir_matcher: dir_glob.compile_matcher(),
+                    file_matcher: file_glob.compile_matcher(),
+                    sibling_template: rule.require_sibling.clone().unwrap(),
+                })
+            })
+            .collect()
     }
 
     /// Get limits for a directory path.
@@ -408,6 +470,74 @@ impl StructureChecker {
         // Sort by path for consistent output
         violations.sort_by(|a, b| a.path.cmp(&b.path));
         violations
+    }
+
+    /// Check files for missing siblings.
+    ///
+    /// For each file matching a sibling rule (directory pattern + file pattern),
+    /// verifies that a sibling file matching the template exists in the same directory.
+    ///
+    /// # Returns
+    /// A vector of `MissingSibling` violations for files without required siblings.
+    #[must_use]
+    pub fn check_siblings(&self, files: &[PathBuf]) -> Vec<StructureViolation> {
+        if self.sibling_rules.is_empty() {
+            return Vec::new();
+        }
+
+        // Build a HashSet of all file paths for O(1) sibling lookup
+        let file_set: HashSet<&PathBuf> = files.iter().collect();
+
+        let mut violations = Vec::new();
+
+        for file_path in files {
+            let Some(parent) = file_path.parent() else {
+                continue;
+            };
+            let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+
+            for rule in &self.sibling_rules {
+                // Check if parent directory matches the rule's directory pattern
+                if !rule.dir_matcher.is_match(parent) {
+                    continue;
+                }
+
+                // Check if filename matches the rule's file pattern
+                if !rule.file_matcher.is_match(file_name) {
+                    continue;
+                }
+
+                // Derive expected sibling path
+                if let Some(expected_sibling) =
+                    Self::derive_sibling_path(file_path, &rule.sibling_template)
+                    && !file_set.contains(&expected_sibling)
+                {
+                    violations.push(StructureViolation::missing_sibling(
+                        file_path.clone(),
+                        rule.dir_pattern.clone(),
+                        rule.sibling_template.clone(),
+                    ));
+                }
+            }
+        }
+
+        // Sort by path for consistent output
+        violations.sort_by(|a, b| a.path.cmp(&b.path));
+        violations
+    }
+
+    /// Derive sibling path from source file and template.
+    ///
+    /// Template syntax: `{stem}` is replaced with the source file's stem.
+    #[allow(clippy::literal_string_with_formatting_args)] // {stem} is a template placeholder, not a format arg
+    fn derive_sibling_path(source: &Path, template: &str) -> Option<PathBuf> {
+        let parent = source.parent()?;
+        let stem = source.file_stem()?.to_str()?;
+
+        let sibling_name = template.replace("{stem}", stem);
+        Some(parent.join(sibling_name))
     }
 
     /// Explain which rule matches a given directory path.

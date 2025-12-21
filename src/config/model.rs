@@ -422,6 +422,20 @@ pub struct StructureRule {
     /// Example: `^[A-Z][a-zA-Z0-9]*\.tsx$` for `PascalCase` React components.
     #[serde(default)]
     pub file_naming_pattern: Option<String>,
+
+    /// Glob pattern for files that require a sibling file.
+    /// Only files matching this pattern are checked for siblings.
+    /// Must be used together with `require_sibling`.
+    /// Example: `*.tsx` for React components.
+    #[serde(default)]
+    pub file_pattern: Option<String>,
+
+    /// Template for the required sibling file.
+    /// Use `{stem}` as placeholder for the source file's stem (filename without extension).
+    /// Must be used together with `file_pattern`.
+    /// Example: `{stem}.test.tsx` requires `Button.test.tsx` for `Button.tsx`.
+    #[serde(default)]
+    pub require_sibling: Option<String>,
 }
 
 /// Structure override for specific directories [[structure.override]].

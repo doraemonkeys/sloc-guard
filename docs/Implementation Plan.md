@@ -20,7 +20,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, SARIF Guidance.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
-- **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.6 Config Presets, 11.8 Terminology Modernization.
+- **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.2 File Co-location Check, 11.6 Config Presets, 11.8 Terminology Modernization.
 - **Phase 12**: Structure Rule Priority, State File Consolidation, .gitignore Support, Remote Config (Fetch Warning, Offline Mode, Hash Lock), Rule Matching Override, Relative max_depth, --diff A..B Range.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 - **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
@@ -48,14 +48,6 @@ Location: `src/output/html.rs`
 ---
 
 ## Phase 11: Advanced Governance (Pending)
-
-### Task 11.2: File Co-location Check
-Location: `src/checker/structure.rs`
-```
-- Add `require_sibling` to [[structure.rules]]: { pattern: "*.ts", sibling: "*.spec.ts" }
-- Validates paired files exist together (component + test, implementation + docs)
-- New violation type: MissingSibling { file, expected_sibling_pattern }
-```
 
 ### Task 11.3: Time-bound Overrides
 Location: `src/config/*.rs`, `src/checker/*.rs`
@@ -96,7 +88,7 @@ Location: `src/config/structure.rs`, `src/checker/structure.rs`
 | ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
 | ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
 | ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
-| **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, 11.2 Co-location, 11.7 Deny Patterns |
+| **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, ~~11.2 Co-location~~ ✅, 11.7 Deny Patterns |
 | **5. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **6. Visualization** | 7.1-7.2 HTML Charts/Trends |
 

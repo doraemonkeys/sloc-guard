@@ -53,6 +53,8 @@ fn checker_enabled_with_rules() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -169,6 +171,8 @@ fn rule_overrides_global_limit() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -203,6 +207,8 @@ fn rule_inherits_unset_limit_from_global() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -300,6 +306,8 @@ fn invalid_rule_pattern_returns_error() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -425,6 +433,8 @@ fn warn_threshold_rule_overrides_global() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -532,6 +542,8 @@ fn rule_can_set_unlimited_to_override_global() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -597,6 +609,8 @@ fn invalid_rule_max_files_returns_error() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -622,6 +636,8 @@ fn invalid_rule_max_dirs_returns_error() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -696,6 +712,8 @@ fn override_takes_priority_over_rules() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         overrides: vec![StructureOverride {
             path: "src/legacy".to_string(),
@@ -1054,6 +1072,8 @@ fn rule_overrides_global_depth_limit() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1124,6 +1144,8 @@ fn invalid_rule_max_depth_returns_error() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1168,6 +1190,8 @@ fn checker_enabled_with_allowlist_rule() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1275,6 +1299,8 @@ fn multiple_matching_rules_last_match_wins() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "src/generated/**".to_string(),
@@ -1286,6 +1312,8 @@ fn multiple_matching_rules_last_match_wins() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
         ],
         ..Default::default()
@@ -1323,6 +1351,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "src/core/**".to_string(),
@@ -1334,6 +1364,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
         ],
         ..Default::default()
@@ -1371,6 +1403,8 @@ fn three_rules_last_matching_wins() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "src/**".to_string(),
@@ -1382,6 +1416,8 @@ fn three_rules_last_matching_wins() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "src/lib/**".to_string(),
@@ -1393,6 +1429,8 @@ fn three_rules_last_matching_wins() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
         ],
         ..Default::default()
@@ -1429,6 +1467,8 @@ fn non_matching_rules_skipped_in_priority() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "tests/**".to_string(), // Does NOT match src/lib
@@ -1440,6 +1480,8 @@ fn non_matching_rules_skipped_in_priority() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
         ],
         ..Default::default()
@@ -1478,6 +1520,8 @@ fn explain_reports_last_matching_rule() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
             StructureRule {
                 pattern: "src/lib/**".to_string(),
@@ -1489,6 +1533,8 @@ fn explain_reports_last_matching_rule() {
                 allow_patterns: vec![],
                 file_naming_pattern: None,
                 relative_depth: false,
+                file_pattern: None,
+                require_sibling: None,
             },
         ],
         ..Default::default()
@@ -1540,6 +1586,8 @@ fn calculate_base_depth_simple_pattern() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1576,6 +1624,8 @@ fn relative_depth_allows_deep_nesting_within_base() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1611,6 +1661,8 @@ fn relative_depth_violates_when_too_deep() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1647,6 +1699,8 @@ fn relative_depth_false_uses_absolute_depth() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: false, // Default behavior
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1684,6 +1738,8 @@ fn relative_depth_with_wildcard_in_middle() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1720,6 +1776,8 @@ fn relative_depth_with_double_star_at_start() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1754,6 +1812,8 @@ fn relative_depth_warn_threshold() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1793,6 +1853,8 @@ fn relative_depth_moving_base_works() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1830,6 +1892,8 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
             allow_patterns: vec![],
             file_naming_pattern: None,
             relative_depth: true,
+            file_pattern: None,
+            require_sibling: None,
         }],
         ..Default::default()
     };
@@ -1849,4 +1913,412 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
     let violations = checker.check(&stats);
     // relative = 2 - 2 = 0, within limit of 1
     assert!(violations.is_empty());
+}
+
+// ============================================================================
+// Sibling (Co-location) Tests
+// ============================================================================
+
+#[test]
+fn require_sibling_without_file_pattern_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: None,                               // Missing!
+            require_sibling: Some("{stem}.spec".to_string()), // Set
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("require_sibling"));
+        assert!(msg.contains("file_pattern"));
+    }
+}
+
+#[test]
+fn file_pattern_without_require_sibling_is_allowed() {
+    // file_pattern alone doesn't trigger sibling checking (no-op)
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: None,
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn check_siblings_no_rules_returns_empty() {
+    let config = StructureConfig {
+        max_files: Some(100),
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/foo.ts"),
+        PathBuf::from("src/lib/bar.ts"),
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn check_siblings_file_has_sibling_no_violation() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/foo.ts"),
+        PathBuf::from("src/lib/foo.spec"), // Sibling exists
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn check_siblings_file_missing_sibling_returns_violation() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/foo.ts"), // No foo.test.ts exists
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/lib/foo.ts"));
+    assert_eq!(
+        violations[0].violation_type,
+        ViolationType::MissingSibling {
+            expected_sibling_pattern: "{stem}.spec".to_string()
+        }
+    );
+}
+
+#[test]
+fn check_siblings_dir_pattern_not_matching_skips_check() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/components/**".to_string(), // Only components
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/utils/foo.ts"), // utils, not components
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty()); // No check because dir pattern doesn't match
+}
+
+#[test]
+fn check_siblings_file_pattern_not_matching_skips_check() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.tsx".to_string()), // Only .tsx files
+            require_sibling: Some("{stem}.test.tsx".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/foo.ts"), // .ts, not .tsx
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty()); // No check because file pattern doesn't match
+}
+
+#[test]
+fn check_siblings_multiple_files_mixed_results() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/foo.ts"),
+        PathBuf::from("src/lib/foo.spec"), // foo.ts has sibling
+        PathBuf::from("src/lib/bar.ts"),   // bar.ts missing sibling
+        PathBuf::from("src/lib/baz.ts"),
+        PathBuf::from("src/lib/baz.spec"), // baz.ts has sibling
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/lib/bar.ts"));
+}
+
+#[test]
+fn check_siblings_test_file_not_checked_for_siblings() {
+    // Test that .test.ts files also get checked (they match *.ts)
+    // This is expected behavior - if you want to exclude test files,
+    // use a more specific file_pattern
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()), // Matches ALL *.ts including *.test.ts
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/foo.test.ts"), // This matches *.ts
+    ];
+
+    let violations = checker.check_siblings(&files);
+    // foo.test.ts matches *.ts, so it requires foo.test.spec which doesn't exist
+    assert_eq!(violations.len(), 1);
+}
+
+#[test]
+fn check_siblings_nested_directories() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/components/Button.ts"),
+        PathBuf::from("src/components/Button.spec"),
+        PathBuf::from("src/utils/helpers.ts"), // Missing sibling
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/utils/helpers.ts"));
+}
+
+#[test]
+fn check_siblings_sorted_by_path() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.ts".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/lib/zebra.ts"),
+        PathBuf::from("src/lib/alpha.ts"),
+        PathBuf::from("src/lib/middle.ts"),
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 3);
+    assert_eq!(violations[0].path, PathBuf::from("src/lib/alpha.ts"));
+    assert_eq!(violations[1].path, PathBuf::from("src/lib/middle.ts"));
+    assert_eq!(violations[2].path, PathBuf::from("src/lib/zebra.ts"));
+}
+
+#[test]
+fn derive_sibling_path_basic() {
+    // Test the derive_sibling_path function indirectly through check_siblings
+    // Use .spec for test files so they don't match *.tsx pattern
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*.tsx".to_string()),
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Button.tsx expects Button.spec
+    let files = vec![
+        PathBuf::from("src/Button.tsx"),
+        PathBuf::from("src/Button.spec"), // sibling with different extension
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn derive_sibling_path_different_template() {
+    // Use *Service.java to only match service files, not test files
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("*Service.java".to_string()), // Only matches *Service.java
+            require_sibling: Some("{stem}Test.java".to_string()), // Java style
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // UserService.java expects UserServiceTest.java
+    let files = vec![
+        PathBuf::from("src/UserService.java"),
+        PathBuf::from("src/UserServiceTest.java"), // Doesn't match *Service.java
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn invalid_file_pattern_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            pattern: "src/**".to_string(),
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: Some("[invalid".to_string()), // Invalid glob
+            require_sibling: Some("{stem}.spec".to_string()),
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
 }
