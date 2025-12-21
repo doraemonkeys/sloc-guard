@@ -56,6 +56,27 @@ Location: `src/config/*.rs`, `src/checker/threshold.rs`
 - Remove auto-migration code if any
 ```
 
+### Task 12.10: Rule Matching Overrides Extension Filter
+Location: `src/commands/check.rs`, `src/checker/threshold.rs`
+```
+- Current: Global `content.extensions` filter runs BEFORE rule matching
+- Problem: Rules for extension-less files (Jenkinsfile, Dockerfile) never apply
+- Fix: Change logic to `(matches_extension OR matches_any_rule)`
+- ThresholdChecker::should_process() must check rule patterns, not just extensions
+- Ensures rules can target any file regardless of extension list
+```
+
+### Task 12.11: Relative max_depth for Structure Rules
+Location: `src/checker/structure.rs`, `src/config/structure.rs`
+```
+- Current: max_depth measures absolute depth from scan root
+- Problem: Moving `src/features` to `packages/core/src/features` breaks depth rules
+- Add `relative_depth: bool` field to StructureRule (default: false for backward compat)
+- When true: depth is measured from the matched pattern's base directory
+- Example: pattern="src/features/**", relative_depth=true, max_depth=2
+  → checks depth within src/features/, not from project root
+```
+
 ---
 
 ## Phase 11: Advanced Governance (Pending)
@@ -164,9 +185,10 @@ Location: `src/config/remote_tests.rs`
 | ~~**6. Cleanup**~~ | ~~11.8 Terminology Modernization~~ ✅ |
 | ~~**7. Bug Fixes**~~ | ~~12.1 Structure Rule Priority~~, ~~12.2 Remove Deprecated Baseline~~ ✅ |
 | ~~**8. Config Validation**~~ | ~~12.3 Override Path Validation~~ ✅, ~~12.5 Git Fallback Warning~~ ✅, ~~12.8 FS .gitignore Support~~ ✅, ~~12.9.1 Remote Fetch Warning~~ ✅, ~~12.9.2 Offline Mode~~ ✅, ~~12.9.3 Hash Lock~~ ✅ |
-| **9. State Robustness** | 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation |
-| **10. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |
-| **11. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
-| **12. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
-| **13. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **9. Architecture Fixes** | 12.10 Rule Matching Overrides Extension Filter, 12.11 Relative max_depth |
+| **10. State Robustness** | 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation |
+| **11. State File Cleanup** | ~~12.4 Consolidate State Files~~ ✅, ~~12.6 max_depth Example~~ ✅, 12.7 Remove V1 path_rules |
+| **12. Governance Deep Dive** | 11.1 Naming Convention, 11.2 Co-location, 11.7 Deny Patterns |
+| **13. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
+| **14. Visualization** | 7.1-7.2 HTML Charts/Trends |
 
