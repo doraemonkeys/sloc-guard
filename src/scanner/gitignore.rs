@@ -5,7 +5,8 @@ use std::sync::atomic::AtomicBool;
 use gix::bstr::{BStr, ByteSlice};
 use gix::dir::walk::EmissionMode;
 
-use super::{FileFilter, FileScanner, ScanResult, StructureScanConfig};
+use super::types::{ScanResult, StructureScanConfig};
+use super::{FileFilter, FileScanner};
 use crate::checker::{DirStats, StructureViolation};
 use crate::error::{Result, SlocGuardError};
 
