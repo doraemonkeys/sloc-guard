@@ -17,6 +17,11 @@ pub enum ViolationType {
     MaxDepth,
     /// File type not allowed by allowlist (`allow_extensions`/`allow_patterns`).
     DisallowedFile,
+    /// File matches a deny pattern (`deny_extensions`/`deny_patterns`).
+    DeniedFile {
+        /// The pattern or extension that matched (e.g., ".exe" or "*.bak").
+        pattern_or_extension: String,
+    },
     /// File name does not match required naming pattern (`file_naming_pattern`).
     NamingConvention {
         /// The regex pattern that the filename should have matched.
@@ -89,6 +94,26 @@ impl StructureViolation {
         Self {
             path,
             violation_type: ViolationType::DisallowedFile,
+            actual: 1,
+            limit: 0,
+            is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a denied file violation.
+    #[must_use]
+    pub const fn denied_file(
+        path: PathBuf,
+        rule_pattern: String,
+        pattern_or_extension: String,
+    ) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::DeniedFile {
+                pattern_or_extension,
+            },
             actual: 1,
             limit: 0,
             is_warning: false,

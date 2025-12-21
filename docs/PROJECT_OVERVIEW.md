@@ -46,8 +46,8 @@ ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
-StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, rules, overrides }
-StructureRule { pattern, max_files, max_dirs, max_depth, relative_depth, warn_threshold, allow_extensions, allow_patterns, file_naming_pattern, file_pattern, require_sibling }  // [[structure.rules]]
+StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, deny_extensions, deny_patterns, rules, overrides }
+StructureRule { pattern, max_files, max_dirs, max_depth, relative_depth, warn_threshold, allow_extensions, allow_patterns, deny_extensions, deny_patterns, file_naming_pattern, file_pattern, require_sibling }  // [[structure.rules]]
 StructureOverride { path, max_files, max_dirs, max_depth, reason }  // [[structure.override]] - dir only
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
@@ -66,7 +66,7 @@ CheckResult::Passed { path, stats, limit, override_reason }
 
 // Structure checking
 DirStats { file_count, dir_count, depth }  // immediate children counts + depth from scan root
-ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern }
+ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DeniedFile { pattern_or_extension } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern }
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
 // Explain (rule chain debugging)
@@ -113,8 +113,8 @@ FileReader trait { read(), metadata() }  // IO abstraction for file reading
 RealFileReader  // Production impl using std::fs
 FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }  // IO abstraction for directory traversal
 ScanResult { files, dir_stats, allowlist_violations }  // Unified scan output
-StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules }  // Config for structure-aware scanning
-AllowlistRule { pattern, allow_extensions, allow_patterns, naming_pattern_str }  // Directory allowlist matching
+StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules, global_deny_extensions, global_deny_patterns }  // Config for structure-aware scanning
+AllowlistRule { pattern, allow_extensions, allow_patterns, deny_extensions, deny_patterns, naming_pattern_str }  // Directory allowlist matching
 CompositeScanner  // Production impl with git/non-git fallback
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
 CheckOptions { args, cli, paths, config, ctx, cache, baseline, project_root }  // Encapsulates run_check_with_context params

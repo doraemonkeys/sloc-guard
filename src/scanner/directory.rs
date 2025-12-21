@@ -216,11 +216,36 @@ impl<'a> StructureScanState<'a> {
             return;
         };
 
+        // 1. Check global deny patterns first (applies to all files)
+        if let Some(matched) = cfg.file_matches_global_deny(abs_path) {
+            self.result
+                .allowlist_violations
+                .push(StructureViolation::denied_file(
+                    path.to_path_buf(),
+                    "global".to_string(),
+                    matched,
+                ));
+            return; // Denied files don't need further checks
+        }
+
+        // 2. Check per-rule deny and allowlist patterns
         let Some(rule) = cfg.find_matching_allowlist_rule(parent) else {
             return;
         };
 
-        // Check allowlist (extensions/patterns) - only if configured
+        // 2a. Check per-rule deny patterns
+        if let Some(matched) = rule.file_matches_deny(abs_path) {
+            self.result
+                .allowlist_violations
+                .push(StructureViolation::denied_file(
+                    path.to_path_buf(),
+                    rule.pattern.clone(),
+                    matched,
+                ));
+            return; // Denied files don't need further checks
+        }
+
+        // 2b. Check allowlist (extensions/patterns) - only if configured
         if rule.has_allowlist() && !rule.file_matches(abs_path) {
             self.result
                 .allowlist_violations
@@ -230,7 +255,7 @@ impl<'a> StructureScanState<'a> {
                 ));
         }
 
-        // Check naming convention
+        // 2c. Check naming convention
         if !rule.filename_matches_naming_pattern(abs_path)
             && let Some(ref pattern_str) = rule.naming_pattern_str
         {

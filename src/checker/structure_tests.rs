@@ -55,6 +55,8 @@ fn checker_enabled_with_rules() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -173,6 +175,8 @@ fn rule_overrides_global_limit() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -209,6 +213,8 @@ fn rule_inherits_unset_limit_from_global() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -308,6 +314,8 @@ fn invalid_rule_pattern_returns_error() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -435,6 +443,8 @@ fn warn_threshold_rule_overrides_global() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -544,6 +554,8 @@ fn rule_can_set_unlimited_to_override_global() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -611,6 +623,8 @@ fn invalid_rule_max_files_returns_error() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -638,6 +652,8 @@ fn invalid_rule_max_dirs_returns_error() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -714,6 +730,8 @@ fn override_takes_priority_over_rules() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         overrides: vec![StructureOverride {
             path: "src/legacy".to_string(),
@@ -1074,6 +1092,8 @@ fn rule_overrides_global_depth_limit() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1146,6 +1166,8 @@ fn invalid_rule_max_depth_returns_error() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1192,6 +1214,8 @@ fn checker_enabled_with_allowlist_rule() {
             relative_depth: false,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1301,6 +1325,8 @@ fn multiple_matching_rules_last_match_wins() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
             StructureRule {
                 pattern: "src/generated/**".to_string(),
@@ -1314,6 +1340,8 @@ fn multiple_matching_rules_last_match_wins() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
         ],
         ..Default::default()
@@ -1353,6 +1381,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
             StructureRule {
                 pattern: "src/core/**".to_string(),
@@ -1366,6 +1396,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
         ],
         ..Default::default()
@@ -1405,6 +1437,8 @@ fn three_rules_last_matching_wins() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
             StructureRule {
                 pattern: "src/**".to_string(),
@@ -1418,6 +1452,8 @@ fn three_rules_last_matching_wins() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
             StructureRule {
                 pattern: "src/lib/**".to_string(),
@@ -1431,6 +1467,8 @@ fn three_rules_last_matching_wins() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
         ],
         ..Default::default()
@@ -1469,6 +1507,8 @@ fn non_matching_rules_skipped_in_priority() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
             StructureRule {
                 pattern: "tests/**".to_string(), // Does NOT match src/lib
@@ -1482,6 +1522,8 @@ fn non_matching_rules_skipped_in_priority() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
         ],
         ..Default::default()
@@ -1522,6 +1564,8 @@ fn explain_reports_last_matching_rule() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
             StructureRule {
                 pattern: "src/lib/**".to_string(),
@@ -1535,6 +1579,8 @@ fn explain_reports_last_matching_rule() {
                 relative_depth: false,
                 file_pattern: None,
                 require_sibling: None,
+                deny_extensions: vec![],
+                deny_patterns: vec![],
             },
         ],
         ..Default::default()
@@ -1588,6 +1634,8 @@ fn calculate_base_depth_simple_pattern() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1626,6 +1674,8 @@ fn relative_depth_allows_deep_nesting_within_base() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1663,6 +1713,8 @@ fn relative_depth_violates_when_too_deep() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1701,6 +1753,8 @@ fn relative_depth_false_uses_absolute_depth() {
             relative_depth: false, // Default behavior
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1740,6 +1794,8 @@ fn relative_depth_with_wildcard_in_middle() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1778,6 +1834,8 @@ fn relative_depth_with_double_star_at_start() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1814,6 +1872,8 @@ fn relative_depth_warn_threshold() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1855,6 +1915,8 @@ fn relative_depth_moving_base_works() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1894,6 +1956,8 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
             relative_depth: true,
             file_pattern: None,
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1934,6 +1998,8 @@ fn require_sibling_without_file_pattern_returns_error() {
             relative_depth: false,
             file_pattern: None,                               // Missing!
             require_sibling: Some("{stem}.spec".to_string()), // Set
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -1963,6 +2029,8 @@ fn file_pattern_without_require_sibling_is_allowed() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2003,6 +2071,8 @@ fn check_siblings_file_has_sibling_no_violation() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2032,6 +2102,8 @@ fn check_siblings_file_missing_sibling_returns_violation() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2067,6 +2139,8 @@ fn check_siblings_dir_pattern_not_matching_skips_check() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2095,6 +2169,8 @@ fn check_siblings_file_pattern_not_matching_skips_check() {
             relative_depth: false,
             file_pattern: Some("*.tsx".to_string()), // Only .tsx files
             require_sibling: Some("{stem}.test.tsx".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2123,6 +2199,8 @@ fn check_siblings_multiple_files_mixed_results() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2159,6 +2237,8 @@ fn check_siblings_test_file_not_checked_for_siblings() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()), // Matches ALL *.ts including *.test.ts
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2188,6 +2268,8 @@ fn check_siblings_nested_directories() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2219,6 +2301,8 @@ fn check_siblings_sorted_by_path() {
             relative_depth: false,
             file_pattern: Some("*.ts".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2254,6 +2338,8 @@ fn derive_sibling_path_basic() {
             relative_depth: false,
             file_pattern: Some("*.tsx".to_string()),
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2285,6 +2371,8 @@ fn derive_sibling_path_different_template() {
             relative_depth: false,
             file_pattern: Some("*Service.java".to_string()), // Only matches *Service.java
             require_sibling: Some("{stem}Test.java".to_string()), // Java style
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -2315,6 +2403,8 @@ fn invalid_file_pattern_returns_error() {
             relative_depth: false,
             file_pattern: Some("[invalid".to_string()), // Invalid glob
             require_sibling: Some("{stem}.spec".to_string()),
+            deny_extensions: vec![],
+            deny_patterns: vec![],
         }],
         ..Default::default()
     };

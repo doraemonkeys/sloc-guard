@@ -364,6 +364,16 @@ pub struct StructureConfig {
     #[serde(default)]
     pub count_exclude: Vec<String>,
 
+    /// Global deny list of file extensions (with leading dot, e.g., ".exe", ".dll").
+    /// Files matching these extensions trigger immediate violations.
+    #[serde(default)]
+    pub deny_extensions: Vec<String>,
+
+    /// Global deny list of file patterns (glob patterns, e.g., "*.bak", "temp_*").
+    /// Files matching these patterns trigger immediate violations.
+    #[serde(default)]
+    pub deny_patterns: Vec<String>,
+
     /// Per-directory rules that override global limits.
     #[serde(default)]
     pub rules: Vec<StructureRule>,
@@ -416,6 +426,18 @@ pub struct StructureRule {
     /// Combined with `allow_extensions` using OR logic.
     #[serde(default)]
     pub allow_patterns: Vec<String>,
+
+    /// Deny list of file extensions (with leading dot, e.g., ".exe", ".dll").
+    /// Files matching these extensions trigger immediate violations.
+    /// Checked BEFORE allowlist - if denied, file is rejected regardless of allowlist.
+    #[serde(default)]
+    pub deny_extensions: Vec<String>,
+
+    /// Deny list of file patterns (glob patterns, e.g., "*.bak", "temp_*").
+    /// Files matching these patterns trigger immediate violations.
+    /// Checked BEFORE allowlist - if denied, file is rejected regardless of allowlist.
+    #[serde(default)]
+    pub deny_patterns: Vec<String>,
 
     /// Regex pattern for filename validation.
     /// Files not matching this pattern trigger a `NamingConvention` violation.

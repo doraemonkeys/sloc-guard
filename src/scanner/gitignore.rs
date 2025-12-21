@@ -395,31 +395,52 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                 // gix dirwalk only emits files, so we must count subdirectories this way
                 self.register_directory_chain(parent);
 
-                // Check allowlist and naming violations
+                // Check deny patterns and allowlist violations
                 if let Some(cfg) = self.structure_config {
-                    // Convert to absolute path for allowlist matching
+                    // Convert to absolute path for pattern matching
                     let abs_parent = self.workdir.join(parent);
                     let abs_file = self.workdir.join(path_ref);
-                    if let Some(rule) = cfg.find_matching_allowlist_rule(&abs_parent) {
-                        // Check allowlist (extensions/patterns) - only if configured
-                        if rule.has_allowlist() && !rule.file_matches(&abs_file) {
-                            self.allowlist_violations
-                                .push(StructureViolation::disallowed_file(
-                                    path.clone().into_owned(),
-                                    rule.pattern.clone(),
-                                ));
-                        }
 
-                        // Check naming convention
-                        if !rule.filename_matches_naming_pattern(&abs_file)
-                            && let Some(ref pattern_str) = rule.naming_pattern_str
-                        {
+                    // 1. Check global deny patterns first (applies to all files)
+                    if let Some(matched) = cfg.file_matches_global_deny(&abs_file) {
+                        self.allowlist_violations
+                            .push(StructureViolation::denied_file(
+                                path.clone().into_owned(),
+                                "global".to_string(),
+                                matched,
+                            ));
+                    } else if let Some(rule) = cfg.find_matching_allowlist_rule(&abs_parent) {
+                        // 2. Check per-rule deny patterns
+                        if let Some(matched) = rule.file_matches_deny(&abs_file) {
                             self.allowlist_violations
-                                .push(StructureViolation::naming_convention(
+                                .push(StructureViolation::denied_file(
                                     path.clone().into_owned(),
                                     rule.pattern.clone(),
-                                    pattern_str.clone(),
+                                    matched,
                                 ));
+                        } else {
+                            // 3. Check allowlist (extensions/patterns) - only if configured
+                            if rule.has_allowlist() && !rule.file_matches(&abs_file) {
+                                self.allowlist_violations.push(
+                                    StructureViolation::disallowed_file(
+                                        path.clone().into_owned(),
+                                        rule.pattern.clone(),
+                                    ),
+                                );
+                            }
+
+                            // 4. Check naming convention
+                            if !rule.filename_matches_naming_pattern(&abs_file)
+                                && let Some(ref pattern_str) = rule.naming_pattern_str
+                            {
+                                self.allowlist_violations.push(
+                                    StructureViolation::naming_convention(
+                                        path.clone().into_owned(),
+                                        rule.pattern.clone(),
+                                        pattern_str.clone(),
+                                    ),
+                                );
+                            }
                         }
                     }
                 }

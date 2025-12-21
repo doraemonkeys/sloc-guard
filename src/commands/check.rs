@@ -493,6 +493,17 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
                 .unwrap_or("unknown");
             Some(format!("structure: disallowed file (rule: {rule})"))
         }
+        ViolationType::DeniedFile {
+            pattern_or_extension,
+        } => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("global");
+            Some(format!(
+                "structure: denied file (matched: {pattern_or_extension}, rule: {rule})"
+            ))
+        }
         ViolationType::NamingConvention { expected_pattern } => {
             let rule = violation
                 .triggering_rule_pattern

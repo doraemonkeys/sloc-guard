@@ -286,7 +286,9 @@ impl CheckContext {
             || config.structure.max_dirs.is_some()
             || config.structure.max_depth.is_some()
             || !config.structure.rules.is_empty()
-            || !config.structure.overrides.is_empty();
+            || !config.structure.overrides.is_empty()
+            || !config.structure.deny_extensions.is_empty()
+            || !config.structure.deny_patterns.is_empty();
 
         if !has_structure_config {
             return Ok(None);
@@ -295,14 +297,18 @@ impl CheckContext {
         // Build allowlist rules from structure.rules
         let mut allowlist_rules = Vec::new();
         for rule in &config.structure.rules {
-            // Only include rules that have allowlists or naming patterns
+            // Include rules that have allowlists, denylists, or naming patterns
             if !rule.allow_extensions.is_empty()
                 || !rule.allow_patterns.is_empty()
+                || !rule.deny_extensions.is_empty()
+                || !rule.deny_patterns.is_empty()
                 || rule.file_naming_pattern.is_some()
             {
                 let allowlist_rule = AllowlistRuleBuilder::new(rule.pattern.clone())
                     .with_extensions(rule.allow_extensions.clone())
                     .with_patterns(rule.allow_patterns.clone())
+                    .with_deny_extensions(rule.deny_extensions.clone())
+                    .with_deny_patterns(rule.deny_patterns.clone())
                     .with_naming_pattern(rule.file_naming_pattern.clone())
                     .build()?;
                 allowlist_rules.push(allowlist_rule);
@@ -313,6 +319,8 @@ impl CheckContext {
             &config.structure.count_exclude,
             exclude_patterns,
             allowlist_rules,
+            config.structure.deny_extensions.clone(),
+            &config.structure.deny_patterns,
         )?;
 
         Ok(Some(structure_scan_config))
