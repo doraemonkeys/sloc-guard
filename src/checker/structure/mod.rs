@@ -425,5 +425,4 @@ impl StructureChecker {
 }
 
 #[cfg(test)]
-#[path = "tests.rs"]
 mod tests;
