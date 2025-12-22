@@ -16,8 +16,8 @@ pattern = "**/*tests.rs"
 max_lines = 1000
 skip_comments = true
 skip_blank = false
-warn_threshold = 0.8
-# warn_threshold = 0.9
+# warn_threshold = 0.8
+warn_threshold = 0.9
 
 [structure]
 max_files = 20
