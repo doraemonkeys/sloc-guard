@@ -301,21 +301,61 @@ impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
                     ..Default::default()
                 });
 
-            // If this is a new directory, increment parent's dir_count
-            if !is_count_excluded
-                && self.seen_dirs.insert(current.clone())
-                && depth > 0
-                && let Some(parent) = current.parent()
-            {
-                let parent_depth = depth - 1;
-                let parent_stats =
-                    self.dir_stats
-                        .entry(parent.to_path_buf())
-                        .or_insert_with(|| DirStats {
-                            depth: parent_depth,
-                            ..Default::default()
-                        });
-                parent_stats.dir_count += 1;
+            // Check deny_dirs patterns for this directory (only on first visit)
+            if self.seen_dirs.insert(current.clone()) {
+                // Check directory-only deny patterns (patterns ending with `/`)
+                if let Some(cfg) = self.structure_config
+                    && let Some(pattern) = cfg.dir_matches_global_deny(&current)
+                {
+                    self.allowlist_violations
+                        .push(StructureViolation::denied_directory(
+                            current.clone(),
+                            "global".to_string(),
+                            pattern,
+                        ));
+                }
+
+                // Check deny_dirs (basename-only matching from structure.deny_dirs)
+                if let Some(cfg) = self.structure_config
+                    && let Some(pattern) = cfg.dir_matches_global_deny_basename(&current)
+                {
+                    self.allowlist_violations
+                        .push(StructureViolation::denied_directory(
+                            current.clone(),
+                            "global".to_string(),
+                            pattern,
+                        ));
+                }
+
+                // Check per-rule deny_dirs
+                if let Some(cfg) = self.structure_config
+                    && let Some(parent) = current.parent()
+                    && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
+                    && let Some(pattern) = rule.dir_matches_deny(&current)
+                {
+                    self.allowlist_violations
+                        .push(StructureViolation::denied_directory(
+                            current.clone(),
+                            rule.scope.clone(),
+                            pattern,
+                        ));
+                }
+
+                // If this is a new directory, increment parent's dir_count
+                if !is_count_excluded
+                    && depth > 0
+                    && let Some(parent) = current.parent()
+                {
+                    let parent_depth = depth - 1;
+                    let parent_stats =
+                        self.dir_stats
+                            .entry(parent.to_path_buf())
+                            .or_insert_with(|| DirStats {
+                                depth: parent_depth,
+                                ..Default::default()
+                            });
+                    parent_stats.dir_count += 1;
+                }
             }
 
             // Move to parent
