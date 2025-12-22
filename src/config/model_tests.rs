@@ -331,3 +331,155 @@ fn config_deserialize_without_version() {
 fn config_version_constant_is_two() {
     assert_eq!(CONFIG_VERSION, "2");
 }
+
+// =============================================================================
+// deny_files and deny_dirs Tests
+// =============================================================================
+
+#[test]
+fn config_deserialize_structure_deny_files() {
+    let toml_str = r#"
+        [structure]
+        deny_files = ["*.bak", "secrets.*", ".DS_Store"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(
+        config.structure.deny_files,
+        vec!["*.bak", "secrets.*", ".DS_Store"]
+    );
+}
+
+#[test]
+fn config_deserialize_structure_deny_dirs() {
+    let toml_str = r#"
+        [structure]
+        deny_dirs = ["__pycache__", "node_modules", ".git"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(
+        config.structure.deny_dirs,
+        vec!["__pycache__", "node_modules", ".git"]
+    );
+}
+
+#[test]
+fn config_deserialize_structure_deny_files_and_dirs_combined() {
+    let toml_str = r#"
+        [structure]
+        max_files = 50
+        deny_files = ["*.bak", "secrets.*"]
+        deny_dirs = ["__pycache__", "node_modules"]
+        deny_extensions = ["dll", "exe"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.max_files, Some(50));
+    assert_eq!(config.structure.deny_files, vec!["*.bak", "secrets.*"]);
+    assert_eq!(
+        config.structure.deny_dirs,
+        vec!["__pycache__", "node_modules"]
+    );
+    assert_eq!(config.structure.deny_extensions, vec!["dll", "exe"]);
+}
+
+#[test]
+fn config_deserialize_structure_rule_deny_files() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+        deny_files = ["util.rs", "helper.rs"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules.len(), 1);
+    assert_eq!(
+        config.structure.rules[0].deny_files,
+        vec!["util.rs", "helper.rs"]
+    );
+}
+
+#[test]
+fn config_deserialize_structure_rule_deny_dirs() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+        deny_dirs = ["temp_*", "__snapshots__"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules.len(), 1);
+    assert_eq!(
+        config.structure.rules[0].deny_dirs,
+        vec!["temp_*", "__snapshots__"]
+    );
+}
+
+#[test]
+fn config_deserialize_structure_rule_deny_files_and_dirs() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "tests/**"
+        max_files = 100
+        deny_files = ["common.rs"]
+        deny_dirs = ["fixtures"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules.len(), 1);
+    let rule = &config.structure.rules[0];
+    assert_eq!(rule.scope, "tests/**");
+    assert_eq!(rule.max_files, Some(100));
+    assert_eq!(rule.deny_files, vec!["common.rs"]);
+    assert_eq!(rule.deny_dirs, vec!["fixtures"]);
+}
+
+#[test]
+fn config_deserialize_deny_file_patterns_alias() {
+    // Test backward compatibility: deny_file_patterns should be aliased to deny_files
+    let toml_str = r#"
+        [structure]
+        deny_file_patterns = ["*.bak", "temp_*"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.deny_files, vec!["*.bak", "temp_*"]);
+}
+
+#[test]
+fn config_deserialize_rule_deny_file_patterns_alias() {
+    // Test backward compatibility at rule level
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+        deny_file_patterns = ["backup*"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules[0].deny_files, vec!["backup*"]);
+}
+
+#[test]
+fn structure_config_deny_files_default_empty() {
+    let config = StructureConfig::default();
+    assert!(config.deny_files.is_empty());
+    assert!(config.deny_dirs.is_empty());
+}
+
+#[test]
+fn config_deserialize_structure_all_deny_types() {
+    let toml_str = r#"
+        [structure]
+        deny_extensions = [".exe", ".dll"]
+        deny_patterns = ["*.bak"]
+        deny_files = ["secrets.*"]
+        deny_dirs = ["__pycache__"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.deny_extensions, vec![".exe", ".dll"]);
+    assert_eq!(config.structure.deny_patterns, vec!["*.bak"]);
+    assert_eq!(config.structure.deny_files, vec!["secrets.*"]);
+    assert_eq!(config.structure.deny_dirs, vec!["__pycache__"]);
+}

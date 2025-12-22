@@ -27,51 +27,51 @@ count_exclude = ["*_tests.rs"]
 
 
 # 在 src 目录下禁止特定文件名
-# [[structure.rules]]
-# scope = "src/**"
-# deny_files = [
-#     # 按类型组织 (反模式)
-#     "types.rs",
-#     "enums.rs",
-#     "structs.rs",
-#     "traits.rs",
-#     "impls.rs",
-#     "constants.rs",
-#     "consts.rs",
-#     "errors.rs",
-#     "models.rs",
-#     "entities.rs",
-#     "dtos.rs",
-#     "definitions.rs",
-#     "functions.rs",
-#     "methods.rs",
-#     "macros.rs",
+[[structure.rules]]
+scope = "src/**"
+deny_files = [
+    # 按类型组织 (反模式)
+    "types.rs",
+    "enums.rs",
+    "structs.rs",
+    "traits.rs",
+    "impls.rs",
+    "constants.rs",
+    "consts.rs",
+    "errors.rs",
+    "models.rs",
+    "entities.rs",
+    "dtos.rs",
+    "definitions.rs",
+    "functions.rs",
+    "methods.rs",
+    "macros.rs",
 
-#     # 通用/杂项 (无明确职责)
-#     "common.rs",
-#     "commons.rs",
-#     "helper.rs",
-#     "helpers.rs",
-#     "utils.rs",
-#     "util.rs",
-#     "utilities.rs",
-#     "misc.rs",
-#     "shared.rs",
-#     "general.rs",
-#     "global.rs",
-#     "globals.rs",
-#     "support.rs",
-#     "extras.rs",
+    # 通用/杂项 (无明确职责)
+    "common.rs",
+    "commons.rs",
+    "helper.rs",
+    "helpers.rs",
+    "utils.rs",
+    "util.rs",
+    "utilities.rs",
+    "misc.rs",
+    "shared.rs",
+    "general.rs",
+    "global.rs",
+    "globals.rs",
+    "support.rs",
+    "extras.rs",
 
-#     # 测试辅助
-#     "tests.rs",
-#     "tests_helper.rs",
-#     "tests_utils.rs",
-#     "tests_macros.rs",
-#     "test_utils.rs",
-#     "test_helper.rs",
-#     "test_helpers.rs",
-#     "test_common.rs",
-#     "mocks.rs",
-#     "fixtures.rs",
-# ]
+    # 测试辅助
+    "tests.rs",
+    "tests_helper.rs",
+    "tests_utils.rs",
+    "tests_macros.rs",
+    "test_utils.rs",
+    "test_helper.rs",
+    "test_helpers.rs",
+    "test_common.rs",
+    "mocks.rs",
+    "fixtures.rs",
+]

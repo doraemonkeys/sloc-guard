@@ -111,8 +111,8 @@ FileReader trait { read(), metadata() }  // IO abstraction for file reading
 RealFileReader  // Production impl using std::fs
 FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }  // IO abstraction for directory traversal
 ScanResult { files, dir_stats, allowlist_violations }  // Unified scan output
-StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules, global_deny_extensions, global_deny_patterns, global_deny_file_patterns }  // Config for structure-aware scanning
-AllowlistRule { pattern, allow_extensions, allow_patterns, deny_extensions, deny_patterns, deny_file_patterns, naming_pattern_str }  // Directory allowlist matching
+StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules, global_deny_extensions, global_deny_patterns, global_deny_files }  // Config for structure-aware scanning
+AllowlistRule { scope, allow_extensions, allow_patterns, deny_extensions, deny_patterns, deny_files, naming_pattern_str }  // Directory allowlist matching
 CompositeScanner  // Production impl with git/non-git fallback
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
 CheckOptions { args, cli, paths, config, ctx, cache, baseline, project_root }  // Encapsulates run_check_with_context params
