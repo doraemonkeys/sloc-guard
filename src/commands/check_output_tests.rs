@@ -151,4 +151,3 @@ fn structure_violation_to_check_result_naming_convention() {
         _ => panic!("Expected Failed result"),
     }
 }
-

@@ -180,4 +180,3 @@ fn validate_override_paths_suffix_matching() {
     let err = result.unwrap_err().to_string();
     assert!(err.contains("legacy"));
 }
-

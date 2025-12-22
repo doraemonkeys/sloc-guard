@@ -102,4 +102,3 @@ pub(crate) fn filter_by_git_diff(
 #[cfg(test)]
 #[path = "check_git_diff_tests.rs"]
 mod tests;
-

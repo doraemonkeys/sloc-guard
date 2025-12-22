@@ -116,4 +116,3 @@ fn process_file_valid_rust_file() {
     assert_eq!(file_stats.path, path);
     assert_eq!(file_stats.language, "Rust");
 }
-

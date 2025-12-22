@@ -73,5 +73,14 @@ pub trait FileScanner: Send + Sync {
 }
 
 #[cfg(test)]
-#[path = "mod_tests.rs"]
-mod tests;
+mod composite_tests;
+#[cfg(test)]
+mod deny_pattern_tests;
+#[cfg(test)]
+mod directory_tests;
+#[cfg(test)]
+mod naming_pattern_tests;
+#[cfg(test)]
+mod structure_scan_tests;
+#[cfg(test)]
+mod types_tests;

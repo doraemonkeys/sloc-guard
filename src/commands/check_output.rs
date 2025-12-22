@@ -1,8 +1,8 @@
 use crate::checker::{CheckResult, StructureViolation, ViolationType};
 use crate::counter::LineStats;
 use crate::output::{
-    HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
-    SarifFormatter, TextFormatter,
+    HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter, SarifFormatter,
+    TextFormatter,
 };
 
 pub(crate) fn format_output(
@@ -118,4 +118,3 @@ pub(crate) fn structure_violation_to_check_result(violation: &StructureViolation
 #[cfg(test)]
 #[path = "check_output_tests.rs"]
 mod tests;
-

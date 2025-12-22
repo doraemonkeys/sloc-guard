@@ -99,4 +99,3 @@ fn parse_diff_range_commit_hash() {
         }
     );
 }
-
