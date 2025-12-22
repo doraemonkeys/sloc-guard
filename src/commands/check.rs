@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -7,29 +6,22 @@ use rayon::prelude::*;
 use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
-use crate::checker::{
-    CheckResult, Checker, DirStats, StructureViolation, ThresholdChecker, ViolationType,
-};
+use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
-use crate::config::{ContentOverride, StructureOverride};
-use crate::counter::LineStats;
-use crate::git::GitDiff;
-use crate::language::LanguageRegistry;
-use crate::output::{
-    FileStatistics, HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
-    ProjectStatistics, SarifFormatter, ScanProgress, StatsFormatter, StatsJsonFormatter,
-    TextFormatter,
-};
-use crate::path_utils::path_matches_override;
+use crate::output::{ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter};
 use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::check_baseline_ops::{
     apply_baseline_comparison, load_baseline, load_baseline_optional, update_baseline_from_results,
 };
+use super::check_git_diff::filter_by_git_diff;
+use super::check_output::{format_output, structure_violation_to_check_result};
+use super::check_processing::process_file_for_check;
+use super::check_validation::validate_override_paths;
 use super::context::{
-    CheckContext, FileReader, color_choice_to_mode, load_cache, load_config,
-    process_file_with_cache, resolve_scan_paths, save_cache, write_output,
+    CheckContext, color_choice_to_mode, load_cache, load_config, resolve_scan_paths, save_cache,
+    write_output,
 };
 
 /// Options for running a check with injected context.
@@ -284,7 +276,7 @@ pub(crate) fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i
 ///
 /// - If `--max-files`, `--max-dirs`, or `--max-depth` is specified, paths must be explicitly provided
 /// - If no paths are provided and no structure params, defaults to current directory
-fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<std::path::PathBuf>> {
+pub(crate) fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<PathBuf>> {
     let has_structure_params =
         args.max_files.is_some() || args.max_dirs.is_some() || args.max_depth.is_some();
 
@@ -295,7 +287,7 @@ fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<std::path::
             ));
         }
         // Default to current directory when no paths and no structure params
-        Ok(vec![std::path::PathBuf::from(".")])
+        Ok(vec![PathBuf::from(".")])
     } else {
         Ok(args.paths.clone())
     }
@@ -332,301 +324,6 @@ pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args
     }
 }
 
-/// Represents a parsed diff range (base..target).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DiffRange {
-    pub base: String,
-    pub target: String,
-}
-
-/// Parse a diff reference string into a `DiffRange`.
-///
-/// Supports:
-/// - `ref` → base=ref, target=HEAD
-/// - `base..target` → base=base, target=target
-/// - `base..` → base=base, target=HEAD
-///
-/// # Errors
-/// Returns an error if:
-/// - Input starts with `..` (no base specified)
-/// - Input is empty
-pub(crate) fn parse_diff_range(diff_ref: &str) -> crate::Result<DiffRange> {
-    if diff_ref.is_empty() {
-        return Err(crate::SlocGuardError::Config(
-            "--diff requires a git reference".to_string(),
-        ));
-    }
-
-    // Check for range syntax (contains "..")
-    if let Some(pos) = diff_ref.find("..") {
-        let base = &diff_ref[..pos];
-        let target = &diff_ref[pos + 2..];
-
-        // Error if no base specified
-        if base.is_empty() {
-            return Err(crate::SlocGuardError::Config(
-                "--diff range requires a base reference (e.g., 'main..feature', not '..feature')"
-                    .to_string(),
-            ));
-        }
-
-        // If target is empty, default to HEAD
-        let target = if target.is_empty() {
-            "HEAD".to_string()
-        } else {
-            target.to_string()
-        };
-
-        Ok(DiffRange {
-            base: base.to_string(),
-            target,
-        })
-    } else {
-        // Single reference: compare to HEAD
-        Ok(DiffRange {
-            base: diff_ref.to_string(),
-            target: "HEAD".to_string(),
-        })
-    }
-}
-
-fn filter_by_git_diff(
-    files: Vec<std::path::PathBuf>,
-    diff_ref: Option<&str>,
-    staged_only: bool,
-    project_root: &Path,
-) -> crate::Result<Vec<std::path::PathBuf>> {
-    if !staged_only && diff_ref.is_none() {
-        return Ok(files);
-    }
-
-    // Discover git repository from project root
-    let git_diff = GitDiff::discover(project_root)?;
-    let changed_files = if staged_only {
-        git_diff.get_staged_files()?
-    } else {
-        let range = parse_diff_range(diff_ref.expect("diff_ref checked above"))?;
-        git_diff.get_changed_files_range(&range.base, &range.target)?
-    };
-
-    // Canonicalize paths for comparison
-    let changed_canonical: std::collections::HashSet<_> = changed_files
-        .iter()
-        .filter_map(|p| p.canonicalize().ok())
-        .collect();
-
-    // Filter to only include changed files
-    let filtered: Vec<_> = files
-        .into_iter()
-        .filter(|f| {
-            f.canonicalize()
-                .ok()
-                .is_some_and(|canon| changed_canonical.contains(&canon))
-        })
-        .collect();
-
-    Ok(filtered)
-}
-
-pub(crate) fn process_file_for_check(
-    file_path: &Path,
-    registry: &LanguageRegistry,
-    checker: &ThresholdChecker,
-    cache: &Mutex<Cache>,
-    reader: &dyn FileReader,
-) -> Option<(CheckResult, FileStatistics)> {
-    let (stats, language) = process_file_with_cache(file_path, registry, cache, reader)?;
-    let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
-    let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
-    let check_result = checker.check(file_path, &effective_stats);
-    let file_stats = FileStatistics {
-        path: file_path.to_path_buf(),
-        stats,
-        language,
-    };
-    Some((check_result, file_stats))
-}
-
-#[must_use]
-pub(crate) fn compute_effective_stats(
-    stats: &LineStats,
-    skip_comments: bool,
-    skip_blank: bool,
-) -> LineStats {
-    let mut effective = stats.clone();
-
-    // If not skipping comments, add them to code count
-    if !skip_comments {
-        effective.code += effective.comment;
-        effective.comment = 0;
-    }
-
-    // If not skipping blanks, add them to code count
-    if !skip_blank {
-        effective.code += effective.blank;
-        effective.blank = 0;
-    }
-
-    effective
-}
-
-/// Convert a structure violation to a check result for unified output.
-fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckResult {
-    // Create synthetic LineStats representing the violation
-    // We use 'code' to represent the actual count for display purposes
-    let stats = LineStats {
-        total: violation.actual,
-        code: violation.actual,
-        comment: 0,
-        blank: 0,
-        ignored: 0,
-    };
-
-    let override_reason = match &violation.violation_type {
-        ViolationType::FileCount => Some("structure: files count exceeded".to_string()),
-        ViolationType::DirCount => Some("structure: subdirs count exceeded".to_string()),
-        ViolationType::MaxDepth => Some("structure: depth count exceeded".to_string()),
-        ViolationType::DisallowedFile => {
-            let rule = violation
-                .triggering_rule_pattern
-                .as_deref()
-                .unwrap_or("unknown");
-            Some(format!("structure: disallowed file (rule: {rule})"))
-        }
-        ViolationType::DeniedFile {
-            pattern_or_extension,
-        } => {
-            let rule = violation
-                .triggering_rule_pattern
-                .as_deref()
-                .unwrap_or("global");
-            Some(format!(
-                "structure: denied file (matched: {pattern_or_extension}, rule: {rule})"
-            ))
-        }
-        ViolationType::NamingConvention { expected_pattern } => {
-            let rule = violation
-                .triggering_rule_pattern
-                .as_deref()
-                .unwrap_or("unknown");
-            Some(format!(
-                "structure: naming convention violation (expected: {expected_pattern}, rule: {rule})"
-            ))
-        }
-        ViolationType::MissingSibling {
-            expected_sibling_pattern,
-        } => {
-            let rule = violation
-                .triggering_rule_pattern
-                .as_deref()
-                .unwrap_or("unknown");
-            Some(format!(
-                "structure: missing sibling (expected: {expected_sibling_pattern}, rule: {rule})"
-            ))
-        }
-        ViolationType::DeniedDirectory { pattern } => {
-            let rule = violation
-                .triggering_rule_pattern
-                .as_deref()
-                .unwrap_or("global");
-            Some(format!(
-                "structure: denied directory (matched: {pattern}, rule: {rule})"
-            ))
-        }
-    };
-
-    if violation.is_warning {
-        CheckResult::Warning {
-            path: violation.path.clone(),
-            stats,
-            limit: violation.limit,
-            override_reason,
-            suggestions: None,
-        }
-    } else {
-        CheckResult::Failed {
-            path: violation.path.clone(),
-            stats,
-            limit: violation.limit,
-            override_reason,
-            suggestions: None,
-        }
-    }
-}
-
-pub(crate) fn format_output(
-    format: OutputFormat,
-    results: &[CheckResult],
-    color_mode: crate::output::ColorMode,
-    verbose: u8,
-    show_suggestions: bool,
-) -> crate::Result<String> {
-    match format {
-        OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose)
-            .with_suggestions(show_suggestions)
-            .format(results),
-        OutputFormat::Json => JsonFormatter::new()
-            .with_suggestions(show_suggestions)
-            .format(results),
-        OutputFormat::Sarif => SarifFormatter::new()
-            .with_suggestions(show_suggestions)
-            .format(results),
-        OutputFormat::Markdown => MarkdownFormatter::new()
-            .with_suggestions(show_suggestions)
-            .format(results),
-        OutputFormat::Html => HtmlFormatter::new()
-            .with_suggestions(show_suggestions)
-            .format(results),
-    }
-}
-
-/// Validate that override paths are correctly configured.
-///
-/// - `ContentOverride` paths must point to files, not directories
-/// - `StructureOverride` paths must point to directories, not files
-///
-/// Returns an error if any override path is misconfigured.
-pub(crate) fn validate_override_paths(
-    content_overrides: &[ContentOverride],
-    structure_overrides: &[StructureOverride],
-    files: &[PathBuf],
-    directories: &HashMap<PathBuf, DirStats>,
-) -> crate::Result<()> {
-    // Check ContentOverrides don't match directories
-    for (i, ovr) in content_overrides.iter().enumerate() {
-        for dir_path in directories.keys() {
-            if path_matches_override(dir_path, &ovr.path) {
-                return Err(crate::SlocGuardError::Config(format!(
-                    "content.override[{}] path '{}' matches directory '{}', \
-                     but content overrides only apply to files. \
-                     Use [[structure.override]] for directory overrides.",
-                    i,
-                    ovr.path,
-                    dir_path.display()
-                )));
-            }
-        }
-    }
-
-    // Check StructureOverrides don't match files
-    for (i, ovr) in structure_overrides.iter().enumerate() {
-        for file_path in files {
-            if path_matches_override(file_path, &ovr.path) {
-                return Err(crate::SlocGuardError::Config(format!(
-                    "structure.override[{}] path '{}' matches file '{}', \
-                     but structure overrides only apply to directories. \
-                     Use [[content.override]] for file overrides.",
-                    i,
-                    ovr.path,
-                    file_path.display()
-                )));
-            }
-        }
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 #[path = "check_tests.rs"]
 mod tests;
@@ -634,10 +331,6 @@ mod tests;
 #[cfg(test)]
 #[path = "check_run_tests.rs"]
 mod run_tests;
-
-#[cfg(test)]
-#[path = "check_conversion_tests.rs"]
-mod conversion_tests;
 
 #[cfg(test)]
 #[path = "check_context_structure_tests.rs"]
