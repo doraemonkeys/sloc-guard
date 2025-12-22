@@ -174,17 +174,14 @@ impl ThresholdChecker {
     }
 
     fn get_warn_threshold_for_path(&self, path: &Path) -> f64 {
-        // 1. Check path_rules for custom warn_threshold (last match wins)
+        // 1. Check path_rules (last match wins)
         for path_rule in self.path_rules.iter().rev() {
-            if path_rule.matcher.is_match(path)
-                && let Some(threshold) = path_rule.warn_threshold
-            {
-                return threshold;
+            if path_rule.matcher.is_match(path) {
+                return path_rule.warn_threshold.unwrap_or(self.warning_threshold);
             }
         }
 
         // 2. Fall back to instance warning_threshold
-        // (set via with_warning_threshold or from config during initialization)
         self.warning_threshold
     }
 

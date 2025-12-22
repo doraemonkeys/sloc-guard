@@ -837,3 +837,37 @@ fn explain_non_excluded_file_has_is_excluded_false() {
         ContentRuleMatch::Excluded { .. }
     ));
 }
+
+#[test]
+fn multiple_rules_winner_takes_all_warn_threshold() {
+    let mut config = default_config();
+    config.content.warn_threshold = 0.9;
+
+    // Rule 1: Warn strict (0.5)
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 1000,
+        warn_threshold: Some(0.5),
+        skip_comments: None,
+        skip_blank: None,
+    });
+
+    // Rule 2: Override for specific file, default warn threshold (None)
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "src/main.rs".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
+    });
+
+    let checker = ThresholdChecker::new(config);
+    let stats = stats_with_code(600); // 60% of limit. 
+    // If inherit 0.5 -> Warn.
+    // If winner takes all 0.9 -> Pass.
+
+    let result = checker.check(Path::new("src/main.rs"), &stats);
+
+    // With fix, this should PASS (uses 0.9).
+    assert!(result.is_passed());
+}
