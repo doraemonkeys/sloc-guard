@@ -55,11 +55,12 @@ CountResult::Stats(LineStats) | IgnoredFile
 CommentSyntax { single_line, multi_line }
 
 // Check results (enum with associated data)
-CheckResult::Passed { path, stats, limit, override_reason }
+CheckResult::Passed { path, stats, limit, override_reason, violation_category }
           | Warning { ..., suggestions }
           | Failed { ..., suggestions }
           | Grandfathered { ... }
-// Accessor methods: path(), stats(), limit(), override_reason(), suggestions()
+ViolationCategory::Content | Structure { violation_type, triggering_rule }  // distinguishes SLOC vs structure violations
+// Accessor methods: path(), stats(), limit(), override_reason(), suggestions(), violation_category()
 // Consuming: into_grandfathered(), with_suggestions()
 
 // Structure checking
