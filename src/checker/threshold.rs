@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::config::Config;
 use crate::counter::LineStats;
@@ -11,8 +11,8 @@ use super::Checker;
 use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
 use super::result::CheckResult;
 
+/// Compiled rule data (pattern metadata stored separately from matcher).
 struct CompiledPathRule {
-    matcher: GlobMatcher,
     max_lines: usize,
     warn_threshold: Option<f64>,
     skip_comments: Option<bool>,
@@ -22,7 +22,11 @@ struct CompiledPathRule {
 pub struct ThresholdChecker {
     config: Config,
     warning_threshold: f64,
+    /// Rule data indexed by rule position.
     path_rules: Vec<CompiledPathRule>,
+    /// Combined `GlobSet` for O(1) "any rule matches" check.
+    /// Indices correspond to `path_rules` positions.
+    path_rules_set: GlobSet,
     /// Extensions to process (from content.extensions).
     /// Empty set means process all files.
     allowed_extensions: HashSet<String>,
@@ -34,7 +38,7 @@ pub struct ThresholdChecker {
 impl ThresholdChecker {
     #[must_use]
     pub fn new(config: Config) -> Self {
-        let path_rules = Self::build_path_rules(&config);
+        let (path_rules, path_rules_set) = Self::build_path_rules(&config);
         let allowed_extensions: HashSet<String> =
             config.content.extensions.iter().cloned().collect();
         let content_exclude = Self::build_content_exclude(&config);
@@ -42,6 +46,7 @@ impl ThresholdChecker {
             config,
             warning_threshold: 0.9,
             path_rules,
+            path_rules_set,
             allowed_extensions,
             content_exclude,
         }
@@ -107,14 +112,8 @@ impl ThresholdChecker {
             }
         }
 
-        // Check if file matches any rule pattern
-        for rule in &self.path_rules {
-            if rule.matcher.is_match(path) {
-                return true;
-            }
-        }
-
-        false
+        // Check if file matches any rule pattern (O(1) via GlobSet)
+        self.path_rules_set.is_match(path)
     }
 
     /// Check if a file is excluded from content checks via `content.exclude`.
@@ -123,14 +122,17 @@ impl ThresholdChecker {
         self.content_exclude.is_match(path)
     }
 
-    fn build_path_rules(config: &Config) -> Vec<CompiledPathRule> {
+    /// Build path rules and a combined `GlobSet` for efficient matching.
+    /// Returns `(rules_data, globset)` where `GlobSet` indices correspond to `rules_data` positions.
+    fn build_path_rules(config: &Config) -> (Vec<CompiledPathRule>, GlobSet) {
         let mut rules = Vec::new();
+        let mut builder = GlobSetBuilder::new();
 
         // Process content.rules (V2 format)
         for rule in &config.content.rules {
             if let Ok(glob) = Glob::new(&rule.pattern) {
+                builder.add(glob);
                 rules.push(CompiledPathRule {
-                    matcher: glob.compile_matcher(),
                     max_lines: rule.max_lines,
                     warn_threshold: rule.warn_threshold,
                     skip_comments: rule.skip_comments,
@@ -139,7 +141,8 @@ impl ThresholdChecker {
             }
         }
 
-        rules
+        let globset = builder.build().unwrap_or_else(|_| GlobSet::empty());
+        (rules, globset)
     }
 
     /// Returns (`max_lines`, `override_reason`) for a path.
@@ -162,11 +165,10 @@ impl ThresholdChecker {
         }
 
         // 3. Check path_rules (glob patterns) - last match wins
-        // Iterate in reverse to find the last matching rule
-        for path_rule in self.path_rules.iter().rev() {
-            if path_rule.matcher.is_match(path) {
-                return (path_rule.max_lines, None);
-            }
+        // Use GlobSet::matches() for O(n) matching where n = path length
+        let matches = self.path_rules_set.matches(path);
+        if let Some(&last_idx) = matches.last() {
+            return (self.path_rules[last_idx].max_lines, None);
         }
 
         // 4. Fall back to content.max_lines (V2) with legacy fallback
@@ -174,11 +176,12 @@ impl ThresholdChecker {
     }
 
     fn get_warn_threshold_for_path(&self, path: &Path) -> f64 {
-        // 1. Check path_rules (last match wins)
-        for path_rule in self.path_rules.iter().rev() {
-            if path_rule.matcher.is_match(path) {
-                return path_rule.warn_threshold.unwrap_or(self.warning_threshold);
-            }
+        // 1. Check path_rules (last match wins) via GlobSet
+        let matches = self.path_rules_set.matches(path);
+        if let Some(&last_idx) = matches.last() {
+            return self.path_rules[last_idx]
+                .warn_threshold
+                .unwrap_or(self.warning_threshold);
         }
 
         // 2. Fall back to instance warning_threshold
@@ -189,17 +192,17 @@ impl ThresholdChecker {
     /// Priority: `path_rules` (last match) > global defaults
     #[must_use]
     pub fn get_skip_settings_for_path(&self, path: &Path) -> (bool, bool) {
-        // Check path_rules (last match wins)
-        for path_rule in self.path_rules.iter().rev() {
-            if path_rule.matcher.is_match(path) {
-                let skip_comments = path_rule
-                    .skip_comments
-                    .unwrap_or(self.config.content.skip_comments);
-                let skip_blank = path_rule
-                    .skip_blank
-                    .unwrap_or(self.config.content.skip_blank);
-                return (skip_comments, skip_blank);
-            }
+        // Check path_rules (last match wins) via GlobSet
+        let matches = self.path_rules_set.matches(path);
+        if let Some(&last_idx) = matches.last() {
+            let path_rule = &self.path_rules[last_idx];
+            let skip_comments = path_rule
+                .skip_comments
+                .unwrap_or(self.config.content.skip_comments);
+            let skip_blank = path_rule
+                .skip_blank
+                .unwrap_or(self.config.content.skip_blank);
+            return (skip_comments, skip_blank);
         }
 
         // Fall back to global defaults
@@ -284,19 +287,15 @@ impl ThresholdChecker {
             });
         }
 
-        // 3. Check content.rules (last match wins - iterate in reverse for display,
-        //    but track the actual last match)
-        // First, find the last matching rule index
-        let mut last_match_idx: Option<usize> = None;
-        for (i, rule) in self.path_rules.iter().enumerate() {
-            if rule.matcher.is_match(path) {
-                last_match_idx = Some(i);
-            }
-        }
+        // 3. Check content.rules (last match wins) via GlobSet
+        // Get all matching indices in one pass
+        let rule_matches = self.path_rules_set.matches(path);
+        let matching_set: HashSet<usize> = rule_matches.iter().copied().collect();
+        let last_match_idx = rule_matches.last().copied();
 
         // Now build the chain with correct status
         for (i, rule) in self.path_rules.iter().enumerate() {
-            let matches = rule.matcher.is_match(path);
+            let matches = matching_set.contains(&i);
             let is_selected = !found_match && last_match_idx == Some(i);
 
             let status = if is_selected {
