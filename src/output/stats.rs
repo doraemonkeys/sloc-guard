@@ -472,5 +472,17 @@ impl StatsFormatter for StatsMarkdownFormatter {
 }
 
 #[cfg(test)]
-#[path = "stats_tests.rs"]
-mod tests;
+#[path = "stats_types_tests.rs"]
+mod types_tests;
+
+#[cfg(test)]
+#[path = "stats_text_formatter_tests.rs"]
+mod text_formatter_tests;
+
+#[cfg(test)]
+#[path = "stats_json_formatter_tests.rs"]
+mod json_formatter_tests;
+
+#[cfg(test)]
+#[path = "stats_markdown_formatter_tests.rs"]
+mod markdown_formatter_tests;
