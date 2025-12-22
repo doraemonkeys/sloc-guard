@@ -7,7 +7,7 @@ pub use explain::{
     StructureRuleCandidate, StructureRuleMatch,
 };
 pub use structure::StructureChecker;
-pub use structure::violation::{DirStats, StructureViolation, ViolationType};
+pub use structure::violation::{DirStats, StructureViolation, ViolationCategory, ViolationType};
 pub use threshold::{CheckResult, ThresholdChecker};
 
 use std::path::Path;

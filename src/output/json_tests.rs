@@ -15,6 +15,7 @@ fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
         },
         limit,
         override_reason: None,
+        violation_category: None,
     }
 }
 
@@ -31,6 +32,7 @@ fn make_warning_result(path: &str, code: usize, limit: usize) -> CheckResult {
         limit,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     }
 }
 
@@ -47,6 +49,7 @@ fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
         limit,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     }
 }
 
@@ -62,6 +65,7 @@ fn make_grandfathered_result(path: &str, code: usize, limit: usize) -> CheckResu
         },
         limit,
         override_reason: None,
+        violation_category: None,
     }
 }
 
@@ -161,6 +165,7 @@ fn json_override_reason_included() {
         limit: 800,
         override_reason: Some("Legacy code from migration".to_string()),
         suggestions: None,
+        violation_category: None,
     }];
 
     let output = formatter.format(&results).unwrap();

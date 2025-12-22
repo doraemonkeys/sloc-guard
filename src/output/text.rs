@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use std::io::Write as IoWrite;
 
-use crate::checker::CheckResult;
+use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -111,47 +111,19 @@ impl TextFormatter {
         )
         .ok();
 
-        let reason = result.override_reason();
-        let is_structure_files = reason.is_some_and(|r| r.contains("structure: files"));
-        let is_structure_dirs = reason.is_some_and(|r| r.contains("structure: subdirs"));
-
-        if is_structure_files {
-            writeln!(
-                output,
-                "   Files: {} (limit: {})",
-                result.stats().sloc(),
-                result.limit()
-            )
-            .ok();
-        } else if is_structure_dirs {
-            writeln!(
-                output,
-                "   Directories: {} (limit: {})",
-                result.stats().sloc(),
-                result.limit()
-            )
-            .ok();
-        } else {
-            writeln!(
-                output,
-                "   Lines: {} (limit: {})",
-                result.stats().sloc(),
-                result.limit()
-            )
-            .ok();
-
-            writeln!(
-                output,
-                "   Breakdown: code={}, comment={}, blank={}",
-                result.stats().code,
-                result.stats().comment,
-                result.stats().blank
-            )
-            .ok();
+        // Use structured ViolationCategory instead of parsing strings
+        match result.violation_category() {
+            Some(ViolationCategory::Structure { violation_type, .. }) => {
+                Self::format_structure_violation(result, violation_type, output);
+            }
+            Some(ViolationCategory::Content) | None => {
+                // Content violation: show line count and breakdown
+                Self::format_content_violation(result, output);
+            }
         }
 
-        // Show override reason if present (in verbose mode or for any status)
-        if let Some(r) = reason {
+        // Show reason if present
+        if let Some(r) = result.override_reason() {
             writeln!(output, "   Reason: {r}").ok();
         }
 
@@ -162,6 +134,69 @@ impl TextFormatter {
         {
             Self::format_suggestions(suggestion, output);
         }
+    }
+
+    fn format_structure_violation(
+        result: &CheckResult,
+        violation_type: &ViolationType,
+        output: &mut Vec<u8>,
+    ) {
+        match violation_type {
+            ViolationType::FileCount => {
+                writeln!(
+                    output,
+                    "   Files: {} (limit: {})",
+                    result.stats().sloc(),
+                    result.limit()
+                )
+                .ok();
+            }
+            ViolationType::DirCount => {
+                writeln!(
+                    output,
+                    "   Directories: {} (limit: {})",
+                    result.stats().sloc(),
+                    result.limit()
+                )
+                .ok();
+            }
+            ViolationType::MaxDepth => {
+                writeln!(
+                    output,
+                    "   Depth: {} (limit: {})",
+                    result.stats().sloc(),
+                    result.limit()
+                )
+                .ok();
+            }
+            // File-level structure violations: the reason message is self-explanatory
+            ViolationType::DisallowedFile
+            | ViolationType::DeniedFile { .. }
+            | ViolationType::DeniedDirectory { .. }
+            | ViolationType::NamingConvention { .. }
+            | ViolationType::MissingSibling { .. } => {
+                // No additional metrics needed for file-level violations
+            }
+        }
+    }
+
+    fn format_content_violation(result: &CheckResult, output: &mut Vec<u8>) {
+        writeln!(
+            output,
+            "   Lines: {} (limit: {})",
+            result.stats().sloc(),
+            result.limit()
+        )
+        .ok();
+
+        writeln!(
+            output,
+            "   Breakdown: code={}, comment={}, blank={}",
+            result.stats().code,
+            result.stats().comment,
+            result.stats().blank
+        )
+        .ok();
     }
 
     fn format_suggestions(suggestion: &crate::analyzer::SplitSuggestion, output: &mut Vec<u8>) {

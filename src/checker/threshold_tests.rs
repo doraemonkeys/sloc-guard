@@ -131,6 +131,7 @@ fn check_result_usage_percent() {
         },
         limit: 500,
         override_reason: None,
+        violation_category: None,
     };
 
     assert!((result.usage_percent() - 50.0).abs() < 0.01);
@@ -219,6 +220,7 @@ fn check_result_is_methods() {
         stats: stats_with_code(100),
         limit: 500,
         override_reason: None,
+        violation_category: None,
     };
     let failed = CheckResult::Failed {
         path: PathBuf::from("test.rs"),
@@ -226,6 +228,7 @@ fn check_result_is_methods() {
         limit: 500,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     };
     let warning = CheckResult::Warning {
         path: PathBuf::from("test.rs"),
@@ -233,6 +236,7 @@ fn check_result_is_methods() {
         limit: 500,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     };
 
     assert!(passed.is_passed());

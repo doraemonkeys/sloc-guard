@@ -9,6 +9,7 @@ fn check_result_is_passed() {
         stats: LineStats::default(),
         limit: 500,
         override_reason: None,
+        violation_category: None,
     };
     assert!(result.is_passed());
 }
@@ -27,6 +28,7 @@ fn check_result_is_failed() {
         limit: 500,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     };
     assert!(result.is_failed());
 }

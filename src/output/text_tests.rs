@@ -15,6 +15,7 @@ fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
         },
         limit,
         override_reason: None,
+        violation_category: None,
     }
 }
 
@@ -31,6 +32,7 @@ fn make_warning_result(path: &str, code: usize, limit: usize) -> CheckResult {
         limit,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     }
 }
 
@@ -47,6 +49,7 @@ fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
         limit,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     }
 }
 
@@ -62,6 +65,7 @@ fn make_grandfathered_result(path: &str, code: usize, limit: usize) -> CheckResu
         },
         limit,
         override_reason: None,
+        violation_category: None,
     }
 }
 
@@ -235,6 +239,7 @@ fn override_reason_shown_in_output() {
         limit: 800,
         override_reason: Some("Legacy file from migration".to_string()),
         suggestions: None,
+        violation_category: None,
     }];
 
     let output = formatter.format(&results).unwrap();
@@ -355,6 +360,7 @@ fn grandfathered_colored_output() {
 
 #[test]
 fn format_structure_file_count_violation() {
+    use crate::checker::{ViolationCategory, ViolationType};
     let formatter = TextFormatter::new(ColorMode::Never);
     let results = vec![CheckResult::Failed {
         path: PathBuf::from("."),
@@ -368,6 +374,10 @@ fn format_structure_file_count_violation() {
         limit: 5,
         override_reason: Some("structure: files count exceeded".to_string()),
         suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::FileCount,
+            triggering_rule: None,
+        }),
     }];
 
     let output = formatter.format(&results).unwrap();
@@ -379,6 +389,7 @@ fn format_structure_file_count_violation() {
 
 #[test]
 fn format_structure_dir_count_violation() {
+    use crate::checker::{ViolationCategory, ViolationType};
     let formatter = TextFormatter::new(ColorMode::Never);
     let results = vec![CheckResult::Failed {
         path: PathBuf::from("."),
@@ -392,6 +403,10 @@ fn format_structure_dir_count_violation() {
         limit: 20,
         override_reason: Some("structure: subdirs count exceeded".to_string()),
         suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::DirCount,
+            triggering_rule: None,
+        }),
     }];
 
     let output = formatter.format(&results).unwrap();

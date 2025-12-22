@@ -1,4 +1,4 @@
-use crate::checker::{CheckResult, StructureViolation, ViolationType};
+use crate::checker::{CheckResult, StructureViolation, ViolationCategory, ViolationType};
 use crate::counter::LineStats;
 use crate::output::{
     HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter, SarifFormatter,
@@ -43,6 +43,13 @@ pub(crate) fn structure_violation_to_check_result(violation: &StructureViolation
         ignored: 0,
     };
 
+    // Build the violation category with structured type information
+    let violation_category = Some(ViolationCategory::Structure {
+        violation_type: violation.violation_type.clone(),
+        triggering_rule: violation.triggering_rule_pattern.clone(),
+    });
+
+    // Build human-readable description for override_reason (for backwards compatibility)
     let override_reason = match &violation.violation_type {
         ViolationType::FileCount => Some("structure: files count exceeded".to_string()),
         ViolationType::DirCount => Some("structure: subdirs count exceeded".to_string()),
@@ -103,6 +110,7 @@ pub(crate) fn structure_violation_to_check_result(violation: &StructureViolation
             limit: violation.limit,
             override_reason,
             suggestions: None,
+            violation_category,
         }
     } else {
         CheckResult::Failed {
@@ -111,6 +119,7 @@ pub(crate) fn structure_violation_to_check_result(violation: &StructureViolation
             limit: violation.limit,
             override_reason,
             suggestions: None,
+            violation_category,
         }
     }
 }

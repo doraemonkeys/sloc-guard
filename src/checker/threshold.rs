@@ -10,12 +10,16 @@ use crate::path_utils::path_matches_override;
 
 use super::Checker;
 use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
+use super::structure::violation::ViolationCategory;
 
 /// Result of checking a file against configured thresholds.
 ///
 /// Each variant represents a distinct check outcome. The `suggestions` field is only
 /// available on `Warning` and `Failed` variants, making it impossible to have suggestions
 /// on passed or grandfathered results.
+///
+/// The `violation_category` field distinguishes between content (SLOC) and structure
+/// violations, preserving the structured `ViolationType` for structure violations.
 #[derive(Debug, Clone)]
 pub enum CheckResult {
     Passed {
@@ -23,6 +27,7 @@ pub enum CheckResult {
         stats: LineStats,
         limit: usize,
         override_reason: Option<String>,
+        violation_category: Option<ViolationCategory>,
     },
     Warning {
         path: PathBuf,
@@ -30,6 +35,7 @@ pub enum CheckResult {
         limit: usize,
         override_reason: Option<String>,
         suggestions: Option<SplitSuggestion>,
+        violation_category: Option<ViolationCategory>,
     },
     Failed {
         path: PathBuf,
@@ -37,12 +43,14 @@ pub enum CheckResult {
         limit: usize,
         override_reason: Option<String>,
         suggestions: Option<SplitSuggestion>,
+        violation_category: Option<ViolationCategory>,
     },
     Grandfathered {
         path: PathBuf,
         stats: LineStats,
         limit: usize,
         override_reason: Option<String>,
+        violation_category: Option<ViolationCategory>,
     },
 }
 
@@ -108,6 +116,25 @@ impl CheckResult {
         }
     }
 
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Accessing option reference isn't const
+    pub fn violation_category(&self) -> Option<&ViolationCategory> {
+        match self {
+            Self::Passed {
+                violation_category, ..
+            }
+            | Self::Warning {
+                violation_category, ..
+            }
+            | Self::Failed {
+                violation_category, ..
+            }
+            | Self::Grandfathered {
+                violation_category, ..
+            } => violation_category.as_ref(),
+        }
+    }
+
     // Predicate methods
 
     #[must_use]
@@ -142,12 +169,14 @@ impl CheckResult {
                 stats,
                 limit,
                 override_reason,
+                violation_category,
                 ..
             } => Self::Grandfathered {
                 path,
                 stats,
                 limit,
                 override_reason,
+                violation_category,
             },
             other => other,
         }
@@ -163,6 +192,7 @@ impl CheckResult {
                 stats,
                 limit,
                 override_reason,
+                violation_category,
                 ..
             } => Self::Warning {
                 path,
@@ -170,12 +200,14 @@ impl CheckResult {
                 limit,
                 override_reason,
                 suggestions: Some(new_suggestions),
+                violation_category,
             },
             Self::Failed {
                 path,
                 stats,
                 limit,
                 override_reason,
+                violation_category,
                 ..
             } => Self::Failed {
                 path,
@@ -183,6 +215,7 @@ impl CheckResult {
                 limit,
                 override_reason,
                 suggestions: Some(new_suggestions),
+                violation_category,
             },
             other => other,
         }
@@ -518,6 +551,7 @@ impl Checker for ThresholdChecker {
                 limit,
                 override_reason,
                 suggestions: None,
+                violation_category: None, // Content violations don't need explicit category
             }
         } else if sloc as f64 >= limit as f64 * warn_threshold {
             CheckResult::Warning {
@@ -526,6 +560,7 @@ impl Checker for ThresholdChecker {
                 limit,
                 override_reason,
                 suggestions: None,
+                violation_category: None,
             }
         } else {
             CheckResult::Passed {
@@ -533,6 +568,7 @@ impl Checker for ThresholdChecker {
                 stats,
                 limit,
                 override_reason,
+                violation_category: None,
             }
         }
     }

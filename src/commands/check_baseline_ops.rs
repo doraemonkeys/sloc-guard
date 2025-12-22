@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use crate::baseline::{Baseline, StructureViolationType, compute_file_hash};
-use crate::checker::CheckResult;
+use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::cli::BaselineUpdateMode;
 use crate::counter::LineStats;
 
@@ -51,6 +51,7 @@ pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &
                     stats: LineStats::default(),
                     limit: 0,
                     override_reason: None,
+                    violation_category: None,
                 },
             );
             *result = owned.into_grandfathered();
@@ -79,7 +80,7 @@ pub(crate) fn update_baseline_from_results(
         }
 
         let path_str = result.path().to_string_lossy().replace('\\', "/");
-        let is_structure = is_structure_violation(result.override_reason());
+        let is_structure = is_structure_violation_result(result);
 
         // Apply mode filtering
         let should_include = match mode {
@@ -97,10 +98,8 @@ pub(crate) fn update_baseline_from_results(
         }
 
         if is_structure {
-            // Parse structure violation type from override_reason
-            if let Some((vtype, count)) =
-                parse_structure_violation(result.override_reason(), result.stats().code)
-            {
+            // Parse structure violation type using structured ViolationCategory
+            if let Some((vtype, count)) = parse_structure_violation_from_result(result) {
                 new_baseline.set_structure(&path_str, vtype, count);
             }
         } else {
@@ -114,12 +113,45 @@ pub(crate) fn update_baseline_from_results(
 }
 
 /// Check if a check result represents a structure violation.
+pub(crate) fn is_structure_violation_result(result: &CheckResult) -> bool {
+    matches!(
+        result.violation_category(),
+        Some(ViolationCategory::Structure { .. })
+    )
+}
+
+/// Check if a check result represents a structure violation (legacy string-based check).
+/// Used for backwards compatibility during migration and in tests.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn is_structure_violation(override_reason: Option<&str>) -> bool {
     override_reason.is_some_and(|r| r.starts_with("structure:"))
 }
 
+/// Parse structure violation type from `CheckResult`.
+/// Uses the structured `ViolationCategory` when available, falling back to string parsing.
+pub(crate) fn parse_structure_violation_from_result(
+    result: &CheckResult,
+) -> Option<(StructureViolationType, usize)> {
+    match result.violation_category() {
+        Some(ViolationCategory::Structure { violation_type, .. }) => {
+            let vtype = match violation_type {
+                ViolationType::FileCount => StructureViolationType::Files,
+                ViolationType::DirCount => StructureViolationType::Dirs,
+                // Other structure violations don't have baseline support yet
+                _ => return None,
+            };
+            Some((vtype, result.stats().code))
+        }
+        _ => {
+            // Fallback to legacy string parsing for backwards compatibility
+            parse_structure_violation(result.override_reason(), result.stats().code)
+        }
+    }
+}
+
 /// Parse structure violation type from `override_reason`.
 /// Returns (`StructureViolationType`, count) if parseable.
+/// Deprecated: prefer `parse_structure_violation_from_result` for new code.
 pub(crate) fn parse_structure_violation(
     override_reason: Option<&str>,
     count: usize,

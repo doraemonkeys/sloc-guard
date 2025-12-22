@@ -17,6 +17,7 @@ fn make_passed_result(path: &str, code: usize, limit: usize) -> CheckResult {
         },
         limit,
         override_reason: None,
+        violation_category: None,
     }
 }
 
@@ -33,6 +34,7 @@ fn make_failed_result(path: &str, code: usize, limit: usize) -> CheckResult {
         limit,
         override_reason: None,
         suggestions: None,
+        violation_category: None,
     }
 }
 

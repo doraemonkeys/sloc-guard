@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use serde::Serialize;
+
 /// Counts of immediate children in a directory.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DirStats {
@@ -10,7 +12,8 @@ pub struct DirStats {
 }
 
 /// Type of structure violation.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum ViolationType {
     FileCount,
     DirCount,
@@ -36,6 +39,24 @@ pub enum ViolationType {
     MissingSibling {
         /// The sibling pattern template that was expected (e.g., "{stem}.test.tsx").
         expected_sibling_pattern: String,
+    },
+}
+
+/// Category of violation for `CheckResult`.
+///
+/// Distinguishes between content (SLOC) violations and structure violations,
+/// carrying the structured `ViolationType` for structure violations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "category", rename_all = "snake_case")]
+pub enum ViolationCategory {
+    /// Content violation (SLOC limit exceeded).
+    Content,
+    /// Structure violation with specific type.
+    Structure {
+        violation_type: ViolationType,
+        /// Pattern of the rule that triggered this violation.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        triggering_rule: Option<String>,
     },
 }
 

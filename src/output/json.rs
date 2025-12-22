@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use crate::analyzer::SplitSuggestion;
-use crate::checker::CheckResult;
+use crate::checker::{CheckResult, ViolationCategory};
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -55,6 +55,8 @@ struct FileResult {
     stats: FileStats,
     #[serde(skip_serializing_if = "Option::is_none")]
     override_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    violation_category: Option<ViolationCategory>,
     #[serde(skip_serializing_if = "Option::is_none")]
     suggestions: Option<SplitSuggestion>,
 }
@@ -121,6 +123,7 @@ fn convert_result(result: &CheckResult, show_suggestions: bool) -> FileResult {
             blank: result.stats().blank,
         },
         override_reason: result.override_reason().map(String::from),
+        violation_category: result.violation_category().cloned(),
         suggestions,
     }
 }

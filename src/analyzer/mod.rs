@@ -41,6 +41,7 @@ pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &Langua
                     stats: LineStats::default(),
                     limit: 0,
                     override_reason: None,
+                    violation_category: None,
                 },
             );
             *result = owned.with_suggestions(suggestion);
