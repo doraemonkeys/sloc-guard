@@ -259,5 +259,5 @@ impl<'a> SlocCounter<'a> {
 }
 
 #[cfg(test)]
-#[path = "sloc_tests.rs"]
-mod tests;
+#[path = "sloc_tests/mod.rs"]
+mod sloc_tests;
