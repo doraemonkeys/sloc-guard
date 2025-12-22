@@ -4,7 +4,7 @@ use super::FileScanner;
 use super::directory::DirectoryScanner;
 use super::filter::GlobFilter;
 use super::gitignore::GitAwareScanner;
-use super::types::{ScanResult, StructureScanConfig};
+use super::{ScanResult, StructureScanConfig};
 use crate::SlocGuardError;
 use crate::error::Result;
 

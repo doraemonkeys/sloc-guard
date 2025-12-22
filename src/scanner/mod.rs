@@ -1,18 +1,33 @@
+mod allowlist;
 mod composite;
 mod directory;
 mod filter;
 mod gitignore;
-mod types;
+mod structure_config;
 
+pub use allowlist::{AllowlistRule, AllowlistRuleBuilder};
 pub use composite::{CompositeScanner, scan_files};
 pub use directory::DirectoryScanner;
 pub use filter::{FileFilter, GlobFilter};
 pub use gitignore::GitAwareScanner;
-pub use types::{AllowlistRule, AllowlistRuleBuilder, ScanResult, StructureScanConfig};
+pub use structure_config::StructureScanConfig;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use crate::checker::{DirStats, StructureViolation};
 use crate::error::Result;
+
+/// Result of unified directory scan with structure stats.
+#[derive(Debug, Clone, Default)]
+pub struct ScanResult {
+    /// All file paths discovered during scanning.
+    pub files: Vec<PathBuf>,
+    /// Directory statistics: immediate children counts and depth.
+    pub dir_stats: HashMap<PathBuf, DirStats>,
+    /// Allowlist violations detected during scanning.
+    pub allowlist_violations: Vec<StructureViolation>,
+}
 
 /// Trait for scanning directories and finding files.
 ///
@@ -73,6 +88,8 @@ pub trait FileScanner: Send + Sync {
 }
 
 #[cfg(test)]
+mod allowlist_tests;
+#[cfg(test)]
 mod composite_tests;
 #[cfg(test)]
 mod deny_pattern_tests;
@@ -81,6 +98,6 @@ mod directory_tests;
 #[cfg(test)]
 mod naming_pattern_tests;
 #[cfg(test)]
-mod structure_scan_tests;
+mod structure_config_tests;
 #[cfg(test)]
-mod types_tests;
+mod structure_scan_tests;

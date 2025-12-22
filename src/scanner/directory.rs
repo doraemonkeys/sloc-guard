@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
-use super::types::{ScanResult, StructureScanConfig};
 use super::{FileFilter, FileScanner};
+use super::{ScanResult, StructureScanConfig};
 use crate::checker::{DirStats, StructureViolation};
 use crate::error::Result;
 
