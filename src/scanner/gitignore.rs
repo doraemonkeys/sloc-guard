@@ -153,8 +153,7 @@ impl<F: FileFilter> GitAwareScanner<F> {
             .emit_tracked(true)
             .emit_untracked(EmissionMode::Matching);
 
-        let mut delegate =
-            StructureAwareCollector::new(&prefix, &self.filter, structure_config, &workdir_abs);
+        let mut delegate = StructureAwareCollector::new(&prefix, &self.filter, structure_config);
 
         // Convert prefix to BStr for pattern matching
         // Normalize path separators to forward slashes for git pathspecs
@@ -256,7 +255,6 @@ struct StructureAwareCollector<'a, F: FileFilter> {
     prefix: &'a Path,
     filter: &'a F,
     structure_config: Option<&'a StructureScanConfig>,
-    workdir: &'a Path,
     files: Vec<PathBuf>,
     dir_stats: HashMap<PathBuf, DirStats>,
     allowlist_violations: Vec<StructureViolation>,
@@ -270,13 +268,11 @@ impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
         prefix: &'a Path,
         filter: &'a F,
         structure_config: Option<&'a StructureScanConfig>,
-        workdir: &'a Path,
     ) -> Self {
         Self {
             prefix,
             filter,
             structure_config,
-            workdir,
             files: Vec::new(),
             dir_stats: HashMap::new(),
             allowlist_violations: Vec::new(),
@@ -397,21 +393,18 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
 
                 // Check deny patterns and allowlist violations
                 if let Some(cfg) = self.structure_config {
-                    // Convert to absolute path for pattern matching
-                    let abs_parent = self.workdir.join(parent);
-                    let abs_file = self.workdir.join(path_ref);
-
                     // 1. Check global deny patterns first (applies to all files)
-                    if let Some(matched) = cfg.file_matches_global_deny(&abs_file) {
+                    // Use relative path for pattern matching (patterns are relative like "src/**")
+                    if let Some(matched) = cfg.file_matches_global_deny(path_ref) {
                         self.allowlist_violations
                             .push(StructureViolation::denied_file(
                                 path.clone().into_owned(),
                                 "global".to_string(),
                                 matched,
                             ));
-                    } else if let Some(rule) = cfg.find_matching_allowlist_rule(&abs_parent) {
+                    } else if let Some(rule) = cfg.find_matching_allowlist_rule(parent) {
                         // 2. Check per-rule deny patterns
-                        if let Some(matched) = rule.file_matches_deny(&abs_file) {
+                        if let Some(matched) = rule.file_matches_deny(path_ref) {
                             self.allowlist_violations
                                 .push(StructureViolation::denied_file(
                                     path.clone().into_owned(),
@@ -420,7 +413,7 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                                 ));
                         } else {
                             // 3. Check allowlist (extensions/patterns) - only if configured
-                            if rule.has_allowlist() && !rule.file_matches(&abs_file) {
+                            if rule.has_allowlist() && !rule.file_matches(path_ref) {
                                 self.allowlist_violations.push(
                                     StructureViolation::disallowed_file(
                                         path.clone().into_owned(),
@@ -430,7 +423,7 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                             }
 
                             // 4. Check naming convention
-                            if !rule.filename_matches_naming_pattern(&abs_file)
+                            if !rule.filename_matches_naming_pattern(path_ref)
                                 && let Some(ref pattern_str) = rule.naming_pattern_str
                             {
                                 self.allowlist_violations.push(
@@ -456,16 +449,15 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                 });
 
             // Check directory-only deny patterns (patterns ending with `/`)
-            if let Some(cfg) = self.structure_config {
-                let abs_dir = self.workdir.join(path_ref);
-                if let Some(pattern) = cfg.dir_matches_global_deny(&abs_dir) {
-                    self.allowlist_violations
-                        .push(StructureViolation::denied_directory(
-                            path.clone().into_owned(),
-                            "global".to_string(),
-                            pattern,
-                        ));
-                }
+            if let Some(cfg) = self.structure_config
+                && let Some(pattern) = cfg.dir_matches_global_deny(path_ref)
+            {
+                self.allowlist_violations
+                    .push(StructureViolation::denied_directory(
+                        path.clone().into_owned(),
+                        "global".to_string(),
+                        pattern,
+                    ));
             }
 
             // Register directory chain for this directory
