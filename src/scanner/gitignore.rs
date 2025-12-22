@@ -258,9 +258,9 @@ struct StructureAwareCollector<'a, F: FileFilter> {
     files: Vec<PathBuf>,
     dir_stats: HashMap<PathBuf, DirStats>,
     allowlist_violations: Vec<StructureViolation>,
-    /// Track directories we've already counted to avoid double-counting.
-    /// gix dirwalk only emits files, so we infer directories from file paths.
-    seen_dirs: std::collections::HashSet<PathBuf>,
+    /// Directories fully processed by `register_directory_chain`.
+    /// Separate from `dir_stats` because `emit()` pre-creates parent entries for file counting.
+    visited_dirs: std::collections::HashSet<PathBuf>,
 }
 
 impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
@@ -276,92 +276,108 @@ impl<'a, F: FileFilter> StructureAwareCollector<'a, F> {
             files: Vec::new(),
             dir_stats: HashMap::new(),
             allowlist_violations: Vec::new(),
-            seen_dirs: std::collections::HashSet::new(),
+            visited_dirs: std::collections::HashSet::new(),
         }
     }
 
     /// Register a directory and all its ancestors, counting subdirectories.
     /// gix dirwalk only emits files, so we must infer directory structure from file paths.
+    ///
+    /// Optimization: Collects ancestor chain first, stopping at already-visited directories.
+    /// This avoids redundant work when multiple files share common ancestor directories.
     fn register_directory_chain(&mut self, dir_path: &Path) {
-        let mut current = dir_path.to_path_buf();
+        // Phase 1: Collect ancestor chain until we hit an already-visited directory.
+        // Note: We check `visited_dirs`, not `dir_stats`, because emit() pre-creates parent
+        // entries in dir_stats for file counting before calling this function.
+        let mut ancestors: Vec<PathBuf> = Vec::new();
+        let mut current = dir_path;
 
         while !current.as_os_str().is_empty() {
-            let depth = self.get_depth(&current);
+            if self.visited_dirs.contains(current) {
+                // Already processed this directory and all its ancestors
+                break;
+            }
+            ancestors.push(current.to_path_buf());
+            current = match current.parent() {
+                Some(p) => p,
+                None => break,
+            };
+        }
+
+        // Phase 2: Process ancestors from root to leaf (reverse order).
+        // This ensures parent dir_stats entries exist before we increment their counts.
+        for dir in ancestors.into_iter().rev() {
+            // Mark as visited (single clone, reused for dir_stats insert)
+            self.visited_dirs.insert(dir.clone());
+
+            let depth = self.get_depth(&dir);
 
             // Check if this directory should be excluded from counting
             let is_count_excluded = self
                 .structure_config
-                .is_some_and(|cfg| cfg.is_count_excluded(&current));
+                .is_some_and(|cfg| cfg.is_count_excluded(&dir));
 
-            // Initialize this directory's stats if not seen
+            // Initialize this directory's stats (or update if pre-created by emit())
             self.dir_stats
-                .entry(current.clone())
+                .entry(dir.clone())
                 .or_insert_with(|| DirStats {
                     depth,
                     ..Default::default()
                 });
 
-            // Check deny_dirs patterns for this directory (only on first visit)
-            if self.seen_dirs.insert(current.clone()) {
-                // Check directory-only deny patterns (patterns ending with `/`)
-                if let Some(cfg) = self.structure_config
-                    && let Some(pattern) = cfg.dir_matches_global_deny(&current)
-                {
-                    self.allowlist_violations
-                        .push(StructureViolation::denied_directory(
-                            current.clone(),
-                            "global".to_string(),
-                            pattern,
-                        ));
-                }
-
-                // Check deny_dirs (basename-only matching from structure.deny_dirs)
-                if let Some(cfg) = self.structure_config
-                    && let Some(pattern) = cfg.dir_matches_global_deny_basename(&current)
-                {
-                    self.allowlist_violations
-                        .push(StructureViolation::denied_directory(
-                            current.clone(),
-                            "global".to_string(),
-                            pattern,
-                        ));
-                }
-
-                // Check per-rule deny_dirs
-                if let Some(cfg) = self.structure_config
-                    && let Some(parent) = current.parent()
-                    && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
-                    && let Some(pattern) = rule.dir_matches_deny(&current)
-                {
-                    self.allowlist_violations
-                        .push(StructureViolation::denied_directory(
-                            current.clone(),
-                            rule.scope.clone(),
-                            pattern,
-                        ));
-                }
-
-                // If this is a new directory, increment parent's dir_count
-                if !is_count_excluded
-                    && depth > 0
-                    && let Some(parent) = current.parent()
-                {
-                    let parent_depth = depth - 1;
-                    let parent_stats =
-                        self.dir_stats
-                            .entry(parent.to_path_buf())
-                            .or_insert_with(|| DirStats {
-                                depth: parent_depth,
-                                ..Default::default()
-                            });
-                    parent_stats.dir_count += 1;
-                }
+            // Check directory-only deny patterns (patterns ending with `/`)
+            if let Some(cfg) = self.structure_config
+                && let Some(pattern) = cfg.dir_matches_global_deny(&dir)
+            {
+                self.allowlist_violations
+                    .push(StructureViolation::denied_directory(
+                        dir.clone(),
+                        "global".to_string(),
+                        pattern,
+                    ));
             }
 
-            // Move to parent
-            match current.parent() {
-                Some(p) if !p.as_os_str().is_empty() => current = p.to_path_buf(),
-                _ => break,
+            // Check deny_dirs (basename-only matching from structure.deny_dirs)
+            if let Some(cfg) = self.structure_config
+                && let Some(pattern) = cfg.dir_matches_global_deny_basename(&dir)
+            {
+                self.allowlist_violations
+                    .push(StructureViolation::denied_directory(
+                        dir.clone(),
+                        "global".to_string(),
+                        pattern,
+                    ));
+            }
+
+            // Check per-rule deny_dirs
+            if let Some(cfg) = self.structure_config
+                && let Some(parent) = dir.parent()
+                && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
+                && let Some(pattern) = rule.dir_matches_deny(&dir)
+            {
+                self.allowlist_violations
+                    .push(StructureViolation::denied_directory(
+                        dir.clone(),
+                        rule.scope.clone(),
+                        pattern,
+                    ));
+            }
+
+            // Increment parent's dir_count
+            // Note: Parent may not exist in dir_stats yet (e.g., root directory when prefix is empty)
+            if !is_count_excluded
+                && depth > 0
+                && let Some(parent) = dir.parent()
+            {
+                let parent_depth = depth - 1;
+                let parent_stats =
+                    self.dir_stats
+                        .entry(parent.to_path_buf())
+                        .or_insert_with(|| DirStats {
+                            depth: parent_depth,
+                            ..Default::default()
+                        });
+                parent_stats.dir_count += 1;
             }
         }
     }
