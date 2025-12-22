@@ -1,10 +1,8 @@
 mod parser;
 mod split;
-mod types;
 
-pub use parser::{FunctionParser, get_parser};
-pub use split::SplitAnalyzer;
-pub use types::{FunctionInfo, SplitChunk, SplitSuggestion};
+pub use parser::{FunctionInfo, FunctionParser, get_parser};
+pub use split::{SplitAnalyzer, SplitChunk, SplitSuggestion};
 
 use crate::checker::CheckResult;
 use crate::counter::LineStats;

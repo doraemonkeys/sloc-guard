@@ -1,6 +1,30 @@
 use regex::Regex;
+use serde::Serialize;
 
-use super::types::FunctionInfo;
+/// Information about a detected function or method in a file.
+#[derive(Debug, Clone, Serialize)]
+pub struct FunctionInfo {
+    /// Function name
+    pub name: String,
+    /// Starting line (1-indexed)
+    pub start_line: usize,
+    /// Ending line (1-indexed)
+    pub end_line: usize,
+    /// Number of code lines
+    pub line_count: usize,
+}
+
+impl FunctionInfo {
+    #[must_use]
+    pub const fn new(name: String, start_line: usize, end_line: usize) -> Self {
+        Self {
+            name,
+            start_line,
+            end_line,
+            line_count: end_line.saturating_sub(start_line) + 1,
+        }
+    }
+}
 
 /// Trait for language-specific function detection.
 pub trait FunctionParser {
