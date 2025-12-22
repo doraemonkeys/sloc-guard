@@ -5,7 +5,7 @@ use crate::git::GitDiff;
 
 /// Represents a parsed diff range (base..target).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct DiffRange {
+pub struct DiffRange {
     pub base: String,
     pub target: String,
 }
@@ -21,7 +21,7 @@ pub(crate) struct DiffRange {
 /// Returns an error if:
 /// - Input starts with `..` (no base specified)
 /// - Input is empty
-pub(crate) fn parse_diff_range(diff_ref: &str) -> crate::Result<DiffRange> {
+pub fn parse_diff_range(diff_ref: &str) -> crate::Result<DiffRange> {
     if diff_ref.is_empty() {
         return Err(crate::SlocGuardError::Config(
             "--diff requires a git reference".to_string(),
@@ -61,7 +61,7 @@ pub(crate) fn parse_diff_range(diff_ref: &str) -> crate::Result<DiffRange> {
     }
 }
 
-pub(crate) fn filter_by_git_diff(
+pub fn filter_by_git_diff(
     files: Vec<PathBuf>,
     diff_ref: Option<&str>,
     staged_only: bool,
@@ -98,7 +98,3 @@ pub(crate) fn filter_by_git_diff(
 
     Ok(filtered)
 }
-
-#[cfg(test)]
-#[path = "check_git_diff_tests.rs"]
-mod tests;

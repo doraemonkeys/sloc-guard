@@ -5,7 +5,7 @@ use crate::output::{
     TextFormatter,
 };
 
-pub(crate) fn format_output(
+pub fn format_output(
     format: OutputFormat,
     results: &[CheckResult],
     color_mode: crate::output::ColorMode,
@@ -32,7 +32,7 @@ pub(crate) fn format_output(
 }
 
 /// Convert a structure violation to a check result for unified output.
-pub(crate) fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckResult {
+pub fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckResult {
     // Create synthetic LineStats representing the violation
     // We use 'code' to represent the actual count for display purposes
     let stats = LineStats {
@@ -123,7 +123,3 @@ pub(crate) fn structure_violation_to_check_result(violation: &StructureViolation
         }
     }
 }
-
-#[cfg(test)]
-#[path = "check_output_tests.rs"]
-mod tests;

@@ -5,7 +5,7 @@ use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::cli::BaselineUpdateMode;
 use crate::counter::LineStats;
 
-pub(crate) fn load_baseline(baseline_path: Option<&Path>) -> crate::Result<Option<Baseline>> {
+pub fn load_baseline(baseline_path: Option<&Path>) -> crate::Result<Option<Baseline>> {
     let Some(path) = baseline_path else {
         return Ok(None);
     };
@@ -21,9 +21,7 @@ pub(crate) fn load_baseline(baseline_path: Option<&Path>) -> crate::Result<Optio
 }
 
 /// Load baseline optionally - returns None if file doesn't exist (for update-baseline mode).
-pub(crate) fn load_baseline_optional(
-    baseline_path: Option<&Path>,
-) -> crate::Result<Option<Baseline>> {
+pub fn load_baseline_optional(baseline_path: Option<&Path>) -> crate::Result<Option<Baseline>> {
     let Some(path) = baseline_path else {
         return Ok(None);
     };
@@ -35,7 +33,7 @@ pub(crate) fn load_baseline_optional(
     Ok(Some(Baseline::load(path)?))
 }
 
-pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baseline) {
+pub fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baseline) {
     for result in results.iter_mut() {
         if !result.is_failed() {
             continue;
@@ -60,7 +58,7 @@ pub(crate) fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &
 }
 
 /// Update baseline file from check results based on the specified mode.
-pub(crate) fn update_baseline_from_results(
+pub fn update_baseline_from_results(
     results: &[CheckResult],
     mode: BaselineUpdateMode,
     baseline_path: &Path,
@@ -113,7 +111,7 @@ pub(crate) fn update_baseline_from_results(
 }
 
 /// Check if a check result represents a structure violation.
-pub(crate) fn is_structure_violation_result(result: &CheckResult) -> bool {
+pub fn is_structure_violation_result(result: &CheckResult) -> bool {
     matches!(
         result.violation_category(),
         Some(ViolationCategory::Structure { .. })
@@ -123,13 +121,13 @@ pub(crate) fn is_structure_violation_result(result: &CheckResult) -> bool {
 /// Check if a check result represents a structure violation (legacy string-based check).
 /// Used for backwards compatibility during migration and in tests.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn is_structure_violation(override_reason: Option<&str>) -> bool {
+pub fn is_structure_violation(override_reason: Option<&str>) -> bool {
     override_reason.is_some_and(|r| r.starts_with("structure:"))
 }
 
 /// Parse structure violation type from `CheckResult`.
 /// Uses the structured `ViolationCategory` when available, falling back to string parsing.
-pub(crate) fn parse_structure_violation_from_result(
+pub fn parse_structure_violation_from_result(
     result: &CheckResult,
 ) -> Option<(StructureViolationType, usize)> {
     match result.violation_category() {
@@ -152,7 +150,7 @@ pub(crate) fn parse_structure_violation_from_result(
 /// Parse structure violation type from `override_reason`.
 /// Returns (`StructureViolationType`, count) if parseable.
 /// Deprecated: prefer `parse_structure_violation_from_result` for new code.
-pub(crate) fn parse_structure_violation(
+pub fn parse_structure_violation(
     override_reason: Option<&str>,
     count: usize,
 ) -> Option<(StructureViolationType, usize)> {
@@ -171,7 +169,3 @@ pub(crate) fn parse_structure_violation(
 
     Some((vtype, count))
 }
-
-#[cfg(test)]
-#[path = "check_baseline_tests.rs"]
-mod tests;

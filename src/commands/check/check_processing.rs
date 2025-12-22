@@ -7,9 +7,9 @@ use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 use crate::output::FileStatistics;
 
-use super::context::{FileReader, process_file_with_cache};
+use crate::commands::context::{FileReader, process_file_with_cache};
 
-pub(crate) fn process_file_for_check(
+pub fn process_file_for_check(
     file_path: &Path,
     registry: &LanguageRegistry,
     checker: &ThresholdChecker,
@@ -29,7 +29,7 @@ pub(crate) fn process_file_for_check(
 }
 
 #[must_use]
-pub(crate) fn compute_effective_stats(
+pub fn compute_effective_stats(
     stats: &LineStats,
     skip_comments: bool,
     skip_blank: bool,
@@ -50,7 +50,3 @@ pub(crate) fn compute_effective_stats(
 
     effective
 }
-
-#[cfg(test)]
-#[path = "check_processing_tests.rs"]
-mod tests;

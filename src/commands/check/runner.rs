@@ -19,7 +19,7 @@ use super::check_git_diff::filter_by_git_diff;
 use super::check_output::{format_output, structure_violation_to_check_result};
 use super::check_processing::process_file_for_check;
 use super::check_validation::validate_override_paths;
-use super::context::{
+use crate::commands::context::{
     CheckContext, color_choice_to_mode, load_cache, load_config, resolve_scan_paths, save_cache,
     write_output,
 };
@@ -28,7 +28,7 @@ use super::context::{
 ///
 /// Encapsulates all parameters needed by `run_check_with_context` to improve
 /// readability and maintainability.
-pub(crate) struct CheckOptions<'a> {
+pub struct CheckOptions<'a> {
     pub args: &'a CheckArgs,
     pub cli: &'a Cli,
     pub paths: &'a [PathBuf],
@@ -50,7 +50,7 @@ pub fn run_check(args: &CheckArgs, cli: &Cli) -> i32 {
     }
 }
 
-pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
+pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
     // 0. Validate structure params require explicit path
     let paths = validate_and_resolve_paths(args)?;
 
@@ -116,7 +116,7 @@ pub(crate) fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> 
 ///
 /// This function contains the core check logic and accepts pre-built dependencies,
 /// enabling unit testing with custom/mock components.
-pub(crate) fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
+pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     // Destructure options for convenient access
     let args = opts.args;
     let cli = opts.cli;
@@ -276,7 +276,7 @@ pub(crate) fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i
 ///
 /// - If `--max-files`, `--max-dirs`, or `--max-depth` is specified, paths must be explicitly provided
 /// - If no paths are provided and no structure params, defaults to current directory
-pub(crate) fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<PathBuf>> {
+pub fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<PathBuf>> {
     let has_structure_params =
         args.max_files.is_some() || args.max_dirs.is_some() || args.max_depth.is_some();
 
@@ -293,7 +293,7 @@ pub(crate) fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<
     }
 }
 
-pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args: &CheckArgs) {
+pub const fn apply_cli_overrides(config: &mut crate::config::Config, args: &CheckArgs) {
     if let Some(max_lines) = args.max_lines {
         config.content.max_lines = max_lines;
     }
@@ -323,15 +323,3 @@ pub(crate) const fn apply_cli_overrides(config: &mut crate::config::Config, args
         config.structure.max_depth = Some(max_depth);
     }
 }
-
-#[cfg(test)]
-#[path = "check_tests.rs"]
-mod tests;
-
-#[cfg(test)]
-#[path = "check_run_tests.rs"]
-mod run_tests;
-
-#[cfg(test)]
-#[path = "check_context_structure_tests.rs"]
-mod context_structure_tests;

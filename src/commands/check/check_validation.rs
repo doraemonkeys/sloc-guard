@@ -11,7 +11,7 @@ use crate::path_utils::path_matches_override;
 /// - `StructureOverride` paths must point to directories, not files
 ///
 /// Returns an error if any override path is misconfigured.
-pub(crate) fn validate_override_paths(
+pub fn validate_override_paths(
     content_overrides: &[ContentOverride],
     structure_overrides: &[StructureOverride],
     files: &[PathBuf],
@@ -51,7 +51,3 @@ pub(crate) fn validate_override_paths(
 
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "check_validation_tests.rs"]
-mod tests;
