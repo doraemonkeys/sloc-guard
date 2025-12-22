@@ -4,7 +4,7 @@
 //! anchored patterns, parent gitignore inheritance, wildcards, and spaces.
 
 use super::super::{FileScanner, GitAwareScanner};
-use super::fixtures::{AcceptAllFilter, RustOnlyFilter, init_git_repo};
+use super::mock_filters::{AcceptAllFilter, RustOnlyFilter, init_git_repo};
 use tempfile::TempDir;
 
 #[test]

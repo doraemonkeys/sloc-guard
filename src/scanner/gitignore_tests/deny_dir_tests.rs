@@ -4,7 +4,7 @@
 //! nested structures, glob patterns, duplicate violation prevention, and combined file/dir denial.
 
 use super::super::{FileScanner, GitAwareScanner, StructureScanConfig};
-use super::fixtures::{AcceptAllFilter, init_git_repo};
+use super::mock_filters::{AcceptAllFilter, init_git_repo};
 use crate::scanner::AllowlistRuleBuilder;
 use tempfile::TempDir;
 

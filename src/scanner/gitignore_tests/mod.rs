@@ -6,7 +6,7 @@
 //! - `deny_file_tests`: File denial pattern tests
 //! - `deny_dir_tests`: Directory denial pattern tests
 
-mod fixtures;
+mod mock_filters;
 
 mod deny_dir_tests;
 mod deny_file_tests;
