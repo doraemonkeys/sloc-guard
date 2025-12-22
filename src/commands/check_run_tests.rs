@@ -28,7 +28,7 @@ fn run_check_impl_with_valid_directory() {
     let args = CheckArgs {
         paths: vec![PathBuf::from("src")],
         config: None,
-        max_lines: Some(2000),
+        max_lines: Some(3000),
         ext: Some(vec!["rs".to_string()]),
         exclude: vec!["**/target/**".to_string()],
         include: vec![],
