@@ -66,7 +66,7 @@ CheckResult::Passed { path, stats, limit, override_reason }
 
 // Structure checking
 DirStats { file_count, dir_count, depth }  // immediate children counts + depth from scan root
-ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DeniedFile { pattern_or_extension } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern }
+ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DeniedFile { pattern_or_extension } | DeniedDirectory { pattern } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern }
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
 // Explain (rule chain debugging)

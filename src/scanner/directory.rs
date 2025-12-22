@@ -277,6 +277,19 @@ impl<'a> StructureScanState<'a> {
             return;
         }
 
+        // Check directory-only deny patterns (patterns ending with `/`)
+        if let Some(cfg) = self.structure_config
+            && let Some(pattern) = cfg.dir_matches_global_deny(path)
+        {
+            self.result
+                .allowlist_violations
+                .push(StructureViolation::denied_directory(
+                    path.to_path_buf(),
+                    "global".to_string(),
+                    pattern,
+                ));
+        }
+
         // Check count_exclude
         let is_count_excluded = self
             .structure_config

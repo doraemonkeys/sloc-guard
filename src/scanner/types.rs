@@ -127,8 +127,14 @@ pub struct StructureScanConfig {
     pub allowlist_rules: Vec<AllowlistRule>,
     /// Global deny extensions (e.g., ".exe", ".dll") that apply everywhere.
     pub global_deny_extensions: Vec<String>,
-    /// Global deny patterns (compiled) that apply everywhere.
+    /// Global deny patterns (compiled) that apply to files everywhere.
     pub global_deny_patterns: GlobSet,
+    /// Original file deny pattern strings (for error messages).
+    pub global_deny_pattern_strs: Vec<String>,
+    /// Directory-only deny patterns (patterns ending with `/`, e.g., "`**/node_modules/`").
+    pub global_deny_dir_patterns: GlobSet,
+    /// Original directory-only deny pattern strings (for error messages).
+    pub global_deny_dir_pattern_strs: Vec<String>,
 }
 
 impl StructureScanConfig {
@@ -146,7 +152,23 @@ impl StructureScanConfig {
         let count_exclude = Self::build_glob_set(count_exclude_patterns)?;
         let scanner_exclude = Self::build_glob_set(scanner_exclude_patterns)?;
         let scanner_exclude_dir_names = Self::extract_dir_names(scanner_exclude_patterns);
-        let global_deny_patterns_compiled = Self::build_glob_set(global_deny_patterns)?;
+
+        // Separate directory-only patterns (ending with `/`) from file patterns
+        let (dir_patterns, file_patterns): (Vec<_>, Vec<_>) =
+            global_deny_patterns.iter().partition(|p| p.ends_with('/'));
+
+        // For directory patterns, strip the trailing `/` for glob matching
+        let dir_pattern_strs: Vec<String> = dir_patterns.iter().map(|s| (*s).clone()).collect();
+        let dir_patterns_for_glob: Vec<String> = dir_patterns
+            .iter()
+            .map(|p| p.trim_end_matches('/').to_string())
+            .collect();
+
+        // Convert file_patterns from Vec<&String> to Vec<String> for build_glob_set
+        let file_pattern_strs: Vec<String> = file_patterns.iter().map(|s| (*s).clone()).collect();
+
+        let global_deny_patterns_compiled = Self::build_glob_set(&file_pattern_strs)?;
+        let global_deny_dir_patterns = Self::build_glob_set(&dir_patterns_for_glob)?;
 
         Ok(Self {
             count_exclude,
@@ -155,6 +177,9 @@ impl StructureScanConfig {
             allowlist_rules,
             global_deny_extensions,
             global_deny_patterns: global_deny_patterns_compiled,
+            global_deny_pattern_strs: file_pattern_strs,
+            global_deny_dir_patterns,
+            global_deny_dir_pattern_strs: dir_pattern_strs,
         })
     }
 
@@ -242,11 +267,49 @@ impl StructureScanConfig {
 
         // Check global deny patterns
         let file_name = file_path.file_name().unwrap_or_default();
-        if self.global_deny_patterns.is_match(file_name)
-            || self.global_deny_patterns.is_match(file_path)
+        if let Some(idx) = self
+            .global_deny_patterns
+            .matches(file_name)
+            .into_iter()
+            .next()
         {
-            // Return a generic description since GlobSet doesn't expose pattern strings
-            return Some("global deny pattern".to_string());
+            return self.global_deny_pattern_strs.get(idx).cloned();
+        }
+
+        if let Some(idx) = self
+            .global_deny_patterns
+            .matches(file_path)
+            .into_iter()
+            .next()
+        {
+            return self.global_deny_pattern_strs.get(idx).cloned();
+        }
+
+        None
+    }
+
+    /// Check if a directory matches global directory-only deny patterns (patterns ending with `/`).
+    /// Returns `Some(original_pattern)` if denied, `None` otherwise.
+    pub(crate) fn dir_matches_global_deny(&self, dir_path: &Path) -> Option<String> {
+        let dir_name = dir_path.file_name().unwrap_or_default();
+
+        // Check against compiled patterns (without trailing `/`)
+        if let Some(idx) = self
+            .global_deny_dir_patterns
+            .matches(dir_name)
+            .into_iter()
+            .next()
+        {
+            return self.global_deny_dir_pattern_strs.get(idx).cloned();
+        }
+
+        if let Some(idx) = self
+            .global_deny_dir_patterns
+            .matches(dir_path)
+            .into_iter()
+            .next()
+        {
+            return self.global_deny_dir_pattern_strs.get(idx).cloned();
         }
 
         None

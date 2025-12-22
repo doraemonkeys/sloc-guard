@@ -524,6 +524,15 @@ fn structure_violation_to_check_result(violation: &StructureViolation) -> CheckR
                 "structure: missing sibling (expected: {expected_sibling_pattern}, rule: {rule})"
             ))
         }
+        ViolationType::DeniedDirectory { pattern } => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("global");
+            Some(format!(
+                "structure: denied directory (matched: {pattern}, rule: {rule})"
+            ))
+        }
     };
 
     if violation.is_warning {

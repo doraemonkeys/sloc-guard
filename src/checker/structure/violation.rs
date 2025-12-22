@@ -22,6 +22,11 @@ pub enum ViolationType {
         /// The pattern or extension that matched (e.g., ".exe" or "*.bak").
         pattern_or_extension: String,
     },
+    /// Directory matches a directory-only deny pattern (patterns ending with `/`).
+    DeniedDirectory {
+        /// The pattern that matched (e.g., "`**/node_modules/`").
+        pattern: String,
+    },
     /// File name does not match required naming pattern (`file_naming_pattern`).
     NamingConvention {
         /// The regex pattern that the filename should have matched.
@@ -156,6 +161,20 @@ impl StructureViolation {
             },
             actual: 1,
             limit: 1,
+            is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a denied directory violation (for patterns ending with `/`).
+    #[must_use]
+    pub const fn denied_directory(path: PathBuf, rule_pattern: String, pattern: String) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::DeniedDirectory { pattern },
+            actual: 1,
+            limit: 0,
             is_warning: false,
             override_reason: None,
             triggering_rule_pattern: Some(rule_pattern),

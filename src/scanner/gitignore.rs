@@ -455,6 +455,19 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                     ..Default::default()
                 });
 
+            // Check directory-only deny patterns (patterns ending with `/`)
+            if let Some(cfg) = self.structure_config {
+                let abs_dir = self.workdir.join(path_ref);
+                if let Some(pattern) = cfg.dir_matches_global_deny(&abs_dir) {
+                    self.allowlist_violations
+                        .push(StructureViolation::denied_directory(
+                            path.clone().into_owned(),
+                            "global".to_string(),
+                            pattern,
+                        ));
+                }
+            }
+
             // Register directory chain for this directory
             self.register_directory_chain(path_ref);
         }

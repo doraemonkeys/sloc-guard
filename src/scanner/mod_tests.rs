@@ -1738,3 +1738,203 @@ fn scan_with_structure_combined_allowlist_and_naming_violations() {
     // Two violations: config.json (disallowed) and button.tsx (naming)
     assert_eq!(result.allowlist_violations.len(), 2);
 }
+
+// =============================================================================
+// Directory-Only Deny Pattern Tests (trailing `/`)
+// =============================================================================
+
+#[test]
+fn deny_pattern_with_trailing_slash_only_matches_directories() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "").unwrap();
+
+    // Create a directory named "node_modules"
+    let node_modules_dir = src_dir.join("node_modules");
+    std::fs::create_dir(&node_modules_dir).unwrap();
+    std::fs::write(node_modules_dir.join("package.json"), "").unwrap();
+
+    // Create a FILE named "node_modules" (not a directory)
+    std::fs::write(src_dir.join("node_modules_legacy"), "").unwrap();
+
+    // Pattern with trailing `/` should only match directories
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &["**/node_modules/".to_string()],
+    )
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    // Should have exactly one violation for the node_modules directory
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(
+        result.allowlist_violations[0]
+            .path
+            .ends_with("node_modules")
+    );
+    assert!(matches!(
+        &result.allowlist_violations[0].violation_type,
+        ViolationType::DeniedDirectory { .. }
+    ));
+}
+
+#[test]
+fn deny_pattern_without_trailing_slash_only_matches_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+
+    // Create a file that matches the pattern
+    std::fs::write(src_dir.join("temp_data.txt"), "").unwrap();
+
+    // Create a directory with a similar name
+    let temp_dir_child = src_dir.join("temp_backup");
+    std::fs::create_dir(&temp_dir_child).unwrap();
+    std::fs::write(temp_dir_child.join("file.rs"), "").unwrap();
+
+    // Pattern without trailing `/` should only match files
+    let config =
+        StructureScanConfig::new(&[], &[], Vec::new(), vec![], &["temp_*".to_string()]).unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    // Should have exactly one violation for the temp_data.txt file
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(
+        result.allowlist_violations[0]
+            .path
+            .ends_with("temp_data.txt")
+    );
+    assert!(matches!(
+        &result.allowlist_violations[0].violation_type,
+        ViolationType::DeniedFile { .. }
+    ));
+}
+
+#[test]
+fn structure_scan_config_separates_dir_and_file_patterns() {
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &[
+            "**/node_modules/".to_string(), // Directory pattern
+            "*.bak".to_string(),            // File pattern
+            "**/mocks/".to_string(),        // Directory pattern
+        ],
+    )
+    .unwrap();
+
+    // Two directory-only patterns stored
+    assert_eq!(config.global_deny_dir_pattern_strs.len(), 2);
+    assert!(
+        config
+            .global_deny_dir_pattern_strs
+            .contains(&"**/node_modules/".to_string())
+    );
+    assert!(
+        config
+            .global_deny_dir_pattern_strs
+            .contains(&"**/mocks/".to_string())
+    );
+}
+
+#[test]
+fn dir_matches_global_deny_returns_original_pattern() {
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &["**/node_modules/".to_string()],
+    )
+    .unwrap();
+
+    // Directory matching should return the original pattern with trailing `/`
+    let result = config.dir_matches_global_deny(Path::new("project/src/node_modules"));
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), "**/node_modules/");
+
+    // Non-matching directory should return None
+    let result = config.dir_matches_global_deny(Path::new("project/src/utils"));
+    assert!(result.is_none());
+}
+
+#[test]
+fn multiple_directory_only_deny_patterns() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+
+    // Create multiple directories that should be denied
+    let node_modules = src_dir.join("node_modules");
+    std::fs::create_dir(&node_modules).unwrap();
+
+    let mocks = src_dir.join("mocks");
+    std::fs::create_dir(&mocks).unwrap();
+
+    let valid_dir = src_dir.join("utils");
+    std::fs::create_dir(&valid_dir).unwrap();
+
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &["**/node_modules/".to_string(), "**/mocks/".to_string()],
+    )
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    // Should have violations for both node_modules and mocks directories
+    assert_eq!(result.allowlist_violations.len(), 2);
+    let violation_paths: Vec<_> = result
+        .allowlist_violations
+        .iter()
+        .map(|v| v.path.file_name().unwrap().to_string_lossy().to_string())
+        .collect();
+    assert!(violation_paths.contains(&"node_modules".to_string()));
+    assert!(violation_paths.contains(&"mocks".to_string()));
+}
+
+#[test]
+fn deny_pattern_trailing_slash_with_simple_name() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a directory with a simple name pattern
+    let temp_stuff = temp_dir.path().join("temp_stuff");
+    std::fs::create_dir(&temp_stuff).unwrap();
+    std::fs::write(temp_stuff.join("data.txt"), "").unwrap();
+
+    // Also create a file with similar name (should NOT be caught)
+    std::fs::write(temp_dir.path().join("temp_file.txt"), "").unwrap();
+
+    // Pattern: temp_*/ should only match directories starting with temp_
+    let config =
+        StructureScanConfig::new(&[], &[], Vec::new(), vec![], &["temp_*/".to_string()]).unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    // Should only have violation for the temp_stuff directory
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(result.allowlist_violations[0].path.ends_with("temp_stuff"));
+    assert!(matches!(
+        &result.allowlist_violations[0].violation_type,
+        ViolationType::DeniedDirectory { pattern } if pattern == "temp_*/"
+    ));
+}
