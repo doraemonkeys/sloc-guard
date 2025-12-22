@@ -62,6 +62,11 @@ pub struct ContentConfig {
     #[serde(default)]
     pub strict: bool,
 
+    /// Glob patterns for files to exclude from content (SLOC) checks.
+    /// These files are still visible for structure checks.
+    #[serde(default)]
+    pub exclude: Vec<String>,
+
     /// Path-based rules [[content.rules]].
     #[serde(default)]
     pub rules: Vec<ContentRule>,
@@ -84,6 +89,7 @@ impl Default for ContentConfig {
             skip_comments: true,
             skip_blank: true,
             strict: false,
+            exclude: Vec::new(),
             rules: Vec::new(),
             languages: std::collections::HashMap::new(),
             overrides: Vec::new(),

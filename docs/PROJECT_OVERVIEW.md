@@ -41,7 +41,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
 Config { version, extends, extends_sha256, scanner, content, structure }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
-ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, rules, languages, overrides }
+ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules, languages, overrides }  // exclude: glob patterns to skip SLOC but keep for structure
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
 ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, count_exclude, deny_extensions, deny_patterns, deny_files, deny_dirs, rules, overrides }
@@ -69,8 +69,8 @@ StructureViolation { path, violation_type, actual, limit, is_warning, override_r
 
 // Explain (rule chain debugging)
 MatchStatus::Matched | Superseded | NoMatch
-ContentRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
-ContentExplanation { path, matched_rule, effective_limit, warn_threshold, skip_*, rule_chain }
+ContentRuleMatch::Excluded { pattern } | Override { index, reason } | Rule { index, pattern } | Default
+ContentExplanation { path, is_excluded, matched_rule, effective_limit, warn_threshold, skip_*, rule_chain }
 StructureRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
 StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, rule_chain }
 
@@ -139,7 +139,7 @@ CLI args → load_config() → [if --offline] use cache only, error on miss
          → LanguageRegistry
          → [if gitignore] GitAwareScanner else DirectoryScanner
             Scanner returns ALL files (exclude patterns only, no extension filter)
-         → ThresholdChecker::should_process() filters by content.extensions OR rule match
+         → ThresholdChecker::should_process() filters by content.exclude, then content.extensions OR rule match
          → parallel file processing (rayon):
               cache lookup by mtime+size → [miss] SlocCounter::count() → update cache
          → save_cache()

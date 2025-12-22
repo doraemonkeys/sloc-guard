@@ -18,6 +18,8 @@ pub enum MatchStatus {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentRuleMatch {
+    /// File excluded from content checks via `content.exclude`
+    Excluded { pattern: String },
     /// Matched a `[[content.overrides]]` entry
     Override { index: usize, reason: String },
     /// Matched a `[[content.rules]]` pattern
@@ -44,9 +46,11 @@ pub struct ContentRuleCandidate {
 pub struct ContentExplanation {
     /// Path being explained
     pub path: PathBuf,
+    /// Whether file is excluded from content checks via `content.exclude`
+    pub is_excluded: bool,
     /// Which rule was ultimately selected
     pub matched_rule: ContentRuleMatch,
-    /// Effective line limit applied
+    /// Effective line limit applied (0 if excluded)
     pub effective_limit: usize,
     /// Warning threshold (0.0-1.0)
     pub warn_threshold: f64,

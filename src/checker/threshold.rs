@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use globset::{Glob, GlobMatcher};
+use globset::{Glob, GlobMatcher, GlobSet, GlobSetBuilder};
 
 use crate::analyzer::SplitSuggestion;
 use crate::config::Config;
@@ -247,6 +247,9 @@ pub struct ThresholdChecker {
     /// Extensions to process (from content.extensions).
     /// Empty set means process all files.
     allowed_extensions: HashSet<String>,
+    /// Glob patterns for files to exclude from content checks.
+    /// These files skip SLOC counting but remain visible for structure checks.
+    content_exclude: GlobSet,
 }
 
 impl ThresholdChecker {
@@ -255,12 +258,24 @@ impl ThresholdChecker {
         let path_rules = Self::build_path_rules(&config);
         let allowed_extensions: HashSet<String> =
             config.content.extensions.iter().cloned().collect();
+        let content_exclude = Self::build_content_exclude(&config);
         Self {
             config,
             warning_threshold: 0.9,
             path_rules,
             allowed_extensions,
+            content_exclude,
         }
+    }
+
+    fn build_content_exclude(config: &Config) -> GlobSet {
+        let mut builder = GlobSetBuilder::new();
+        for pattern in &config.content.exclude {
+            if let Ok(glob) = Glob::new(pattern) {
+                builder.add(glob);
+            }
+        }
+        builder.build().unwrap_or_else(|_| GlobSet::empty())
     }
 
     #[must_use]
@@ -272,14 +287,20 @@ impl ThresholdChecker {
     /// Check if a file should be processed based on extension or rule match.
     ///
     /// A file is processed if:
-    /// - `content.extensions` is empty (no filter), OR
-    /// - File extension is in `content.extensions`, OR
-    /// - File matches any content override or rule pattern
+    /// - NOT in `content.exclude` patterns, AND
+    /// - (`content.extensions` is empty (no filter), OR
+    ///   File extension is in `content.extensions`, OR
+    ///   File matches any content override or rule pattern)
     ///
     /// This ensures extension-less files (Dockerfile, Jenkinsfile, etc.) can be
     /// checked if there's an explicit rule targeting them.
     #[must_use]
     pub fn should_process(&self, path: &Path) -> bool {
+        // Check content exclusion FIRST - excluded files skip SLOC checks entirely
+        if self.content_exclude.is_match(path) {
+            return false;
+        }
+
         if self.allowed_extensions.is_empty() {
             return true; // No filter = process all files
         }
@@ -315,6 +336,12 @@ impl ThresholdChecker {
         }
 
         false
+    }
+
+    /// Check if a file is excluded from content checks via `content.exclude`.
+    #[must_use]
+    pub fn is_content_excluded(&self, path: &Path) -> bool {
+        self.content_exclude.is_match(path)
     }
 
     fn build_path_rules(config: &Config) -> Vec<CompiledPathRule> {
@@ -411,6 +438,21 @@ impl ThresholdChecker {
     /// Returns a detailed breakdown of all evaluated rules and which one won.
     #[must_use]
     pub fn explain(&self, path: &Path) -> ContentExplanation {
+        // 0. Check content exclusion FIRST (highest priority)
+        if let Some(pattern) = self.find_matching_exclude_pattern(path) {
+            let (skip_comments, skip_blank) = self.get_skip_settings_for_path(path);
+            return ContentExplanation {
+                path: path.to_path_buf(),
+                is_excluded: true,
+                matched_rule: ContentRuleMatch::Excluded { pattern },
+                effective_limit: 0,
+                warn_threshold: self.get_warn_threshold_for_path(path),
+                skip_comments,
+                skip_blank,
+                rule_chain: Vec::new(),
+            };
+        }
+
         let mut rule_chain = Vec::new();
         let mut matched_rule = ContentRuleMatch::Default;
         let mut found_match = false;
@@ -524,6 +566,7 @@ impl ThresholdChecker {
 
         ContentExplanation {
             path: path.to_path_buf(),
+            is_excluded: false,
             matched_rule,
             effective_limit: self.get_limit_for_path(path).0,
             warn_threshold: self.get_warn_threshold_for_path(path),
@@ -531,6 +574,18 @@ impl ThresholdChecker {
             skip_blank,
             rule_chain,
         }
+    }
+
+    /// Find the first matching content.exclude pattern for a path.
+    fn find_matching_exclude_pattern(&self, path: &Path) -> Option<String> {
+        for pattern in &self.config.content.exclude {
+            if let Ok(glob) = Glob::new(pattern)
+                && glob.compile_matcher().is_match(path)
+            {
+                return Some(pattern.clone());
+            }
+        }
+        None
     }
 }
 

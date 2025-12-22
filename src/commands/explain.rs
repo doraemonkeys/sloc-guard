@@ -86,6 +86,15 @@ fn format_content_text(exp: &ContentExplanation) -> String {
 
     // Show matched rule
     match &exp.matched_rule {
+        ContentRuleMatch::Excluded { pattern } => {
+            output.push_str(&format!(
+                "  Status:  EXCLUDED (matches content.exclude pattern \"{pattern}\")\n"
+            ));
+            output.push_str(
+                "  Note:    This file is excluded from SLOC counting but visible for structure checks.\n",
+            );
+            return output;
+        }
         ContentRuleMatch::Override { index, reason } => {
             output.push_str(&format!(
                 "  Matched: [[content.overrides]] index {index} (reason: {reason})\n"
