@@ -15,7 +15,7 @@ fn multiple_matching_rules_last_match_wins() {
         max_files: Some(5), // Global default
         rules: vec![
             StructureRule {
-                pattern: "src/**".to_string(),
+                scope: "src/**".to_string(),
                 max_files: Some(10), // First rule: 10 files
                 max_dirs: None,
                 max_depth: None,
@@ -33,7 +33,7 @@ fn multiple_matching_rules_last_match_wins() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "src/generated/**".to_string(),
+                scope: "src/generated/**".to_string(),
                 max_files: Some(100), // Second rule (more specific): 100 files
                 max_dirs: None,
                 max_depth: None,
@@ -77,7 +77,7 @@ fn last_match_wins_more_restrictive_rule_last() {
         max_files: Some(100), // Global: very permissive
         rules: vec![
             StructureRule {
-                pattern: "src/**".to_string(),
+                scope: "src/**".to_string(),
                 max_files: Some(50), // First rule: permissive
                 max_dirs: None,
                 max_depth: None,
@@ -95,7 +95,7 @@ fn last_match_wins_more_restrictive_rule_last() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "src/core/**".to_string(),
+                scope: "src/core/**".to_string(),
                 max_files: Some(10), // Second rule: restrictive
                 max_dirs: None,
                 max_depth: None,
@@ -139,7 +139,7 @@ fn three_rules_last_matching_wins() {
     let config = StructureConfig {
         rules: vec![
             StructureRule {
-                pattern: "**".to_string(),
+                scope: "**".to_string(),
                 max_files: Some(5),
                 max_dirs: None,
                 max_depth: None,
@@ -157,7 +157,7 @@ fn three_rules_last_matching_wins() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "src/**".to_string(),
+                scope: "src/**".to_string(),
                 max_files: Some(10),
                 max_dirs: None,
                 max_depth: None,
@@ -175,7 +175,7 @@ fn three_rules_last_matching_wins() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "src/lib/**".to_string(),
+                scope: "src/lib/**".to_string(),
                 max_files: Some(20),
                 max_dirs: None,
                 max_depth: None,
@@ -218,7 +218,7 @@ fn non_matching_rules_skipped_in_priority() {
     let config = StructureConfig {
         rules: vec![
             StructureRule {
-                pattern: "src/**".to_string(),
+                scope: "src/**".to_string(),
                 max_files: Some(10), // Matches
                 max_dirs: None,
                 max_depth: None,
@@ -236,7 +236,7 @@ fn non_matching_rules_skipped_in_priority() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "tests/**".to_string(), // Does NOT match src/lib
+                scope: "tests/**".to_string(), // Does NOT match src/lib
                 max_files: Some(100),
                 max_dirs: None,
                 max_depth: None,
@@ -279,7 +279,7 @@ fn explain_reports_last_matching_rule() {
     let config = StructureConfig {
         rules: vec![
             StructureRule {
-                pattern: "src/**".to_string(),
+                scope: "src/**".to_string(),
                 max_files: Some(10),
                 max_dirs: None,
                 max_depth: None,
@@ -297,7 +297,7 @@ fn explain_reports_last_matching_rule() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "src/lib/**".to_string(),
+                scope: "src/lib/**".to_string(),
                 max_files: Some(50),
                 max_dirs: None,
                 max_depth: None,

@@ -81,7 +81,7 @@ fn rule_overrides_global_limit() {
     let config = StructureConfig {
         max_files: Some(5),
         rules: vec![StructureRule {
-            pattern: "src/generated/**".to_string(),
+            scope: "src/generated/**".to_string(),
             max_files: Some(100),
             max_dirs: None,
             max_depth: None,
@@ -122,7 +122,7 @@ fn rule_inherits_unset_limit_from_global() {
         max_files: Some(5),
         max_dirs: Some(3),
         rules: vec![StructureRule {
-            pattern: "src/generated/**".to_string(),
+            scope: "src/generated/**".to_string(),
             max_files: Some(100),
             max_dirs: None, // Should inherit global max_dirs=3
             max_depth: None,
@@ -271,7 +271,7 @@ fn warn_threshold_rule_overrides_global() {
         max_files: Some(50),
         warn_threshold: Some(0.9), // Global: warn at 45
         rules: vec![StructureRule {
-            pattern: "src/special/**".to_string(),
+            scope: "src/special/**".to_string(),
             max_files: None, // Inherit 50
             max_dirs: None,
             max_depth: None,
@@ -389,7 +389,7 @@ fn rule_can_set_unlimited_to_override_global() {
         max_files: Some(5),
         max_dirs: Some(2),
         rules: vec![StructureRule {
-            pattern: "src/generated/**".to_string(),
+            scope: "src/generated/**".to_string(),
             max_files: Some(UNLIMITED), // Override to unlimited
             max_dirs: None,             // Inherit global (2)
             max_depth: None,
@@ -500,7 +500,7 @@ fn invalid_max_dirs_value_returns_error() {
 fn invalid_rule_max_files_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: Some(-10), // Invalid
             max_dirs: None,
             max_depth: None,
@@ -532,7 +532,7 @@ fn invalid_rule_max_files_returns_error() {
 fn invalid_rule_max_dirs_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: Some(-3), // Invalid
             max_depth: None,

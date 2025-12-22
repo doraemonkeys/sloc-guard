@@ -8,7 +8,7 @@ fn allowlist_rule_builder_creates_rule() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    assert_eq!(rule.pattern, "src/**");
+    assert_eq!(rule.scope, "src/**");
     assert_eq!(rule.allow_extensions, vec![".rs".to_string()]);
 }
 

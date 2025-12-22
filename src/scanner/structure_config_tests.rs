@@ -313,11 +313,11 @@ fn find_matching_allowlist_rule_returns_first_match() {
 
     let src_rule = config.find_matching_allowlist_rule(Path::new("project/src/lib"));
     assert!(src_rule.is_some());
-    assert_eq!(src_rule.unwrap().pattern, "**/src/**");
+    assert_eq!(src_rule.unwrap().scope, "**/src/**");
 
     let test_rule = config.find_matching_allowlist_rule(Path::new("project/tests/unit"));
     assert!(test_rule.is_some());
-    assert_eq!(test_rule.unwrap().pattern, "**/tests/**");
+    assert_eq!(test_rule.unwrap().scope, "**/tests/**");
 
     let none_rule = config.find_matching_allowlist_rule(Path::new("project/docs"));
     assert!(none_rule.is_none());

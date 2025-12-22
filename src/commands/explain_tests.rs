@@ -197,7 +197,7 @@ fn explain_structure_rule_matches() {
         max_files: Some(10),
         max_dirs: Some(5),
         rules: vec![StructureRule {
-            pattern: "src/components/*".to_string(),
+            scope: "src/components/*".to_string(),
             max_files: Some(50),
             max_dirs: Some(10),
             max_depth: None,
@@ -254,7 +254,7 @@ fn explain_structure_rule_chain_statuses() {
         max_dirs: Some(5),
         rules: vec![
             StructureRule {
-                pattern: "src/*".to_string(),
+                scope: "src/*".to_string(),
                 max_files: Some(20),
                 max_dirs: Some(10),
                 max_depth: None,
@@ -272,7 +272,7 @@ fn explain_structure_rule_chain_statuses() {
                 deny_dirs: vec![],
             },
             StructureRule {
-                pattern: "test/*".to_string(),
+                scope: "test/*".to_string(),
                 max_files: Some(30),
                 max_dirs: Some(15),
                 max_depth: None,

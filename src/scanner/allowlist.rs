@@ -9,8 +9,8 @@ use crate::error::Result;
 /// A compiled allowlist rule for checking allowed file types in a directory.
 #[derive(Debug, Clone)]
 pub struct AllowlistRule {
-    /// Glob pattern matching directories where this rule applies.
-    pub pattern: String,
+    /// Glob pattern defining the directory scope where this rule applies.
+    pub scope: String,
     matcher: globset::GlobMatcher,
     /// Validated extensions (with leading dot, e.g., ".rs").
     pub allow_extensions: Vec<String>,
@@ -130,7 +130,7 @@ impl AllowlistRule {
 
 /// Builder for creating `AllowlistRule` instances.
 pub struct AllowlistRuleBuilder {
-    pattern: String,
+    scope: String,
     allow_extensions: Vec<String>,
     allow_patterns: Vec<String>,
     deny_extensions: Vec<String>,
@@ -142,9 +142,9 @@ pub struct AllowlistRuleBuilder {
 
 impl AllowlistRuleBuilder {
     #[must_use]
-    pub const fn new(pattern: String) -> Self {
+    pub const fn new(scope: String) -> Self {
         Self {
-            pattern,
+            scope,
             allow_extensions: Vec::new(),
             allow_patterns: Vec::new(),
             deny_extensions: Vec::new(),
@@ -202,8 +202,8 @@ impl AllowlistRuleBuilder {
     /// # Errors
     /// Returns an error if any pattern is invalid.
     pub fn build(self) -> Result<AllowlistRule> {
-        let glob = Glob::new(&self.pattern).map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: self.pattern.clone(),
+        let glob = Glob::new(&self.scope).map_err(|e| SlocGuardError::InvalidPattern {
+            pattern: self.scope.clone(),
             source: e,
         })?;
 
@@ -286,7 +286,7 @@ impl AllowlistRuleBuilder {
         };
 
         Ok(AllowlistRule {
-            pattern: self.pattern,
+            scope: self.scope,
             matcher: glob.compile_matcher(),
             allow_extensions: self.allow_extensions,
             allow_patterns,

@@ -118,7 +118,7 @@ fn rule_overrides_global_depth_limit() {
     let config = StructureConfig {
         max_depth: Some(2),
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(5), // Override to allow deeper
@@ -195,7 +195,7 @@ fn invalid_max_depth_value_returns_error() {
 fn invalid_rule_max_depth_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(-3), // Invalid
@@ -251,7 +251,7 @@ fn calculate_base_depth_simple_pattern() {
     // "src/features/**" → base_depth = 2
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/features/**".to_string(),
+            scope: "src/features/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(2),
@@ -294,7 +294,7 @@ fn relative_depth_allows_deep_nesting_within_base() {
     // Absolute depth 4 = relative depth 2 (within limit)
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/features/**".to_string(),
+            scope: "src/features/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(2),
@@ -336,7 +336,7 @@ fn relative_depth_violates_when_too_deep() {
     // Absolute depth 5 = relative depth 3 (exceeds limit)
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/features/**".to_string(),
+            scope: "src/features/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(2),
@@ -379,7 +379,7 @@ fn relative_depth_false_uses_absolute_depth() {
     // Without relative_depth, the absolute depth is used
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/features/**".to_string(),
+            scope: "src/features/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(2),
@@ -423,7 +423,7 @@ fn relative_depth_with_wildcard_in_middle() {
     // base_depth should be 1 (only "src" is concrete)
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/*/utils/**".to_string(),
+            scope: "src/*/utils/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(1),
@@ -466,7 +466,7 @@ fn relative_depth_with_double_star_at_start() {
     // Pattern: **/*.rs → base_depth = 0
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "**".to_string(),
+            scope: "**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(3),
@@ -507,7 +507,7 @@ fn relative_depth_with_double_star_at_start() {
 fn relative_depth_warn_threshold() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/features/**".to_string(),
+            scope: "src/features/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(5),
@@ -553,7 +553,7 @@ fn relative_depth_moving_base_works() {
     // relative depth still works correctly
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "packages/core/src/features/**".to_string(),
+            scope: "packages/core/src/features/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: Some(2),
@@ -597,7 +597,7 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
     // This shouldn't happen normally, but we use saturating_sub to be safe.
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/features/**".to_string(), // base_depth = 2
+            scope: "src/features/**".to_string(), // base_depth = 2
             max_files: None,
             max_dirs: None,
             max_depth: Some(1),

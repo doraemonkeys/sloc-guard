@@ -38,7 +38,7 @@ fn override_takes_priority_over_rules() {
     let config = StructureConfig {
         max_files: Some(10),
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: Some(20),
             max_dirs: None,
             max_depth: None,

@@ -53,7 +53,7 @@ fn checker_enabled_with_overrides() {
 fn checker_enabled_with_allowlist_rule() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -171,7 +171,7 @@ fn structure_violation_new() {
 fn invalid_rule_pattern_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "[invalid".to_string(),
+            scope: "[invalid".to_string(),
             max_files: Some(10),
             max_dirs: None,
             max_depth: None,

@@ -396,8 +396,10 @@ pub struct StructureConfig {
 /// Rule for overriding structure limits on specific directories.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct StructureRule {
-    /// Glob pattern for directory matching.
-    pub pattern: String,
+    /// Glob pattern defining the directory scope where this rule applies.
+    /// Example: `scope = "src/**"` applies to all directories under `src/`.
+    #[serde(alias = "pattern")]
+    pub scope: String,
 
     /// Override limit for files in matched directories.
     /// Use `-1` for unlimited (no check), `0` for prohibited, `>0` for limit.
@@ -414,9 +416,9 @@ pub struct StructureRule {
     #[serde(default)]
     pub max_depth: Option<i64>,
 
-    /// When true, `max_depth` is measured relative to the pattern's base directory
+    /// When true, `max_depth` is measured relative to the scope's base directory
     /// instead of from the scan root.
-    /// Example: `pattern="src/features/**"`, `relative_depth=true`, `max_depth=2`
+    /// Example: `scope="src/features/**"`, `relative_depth=true`, `max_depth=2`
     /// → checks depth within src/features/, not from project root.
     #[serde(default)]
     pub relative_depth: bool,

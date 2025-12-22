@@ -239,7 +239,7 @@ impl<'a> StructureScanState<'a> {
                 .allowlist_violations
                 .push(StructureViolation::denied_file(
                     path.to_path_buf(),
-                    rule.pattern.clone(),
+                    rule.scope.clone(),
                     matched,
                 ));
             return; // Denied files don't need further checks
@@ -251,7 +251,7 @@ impl<'a> StructureScanState<'a> {
                 .allowlist_violations
                 .push(StructureViolation::disallowed_file(
                     path.to_path_buf(),
-                    rule.pattern.clone(),
+                    rule.scope.clone(),
                 ));
         }
 
@@ -263,7 +263,7 @@ impl<'a> StructureScanState<'a> {
                 .allowlist_violations
                 .push(StructureViolation::naming_convention(
                     path.to_path_buf(),
-                    rule.pattern.clone(),
+                    rule.scope.clone(),
                     pattern_str.clone(),
                 ));
         }
@@ -313,7 +313,7 @@ impl<'a> StructureScanState<'a> {
                 .allowlist_violations
                 .push(StructureViolation::denied_directory(
                     path.to_path_buf(),
-                    rule.pattern.clone(),
+                    rule.scope.clone(),
                     pattern,
                 ));
         }

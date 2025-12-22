@@ -308,7 +308,7 @@ impl CheckContext {
                 || !rule.deny_dirs.is_empty()
                 || rule.file_naming_pattern.is_some()
             {
-                let allowlist_rule = AllowlistRuleBuilder::new(rule.pattern.clone())
+                let allowlist_rule = AllowlistRuleBuilder::new(rule.scope.clone())
                     .with_extensions(rule.allow_extensions.clone())
                     .with_patterns(rule.allow_patterns.clone())
                     .with_deny_extensions(rule.deny_extensions.clone())

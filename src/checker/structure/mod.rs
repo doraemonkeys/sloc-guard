@@ -296,7 +296,7 @@ impl StructureChecker {
                 {
                     violations.push(StructureViolation::missing_sibling(
                         file_path.clone(),
-                        rule.dir_pattern.clone(),
+                        rule.dir_scope.clone(),
                         rule.sibling_template.clone(),
                     ));
                 }
@@ -375,7 +375,7 @@ impl StructureChecker {
                 found_match = true;
                 matched_rule = StructureRuleMatch::Rule {
                     index: i,
-                    pattern: rule.pattern.clone(),
+                    pattern: rule.scope.clone(),
                 };
                 MatchStatus::Matched
             } else if matches {
@@ -386,7 +386,7 @@ impl StructureChecker {
 
             rule_chain.push(StructureRuleCandidate {
                 source: format!("structure.rules[{i}]"),
-                pattern: Some(rule.pattern.clone()),
+                pattern: Some(rule.scope.clone()),
                 max_files: rule.max_files,
                 max_dirs: rule.max_dirs,
                 max_depth: rule.max_depth,

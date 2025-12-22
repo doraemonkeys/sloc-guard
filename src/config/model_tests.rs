@@ -223,12 +223,12 @@ fn config_deserialize_structure_with_rules() {
     assert_eq!(config.structure.rules.len(), 2);
 
     let rule0 = &config.structure.rules[0];
-    assert_eq!(rule0.pattern, "src/generated/**");
+    assert_eq!(rule0.scope, "src/generated/**");
     assert_eq!(rule0.max_files, Some(50));
     assert!(rule0.max_dirs.is_none());
 
     let rule1 = &config.structure.rules[1];
-    assert_eq!(rule1.pattern, "tests/**");
+    assert_eq!(rule1.scope, "tests/**");
     assert_eq!(rule1.max_files, Some(20));
     assert_eq!(rule1.max_dirs, Some(10));
 }
@@ -248,7 +248,7 @@ fn config_deserialize_structure_only_rules() {
     assert!(config.structure.max_files.is_none());
     assert!(config.structure.max_dirs.is_none());
     assert_eq!(config.structure.rules.len(), 1);
-    assert_eq!(config.structure.rules[0].pattern, "vendor/**");
+    assert_eq!(config.structure.rules[0].scope, "vendor/**");
 }
 
 #[test]

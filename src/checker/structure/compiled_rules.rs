@@ -7,7 +7,7 @@ use globset::GlobMatcher;
 
 /// Compiled structure rule with precompiled glob matcher.
 pub(super) struct CompiledStructureRule {
-    pub pattern: String,
+    pub scope: String,
     pub matcher: GlobMatcher,
     pub max_files: Option<i64>,
     pub max_dirs: Option<i64>,
@@ -22,8 +22,8 @@ pub(super) struct CompiledStructureRule {
 
 /// Compiled sibling rule for file co-location checking.
 pub(super) struct CompiledSiblingRule {
-    /// Original directory pattern string (for violation messages).
-    pub dir_pattern: String,
+    /// Original directory scope string (for violation messages).
+    pub dir_scope: String,
     /// Matcher for directory (parent of files).
     pub dir_matcher: GlobMatcher,
     /// Matcher for files that require a sibling.

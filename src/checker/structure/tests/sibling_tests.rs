@@ -12,7 +12,7 @@ use super::*;
 fn require_sibling_without_file_pattern_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -46,7 +46,7 @@ fn file_pattern_without_require_sibling_is_allowed() {
     // file_pattern alone doesn't trigger sibling checking (no-op)
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -74,7 +74,7 @@ fn file_pattern_without_require_sibling_is_allowed() {
 fn invalid_file_pattern_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -123,7 +123,7 @@ fn check_siblings_no_rules_returns_empty() {
 fn check_siblings_file_has_sibling_no_violation() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -157,7 +157,7 @@ fn check_siblings_file_has_sibling_no_violation() {
 fn check_siblings_file_missing_sibling_returns_violation() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -201,7 +201,7 @@ fn check_siblings_file_missing_sibling_returns_violation() {
 fn check_siblings_dir_pattern_not_matching_skips_check() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/components/**".to_string(), // Only components
+            scope: "src/components/**".to_string(), // Only components
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -234,7 +234,7 @@ fn check_siblings_dir_pattern_not_matching_skips_check() {
 fn check_siblings_file_pattern_not_matching_skips_check() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -271,7 +271,7 @@ fn check_siblings_file_pattern_not_matching_skips_check() {
 fn check_siblings_multiple_files_mixed_results() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -312,7 +312,7 @@ fn check_siblings_test_file_not_checked_for_siblings() {
     // use a more specific file_pattern
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -346,7 +346,7 @@ fn check_siblings_test_file_not_checked_for_siblings() {
 fn check_siblings_nested_directories() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -382,7 +382,7 @@ fn check_siblings_nested_directories() {
 fn check_siblings_sorted_by_path() {
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "src/**".to_string(),
+            scope: "src/**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -426,7 +426,7 @@ fn derive_sibling_path_basic() {
     // Use .spec for test files so they don't match *.tsx pattern
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "**".to_string(),
+            scope: "**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,
@@ -462,7 +462,7 @@ fn derive_sibling_path_different_template() {
     // Use *Service.java to only match service files, not test files
     let config = StructureConfig {
         rules: vec![StructureRule {
-            pattern: "**".to_string(),
+            scope: "**".to_string(),
             max_files: None,
             max_dirs: None,
             max_depth: None,

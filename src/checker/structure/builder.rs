@@ -12,16 +12,16 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
     rules
         .iter()
         .map(|rule| {
-            let glob = Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: rule.pattern.clone(),
+            let glob = Glob::new(&rule.scope).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: rule.scope.clone(),
                 source: e,
             })?;
 
             // Calculate base_depth: count path components before first glob metacharacter
-            let base_depth = calculate_base_depth(&rule.pattern);
+            let base_depth = calculate_base_depth(&rule.scope);
 
             Ok(CompiledStructureRule {
-                pattern: rule.pattern.clone(),
+                scope: rule.scope.clone(),
                 matcher: glob.compile_matcher(),
                 max_files: rule.max_files,
                 max_dirs: rule.max_dirs,
@@ -40,11 +40,10 @@ pub(super) fn build_sibling_rules(rules: &[StructureRule]) -> Result<Vec<Compile
         .iter()
         .filter(|rule| rule.require_sibling.is_some() && rule.file_pattern.is_some())
         .map(|rule| {
-            let dir_glob =
-                Glob::new(&rule.pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                    pattern: rule.pattern.clone(),
-                    source: e,
-                })?;
+            let dir_glob = Glob::new(&rule.scope).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: rule.scope.clone(),
+                source: e,
+            })?;
 
             let file_pattern = rule.file_pattern.as_ref().unwrap();
             let file_glob =
@@ -54,7 +53,7 @@ pub(super) fn build_sibling_rules(rules: &[StructureRule]) -> Result<Vec<Compile
                 })?;
 
             Ok(CompiledSiblingRule {
-                dir_pattern: rule.pattern.clone(),
+                dir_scope: rule.scope.clone(),
                 dir_matcher: dir_glob.compile_matcher(),
                 file_matcher: file_glob.compile_matcher(),
                 sibling_template: rule.require_sibling.clone().unwrap(),

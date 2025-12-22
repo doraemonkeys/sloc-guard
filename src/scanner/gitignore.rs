@@ -408,7 +408,7 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                             self.allowlist_violations
                                 .push(StructureViolation::denied_file(
                                     path.clone().into_owned(),
-                                    rule.pattern.clone(),
+                                    rule.scope.clone(),
                                     matched,
                                 ));
                         } else {
@@ -417,7 +417,7 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                                 self.allowlist_violations.push(
                                     StructureViolation::disallowed_file(
                                         path.clone().into_owned(),
-                                        rule.pattern.clone(),
+                                        rule.scope.clone(),
                                     ),
                                 );
                             }
@@ -429,7 +429,7 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
                                 self.allowlist_violations.push(
                                     StructureViolation::naming_convention(
                                         path.clone().into_owned(),
-                                        rule.pattern.clone(),
+                                        rule.scope.clone(),
                                         pattern_str.clone(),
                                     ),
                                 );

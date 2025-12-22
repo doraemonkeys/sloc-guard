@@ -39,10 +39,10 @@ fn config_with_depth_limit(max_depth: i64) -> StructureConfig {
     }
 }
 
-/// Create a basic structure rule with the given pattern and `max_files`.
-fn make_rule(pattern: &str, max_files: Option<i64>) -> StructureRule {
+/// Create a basic structure rule with the given scope and `max_files`.
+fn make_rule(scope: &str, max_files: Option<i64>) -> StructureRule {
     StructureRule {
-        pattern: pattern.to_string(),
+        scope: scope.to_string(),
         max_files,
         max_dirs: None,
         max_depth: None,
