@@ -27,9 +27,9 @@ count_exclude = ["*_tests.rs"]
 
 
 # 在 src 目录下禁止特定文件名
-[[structure.rules]]
-pattern = "src/**"
-# deny_file_patterns = [
+# [[structure.rules]]
+# scope = "src/**"
+# deny_files = [
 #     # 按类型组织 (反模式)
 #     "types.rs",
 #     "enums.rs",

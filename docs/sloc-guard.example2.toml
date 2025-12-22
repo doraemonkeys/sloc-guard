@@ -1,0 +1,173 @@
+# ==============================================================================
+# SlocGuard Configuration (V2)
+# ==============================================================================
+# This configuration assumes all planned features (Phase 1-14) are implemented.
+#
+# Sections:
+# 1. [scanner]   - Physical discovery (files/folders to find on disk)
+# 2. [content]   - Code size limits (SLOC Guard) + [[content.override]]
+# 3. [structure] - File/Directory count & topology limits (Structure Guard) + [[structure.override]]
+#
+# Rule Priority Chain (high → low):
+#   Content:   [[content.override]] > [[content.rules]] (last match) > [content.languages.X] > [content]
+#   Structure: [[structure.override]] > [[structure.rules]] (last match) > [structure]
+# ==============================================================================
+
+version = "2.1" # Schema version
+
+# ------------------------------------------------------------------------------
+# Config Inheritance (extends)
+# ------------------------------------------------------------------------------
+# Inherit from a base configuration (local, remote, or preset).
+# Child config values override parent values.
+
+# Preset examples: "preset:rust-strict", "preset:node-strict", "preset:monorepo-base"
+# extends = "preset:rust-strict"
+
+# Remote inheritance (with hash pinning for security):
+# extends = "https://internal.corp/sloc-guard/base-v2.toml"
+# extends_sha256 = "a1b2c3d4..." # Verifies remote content integrity (optional but recommended)
+
+# ------------------------------------------------------------------------------
+# 1. Scanner Configuration (Physical Discovery)
+# ------------------------------------------------------------------------------
+# Determines what files are physically discovered on disk.
+# Files excluded here are completely invisible to ALL checkers (content & structure).
+
+[scanner]
+gitignore = true # Respect .gitignore rules (default: true)
+
+# Global physical exclude patterns (additive to .gitignore)
+exclude = [
+    "node_modules/**",
+    "target/**",
+    "dist/**",
+    "vendor/**",
+    "**/*.min.js",
+]
+
+# ------------------------------------------------------------------------------
+# 2. Content Guard (SLOC Limits)
+# ------------------------------------------------------------------------------
+# Controls file size limits and content analysis.
+
+[content]
+# Only these extensions are processed for SLOC counting
+extensions = ["rs", "ts", "js", "go", "py"]
+
+# Logical exclude: Files matching these patterns are skipped for SLOC counting
+# but REMAIN VISIBLE for structure counts (e.g. they count towards max_files).
+exclude = ["**/*.generated.ts", "**/*.pb.go"]
+
+# Global Limits
+max_lines = 400         # Hard limit (Error)
+warn_threshold = 0.8    # Warning at 320 lines (80%)
+skip_comments = true    # Don't count comments
+skip_blank = true       # Don't count blank lines
+
+# --- Specific Content Rules ---
+# Match specific files by pattern. Last match wins.
+
+[[content.rules]]
+pattern = "src/ui/**"   # UI Components
+max_lines = 250         # Stricter limit
+
+[[content.rules]]
+pattern = "tests/**"    # Test files
+max_lines = 1000        # Relaxed limit
+
+# --- Language-Specific Shorthand ---
+# Equivalent to [[content.rules]] with pattern = "**/*.ext"
+
+[content.languages.rs]
+max_lines = 500
+skip_comments = false   # Count comments in Rust files (example)
+
+# ------------------------------------------------------------------------------
+# 3. Structure Guard (Directory Limits & Topology)
+# ------------------------------------------------------------------------------
+# Controls file counts, directory counts, nesting depth, and file naming.
+# Limits: -1 = Unlimited, 0 = Prohibited, >0 = Limit.
+
+[structure]
+# Global Defaults
+max_files = 50
+max_dirs = 10
+max_depth = 5           # Max absolute nesting depth from scan root
+
+# Granular Warnings (New in Phase 11)
+# Absolute thresholds take precedence over percentages.
+warn_files_at = 45      # Warn explicitly at 45 files
+warn_dirs_threshold = 0.5 # Warn at 50% usage (5 dirs)
+
+# "Ghost" files: Visible in directory listing, but don't count towards max_files quota.
+count_exclude = ["README.md", "LICENSE", ".gitkeep"]
+
+# Global Deny Rules (Topology Enforcement)
+# 全局 deny：所有地方都禁止这些 basename
+deny_files = ["*.bak", "secrets.*", ".DS_Store"]    # basename 匹配
+deny_dirs = ["__pycache__", "node_modules", ".git"]  # basename 匹配
+deny_extensions = ["dll", "exe"]
+
+# 白名单模式，与 deny 模式互斥
+# 规则级别互斥 (整个规则只能是 allow-only 或 deny-only)
+# allow_files = ["README.md", "LICENSE"]
+# allow_dirs = ["temp_*"]
+# allow_extensions = ["rs", "go", "py"]
+
+# --- Structure Rules (Scoped) ---
+# 'scope' defines the directory range where the rule applies.
+
+[[structure.rules]]
+scope = "src/**"
+deny_files = ["util.rs", "helper.rs"]  # 在 src/** 范围内禁止这些 basename
+deny_dirs = ["temp_*"]
+
+[[structure.rules]]
+scope = "tests/**"
+deny_files = ["common.rs"]  # 只在 tests/** 范围内禁止
+
+# Scenario: Generated Code
+[[structure.rules]]
+scope = "src/generated"
+max_files = -1             # Unlimited files
+max_dirs = -1              # Unlimited directories
+# 白名单模式，与 deny 模式互斥
+allow_extensions = ["rs"]  # Only allow Rust files here (deny everything else)
+
+# Scenario: Atomic Components
+[[structure.rules]]
+scope = "src/components/*" # Matches direct children (e.g., src/components/Button/)
+max_files = 5
+max_dirs = 0               # Leaf node (no subdirectories allowed)
+file_naming_pattern = "^[A-Z][a-zA-Z0-9]*$" # PascalCase file naming
+deny_extensions = ["css"]  # Enforce CSS-in-JS (no .css files)
+
+# Scenario: Feature Modules
+[[structure.rules]]
+scope = "src/features/**"
+max_files = 20
+max_depth = 8              # Allow deeper nesting here
+relative_depth = 3         # Max depth relative to the matching folder
+require_sibling = "README.md" # Every feature folder must have a README
+
+# ------------------------------------------------------------------------------
+# 4. Overrides (Grandfathering)
+# ------------------------------------------------------------------------------
+# Exemptions for specific files/directories.
+# Supports expiration dates for technical debt management.
+
+# --- Content Overrides (Files) ---
+[[content.override]]
+path = "src/legacy/big_file.rs"
+max_lines = 2000
+reason = "Core legacy logic, too risky to split."
+expires = "2025-12-31"     # Warning/Error after this date
+
+# --- Structure Overrides (Directories) ---
+[[structure.override]]
+path = "src/legacy_module"
+max_files = 500
+max_dirs = 100
+reason = "Monolith module."
+expires = "2024-06-01"     # Expired! This will trigger a violation.

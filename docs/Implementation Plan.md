@@ -49,26 +49,157 @@ Location: `src/output/html.rs`
 
 ## Phase 11: Advanced Governance (Pending)
 
-### Task 11.3: Time-bound Overrides
-Location: `src/config/*.rs`, `src/checker/*.rs`
-```
-- Add `expires = "YYYY-MM-DD"` to [[content.override]] and [[structure.override]]
-- Expired overrides become violations (treat as if override doesn't exist)
-- Warning mode: warn N days before expiration (configurable)
+> **Performance Note**: Introducing allowlists and complex scope matching may increase computational cost. Ensure **`globset` compilation reuse** during implementation to avoid performance regression.
+
+### Task 11.9: Rename `pattern` → `scope` in Structure Rules
+
+Rename the `pattern` field to `scope` in `[[structure.rules]]` to clarify its semantic role.
+
+**Behavior**:
+- `scope` defines the directory range where a rule applies (e.g., `src/**`, `tests/**`)
+- Accepts same glob patterns as before; no functional change in matching logic
+
+**Config Example**:
+```toml
+[[structure.rules]]
+scope = "src/**"          # Was: pattern = "src/**"
+deny_files = ["util.rs"]
 ```
 
+**Rationale**: `pattern` implies a target to match (like a filename), but it actually defines the directory scope. `scope` explicitly denotes "where" the rule applies, orthogonal to "what" is matched.
+
+---
+
+### Task 11.10: Content Exclude Patterns
+
+Add logical exclusion for content checking that doesn't affect structure visibility.
+
+**Behavior**:
+- Files matching `content.exclude` patterns skip SLOC counting but remain visible for structure checks
+- Different from `scanner.exclude` (physical exclusion) - this is content-only exclusion
+
+**Config Example**:
+```toml
+[content]
+exclude = ["**/*.generated.ts", "**/*.pb.go"]  # Skip SLOC, still count in structure
+```
+
+**Use Case**: Scan all `.ts` files but skip SLOC for generated files while still counting them in `max_files`.
+
+---
+
+### Task 11.11: Granular Warn Thresholds
+
+Add per-metric warning thresholds for structure limits.
+
+**Behavior**:
+- Absolute thresholds (`warn_files_at`, `warn_dirs_at`) take precedence over percentages
+- Percentage thresholds (`warn_files_threshold`, `warn_dirs_threshold`) override global `warn_threshold`
+- Fallback chain: per-metric absolute → per-metric percentage → global `warn_threshold` → default 0.8
+- Apply to both `[structure]` and `[[structure.rules]]`
+
+**Config Example**:
+```toml
+[structure]
+max_files = 50
+max_dirs = 10
+warn_files_at = 45           # Warn at 45 files (absolute)
+warn_dirs_threshold = 0.5    # Warn at 50% dir usage
+```
+
+**Rationale**: Single percentage thresholds fail for small values (0.8 × 5 = 4) and can't differentiate metrics.
+
+---
+
+### Task 11.12: Rename deny_file_patterns → deny_files, Add deny_dirs
+
+Unify file/directory deny patterns with consistent naming.
+
+**Behavior**:
+- Rename `deny_file_patterns` → `deny_files` (global and rule-level)
+- Add `deny_dirs` for directory basename patterns (global and rule-level)
+- Both fields match basenames only (no path separators)
+- Alias old name for backward compatibility
+
+**Config Example**:
+```toml
+[structure]
+deny_files = ["*.bak", "secrets.*", ".DS_Store"]  # File basename patterns
+deny_dirs = ["__pycache__", "node_modules", ".git"]  # Directory basename patterns
+deny_extensions = ["dll", "exe"]  # Extension-only patterns
+
+[[structure.rules]]
+scope = "src/**"
+deny_files = ["util.rs", "helper.rs"]  # Scoped file deny
+deny_dirs = ["temp_*"]  # Scoped directory deny
+```
+
+---
+
+### Task 11.13: Structure Allowlist Mode
+
+Add allowlist-based filtering as an alternative to deny-based filtering.
+
+**Behavior**:
+- Add `allow_files`, `allow_dirs`, `allow_extensions` fields (global and rule-level)
+- Rule-level mutual exclusion: a rule can only use allow-mode OR deny-mode, not both
+- Global-level mutual exclusion: global config can only use allow-mode OR deny-mode
+- Allow-mode semantics: only matching items are permitted; everything else is denied
+
+**Config Example**:
+```toml
+# Deny mode (default)
+[structure]
+deny_files = ["*.bak", "secrets.*"]
+deny_dirs = ["__pycache__", "node_modules"]
+
+# Allow mode (mutually exclusive with deny at same level)
+# [structure]
+# allow_files = ["README.md", "LICENSE"]
+# allow_dirs = ["src", "tests"]
+# allow_extensions = ["rs", "go", "py"]
+
+[[structure.rules]]
+scope = "src/generated"
+max_files = -1
+allow_extensions = ["rs"]  # Only allow .rs files here
+```
+
+**Validation**: Error if both allow and deny fields are set at the same level.
+
+---
+
+### Task 11.3: Time-bound Overrides
+
+Add expiration dates to overrides for technical debt management.
+
+**Behavior**:
+- Add `expires = "YYYY-MM-DD"` to `[[content.override]]` and `[[structure.override]]`
+- Expired overrides become violations (treated as if override doesn't exist)
+- Optional: warning N days before expiration (configurable via `warn_expiry_days`)
+
+**Config Example**:
+```toml
+[[content.override]]
+path = "src/legacy/big_file.rs"
+max_lines = 2000
+reason = "Core legacy logic, too risky to split."
+expires = "2025-12-31"
+```
+
+---
+
 ### Task 11.4: Baseline Ratchet
-Location: `src/commands/check.rs`, `src/baseline/mod.rs`
-```
-- CI mode flag: --ratchet (or config: baseline.ratchet = true)
-- Ratchet behavior when current violations < baseline count:
-  - Default: emit warning "Baseline can be tightened: N violations removed"
-  - With --ratchet=auto: auto-update baseline file silently
-  - With --ratchet=strict: fail CI if baseline not updated (forces team to commit improvement)
-- Prevents regression: error count can only decrease over time
-- CI integration: GitHub Action output `baseline-outdated: true` for workflow conditionals
-- Optional: suggest PR bot integration for automatic baseline update PRs
-```
+
+Enforce that violation count can only decrease over time.
+
+**Behavior**:
+- Add `--ratchet` flag or `baseline.ratchet = true` config
+- When current violations < baseline count:
+  - Default: emit warning "Baseline can be tightened"
+  - `--ratchet=auto`: auto-update baseline silently
+  - `--ratchet=strict`: fail CI if baseline not updated
+- GitHub Action output: `baseline-outdated: true` for workflow conditionals
 
 ---
 
@@ -79,7 +210,8 @@ Location: `src/commands/check.rs`, `src/baseline/mod.rs`
 | ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
 | ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
 | ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
-| **4. Governance Deep Dive** | ~~11.1 Naming Convention~~ ✅, ~~11.2 Co-location~~ ✅, ~~11.7 Deny Patterns~~ ✅, ~~11.8 Deny File Patterns~~ ✅ |
-| **5. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
-| **6. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **4. Structure Naming** | 11.9 pattern→scope, 11.12 deny_file_patterns→deny_files + deny_dirs |
+| **5. Governance Refinement** | 11.10 Content Exclude, 11.11 Granular Warn, 11.13 Allowlist Mode |
+| **6. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
+| **7. Visualization** | 7.1-7.2 HTML Charts/Trends |
 
