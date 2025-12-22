@@ -405,5 +405,5 @@ impl Checker for ThresholdChecker {
 }
 
 #[cfg(test)]
-#[path = "threshold_tests.rs"]
+#[path = "threshold_tests/mod.rs"]
 mod tests;
