@@ -86,6 +86,10 @@ fn rule_overrides_global_limit() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -94,7 +98,6 @@ fn rule_overrides_global_limit() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],
@@ -127,6 +130,10 @@ fn rule_inherits_unset_limit_from_global() {
             max_dirs: None, // Should inherit global max_dirs=3
             max_depth: None,
             warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -135,7 +142,6 @@ fn rule_inherits_unset_limit_from_global() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],
@@ -276,6 +282,10 @@ fn warn_threshold_rule_overrides_global() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: Some(0.5), // Rule: warn at 25
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -284,7 +294,6 @@ fn warn_threshold_rule_overrides_global() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],
@@ -308,10 +317,11 @@ fn warn_threshold_rule_overrides_global() {
 }
 
 #[test]
-fn no_warn_threshold_means_no_warnings() {
+fn no_warn_threshold_uses_default_0_8() {
+    // When no warn_threshold is set, the default 0.8 is used
     let config = StructureConfig {
         max_files: Some(50),
-        // No warn_threshold set
+        // No warn_threshold set - uses default 0.8, so warns at 40 files
         ..Default::default()
     };
     let checker = StructureChecker::new(&config).unwrap();
@@ -319,7 +329,7 @@ fn no_warn_threshold_means_no_warnings() {
     stats.insert(
         PathBuf::from("src"),
         DirStats {
-            file_count: 49, // Just under limit, but no warn_threshold
+            file_count: 39, // Below 40 (80% of 50)
             dir_count: 0,
             depth: 0,
         },
@@ -327,7 +337,7 @@ fn no_warn_threshold_means_no_warnings() {
 
     let violations = checker.check(&stats);
 
-    // No violations because we're under the limit and no warn_threshold
+    // No violations because we're below the default threshold (0.8 * 50 = 40)
     assert!(violations.is_empty());
 }
 
@@ -394,6 +404,10 @@ fn rule_can_set_unlimited_to_override_global() {
             max_dirs: None,             // Inherit global (2)
             max_depth: None,
             warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -402,7 +416,6 @@ fn rule_can_set_unlimited_to_override_global() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],
@@ -505,6 +518,10 @@ fn invalid_rule_max_files_returns_error() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -513,7 +530,6 @@ fn invalid_rule_max_files_returns_error() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],
@@ -537,6 +553,10 @@ fn invalid_rule_max_dirs_returns_error() {
             max_dirs: Some(-3), // Invalid
             max_depth: None,
             warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -545,7 +565,6 @@ fn invalid_rule_max_dirs_returns_error() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],
@@ -558,4 +577,260 @@ fn invalid_rule_max_dirs_returns_error() {
         let msg = err.to_string();
         assert!(msg.contains("Invalid max_dirs value in rule 1"));
     }
+}
+
+// ============================================================================
+// Granular Warn Threshold Tests
+// ============================================================================
+
+#[test]
+fn warn_files_at_absolute_takes_precedence() {
+    // Absolute threshold (warn_files_at) takes precedence over percentage
+    let config = StructureConfig {
+        max_files: Some(50),
+        warn_threshold: Some(0.9), // Would be 45 files
+        warn_files_at: Some(40),   // Absolute: 40 files (takes precedence)
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 42, // Above 40 (absolute), below 45 (percentage)
+            dir_count: 0,
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+    assert_eq!(violations[0].violation_type, ViolationType::FileCount);
+}
+
+#[test]
+fn warn_dirs_at_absolute_takes_precedence() {
+    // Absolute threshold (warn_dirs_at) takes precedence over percentage
+    let config = StructureConfig {
+        max_dirs: Some(10),
+        warn_threshold: Some(0.9), // Would be 9 dirs
+        warn_dirs_at: Some(6),     // Absolute: 6 dirs (takes precedence)
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 0,
+            dir_count: 7, // Above 6 (absolute), below 9 (percentage)
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+    assert_eq!(violations[0].violation_type, ViolationType::DirCount);
+}
+
+#[test]
+fn warn_files_threshold_overrides_global() {
+    // Per-metric percentage (warn_files_threshold) overrides global warn_threshold
+    let config = StructureConfig {
+        max_files: Some(50),
+        warn_threshold: Some(0.9),       // Global: 45 files
+        warn_files_threshold: Some(0.5), // Per-metric: 25 files (overrides)
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 30, // Above 25 (per-metric), below 45 (global)
+            dir_count: 0,
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+}
+
+#[test]
+fn warn_dirs_threshold_overrides_global() {
+    // Per-metric percentage (warn_dirs_threshold) overrides global warn_threshold
+    let config = StructureConfig {
+        max_dirs: Some(10),
+        warn_threshold: Some(0.9),      // Global: 9 dirs
+        warn_dirs_threshold: Some(0.5), // Per-metric: 5 dirs (overrides)
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 0,
+            dir_count: 6, // Above 5 (per-metric), below 9 (global)
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+}
+
+#[test]
+fn granular_warn_different_for_files_and_dirs() {
+    // Different thresholds for files and dirs
+    let config = StructureConfig {
+        max_files: Some(50),
+        max_dirs: Some(10),
+        warn_files_at: Some(45),        // Warn at 45 files (absolute)
+        warn_dirs_threshold: Some(0.5), // Warn at 5 dirs (percentage)
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Test file warning without dir warning
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/a"),
+        DirStats {
+            file_count: 46, // Above 45 (files warn)
+            dir_count: 4,   // Below 5 (dirs OK)
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+    assert_eq!(violations[0].violation_type, ViolationType::FileCount);
+}
+
+#[test]
+fn granular_warn_in_rule_overrides_global() {
+    // Rule-level granular thresholds override global settings
+    let config = StructureConfig {
+        max_files: Some(50),
+        warn_threshold: Some(0.9), // Global: 45 files
+        rules: vec![StructureRule {
+            scope: "src/special/**".to_string(),
+            max_files: None, // Inherit limit
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            warn_files_at: Some(25), // Rule: warn at 25 files
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/special/dir"),
+        DirStats {
+            file_count: 30, // Above 25 (rule), below 45 (global)
+            dir_count: 0,
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+}
+
+#[test]
+fn default_warn_threshold_is_0_8() {
+    // When no threshold is set, default is 0.8
+    let config = StructureConfig {
+        max_files: Some(10),
+        // No warn_threshold set - should use default 0.8 (8 files)
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 9, // Above 8 (80% of 10), below 10
+            dir_count: 0,
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+}
+
+#[test]
+fn rule_inherits_granular_threshold_from_global() {
+    // Rule without granular threshold inherits from global
+    let config = StructureConfig {
+        max_files: Some(50),
+        warn_files_at: Some(40), // Global absolute
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            max_files: None, // Inherit limit
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            warn_files_at: None, // Should inherit 40 from global
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/lib"),
+        DirStats {
+            file_count: 42, // Above 40 (inherited)
+            dir_count: 0,
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
 }

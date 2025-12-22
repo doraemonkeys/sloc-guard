@@ -365,6 +365,26 @@ pub struct StructureConfig {
     #[serde(default)]
     pub warn_threshold: Option<f64>,
 
+    /// Absolute file count at which to warn (takes precedence over percentage thresholds).
+    /// Example: `max_files=50`, `warn_files_at=45` → warns at exactly 45 files.
+    #[serde(default)]
+    pub warn_files_at: Option<i64>,
+
+    /// Absolute directory count at which to warn (takes precedence over percentage thresholds).
+    /// Example: `max_dirs=10`, `warn_dirs_at=8` → warns at exactly 8 directories.
+    #[serde(default)]
+    pub warn_dirs_at: Option<i64>,
+
+    /// Percentage threshold (0.0-1.0) for file count warnings (overrides global `warn_threshold`).
+    /// Example: `max_files=50`, `warn_files_threshold=0.8` → warns at 40 files.
+    #[serde(default)]
+    pub warn_files_threshold: Option<f64>,
+
+    /// Percentage threshold (0.0-1.0) for directory count warnings (overrides global `warn_threshold`).
+    /// Example: `max_dirs=10`, `warn_dirs_threshold=0.5` → warns at 5 directories.
+    #[serde(default)]
+    pub warn_dirs_threshold: Option<f64>,
+
     /// Glob patterns for items not counted in structure limits (e.g., "*.md", ".gitkeep").
     /// These items are still visible but don't count toward file/dir quotas.
     #[serde(default)]
@@ -432,6 +452,22 @@ pub struct StructureRule {
     /// Override threshold for warnings in matched directories.
     #[serde(default)]
     pub warn_threshold: Option<f64>,
+
+    /// Absolute file count at which to warn (takes precedence over percentage thresholds).
+    #[serde(default)]
+    pub warn_files_at: Option<i64>,
+
+    /// Absolute directory count at which to warn (takes precedence over percentage thresholds).
+    #[serde(default)]
+    pub warn_dirs_at: Option<i64>,
+
+    /// Percentage threshold (0.0-1.0) for file count warnings (overrides global `warn_threshold`).
+    #[serde(default)]
+    pub warn_files_threshold: Option<f64>,
+
+    /// Percentage threshold (0.0-1.0) for directory count warnings (overrides global `warn_threshold`).
+    #[serde(default)]
+    pub warn_dirs_threshold: Option<f64>,
 
     /// Allowlist of allowed file extensions (with leading dot, e.g., ".rs", ".go").
     /// Files NOT matching these extensions are violations.

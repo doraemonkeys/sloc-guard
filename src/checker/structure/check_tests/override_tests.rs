@@ -43,6 +43,10 @@ fn override_takes_priority_over_rules() {
             max_dirs: None,
             max_depth: None,
             warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
             file_naming_pattern: None,
@@ -51,7 +55,6 @@ fn override_takes_priority_over_rules() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
-
             deny_files: vec![],
             deny_dirs: vec![],
         }],

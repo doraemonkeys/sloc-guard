@@ -18,6 +18,14 @@ pub(super) struct CompiledStructureRule {
     /// Only meaningful when `relative_depth` is true.
     pub base_depth: usize,
     pub warn_threshold: Option<f64>,
+    /// Absolute file count at which to warn.
+    pub warn_files_at: Option<i64>,
+    /// Absolute directory count at which to warn.
+    pub warn_dirs_at: Option<i64>,
+    /// Percentage threshold for file count warnings.
+    pub warn_files_threshold: Option<f64>,
+    /// Percentage threshold for directory count warnings.
+    pub warn_dirs_threshold: Option<f64>,
 }
 
 /// Compiled sibling rule for file co-location checking.
@@ -43,5 +51,13 @@ pub(super) struct StructureLimits {
     /// Depth of the matched rule's base directory.
     pub base_depth: usize,
     pub warn_threshold: Option<f64>,
+    /// Absolute file count at which to warn.
+    pub warn_files_at: Option<i64>,
+    /// Absolute directory count at which to warn.
+    pub warn_dirs_at: Option<i64>,
+    /// Percentage threshold for file count warnings.
+    pub warn_files_threshold: Option<f64>,
+    /// Percentage threshold for directory count warnings.
+    pub warn_dirs_threshold: Option<f64>,
     pub override_reason: Option<String>,
 }

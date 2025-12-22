@@ -34,6 +34,10 @@ pub struct StructureChecker {
     max_dirs: Option<i64>,
     max_depth: Option<i64>,
     warn_threshold: Option<f64>,
+    warn_files_at: Option<i64>,
+    warn_dirs_at: Option<i64>,
+    warn_files_threshold: Option<f64>,
+    warn_dirs_threshold: Option<f64>,
     rules: Vec<CompiledStructureRule>,
     overrides: Vec<StructureOverride>,
     sibling_rules: Vec<CompiledSiblingRule>,
@@ -56,6 +60,10 @@ impl StructureChecker {
             max_dirs: config.max_dirs,
             max_depth: config.max_depth,
             warn_threshold: config.warn_threshold,
+            warn_files_at: config.warn_files_at,
+            warn_dirs_at: config.warn_dirs_at,
+            warn_files_threshold: config.warn_files_threshold,
+            warn_dirs_threshold: config.warn_dirs_threshold,
             rules,
             overrides: config.overrides.clone(),
             sibling_rules,
@@ -95,7 +103,8 @@ impl StructureChecker {
 
     fn resolve_limits(&self, path: &Path) -> StructureLimits {
         // 1. Check overrides first (highest priority)
-        // Note: Overrides don't support relative_depth (they use absolute limits)
+        // Note: Overrides don't support relative_depth or granular warn thresholds
+        // (they inherit global warn settings)
         for ovr in &self.overrides {
             if path_matches_override(path, &ovr.path) {
                 return StructureLimits {
@@ -105,6 +114,10 @@ impl StructureChecker {
                     relative_depth: false,
                     base_depth: 0,
                     warn_threshold: self.warn_threshold,
+                    warn_files_at: self.warn_files_at,
+                    warn_dirs_at: self.warn_dirs_at,
+                    warn_files_threshold: self.warn_files_threshold,
+                    warn_dirs_threshold: self.warn_dirs_threshold,
                     override_reason: Some(ovr.reason.clone()),
                 };
             }
@@ -121,6 +134,10 @@ impl StructureChecker {
                     relative_depth: rule.relative_depth,
                     base_depth: rule.base_depth,
                     warn_threshold: rule.warn_threshold.or(self.warn_threshold),
+                    warn_files_at: rule.warn_files_at.or(self.warn_files_at),
+                    warn_dirs_at: rule.warn_dirs_at.or(self.warn_dirs_at),
+                    warn_files_threshold: rule.warn_files_threshold.or(self.warn_files_threshold),
+                    warn_dirs_threshold: rule.warn_dirs_threshold.or(self.warn_dirs_threshold),
                     override_reason: None,
                 };
             }
@@ -134,6 +151,10 @@ impl StructureChecker {
             relative_depth: false,
             base_depth: 0,
             warn_threshold: self.warn_threshold,
+            warn_files_at: self.warn_files_at,
+            warn_dirs_at: self.warn_dirs_at,
+            warn_files_threshold: self.warn_files_threshold,
+            warn_dirs_threshold: self.warn_dirs_threshold,
             override_reason: None,
         }
     }
@@ -150,6 +171,9 @@ impl StructureChecker {
         clippy::cast_precision_loss
     )] // Limits are validated to be non-negative (if not UNLIMITED), so casting is safe.
     pub fn check(&self, dir_stats: &HashMap<PathBuf, DirStats>) -> Vec<StructureViolation> {
+        /// Default warn threshold when none specified.
+        const DEFAULT_WARN_THRESHOLD: f64 = 0.8;
+
         let mut violations = Vec::new();
 
         for (path, stats) in dir_stats {
@@ -160,9 +184,14 @@ impl StructureChecker {
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit = limits
-                    .warn_threshold
-                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                // Warn threshold fallback: absolute → percentage → global → default 0.8
+                let warn_limit = Self::calculate_warn_limit(
+                    limit,
+                    limits.warn_files_at,
+                    limits.warn_files_threshold,
+                    limits.warn_threshold,
+                    DEFAULT_WARN_THRESHOLD,
+                );
 
                 if stats.file_count > limit_usize {
                     violations.push(StructureViolation::new(
@@ -188,9 +217,14 @@ impl StructureChecker {
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit = limits
-                    .warn_threshold
-                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                // Warn threshold fallback: absolute → percentage → global → default 0.8
+                let warn_limit = Self::calculate_warn_limit(
+                    limit,
+                    limits.warn_dirs_at,
+                    limits.warn_dirs_threshold,
+                    limits.warn_threshold,
+                    DEFAULT_WARN_THRESHOLD,
+                );
 
                 if stats.dir_count > limit_usize {
                     violations.push(StructureViolation::new(
@@ -212,13 +246,13 @@ impl StructureChecker {
             }
 
             // Check depth (skip if unlimited)
+            // Note: depth uses global warn_threshold only (no granular threshold)
             if let Some(limit) = limits.max_depth
                 && limit != UNLIMITED
             {
                 let limit_usize = limit as usize;
-                let warn_limit = limits
-                    .warn_threshold
-                    .map_or(limit_usize, |t| ((limit as f64) * t).ceil() as usize);
+                let warn_limit = limits.warn_threshold.unwrap_or(DEFAULT_WARN_THRESHOLD);
+                let warn_limit = ((limit as f64) * warn_limit).ceil() as usize;
 
                 // Calculate effective depth: relative to base if relative_depth is set
                 let effective_depth = if limits.relative_depth {
@@ -250,6 +284,39 @@ impl StructureChecker {
         // Sort by path for consistent output
         violations.sort_by(|a, b| a.path.cmp(&b.path));
         violations
+    }
+
+    /// Calculate the warn limit using the fallback chain:
+    /// absolute → percentage → global → default
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
+    fn calculate_warn_limit(
+        limit: i64,
+        absolute: Option<i64>,
+        percentage: Option<f64>,
+        global_threshold: Option<f64>,
+        default_threshold: f64,
+    ) -> usize {
+        // 1. Absolute threshold takes highest precedence
+        if let Some(abs) = absolute {
+            return abs as usize;
+        }
+
+        // 2. Per-metric percentage threshold
+        if let Some(pct) = percentage {
+            return ((limit as f64) * pct).ceil() as usize;
+        }
+
+        // 3. Global warn_threshold
+        if let Some(global) = global_threshold {
+            return ((limit as f64) * global).ceil() as usize;
+        }
+
+        // 4. Default threshold (0.8)
+        ((limit as f64) * default_threshold).ceil() as usize
     }
 
     /// Check files for missing siblings.
