@@ -95,7 +95,8 @@ fn rule_overrides_global_limit() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -135,7 +136,8 @@ fn rule_inherits_unset_limit_from_global() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -283,7 +285,8 @@ fn warn_threshold_rule_overrides_global() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -400,7 +403,8 @@ fn rule_can_set_unlimited_to_override_global() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -510,7 +514,8 @@ fn invalid_rule_max_files_returns_error() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -541,7 +546,8 @@ fn invalid_rule_max_dirs_returns_error() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };

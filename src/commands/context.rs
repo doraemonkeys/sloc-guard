@@ -289,7 +289,8 @@ impl CheckContext {
             || !config.structure.overrides.is_empty()
             || !config.structure.deny_extensions.is_empty()
             || !config.structure.deny_patterns.is_empty()
-            || !config.structure.deny_file_patterns.is_empty();
+            || !config.structure.deny_files.is_empty()
+            || !config.structure.deny_dirs.is_empty();
 
         if !has_structure_config {
             return Ok(None);
@@ -303,7 +304,8 @@ impl CheckContext {
                 || !rule.allow_patterns.is_empty()
                 || !rule.deny_extensions.is_empty()
                 || !rule.deny_patterns.is_empty()
-                || !rule.deny_file_patterns.is_empty()
+                || !rule.deny_files.is_empty()
+                || !rule.deny_dirs.is_empty()
                 || rule.file_naming_pattern.is_some()
             {
                 let allowlist_rule = AllowlistRuleBuilder::new(rule.pattern.clone())
@@ -311,7 +313,8 @@ impl CheckContext {
                     .with_patterns(rule.allow_patterns.clone())
                     .with_deny_extensions(rule.deny_extensions.clone())
                     .with_deny_patterns(rule.deny_patterns.clone())
-                    .with_deny_file_patterns(rule.deny_file_patterns.clone())
+                    .with_deny_files(rule.deny_files.clone())
+                    .with_deny_dirs(rule.deny_dirs.clone())
                     .with_naming_pattern(rule.file_naming_pattern.clone())
                     .build()?;
                 allowlist_rules.push(allowlist_rule);
@@ -324,7 +327,8 @@ impl CheckContext {
             allowlist_rules,
             config.structure.deny_extensions.clone(),
             &config.structure.deny_patterns,
-            &config.structure.deny_file_patterns,
+            &config.structure.deny_files,
+            &config.structure.deny_dirs,
         )?;
 
         Ok(Some(structure_scan_config))

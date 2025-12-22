@@ -24,8 +24,16 @@ fn global_deny_extensions_trigger_violation() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("script.exe"), "").unwrap();
 
-    let config =
-        StructureScanConfig::new(&[], &[], Vec::new(), vec![".exe".to_string()], &[], &[]).unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![".exe".to_string()],
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -47,9 +55,16 @@ fn global_deny_patterns_trigger_violation() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("file.bak"), "").unwrap();
 
-    let config =
-        StructureScanConfig::new(&[], &[], Vec::new(), vec![], &["*.bak".to_string()], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &["*.bak".to_string()],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -66,6 +81,7 @@ fn structure_scan_config_file_matches_global_deny_extension() {
         &[],
         Vec::new(),
         vec![".exe".to_string(), ".dll".to_string()],
+        &[],
         &[],
         &[],
     )
@@ -96,6 +112,7 @@ fn structure_scan_config_file_matches_global_deny_pattern() {
         Vec::new(),
         vec![],
         &["*.bak".to_string(), "temp_*".to_string()],
+        &[],
         &[],
     )
     .unwrap();
@@ -134,7 +151,8 @@ fn per_rule_deny_extensions_trigger_violation() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -157,7 +175,8 @@ fn per_rule_deny_patterns_trigger_violation() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -185,7 +204,8 @@ fn deny_takes_precedence_over_allowlist() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -250,6 +270,7 @@ fn deny_pattern_with_trailing_slash_only_matches_directories() {
         vec![],
         &["**/node_modules/".to_string()],
         &[],
+        &[],
     )
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
@@ -281,9 +302,16 @@ fn deny_pattern_without_trailing_slash_only_matches_files() {
     std::fs::create_dir(&temp_dir_child).unwrap();
     std::fs::write(temp_dir_child.join("file.rs"), "").unwrap();
 
-    let config =
-        StructureScanConfig::new(&[], &[], Vec::new(), vec![], &["temp_*".to_string()], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &["temp_*".to_string()],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -314,6 +342,7 @@ fn structure_scan_config_separates_dir_and_file_patterns() {
             "**/mocks/".to_string(),
         ],
         &[],
+        &[],
     )
     .unwrap();
 
@@ -338,6 +367,7 @@ fn dir_matches_global_deny_returns_original_pattern() {
         Vec::new(),
         vec![],
         &["**/node_modules/".to_string()],
+        &[],
         &[],
     )
     .unwrap();
@@ -372,6 +402,7 @@ fn multiple_directory_only_deny_patterns() {
         vec![],
         &["**/node_modules/".to_string(), "**/mocks/".to_string()],
         &[],
+        &[],
     )
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
@@ -399,9 +430,16 @@ fn deny_pattern_trailing_slash_with_simple_name() {
 
     std::fs::write(temp_dir.path().join("temp_file.txt"), "").unwrap();
 
-    let config =
-        StructureScanConfig::new(&[], &[], Vec::new(), vec![], &["temp_*/".to_string()], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        vec![],
+        &["temp_*/".to_string()],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -412,6 +450,120 @@ fn deny_pattern_trailing_slash_with_simple_name() {
     assert!(matches!(
         &result.allowlist_violations[0].violation_type,
         ViolationType::DeniedDirectory { pattern } if pattern == "temp_*/"
+    ));
+}
+
+// =============================================================================
+// Deny Dirs Tests (directory basename matching)
+// =============================================================================
+
+#[test]
+fn global_deny_dirs_trigger_violation() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+
+    let pycache = src_dir.join("__pycache__");
+    std::fs::create_dir(&pycache).unwrap();
+    std::fs::write(pycache.join("module.pyc"), "").unwrap();
+
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+        &["__pycache__".to_string()], // deny_dirs
+    )
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(result.allowlist_violations[0].path.ends_with("__pycache__"));
+    assert!(matches!(
+        &result.allowlist_violations[0].violation_type,
+        ViolationType::DeniedDirectory { .. }
+    ));
+}
+
+#[test]
+fn per_rule_deny_dirs_trigger_violation() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "").unwrap();
+
+    let temp_dir_child = src_dir.join("temp");
+    std::fs::create_dir(&temp_dir_child).unwrap();
+    std::fs::write(temp_dir_child.join("file.rs"), "").unwrap();
+
+    let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
+        .with_deny_dirs(vec!["temp*".to_string()])
+        .build()
+        .unwrap();
+    let config =
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(result.allowlist_violations[0].path.ends_with("temp"));
+    assert!(matches!(
+        &result.allowlist_violations[0].violation_type,
+        ViolationType::DeniedDirectory { .. }
+    ));
+}
+
+#[test]
+fn deny_dirs_only_matches_directories_not_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+
+    // Create a subdirectory first
+    let sub_dir = src_dir.join("subdir");
+    std::fs::create_dir(&sub_dir).unwrap();
+
+    // Create a file with the same name as the deny pattern in the subdirectory
+    std::fs::write(sub_dir.join("node_modules"), "fake file").unwrap();
+
+    // Create a real directory with the same name in src
+    let real_node_modules = src_dir.join("node_modules");
+    std::fs::create_dir(&real_node_modules).unwrap();
+    std::fs::write(real_node_modules.join("package.json"), "").unwrap();
+
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+        &["node_modules".to_string()], // deny_dirs
+    )
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    // Only the directory should trigger a violation, not the file
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(
+        result.allowlist_violations[0]
+            .path
+            .ends_with("node_modules")
+    );
+    assert!(matches!(
+        &result.allowlist_violations[0].violation_type,
+        ViolationType::DeniedDirectory { .. }
     ));
 }
 
@@ -434,6 +586,7 @@ fn global_deny_file_patterns_trigger_violation() {
         vec![],
         &[],
         &["secrets.*".to_string()],
+        &[],
     )
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
@@ -466,6 +619,7 @@ fn deny_file_patterns_only_matches_filename_not_path() {
         vec![],
         &[],
         &["secrets.*".to_string()],
+        &[],
     )
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
@@ -486,6 +640,7 @@ fn structure_scan_config_file_matches_global_deny_file_pattern() {
         vec![],
         &[],
         &["temp_*".to_string(), "secrets.*".to_string()],
+        &[],
     )
     .unwrap();
 
@@ -519,11 +674,12 @@ fn per_rule_deny_file_patterns_trigger_violation() {
     std::fs::write(src_dir.join("temp_cache.txt"), "").unwrap();
 
     let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
-        .with_deny_file_patterns(vec!["temp_*".to_string()])
+        .with_deny_files(vec!["temp_*".to_string()])
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -540,7 +696,7 @@ fn per_rule_deny_file_patterns_trigger_violation() {
 #[test]
 fn allowlist_rule_file_matches_deny_file_pattern() {
     let rule = AllowlistRuleBuilder::new("src/**".to_string())
-        .with_deny_file_patterns(vec!["*.bak".to_string(), "temp_*".to_string()])
+        .with_deny_files(vec!["*.bak".to_string(), "temp_*".to_string()])
         .build()
         .unwrap();
 
@@ -564,11 +720,12 @@ fn deny_file_patterns_takes_precedence_over_allowlist() {
     // Even though .rs is allowed, backup* should be denied
     let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".rs".to_string()])
-        .with_deny_file_patterns(vec!["backup*".to_string()])
+        .with_deny_files(vec!["backup*".to_string()])
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))

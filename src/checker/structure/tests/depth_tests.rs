@@ -132,7 +132,8 @@ fn rule_overrides_global_depth_limit() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -208,7 +209,8 @@ fn invalid_rule_max_depth_returns_error() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -263,7 +265,8 @@ fn calculate_base_depth_simple_pattern() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -305,7 +308,8 @@ fn relative_depth_allows_deep_nesting_within_base() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -346,7 +350,8 @@ fn relative_depth_violates_when_too_deep() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -388,7 +393,8 @@ fn relative_depth_false_uses_absolute_depth() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -431,7 +437,8 @@ fn relative_depth_with_wildcard_in_middle() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -473,7 +480,8 @@ fn relative_depth_with_double_star_at_start() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -513,7 +521,8 @@ fn relative_depth_warn_threshold() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -558,7 +567,8 @@ fn relative_depth_moving_base_works() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -601,7 +611,8 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };

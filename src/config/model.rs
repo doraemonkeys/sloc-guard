@@ -376,8 +376,13 @@ pub struct StructureConfig {
 
     /// Global deny list of file name patterns (glob patterns, e.g., "temp_*", "secrets.*").
     /// Matches file names (basenames) only, not full paths or directories.
+    #[serde(default, alias = "deny_file_patterns")]
+    pub deny_files: Vec<String>,
+
+    /// Global deny list of directory name patterns (glob patterns, e.g., "`node_modules`", "`__pycache__`").
+    /// Matches directory names (basenames) only, not full paths.
     #[serde(default)]
-    pub deny_file_patterns: Vec<String>,
+    pub deny_dirs: Vec<String>,
 
     /// Per-directory rules that override global limits.
     #[serde(default)]
@@ -447,8 +452,14 @@ pub struct StructureRule {
     /// Deny list of file name patterns (glob patterns, e.g., "temp_*", "secrets.*").
     /// Matches file names (basenames) only, not full paths.
     /// Checked BEFORE allowlist - if denied, file is rejected regardless of allowlist.
+    #[serde(default, alias = "deny_file_patterns")]
+    pub deny_files: Vec<String>,
+
+    /// Deny list of directory name patterns (glob patterns, e.g., "`temp_*`", "`__pycache__`").
+    /// Matches directory names (basenames) only.
+    /// Checked BEFORE other directory processing.
     #[serde(default)]
-    pub deny_file_patterns: Vec<String>,
+    pub deny_dirs: Vec<String>,
 
     /// Regex pattern for filename validation.
     /// Files not matching this pattern trigger a `NamingConvention` violation.

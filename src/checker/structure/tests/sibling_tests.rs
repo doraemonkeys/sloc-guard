@@ -26,7 +26,8 @@ fn require_sibling_without_file_pattern_returns_error() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -59,7 +60,8 @@ fn file_pattern_without_require_sibling_is_allowed() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -86,7 +88,8 @@ fn invalid_file_pattern_returns_error() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -134,7 +137,8 @@ fn check_siblings_file_has_sibling_no_violation() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -167,7 +171,8 @@ fn check_siblings_file_missing_sibling_returns_violation() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -210,7 +215,8 @@ fn check_siblings_dir_pattern_not_matching_skips_check() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -242,7 +248,8 @@ fn check_siblings_file_pattern_not_matching_skips_check() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -278,7 +285,8 @@ fn check_siblings_multiple_files_mixed_results() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -318,7 +326,8 @@ fn check_siblings_test_file_not_checked_for_siblings() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -351,7 +360,8 @@ fn check_siblings_nested_directories() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -386,7 +396,8 @@ fn check_siblings_sorted_by_path() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -429,7 +440,8 @@ fn derive_sibling_path_basic() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -464,7 +476,8 @@ fn derive_sibling_path_different_template() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };

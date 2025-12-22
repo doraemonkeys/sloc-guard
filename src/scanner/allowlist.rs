@@ -21,7 +21,13 @@ pub struct AllowlistRule {
     /// Compiled patterns for deny matching.
     pub deny_patterns: GlobSet,
     /// Compiled file-name-only deny patterns.
-    pub deny_file_patterns: GlobSet,
+    pub deny_files: GlobSet,
+    /// Original file-name-only deny pattern strings (for error messages).
+    pub deny_file_strs: Vec<String>,
+    /// Compiled directory-name-only deny patterns.
+    pub deny_dirs: GlobSet,
+    /// Original directory-name-only deny pattern strings (for error messages).
+    pub deny_dir_strs: Vec<String>,
     /// Compiled regex for filename validation (optional).
     naming_pattern: Option<Regex>,
     /// Original regex string for error messages.
@@ -49,14 +55,9 @@ impl AllowlistRule {
 
         let file_name = file_path.file_name().unwrap_or_default();
 
-        // Check deny_file_patterns (filename only)
-        if let Some(idx) = self
-            .deny_file_patterns
-            .matches(file_name)
-            .into_iter()
-            .next()
-        {
-            return Some(format!("file_pattern #{idx}"));
+        // Check deny_files (filename only)
+        if let Some(idx) = self.deny_files.matches(file_name).into_iter().next() {
+            return self.deny_file_strs.get(idx).cloned();
         }
 
         // Check deny patterns (filename and full path)
@@ -65,6 +66,19 @@ impl AllowlistRule {
         }
         if let Some(idx) = self.deny_patterns.matches(file_path).into_iter().next() {
             return Some(format!("pattern #{idx}"));
+        }
+
+        None
+    }
+
+    /// Check if a directory matches this rule's `deny_dirs`.
+    /// Returns `Some(matched_pattern)` if denied, `None` otherwise.
+    pub(crate) fn dir_matches_deny(&self, dir_path: &Path) -> Option<String> {
+        let dir_name = dir_path.file_name().unwrap_or_default();
+
+        // Check deny_dirs (dirname only)
+        if let Some(idx) = self.deny_dirs.matches(dir_name).into_iter().next() {
+            return self.deny_dir_strs.get(idx).cloned();
         }
 
         None
@@ -121,7 +135,8 @@ pub struct AllowlistRuleBuilder {
     allow_patterns: Vec<String>,
     deny_extensions: Vec<String>,
     deny_patterns: Vec<String>,
-    deny_file_patterns: Vec<String>,
+    deny_files: Vec<String>,
+    deny_dirs: Vec<String>,
     naming_pattern: Option<String>,
 }
 
@@ -134,7 +149,8 @@ impl AllowlistRuleBuilder {
             allow_patterns: Vec::new(),
             deny_extensions: Vec::new(),
             deny_patterns: Vec::new(),
-            deny_file_patterns: Vec::new(),
+            deny_files: Vec::new(),
+            deny_dirs: Vec::new(),
             naming_pattern: None,
         }
     }
@@ -164,8 +180,14 @@ impl AllowlistRuleBuilder {
     }
 
     #[must_use]
-    pub fn with_deny_file_patterns(mut self, patterns: Vec<String>) -> Self {
-        self.deny_file_patterns = patterns;
+    pub fn with_deny_files(mut self, patterns: Vec<String>) -> Self {
+        self.deny_files = patterns;
+        self
+    }
+
+    #[must_use]
+    pub fn with_deny_dirs(mut self, patterns: Vec<String>) -> Self {
+        self.deny_dirs = patterns;
         self
     }
 
@@ -219,21 +241,36 @@ impl AllowlistRuleBuilder {
                 })?;
 
         // Build deny file patterns GlobSet (filename-only matching)
-        let mut deny_file_pattern_builder = GlobSetBuilder::new();
-        for p in &self.deny_file_patterns {
+        let mut deny_file_builder = GlobSetBuilder::new();
+        for p in &self.deny_files {
             let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
                 pattern: p.clone(),
                 source: e,
             })?;
-            deny_file_pattern_builder.add(g);
+            deny_file_builder.add(g);
         }
-        let deny_file_patterns =
-            deny_file_pattern_builder
-                .build()
-                .map_err(|e| SlocGuardError::InvalidPattern {
-                    pattern: "deny_file_patterns".to_string(),
-                    source: e,
-                })?;
+        let deny_files = deny_file_builder
+            .build()
+            .map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: "deny_files".to_string(),
+                source: e,
+            })?;
+
+        // Build deny dirs GlobSet (dirname-only matching)
+        let mut deny_dir_builder = GlobSetBuilder::new();
+        for p in &self.deny_dirs {
+            let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: p.clone(),
+                source: e,
+            })?;
+            deny_dir_builder.add(g);
+        }
+        let deny_dirs = deny_dir_builder
+            .build()
+            .map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: "deny_dirs".to_string(),
+                source: e,
+            })?;
 
         // Compile naming pattern regex if provided
         let (naming_pattern, naming_pattern_str) = match self.naming_pattern {
@@ -255,7 +292,10 @@ impl AllowlistRuleBuilder {
             allow_patterns,
             deny_extensions: self.deny_extensions,
             deny_patterns,
-            deny_file_patterns,
+            deny_files,
+            deny_file_strs: self.deny_files,
+            deny_dirs,
+            deny_dir_strs: self.deny_dirs,
             naming_pattern,
             naming_pattern_str,
         })

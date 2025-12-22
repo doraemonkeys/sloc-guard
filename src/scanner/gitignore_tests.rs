@@ -308,7 +308,8 @@ fn gitaware_scanner_scan_with_structure_with_allowlist() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -339,6 +340,7 @@ fn gitaware_scanner_scan_with_structure_respects_count_exclude() {
         &[],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
         &[],
     )
@@ -373,6 +375,7 @@ fn gitaware_scanner_scan_with_structure_respects_scanner_exclude() {
         &["**/vendor/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
         &[],
     )
@@ -585,7 +588,8 @@ fn gitaware_scanner_scan_with_structure_no_violations_when_files_match() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -614,11 +618,12 @@ fn gitaware_scanner_deny_file_patterns_with_relative_pattern() {
 
     // Pattern "src/**" should match "src/analyzer" and deny "types.rs"
     let allowlist_rule = AllowlistRuleBuilder::new("src/**".to_string())
-        .with_deny_file_patterns(vec!["types.rs".to_string()])
+        .with_deny_files(vec!["types.rs".to_string()])
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -650,11 +655,12 @@ fn gitaware_scanner_deny_file_patterns_nested_directories() {
     std::fs::write(deep_dir.join("utils.rs"), "").unwrap(); // Should be denied
 
     let allowlist_rule = AllowlistRuleBuilder::new("src/**".to_string())
-        .with_deny_file_patterns(vec!["utils.rs".to_string()])
+        .with_deny_files(vec!["utils.rs".to_string()])
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -687,6 +693,7 @@ fn gitaware_scanner_global_deny_file_patterns() {
         Vec::new(),
         &[],
         &["secrets.json".to_string()],
+        &[],
     )
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -715,11 +722,12 @@ fn gitaware_scanner_deny_file_patterns_does_not_match_allowed_files() {
     std::fs::write(src_dir.join("lib.rs"), "").unwrap();
 
     let allowlist_rule = AllowlistRuleBuilder::new("src/**".to_string())
-        .with_deny_file_patterns(vec!["utils.rs".to_string(), "types.rs".to_string()])
+        .with_deny_files(vec!["utils.rs".to_string(), "types.rs".to_string()])
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -748,11 +756,12 @@ fn gitaware_scanner_deny_file_patterns_with_glob() {
     std::fs::write(module_dir.join("temp_data.json"), "").unwrap(); // Should be denied
 
     let allowlist_rule = AllowlistRuleBuilder::new("src/**".to_string())
-        .with_deny_file_patterns(vec!["temp_*".to_string()])
+        .with_deny_files(vec!["temp_*".to_string()])
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))

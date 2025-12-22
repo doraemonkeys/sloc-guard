@@ -290,6 +290,34 @@ impl<'a> StructureScanState<'a> {
                 ));
         }
 
+        // Check deny_dirs (basename-only matching from structure.deny_dirs)
+        if let Some(cfg) = self.structure_config
+            && let Some(pattern) = cfg.dir_matches_global_deny_basename(path)
+        {
+            self.result
+                .allowlist_violations
+                .push(StructureViolation::denied_directory(
+                    path.to_path_buf(),
+                    "global".to_string(),
+                    pattern,
+                ));
+        }
+
+        // Check per-rule deny_dirs
+        if let Some(cfg) = self.structure_config
+            && let Some(parent) = path.parent()
+            && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
+            && let Some(pattern) = rule.dir_matches_deny(path)
+        {
+            self.result
+                .allowlist_violations
+                .push(StructureViolation::denied_directory(
+                    path.to_path_buf(),
+                    rule.pattern.clone(),
+                    pattern,
+                ));
+        }
+
         // Check count_exclude
         let is_count_excluded = self
             .structure_config

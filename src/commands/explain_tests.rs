@@ -211,7 +211,8 @@ fn explain_structure_rule_matches() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         ..Default::default()
     };
@@ -267,7 +268,8 @@ fn explain_structure_rule_chain_statuses() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "test/*".to_string(),
@@ -284,7 +286,8 @@ fn explain_structure_rule_chain_statuses() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
         ],
         overrides: vec![StructureOverride {

@@ -52,7 +52,8 @@ fn override_takes_priority_over_rules() {
             deny_extensions: vec![],
             deny_patterns: vec![],
 
-            deny_file_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
         }],
         overrides: vec![StructureOverride {
             path: "src/legacy".to_string(),

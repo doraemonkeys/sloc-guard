@@ -29,7 +29,8 @@ fn multiple_matching_rules_last_match_wins() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "src/generated/**".to_string(),
@@ -46,7 +47,8 @@ fn multiple_matching_rules_last_match_wins() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
         ],
         ..Default::default()
@@ -89,7 +91,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "src/core/**".to_string(),
@@ -106,7 +109,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
         ],
         ..Default::default()
@@ -149,7 +153,8 @@ fn three_rules_last_matching_wins() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "src/**".to_string(),
@@ -166,7 +171,8 @@ fn three_rules_last_matching_wins() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "src/lib/**".to_string(),
@@ -183,7 +189,8 @@ fn three_rules_last_matching_wins() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
         ],
         ..Default::default()
@@ -225,7 +232,8 @@ fn non_matching_rules_skipped_in_priority() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "tests/**".to_string(), // Does NOT match src/lib
@@ -242,7 +250,8 @@ fn non_matching_rules_skipped_in_priority() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
         ],
         ..Default::default()
@@ -284,7 +293,8 @@ fn explain_reports_last_matching_rule() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
             StructureRule {
                 pattern: "src/lib/**".to_string(),
@@ -301,7 +311,8 @@ fn explain_reports_last_matching_rule() {
                 deny_extensions: vec![],
                 deny_patterns: vec![],
 
-                deny_file_patterns: vec![],
+                deny_files: vec![],
+                deny_dirs: vec![],
             },
         ],
         ..Default::default()

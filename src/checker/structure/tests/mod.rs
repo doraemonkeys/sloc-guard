@@ -56,6 +56,7 @@ fn make_rule(pattern: &str, max_files: Option<i64>) -> StructureRule {
         deny_extensions: vec![],
         deny_patterns: vec![],
 
-        deny_file_patterns: vec![],
+        deny_files: vec![],
+        deny_dirs: vec![],
     }
 }

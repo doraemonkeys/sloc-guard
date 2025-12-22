@@ -25,9 +25,13 @@ pub struct StructureScanConfig {
     /// Original file deny pattern strings (for error messages).
     pub global_deny_pattern_strs: Vec<String>,
     /// Global deny file-name-only patterns (compiled) that apply to files everywhere.
-    pub global_deny_file_patterns: GlobSet,
+    pub global_deny_files: GlobSet,
     /// Original file-name-only deny pattern strings (for error messages).
-    pub global_deny_file_pattern_strs: Vec<String>,
+    pub global_deny_file_strs: Vec<String>,
+    /// Global deny directory-name-only patterns (compiled via `deny_dirs` config).
+    pub global_deny_dir_basenames: GlobSet,
+    /// Original directory-name-only deny pattern strings (for error messages).
+    pub global_deny_dir_basename_strs: Vec<String>,
     /// Directory-only deny patterns (patterns ending with `/`, e.g., "`**/node_modules/`").
     pub global_deny_dir_patterns: GlobSet,
     /// Original directory-only deny pattern strings (for error messages).
@@ -45,7 +49,8 @@ impl StructureScanConfig {
         allowlist_rules: Vec<AllowlistRule>,
         global_deny_extensions: Vec<String>,
         global_deny_patterns: &[String],
-        global_deny_file_patterns: &[String],
+        global_deny_files: &[String],
+        global_deny_dirs: &[String],
     ) -> Result<Self> {
         let count_exclude = Self::build_glob_set(count_exclude_patterns)?;
         let scanner_exclude = Self::build_glob_set(scanner_exclude_patterns)?;
@@ -69,9 +74,12 @@ impl StructureScanConfig {
         let global_deny_dir_patterns = Self::build_glob_set(&dir_patterns_for_glob)?;
 
         // Build global deny file patterns (filename-only matching)
-        let global_deny_file_pattern_strs: Vec<String> = global_deny_file_patterns.to_vec();
-        let global_deny_file_patterns_compiled =
-            Self::build_glob_set(&global_deny_file_pattern_strs)?;
+        let global_deny_file_strs: Vec<String> = global_deny_files.to_vec();
+        let global_deny_files_compiled = Self::build_glob_set(&global_deny_file_strs)?;
+
+        // Build global deny dir patterns (dirname-only matching, from deny_dirs config)
+        let global_deny_dir_basename_strs: Vec<String> = global_deny_dirs.to_vec();
+        let global_deny_dir_basenames = Self::build_glob_set(&global_deny_dir_basename_strs)?;
 
         Ok(Self {
             count_exclude,
@@ -81,8 +89,10 @@ impl StructureScanConfig {
             global_deny_extensions,
             global_deny_patterns: global_deny_patterns_compiled,
             global_deny_pattern_strs: file_pattern_strs,
-            global_deny_file_patterns: global_deny_file_patterns_compiled,
-            global_deny_file_pattern_strs,
+            global_deny_files: global_deny_files_compiled,
+            global_deny_file_strs,
+            global_deny_dir_basenames,
+            global_deny_dir_basename_strs,
             global_deny_dir_patterns,
             global_deny_dir_pattern_strs: dir_pattern_strs,
         })
@@ -172,14 +182,9 @@ impl StructureScanConfig {
 
         let file_name = file_path.file_name().unwrap_or_default();
 
-        // Check global deny file patterns (filename-only matching)
-        if let Some(idx) = self
-            .global_deny_file_patterns
-            .matches(file_name)
-            .into_iter()
-            .next()
-        {
-            return self.global_deny_file_pattern_strs.get(idx).cloned();
+        // Check global deny files (filename-only matching)
+        if let Some(idx) = self.global_deny_files.matches(file_name).into_iter().next() {
+            return self.global_deny_file_strs.get(idx).cloned();
         }
 
         // Check global deny patterns (filename and full path)
@@ -226,6 +231,23 @@ impl StructureScanConfig {
             .next()
         {
             return self.global_deny_dir_pattern_strs.get(idx).cloned();
+        }
+
+        None
+    }
+
+    /// Check if a directory matches global `deny_dirs` patterns (basename-only matching).
+    /// Returns `Some(matched_pattern)` if denied, `None` otherwise.
+    pub(crate) fn dir_matches_global_deny_basename(&self, dir_path: &Path) -> Option<String> {
+        let dir_name = dir_path.file_name().unwrap_or_default();
+
+        if let Some(idx) = self
+            .global_deny_dir_basenames
+            .matches(dir_name)
+            .into_iter()
+            .next()
+        {
+            return self.global_deny_dir_basename_strs.get(idx).cloned();
         }
 
         None

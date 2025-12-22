@@ -91,7 +91,8 @@ fn scan_with_structure_detects_naming_violations() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -122,7 +123,8 @@ fn scan_with_structure_no_naming_violation_when_pattern_matches() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -144,7 +146,8 @@ fn scan_with_structure_naming_violation_includes_pattern() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -174,7 +177,8 @@ fn scan_with_structure_combined_allowlist_and_naming_violations() {
         .build()
         .unwrap();
     let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
+            .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
