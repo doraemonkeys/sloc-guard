@@ -20,16 +20,14 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `types.rs`: `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `gitignore.rs`: `GitAwareScanner` (gix with .gitignore); `composite.rs`: `CompositeScanner` (git/non-git fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
-| `checker/threshold` | `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum (Passed/Warning/Failed/Grandfathered) |
-| `checker/structure` | `StructureChecker` - directory file/subdir/depth limits with glob-based rules, naming convention enforcement, sibling file co-location checks |
-| `checker/explain` | `ContentExplanation`, `StructureExplanation` - rule chain debugging types |
+| `checker/*` | `Checker` trait; `threshold.rs`: `ThresholdChecker` with pre-indexed extension lookup → `CheckResult` enum; `explain.rs`: `ContentExplanation`, `StructureExplanation` for rule chain debugging; `structure/`: `StructureChecker` (split into `builder.rs`, `compiled_rules.rs`, `validation.rs`, `violation.rs`) |
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode) |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation, file locking for concurrent access) |
 | `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar) |
 | `path_utils` | `path_matches_override()` - shared path suffix matching for override path resolution (handles Windows/Unix separators) |
 | `error` | `SlocGuardError` |
-| `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; `CheckContext`/`StatsContext` for DI; `detect` module for project type auto-detection |
+| `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; check split into: `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_validation.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `TrendHistory` - historical stats with delta computation, file locking for concurrent access |
 | `main` | CLI parsing, command dispatch to `commands/*` |
