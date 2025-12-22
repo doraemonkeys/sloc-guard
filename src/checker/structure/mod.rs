@@ -425,4 +425,4 @@ impl StructureChecker {
 }
 
 #[cfg(test)]
-mod tests;
+mod check_tests;
