@@ -460,5 +460,5 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
 }
 
 #[cfg(test)]
-#[path = "loader_tests.rs"]
+#[path = "loader_tests/mod.rs"]
 mod tests;
