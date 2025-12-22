@@ -509,5 +509,5 @@ impl<F: FileFilter> gix::dir::walk::Delegate for StructureAwareCollector<'_, F> 
 }
 
 #[cfg(test)]
-#[path = "gitignore_tests.rs"]
+#[path = "gitignore_tests/mod.rs"]
 mod tests;
