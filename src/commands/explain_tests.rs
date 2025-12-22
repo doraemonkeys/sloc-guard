@@ -210,6 +210,8 @@ fn explain_structure_rule_matches() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -264,6 +266,8 @@ fn explain_structure_rule_chain_statuses() {
                 require_sibling: None,
                 deny_extensions: vec![],
                 deny_patterns: vec![],
+
+                deny_file_patterns: vec![],
             },
             StructureRule {
                 pattern: "test/*".to_string(),
@@ -279,6 +283,8 @@ fn explain_structure_rule_chain_statuses() {
                 require_sibling: None,
                 deny_extensions: vec![],
                 deny_patterns: vec![],
+
+                deny_file_patterns: vec![],
             },
         ],
         overrides: vec![StructureOverride {

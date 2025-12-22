@@ -33,6 +33,8 @@ pub struct AllowlistRule {
     pub deny_extensions: Vec<String>,
     /// Compiled patterns for deny matching.
     pub deny_patterns: GlobSet,
+    /// Compiled file-name-only deny patterns.
+    pub deny_file_patterns: GlobSet,
     /// Compiled regex for filename validation (optional).
     naming_pattern: Option<Regex>,
     /// Original regex string for error messages.
@@ -58,8 +60,19 @@ impl AllowlistRule {
             }
         }
 
-        // Check deny patterns
         let file_name = file_path.file_name().unwrap_or_default();
+
+        // Check deny_file_patterns (filename only)
+        if let Some(idx) = self
+            .deny_file_patterns
+            .matches(file_name)
+            .into_iter()
+            .next()
+        {
+            return Some(format!("file_pattern #{idx}"));
+        }
+
+        // Check deny patterns (filename and full path)
         if let Some(idx) = self.deny_patterns.matches(file_name).into_iter().next() {
             return Some(format!("pattern #{idx}"));
         }
@@ -131,6 +144,10 @@ pub struct StructureScanConfig {
     pub global_deny_patterns: GlobSet,
     /// Original file deny pattern strings (for error messages).
     pub global_deny_pattern_strs: Vec<String>,
+    /// Global deny file-name-only patterns (compiled) that apply to files everywhere.
+    pub global_deny_file_patterns: GlobSet,
+    /// Original file-name-only deny pattern strings (for error messages).
+    pub global_deny_file_pattern_strs: Vec<String>,
     /// Directory-only deny patterns (patterns ending with `/`, e.g., "`**/node_modules/`").
     pub global_deny_dir_patterns: GlobSet,
     /// Original directory-only deny pattern strings (for error messages).
@@ -148,6 +165,7 @@ impl StructureScanConfig {
         allowlist_rules: Vec<AllowlistRule>,
         global_deny_extensions: Vec<String>,
         global_deny_patterns: &[String],
+        global_deny_file_patterns: &[String],
     ) -> Result<Self> {
         let count_exclude = Self::build_glob_set(count_exclude_patterns)?;
         let scanner_exclude = Self::build_glob_set(scanner_exclude_patterns)?;
@@ -170,6 +188,11 @@ impl StructureScanConfig {
         let global_deny_patterns_compiled = Self::build_glob_set(&file_pattern_strs)?;
         let global_deny_dir_patterns = Self::build_glob_set(&dir_patterns_for_glob)?;
 
+        // Build global deny file patterns (filename-only matching)
+        let global_deny_file_pattern_strs: Vec<String> = global_deny_file_patterns.to_vec();
+        let global_deny_file_patterns_compiled =
+            Self::build_glob_set(&global_deny_file_pattern_strs)?;
+
         Ok(Self {
             count_exclude,
             scanner_exclude,
@@ -178,6 +201,8 @@ impl StructureScanConfig {
             global_deny_extensions,
             global_deny_patterns: global_deny_patterns_compiled,
             global_deny_pattern_strs: file_pattern_strs,
+            global_deny_file_patterns: global_deny_file_patterns_compiled,
+            global_deny_file_pattern_strs,
             global_deny_dir_patterns,
             global_deny_dir_pattern_strs: dir_pattern_strs,
         })
@@ -265,8 +290,19 @@ impl StructureScanConfig {
             }
         }
 
-        // Check global deny patterns
         let file_name = file_path.file_name().unwrap_or_default();
+
+        // Check global deny file patterns (filename-only matching)
+        if let Some(idx) = self
+            .global_deny_file_patterns
+            .matches(file_name)
+            .into_iter()
+            .next()
+        {
+            return self.global_deny_file_pattern_strs.get(idx).cloned();
+        }
+
+        // Check global deny patterns (filename and full path)
         if let Some(idx) = self
             .global_deny_patterns
             .matches(file_name)
@@ -323,6 +359,7 @@ pub struct AllowlistRuleBuilder {
     allow_patterns: Vec<String>,
     deny_extensions: Vec<String>,
     deny_patterns: Vec<String>,
+    deny_file_patterns: Vec<String>,
     naming_pattern: Option<String>,
 }
 
@@ -335,6 +372,7 @@ impl AllowlistRuleBuilder {
             allow_patterns: Vec::new(),
             deny_extensions: Vec::new(),
             deny_patterns: Vec::new(),
+            deny_file_patterns: Vec::new(),
             naming_pattern: None,
         }
     }
@@ -360,6 +398,12 @@ impl AllowlistRuleBuilder {
     #[must_use]
     pub fn with_deny_patterns(mut self, patterns: Vec<String>) -> Self {
         self.deny_patterns = patterns;
+        self
+    }
+
+    #[must_use]
+    pub fn with_deny_file_patterns(mut self, patterns: Vec<String>) -> Self {
+        self.deny_file_patterns = patterns;
         self
     }
 
@@ -412,6 +456,23 @@ impl AllowlistRuleBuilder {
                     source: e,
                 })?;
 
+        // Build deny file patterns GlobSet (filename-only matching)
+        let mut deny_file_pattern_builder = GlobSetBuilder::new();
+        for p in &self.deny_file_patterns {
+            let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: p.clone(),
+                source: e,
+            })?;
+            deny_file_pattern_builder.add(g);
+        }
+        let deny_file_patterns =
+            deny_file_pattern_builder
+                .build()
+                .map_err(|e| SlocGuardError::InvalidPattern {
+                    pattern: "deny_file_patterns".to_string(),
+                    source: e,
+                })?;
+
         // Compile naming pattern regex if provided
         let (naming_pattern, naming_pattern_str) = match self.naming_pattern {
             Some(pattern_str) => {
@@ -432,6 +493,7 @@ impl AllowlistRuleBuilder {
             allow_patterns,
             deny_extensions: self.deny_extensions,
             deny_patterns,
+            deny_file_patterns,
             naming_pattern,
             naming_pattern_str,
         })

@@ -20,7 +20,7 @@ fn scan_result_default() {
 
 #[test]
 fn structure_scan_config_new_creates_config() {
-    let config = StructureScanConfig::new(&[], &[], Vec::new(), Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], Vec::new(), Vec::new(), &[], &[]).unwrap();
     assert!(config.allowlist_rules.is_empty());
 }
 
@@ -31,6 +31,7 @@ fn structure_scan_config_with_count_exclude() {
         &[],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -46,6 +47,7 @@ fn structure_scan_config_with_scanner_exclude() {
         Vec::new(),
         Vec::new(),
         &[],
+        &[],
     )
     .unwrap();
     let path = Path::new("src/target/build.rs");
@@ -59,6 +61,7 @@ fn structure_scan_config_extracts_dir_names() {
         &["target/**".to_string(), "node_modules/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -76,16 +79,28 @@ fn structure_scan_config_extracts_dir_names() {
 
 #[test]
 fn structure_scan_config_invalid_pattern_returns_error() {
-    let result =
-        StructureScanConfig::new(&["[invalid".to_string()], &[], Vec::new(), Vec::new(), &[]);
+    let result = StructureScanConfig::new(
+        &["[invalid".to_string()],
+        &[],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    );
     assert!(result.is_err());
 }
 
 #[test]
 fn structure_scan_config_is_scanner_excluded_file() {
-    let config =
-        StructureScanConfig::new(&[], &["*.lock".to_string()], Vec::new(), Vec::new(), &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &["*.lock".to_string()],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    )
+    .unwrap();
     assert!(config.scanner_exclude.is_match(Path::new("Cargo.lock")));
     assert!(!config.scanner_exclude.is_match(Path::new("Cargo.toml")));
 }
@@ -97,6 +112,7 @@ fn structure_scan_config_is_count_excluded() {
         &[],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -114,7 +130,7 @@ fn structure_scan_config_find_matching_allowlist_rule() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![rule], Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![rule], Vec::new(), &[], &[]).unwrap();
 
     assert!(
         config
@@ -138,6 +154,7 @@ fn structure_scan_config_extract_dir_names_windows_paths() {
         Vec::new(),
         Vec::new(),
         &[],
+        &[],
     )
     .unwrap();
     assert!(
@@ -149,9 +166,15 @@ fn structure_scan_config_extract_dir_names_windows_paths() {
 
 #[test]
 fn structure_scan_config_is_scanner_excluded_by_dir_name() {
-    let config =
-        StructureScanConfig::new(&[], &["target/**".to_string()], Vec::new(), Vec::new(), &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &["target/**".to_string()],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    )
+    .unwrap();
     assert!(
         config
             .scanner_exclude_dir_names
@@ -161,7 +184,7 @@ fn structure_scan_config_is_scanner_excluded_by_dir_name() {
 
 #[test]
 fn structure_scan_config_empty_patterns_match_nothing() {
-    let config = StructureScanConfig::new(&[], &[], Vec::new(), Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], Vec::new(), Vec::new(), &[], &[]).unwrap();
     assert!(!config.count_exclude.is_match(Path::new("any.rs")));
     assert!(!config.scanner_exclude.is_match(Path::new("any.rs")));
 }
@@ -173,6 +196,7 @@ fn structure_scan_config_combined_patterns() {
         &["vendor/**".to_string(), "dist/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -189,6 +213,7 @@ fn structure_scan_config_is_scanner_excluded_directory_by_name() {
         &["node_modules/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -211,6 +236,7 @@ fn structure_scan_config_extract_dir_names_complex() {
         ],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -235,8 +261,15 @@ fn structure_scan_config_extract_dir_names_complex() {
 
 #[test]
 fn structure_scan_config_pattern_without_trailing_glob() {
-    let config =
-        StructureScanConfig::new(&[], &["*.log".to_string()], Vec::new(), Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &["*.log".to_string()],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    )
+    .unwrap();
     assert!(config.scanner_exclude_dir_names.is_empty());
 }
 
@@ -246,7 +279,7 @@ fn structure_scan_config_find_no_matching_rule() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![rule], Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![rule], Vec::new(), &[], &[]).unwrap();
 
     let result = config.find_matching_allowlist_rule(Path::new("docs/readme"));
     assert!(result.is_none());
@@ -263,7 +296,8 @@ fn find_matching_allowlist_rule_returns_first_match() {
         .build()
         .unwrap();
 
-    let config = StructureScanConfig::new(&[], &[], vec![rule1, rule2], Vec::new(), &[]).unwrap();
+    let config =
+        StructureScanConfig::new(&[], &[], vec![rule1, rule2], Vec::new(), &[], &[]).unwrap();
 
     let src_rule = config.find_matching_allowlist_rule(Path::new("project/src/lib"));
     assert!(src_rule.is_some());

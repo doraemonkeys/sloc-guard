@@ -307,7 +307,8 @@ fn gitaware_scanner_scan_with_structure_with_allowlist() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[]).unwrap();
+    let config =
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -333,8 +334,15 @@ fn gitaware_scanner_scan_with_structure_respects_count_exclude() {
     std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
     std::fs::write(src_dir.join("generated.txt"), "generated").unwrap();
 
-    let config =
-        StructureScanConfig::new(&["*.txt".to_string()], &[], Vec::new(), Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(
+        &["*.txt".to_string()],
+        &[],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -365,6 +373,7 @@ fn gitaware_scanner_scan_with_structure_respects_scanner_exclude() {
         &["**/vendor/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -575,7 +584,8 @@ fn gitaware_scanner_scan_with_structure_no_violations_when_files_match() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[]).unwrap();
+    let config =
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))

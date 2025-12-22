@@ -25,6 +25,8 @@ fn require_sibling_without_file_pattern_returns_error() {
             require_sibling: Some("{stem}.spec".to_string()), // Set
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -56,6 +58,8 @@ fn file_pattern_without_require_sibling_is_allowed() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -81,6 +85,8 @@ fn invalid_file_pattern_returns_error() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -127,6 +133,8 @@ fn check_siblings_file_has_sibling_no_violation() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -158,6 +166,8 @@ fn check_siblings_file_missing_sibling_returns_violation() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -199,6 +209,8 @@ fn check_siblings_dir_pattern_not_matching_skips_check() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -229,6 +241,8 @@ fn check_siblings_file_pattern_not_matching_skips_check() {
             require_sibling: Some("{stem}.test.tsx".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -263,6 +277,8 @@ fn check_siblings_multiple_files_mixed_results() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -301,6 +317,8 @@ fn check_siblings_test_file_not_checked_for_siblings() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -332,6 +350,8 @@ fn check_siblings_nested_directories() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -365,6 +385,8 @@ fn check_siblings_sorted_by_path() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -406,6 +428,8 @@ fn derive_sibling_path_basic() {
             require_sibling: Some("{stem}.spec".to_string()),
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -439,6 +463,8 @@ fn derive_sibling_path_different_template() {
             require_sibling: Some("{stem}Test.java".to_string()), // Java style
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };

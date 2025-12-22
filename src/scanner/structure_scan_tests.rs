@@ -85,6 +85,7 @@ fn scan_with_structure_respects_scanner_exclude() {
         Vec::new(),
         Vec::new(),
         &[],
+        &[],
     )
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
@@ -109,8 +110,15 @@ fn scan_with_structure_respects_count_exclude() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("generated.txt"), "").unwrap();
 
-    let config =
-        StructureScanConfig::new(&["*.txt".to_string()], &[], Vec::new(), Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(
+        &["*.txt".to_string()],
+        &[],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -134,7 +142,8 @@ fn scan_with_structure_detects_allowlist_violations() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[]).unwrap();
+    let config =
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -156,7 +165,8 @@ fn scan_with_structure_no_violation_for_matching_files() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[]).unwrap();
+    let config =
+        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -280,8 +290,15 @@ fn scan_with_structure_with_count_exclude_does_not_affect_file_list() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("test.gen"), "").unwrap();
 
-    let config =
-        StructureScanConfig::new(&["*.gen".to_string()], &[], Vec::new(), Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(
+        &["*.gen".to_string()],
+        &[],
+        Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -306,6 +323,7 @@ fn scan_with_structure_with_scanner_exclude_skips_entirely() {
         &["**/vendor/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();
@@ -335,7 +353,7 @@ fn scan_with_structure_allowlist_violation_includes_rule_pattern() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(&[], &[], vec![rule], Vec::new(), &[]).unwrap();
+    let config = StructureScanConfig::new(&[], &[], vec![rule], Vec::new(), &[], &[]).unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -361,6 +379,7 @@ fn scan_with_structure_dir_excluded_by_name_match() {
         &["**/target/**".to_string()],
         Vec::new(),
         Vec::new(),
+        &[],
         &[],
     )
     .unwrap();

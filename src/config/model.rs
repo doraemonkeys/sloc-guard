@@ -374,6 +374,11 @@ pub struct StructureConfig {
     #[serde(default)]
     pub deny_patterns: Vec<String>,
 
+    /// Global deny list of file name patterns (glob patterns, e.g., "temp_*", "secrets.*").
+    /// Matches file names (basenames) only, not full paths or directories.
+    #[serde(default)]
+    pub deny_file_patterns: Vec<String>,
+
     /// Per-directory rules that override global limits.
     #[serde(default)]
     pub rules: Vec<StructureRule>,
@@ -438,6 +443,12 @@ pub struct StructureRule {
     /// Checked BEFORE allowlist - if denied, file is rejected regardless of allowlist.
     #[serde(default)]
     pub deny_patterns: Vec<String>,
+
+    /// Deny list of file name patterns (glob patterns, e.g., "temp_*", "secrets.*").
+    /// Matches file names (basenames) only, not full paths.
+    /// Checked BEFORE allowlist - if denied, file is rejected regardless of allowlist.
+    #[serde(default)]
+    pub deny_file_patterns: Vec<String>,
 
     /// Regex pattern for filename validation.
     /// Files not matching this pattern trigger a `NamingConvention` violation.

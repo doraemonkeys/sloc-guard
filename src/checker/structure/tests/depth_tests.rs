@@ -131,6 +131,8 @@ fn rule_overrides_global_depth_limit() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -205,6 +207,8 @@ fn invalid_rule_max_depth_returns_error() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -258,6 +262,8 @@ fn calculate_base_depth_simple_pattern() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -298,6 +304,8 @@ fn relative_depth_allows_deep_nesting_within_base() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -337,6 +345,8 @@ fn relative_depth_violates_when_too_deep() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -377,6 +387,8 @@ fn relative_depth_false_uses_absolute_depth() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -418,6 +430,8 @@ fn relative_depth_with_wildcard_in_middle() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -458,6 +472,8 @@ fn relative_depth_with_double_star_at_start() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -496,6 +512,8 @@ fn relative_depth_warn_threshold() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -539,6 +557,8 @@ fn relative_depth_moving_base_works() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -580,6 +600,8 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };

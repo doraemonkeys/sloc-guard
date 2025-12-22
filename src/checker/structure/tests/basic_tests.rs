@@ -66,6 +66,8 @@ fn checker_enabled_with_allowlist_rule() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
@@ -181,6 +183,8 @@ fn invalid_rule_pattern_returns_error() {
             require_sibling: None,
             deny_extensions: vec![],
             deny_patterns: vec![],
+
+            deny_file_patterns: vec![],
         }],
         ..Default::default()
     };
