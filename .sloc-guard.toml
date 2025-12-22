@@ -13,8 +13,7 @@ skip_blank = false
 
 [[content.rules]]
 pattern = "**/*_tests.rs"
-max_lines = 1200
-# max_lines = 1000
+max_lines = 1000
 skip_comments = true
 skip_blank = false
 warn_threshold = 0.8
