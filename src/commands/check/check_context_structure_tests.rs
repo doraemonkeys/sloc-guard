@@ -52,6 +52,7 @@ fn make_check_args(paths: Vec<PathBuf>) -> CheckArgs {
         strict: false,
         baseline: None,
         update_baseline: None,
+        ratchet: None,
         no_cache: true,
         no_gitignore: true,
         suggest: false,

@@ -9,7 +9,8 @@ pub use runner::run_check;
 // Re-export internal items for tests
 #[cfg(test)]
 pub(crate) use check_baseline_ops::{
-    apply_baseline_comparison, is_structure_violation, load_baseline, parse_structure_violation,
+    apply_baseline_comparison, check_baseline_ratchet, is_structure_violation, load_baseline,
+    parse_structure_violation,
 };
 #[cfg(test)]
 pub(crate) use check_git_diff::{DiffRange, parse_diff_range};

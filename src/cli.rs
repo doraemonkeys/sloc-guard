@@ -62,6 +62,18 @@ pub enum BaselineUpdateMode {
     New,
 }
 
+/// Ratchet mode for `check --ratchet`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum RatchetMode {
+    /// Emit warning if baseline can be tightened (default)
+    #[default]
+    Warn,
+    /// Auto-update baseline when violations decrease
+    Auto,
+    /// Fail CI if baseline is outdated (violations decreased but not updated)
+    Strict,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "sloc-guard")]
 #[command(
@@ -198,6 +210,13 @@ pub struct CheckArgs {
     /// Update baseline after check [possible values: all, content, structure, new]
     #[arg(long, value_name = "MODE", num_args = 0..=1, default_missing_value = "all")]
     pub update_baseline: Option<BaselineUpdateMode>,
+
+    /// Enforce baseline ratchet: violation count can only decrease.
+    /// - warn (default): emit warning when baseline can be tightened
+    /// - auto: auto-update baseline when violations decrease
+    /// - strict: fail CI if baseline is outdated
+    #[arg(long, value_name = "MODE", num_args = 0..=1, default_missing_value = "warn")]
+    pub ratchet: Option<RatchetMode>,
 
     /// Disable file hash caching
     #[arg(long)]

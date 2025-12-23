@@ -29,39 +29,91 @@ fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
     }
 }
 
+/// Builder for constructing `CheckArgs` in tests with sensible defaults.
+#[derive(Default)]
+struct CheckArgsBuilder {
+    paths: Vec<PathBuf>,
+    config: Option<PathBuf>,
+    baseline: Option<PathBuf>,
+    update_baseline: Option<crate::cli::BaselineUpdateMode>,
+    ratchet: Option<crate::cli::RatchetMode>,
+}
+
+impl CheckArgsBuilder {
+    fn paths(mut self, paths: Vec<PathBuf>) -> Self {
+        self.paths = paths;
+        self
+    }
+
+    fn config(mut self, config: PathBuf) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    fn baseline(mut self, baseline: PathBuf) -> Self {
+        self.baseline = Some(baseline);
+        self
+    }
+
+    fn update_baseline(mut self, mode: crate::cli::BaselineUpdateMode) -> Self {
+        self.update_baseline = Some(mode);
+        self
+    }
+
+    fn ratchet(mut self, mode: crate::cli::RatchetMode) -> Self {
+        self.ratchet = Some(mode);
+        self
+    }
+
+    fn build(self) -> CheckArgs {
+        CheckArgs {
+            paths: self.paths,
+            config: self.config,
+            max_lines: None,
+            ext: Some(vec!["rs".to_string()]),
+            exclude: vec![],
+            include: vec![],
+            count_comments: false,
+            count_blank: false,
+            warn_threshold: None,
+            format: OutputFormat::Text,
+            output: None,
+            warn_only: false,
+            diff: None,
+            staged: false,
+            strict: false,
+            baseline: self.baseline,
+            update_baseline: self.update_baseline,
+            ratchet: self.ratchet,
+            no_cache: true,
+            no_gitignore: true,
+            suggest: false,
+            max_files: None,
+            max_dirs: None,
+            max_depth: None,
+            report_json: None,
+            files: vec![],
+        }
+    }
+}
+
 fn make_check_args_with_baseline(
     paths: Vec<PathBuf>,
     config: Option<PathBuf>,
     baseline: Option<PathBuf>,
     update_baseline: Option<crate::cli::BaselineUpdateMode>,
 ) -> CheckArgs {
-    CheckArgs {
-        paths,
-        config,
-        max_lines: None,
-        ext: Some(vec!["rs".to_string()]),
-        exclude: vec![],
-        include: vec![],
-        count_comments: false,
-        count_blank: false,
-        warn_threshold: None,
-        format: OutputFormat::Text,
-        output: None,
-        warn_only: false,
-        diff: None,
-        staged: false,
-        strict: false,
-        baseline,
-        update_baseline,
-        no_cache: true,
-        no_gitignore: true,
-        suggest: false,
-        max_files: None,
-        max_dirs: None,
-        max_depth: None,
-        report_json: None,
-        files: vec![],
+    let mut builder = CheckArgsBuilder::default().paths(paths);
+    if let Some(c) = config {
+        builder = builder.config(c);
     }
+    if let Some(b) = baseline {
+        builder = builder.baseline(b);
+    }
+    if let Some(u) = update_baseline {
+        builder = builder.update_baseline(u);
+    }
+    builder.build()
 }
 
 // =============================================================================
@@ -519,4 +571,262 @@ fn update_baseline_mode_new_preserves_existing_entries() {
         }
         BaselineEntry::Structure { .. } => panic!("Expected Content entry"),
     }
+}
+
+// =============================================================================
+// Baseline Ratchet Tests
+// =============================================================================
+
+fn make_check_args_with_ratchet(
+    paths: Vec<PathBuf>,
+    config: Option<PathBuf>,
+    baseline: Option<PathBuf>,
+    ratchet: Option<crate::cli::RatchetMode>,
+) -> CheckArgs {
+    let mut builder = CheckArgsBuilder::default().paths(paths);
+    if let Some(c) = config {
+        builder = builder.config(c);
+    }
+    if let Some(b) = baseline {
+        builder = builder.baseline(b);
+    }
+    if let Some(r) = ratchet {
+        builder = builder.ratchet(r);
+    }
+    builder.build()
+}
+
+#[test]
+fn check_baseline_ratchet_detects_stale_entries() {
+    use super::check_baseline_ratchet;
+
+    // Current results: only file1.rs is failing
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("file1.rs"),
+        stats: LineStats {
+            total: 600,
+            code: 600,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+        violation_category: None,
+    }];
+
+    // Baseline has file1.rs and file2.rs (file2.rs was fixed)
+    let mut baseline = Baseline::new();
+    baseline.set_content("file1.rs", 600, "hash1".to_string());
+    baseline.set_content("file2.rs", 700, "hash2".to_string());
+
+    let ratchet_result = check_baseline_ratchet(&results, &baseline);
+
+    assert!(ratchet_result.is_outdated());
+    assert_eq!(ratchet_result.stale_entries, 1);
+    assert_eq!(ratchet_result.stale_paths, vec!["file2.rs".to_string()]);
+}
+
+#[test]
+fn check_baseline_ratchet_no_stale_when_all_still_failing() {
+    use super::check_baseline_ratchet;
+
+    let results = vec![
+        CheckResult::Failed {
+            path: PathBuf::from("file1.rs"),
+            stats: LineStats {
+                total: 600,
+                code: 600,
+                comment: 0,
+                blank: 0,
+                ignored: 0,
+            },
+            limit: 500,
+            override_reason: None,
+            suggestions: None,
+            violation_category: None,
+        },
+        CheckResult::Grandfathered {
+            path: PathBuf::from("file2.rs"),
+            stats: LineStats {
+                total: 700,
+                code: 700,
+                comment: 0,
+                blank: 0,
+                ignored: 0,
+            },
+            limit: 500,
+            override_reason: None,
+            violation_category: None,
+        },
+    ];
+
+    let mut baseline = Baseline::new();
+    baseline.set_content("file1.rs", 600, "hash1".to_string());
+    baseline.set_content("file2.rs", 700, "hash2".to_string());
+
+    let ratchet_result = check_baseline_ratchet(&results, &baseline);
+
+    assert!(!ratchet_result.is_outdated());
+    assert_eq!(ratchet_result.stale_entries, 0);
+}
+
+#[test]
+fn ratchet_strict_fails_when_baseline_outdated() {
+    use crate::cli::RatchetMode;
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small compliant file
+    let test_file = temp_dir.path().join("small_file.rs");
+    std::fs::write(&test_file, "fn main() {}\n").unwrap();
+
+    // Create baseline with an entry for this file (simulating previously violated)
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+    let mut baseline = Baseline::new();
+    let file_path_str = test_file.to_string_lossy().replace('\\', "/");
+    baseline.set_content(&file_path_str, 100, "dummy_hash".to_string());
+    baseline.save(&baseline_path).unwrap();
+
+    // Config with lenient limit (file now passes)
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 500\nextensions = [\"rs\"]\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = make_check_args_with_ratchet(
+        vec![temp_dir.path().to_path_buf()],
+        Some(config_path),
+        Some(baseline_path),
+        Some(RatchetMode::Strict),
+    );
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Strict mode should fail because baseline has stale entry
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
+}
+
+#[test]
+fn ratchet_warn_succeeds_but_warns_when_outdated() {
+    use crate::cli::RatchetMode;
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small compliant file
+    let test_file = temp_dir.path().join("small_file.rs");
+    std::fs::write(&test_file, "fn main() {}\n").unwrap();
+
+    // Create baseline with an entry for this file
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+    let mut baseline = Baseline::new();
+    let file_path_str = test_file.to_string_lossy().replace('\\', "/");
+    baseline.set_content(&file_path_str, 100, "dummy_hash".to_string());
+    baseline.save(&baseline_path).unwrap();
+
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 500\nextensions = [\"rs\"]\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = make_check_args_with_ratchet(
+        vec![temp_dir.path().to_path_buf()],
+        Some(config_path),
+        Some(baseline_path),
+        Some(RatchetMode::Warn),
+    );
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Warn mode should succeed (just emit warning)
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+}
+
+#[test]
+fn ratchet_auto_updates_baseline_when_outdated() {
+    use crate::cli::RatchetMode;
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small compliant file
+    let test_file = temp_dir.path().join("small_file.rs");
+    std::fs::write(&test_file, "fn main() {}\n").unwrap();
+
+    // Create baseline with an entry for this file
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+    let mut baseline = Baseline::new();
+    let file_path_str = test_file.to_string_lossy().replace('\\', "/");
+    baseline.set_content(&file_path_str, 100, "dummy_hash".to_string());
+    baseline.save(&baseline_path).unwrap();
+
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 500\nextensions = [\"rs\"]\n";
+    std::fs::write(&config_path, config_content).unwrap();
+
+    let args = make_check_args_with_ratchet(
+        vec![temp_dir.path().to_path_buf()],
+        Some(config_path),
+        Some(baseline_path.clone()),
+        Some(RatchetMode::Auto),
+    );
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), EXIT_SUCCESS);
+
+    // Baseline should be updated (stale entry removed)
+    let updated_baseline = Baseline::load(&baseline_path).unwrap();
+    assert!(
+        updated_baseline.is_empty(),
+        "Baseline should be empty after auto-tighten"
+    );
+}
+
+#[test]
+fn ratchet_config_works_without_cli_flag() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a small compliant file
+    let test_file = temp_dir.path().join("small_file.rs");
+    std::fs::write(&test_file, "fn main() {}\n").unwrap();
+
+    // Create baseline with an entry for this file
+    let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
+    let mut baseline = Baseline::new();
+    let file_path_str = test_file.to_string_lossy().replace('\\', "/");
+    baseline.set_content(&file_path_str, 100, "dummy_hash".to_string());
+    baseline.save(&baseline_path).unwrap();
+
+    // Config with ratchet = "strict"
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let config_content = r#"version = "2"
+
+[content]
+max_lines = 500
+extensions = ["rs"]
+
+[baseline]
+ratchet = "strict"
+"#;
+    std::fs::write(&config_path, config_content).unwrap();
+
+    // No CLI ratchet flag - should use config
+    let args = make_check_args_with_ratchet(
+        vec![temp_dir.path().to_path_buf()],
+        Some(config_path),
+        Some(baseline_path),
+        None, // No CLI flag
+    );
+
+    let cli = make_cli_for_check(ColorChoice::Never, 0, true, false);
+
+    let result = run_check_impl(&args, &cli);
+    assert!(result.is_ok());
+    // Should fail because config has ratchet = "strict" and baseline is stale
+    assert_eq!(result.unwrap(), EXIT_THRESHOLD_EXCEEDED);
 }

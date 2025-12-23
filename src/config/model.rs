@@ -10,6 +10,40 @@ pub const CONFIG_VERSION_V1: &str = "1";
 // V2 Config Types (Scanner/Content/Structure separation)
 // ============================================================================
 
+/// Ratchet mode for baseline enforcement.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RatchetMode {
+    /// Emit warning if baseline can be tightened (default)
+    #[default]
+    Warn,
+    /// Auto-update baseline when violations decrease
+    Auto,
+    /// Fail CI if baseline is outdated
+    Strict,
+}
+
+impl From<crate::cli::RatchetMode> for RatchetMode {
+    fn from(cli_mode: crate::cli::RatchetMode) -> Self {
+        match cli_mode {
+            crate::cli::RatchetMode::Warn => Self::Warn,
+            crate::cli::RatchetMode::Auto => Self::Auto,
+            crate::cli::RatchetMode::Strict => Self::Strict,
+        }
+    }
+}
+
+/// Baseline configuration for grandfathering violations.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BaselineConfig {
+    /// Ratchet enforcement mode.
+    /// - `warn`: emit warning when baseline can be tightened (default when enabled)
+    /// - `auto`: auto-update baseline when violations decrease
+    /// - `strict`: fail CI if baseline is outdated
+    #[serde(default)]
+    pub ratchet: Option<RatchetMode>,
+}
+
 /// Scanner configuration for physical file discovery.
 /// Scanner finds ALL files - no extension filtering here.
 /// This ensures Structure Guard sees the complete directory structure.
@@ -147,6 +181,10 @@ pub struct Config {
     /// Structure configuration (directory limits).
     #[serde(default)]
     pub structure: StructureConfig,
+
+    /// Baseline configuration (grandfathering/ratchet).
+    #[serde(default)]
+    pub baseline: BaselineConfig,
 
     // ========== V1 Legacy Fields (for migration) ==========
     // These fields are deserialized but not serialized (skip_serializing).

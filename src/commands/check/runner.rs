@@ -14,7 +14,8 @@ use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::check_baseline_ops::{
-    apply_baseline_comparison, load_baseline, load_baseline_optional, update_baseline_from_results,
+    apply_baseline_comparison, check_baseline_ratchet, load_baseline, load_baseline_optional,
+    tighten_baseline, update_baseline_from_results,
 };
 use super::check_git_diff::filter_by_git_diff;
 use super::check_output::{format_output, structure_violation_to_check_result};
@@ -227,17 +228,35 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     }
 
     // 7. Apply baseline comparison: mark failures as grandfathered if in baseline
-    if let Some(baseline) = baseline {
+    // Clone is required because `tighten_baseline()` needs `&mut Baseline` for auto-update mode,
+    // while the original `baseline` in CheckOptions is a shared reference (`Option<&Baseline>`).
+    let mut baseline_for_ratchet = baseline.cloned();
+    if let Some(ref baseline) = baseline_for_ratchet {
         apply_baseline_comparison(&mut results, baseline);
     }
 
-    // 7.0.1 Update baseline if --update-baseline is specified
+    // 7.0.1 Check baseline ratchet (violations should only decrease)
+    let ratchet_failed = handle_baseline_ratchet(
+        args,
+        config,
+        &results,
+        &mut baseline_for_ratchet,
+        project_root,
+        cli.quiet,
+    )?;
+
+    // 7.0.2 Update baseline if --update-baseline is specified
     if let Some(mode) = args.update_baseline {
         let baseline_path = args
             .baseline
             .clone()
             .unwrap_or_else(|| state::baseline_path(project_root));
-        update_baseline_from_results(&results, mode, &baseline_path, baseline)?;
+        update_baseline_from_results(
+            &results,
+            mode,
+            &baseline_path,
+            baseline_for_ratchet.as_ref(),
+        )?;
     }
 
     // 7.1 Generate split suggestions for failed files if --suggest is enabled
@@ -270,10 +289,101 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     // Strict mode: CLI flag takes precedence, otherwise use config
     let strict = args.strict || config.content.strict;
 
-    if has_failures || (strict && has_warnings) {
+    if has_failures || (strict && has_warnings) || ratchet_failed {
         Ok(EXIT_THRESHOLD_EXCEEDED)
     } else {
         Ok(EXIT_SUCCESS)
+    }
+}
+
+/// Handle baseline ratchet enforcement.
+///
+/// Returns `true` if ratchet check failed (for strict mode exit code).
+fn handle_baseline_ratchet(
+    args: &CheckArgs,
+    config: &crate::config::Config,
+    results: &[CheckResult],
+    baseline: &mut Option<Baseline>,
+    project_root: &Path,
+    quiet: bool,
+) -> crate::Result<bool> {
+    use crate::config::RatchetMode;
+
+    // Determine effective ratchet mode: CLI takes precedence over config
+    let ratchet_mode: Option<RatchetMode> = match (&args.ratchet, &config.baseline.ratchet) {
+        (Some(cli_mode), _) => Some((*cli_mode).into()),
+        (None, config_mode) => *config_mode,
+    };
+
+    // If no ratchet mode is set, skip ratchet check
+    let Some(mode) = ratchet_mode else {
+        return Ok(false);
+    };
+
+    // Ratchet requires a baseline
+    let Some(current_baseline) = baseline else {
+        // If ratchet is enabled but no baseline exists, emit warning
+        if !quiet {
+            eprintln!(
+                "Warning: --ratchet specified but no baseline found. Use --baseline to specify a baseline file."
+            );
+        }
+        return Ok(false);
+    };
+
+    // Check for stale entries
+    let ratchet_result = check_baseline_ratchet(results, current_baseline);
+
+    if !ratchet_result.is_outdated() {
+        return Ok(false);
+    }
+
+    let baseline_path = args
+        .baseline
+        .clone()
+        .unwrap_or_else(|| state::baseline_path(project_root));
+
+    match mode {
+        RatchetMode::Warn => {
+            if !quiet {
+                eprintln!(
+                    "Warning: Baseline can be tightened - {} violation(s) resolved:",
+                    ratchet_result.stale_entries
+                );
+                for path in &ratchet_result.stale_paths {
+                    eprintln!("  - {path}");
+                }
+                eprintln!(
+                    "Hint: Run with --ratchet=auto to auto-update, or --update-baseline to replace."
+                );
+            }
+            Ok(false)
+        }
+        RatchetMode::Auto => {
+            tighten_baseline(
+                current_baseline,
+                &ratchet_result.stale_paths,
+                &baseline_path,
+            )?;
+            if !quiet {
+                eprintln!(
+                    "Baseline tightened: {} stale entry/entries removed.",
+                    ratchet_result.stale_entries
+                );
+            }
+            Ok(false)
+        }
+        RatchetMode::Strict => {
+            eprintln!(
+                "Error: Baseline is outdated - {} violation(s) resolved but not removed:",
+                ratchet_result.stale_entries
+            );
+            for path in &ratchet_result.stale_paths {
+                eprintln!("  - {path}");
+            }
+            eprintln!("Update the baseline with --update-baseline or use --ratchet=auto.");
+            Ok(true) // Signal failure
+        }
     }
 }
 

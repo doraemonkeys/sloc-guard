@@ -1,9 +1,27 @@
+use std::collections::HashSet;
 use std::path::Path;
 
 use crate::baseline::{Baseline, StructureViolationType, compute_file_hash};
 use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::cli::BaselineUpdateMode;
 use crate::counter::LineStats;
+
+/// Result of baseline ratchet check.
+#[derive(Debug, Clone)]
+pub struct RatchetResult {
+    /// Number of baseline entries that no longer have corresponding violations.
+    pub stale_entries: usize,
+    /// Paths of stale entries for reporting.
+    pub stale_paths: Vec<String>,
+}
+
+impl RatchetResult {
+    /// Returns true if the baseline is outdated (has stale entries).
+    #[must_use]
+    pub const fn is_outdated(&self) -> bool {
+        self.stale_entries > 0
+    }
+}
 
 pub fn load_baseline(baseline_path: Option<&Path>) -> crate::Result<Option<Baseline>> {
     let Some(path) = baseline_path else {
@@ -168,4 +186,44 @@ pub fn parse_structure_violation(
     };
 
     Some((vtype, count))
+}
+
+/// Check if baseline entries are stale (violations have been resolved).
+///
+/// Compares current violations with baseline entries. Returns `RatchetResult`
+/// containing the count of stale entries that can be removed from the baseline.
+pub fn check_baseline_ratchet(results: &[CheckResult], baseline: &Baseline) -> RatchetResult {
+    // Collect all current failure paths (normalized)
+    let current_failures: HashSet<String> = results
+        .iter()
+        .filter(|r| r.is_failed() || r.is_grandfathered())
+        .map(|r| r.path().to_string_lossy().replace('\\', "/"))
+        .collect();
+
+    // Find baseline entries that are no longer violations
+    let mut stale_paths: Vec<String> = Vec::new();
+    for baseline_path in baseline.files().keys() {
+        if !current_failures.contains(baseline_path) {
+            stale_paths.push(baseline_path.clone());
+        }
+    }
+
+    stale_paths.sort();
+
+    RatchetResult {
+        stale_entries: stale_paths.len(),
+        stale_paths,
+    }
+}
+
+/// Remove stale entries from baseline and save (for `--ratchet=auto` mode).
+pub fn tighten_baseline(
+    baseline: &mut Baseline,
+    stale_paths: &[String],
+    path: &Path,
+) -> crate::Result<()> {
+    for stale_path in stale_paths {
+        baseline.remove(stale_path);
+    }
+    baseline.save(path)
 }
