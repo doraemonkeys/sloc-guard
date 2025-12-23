@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{Result, SlocGuardError};
 
 use super::Config;
-use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentRule, LanguageRule};
+use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentRule};
 use super::presets;
 use super::remote::{fetch_remote_config, fetch_remote_config_offline, is_remote_url};
 
@@ -94,60 +94,32 @@ fn migrate_v1_to_v2(config: &mut Config) {
     // Note: overrides migration removed - V1 overrides are no longer supported.
     // Users must manually migrate to [[content.rules]] with reason field.
 
-    // Migrate rules (extension-based) -> content.languages
+    // Migrate V1 [rules.X] (extension-based) -> [[content.rules]]
     // V1 format: [rules.python] with extensions = ["py"]
-    // V2 format: [content.languages.py] - key is the actual file extension
+    // V2 format: [[content.rules]] with pattern = "**/*.py"
+    // Collect and sort extensions for deterministic order
+    let mut all_extensions: Vec<(String, &super::model::RuleConfig)> = Vec::new();
     for rule in config.rules.values() {
         for ext in &rule.extensions {
-            config.content.languages.insert(
-                ext.clone(),
-                LanguageRule {
-                    max_lines: rule.max_lines,
-                    warn_threshold: rule.warn_threshold,
-                    skip_comments: rule.skip_comments,
-                    skip_blank: rule.skip_blank,
-                },
-            );
+            all_extensions.push((ext.clone(), rule));
         }
     }
-}
+    all_extensions.sort_by(|a, b| a.0.cmp(&b.0));
 
-/// Expand `[content.languages.X]` entries into `[[content.rules]]` with pattern `**/*.X`.
-/// Expanded rules are inserted at HEAD of `content.rules` so explicit rules override them.
-fn expand_language_rules(config: &mut Config) {
-    if config.content.languages.is_empty() {
-        return;
-    }
-
-    // Collect expanded rules (sorted by extension for deterministic order)
-    let mut extensions: Vec<_> = config.content.languages.keys().cloned().collect();
-    extensions.sort();
-
-    let expanded_rules: Vec<ContentRule> = extensions
+    // Insert at HEAD of content.rules (so explicit rules override migrated ones)
+    let migrated_rules: Vec<ContentRule> = all_extensions
         .into_iter()
-        .map(|ext| {
-            let lang_rule = config
-                .content
-                .languages
-                .get(&ext)
-                .expect("key exists: iterating over collected keys");
-            ContentRule {
-                pattern: format!("**/*.{ext}"),
-                max_lines: lang_rule.max_lines.unwrap_or(config.content.max_lines),
-                warn_threshold: lang_rule.warn_threshold,
-                skip_comments: lang_rule.skip_comments,
-                skip_blank: lang_rule.skip_blank,
-                reason: None,
-                expires: None,
-            }
+        .map(|(ext, rule)| ContentRule {
+            pattern: format!("**/*.{ext}"),
+            max_lines: rule.max_lines.unwrap_or(config.content.max_lines),
+            warn_threshold: rule.warn_threshold,
+            skip_comments: rule.skip_comments,
+            skip_blank: rule.skip_blank,
+            reason: None,
+            expires: None,
         })
         .collect();
-
-    // Insert at HEAD (so explicit [[content.rules]] override language rules)
-    config.content.rules.splice(0..0, expanded_rules);
-
-    // Clear languages to avoid double processing in ThresholdChecker
-    config.content.languages.clear();
+    config.content.rules.splice(0..0, migrated_rules);
 }
 
 /// Trait for filesystem operations (for testability).
@@ -277,9 +249,6 @@ impl<F: FileSystem> FileConfigLoader<F> {
         if needs_migration {
             migrate_v1_to_v2(&mut config);
         }
-
-        // Expand [content.languages.X] to [[content.rules]] with pattern **/*.X
-        expand_language_rules(&mut config);
 
         Ok(config)
     }

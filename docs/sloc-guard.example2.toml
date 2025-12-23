@@ -9,7 +9,7 @@
 # 3. [structure] - File/Directory count & topology limits (Structure Guard) + [[structure.rules]]
 #
 # Rule Priority Chain (high → low):
-#   Content:   [[content.rules]] (last match) > [content.languages.X] > [content]
+#   Content:   [[content.rules]] (last match) > [content]
 #   Structure: [[structure.rules]] (last match) > [structure]
 # ==============================================================================
 
@@ -76,10 +76,8 @@ max_lines = 250         # Stricter limit
 pattern = "tests/**"    # Test files
 max_lines = 1000        # Relaxed limit
 
-# --- Language-Specific Shorthand ---
-# Equivalent to [[content.rules]] with pattern = "**/*.ext"
-
-[content.languages.rs]
+[[content.rules]]
+pattern = "**/*.rs"     # Rust files
 max_lines = 500
 skip_comments = false   # Count comments in Rust files (example)
 

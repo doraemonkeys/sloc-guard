@@ -70,10 +70,6 @@ pub struct ContentConfig {
     /// Path-based rules [[content.rules]].
     #[serde(default)]
     pub rules: Vec<ContentRule>,
-
-    /// Language-based shorthand rules [content.languages.X].
-    #[serde(default)]
-    pub languages: std::collections::HashMap<String, LanguageRule>,
 }
 
 impl Default for ContentConfig {
@@ -87,7 +83,6 @@ impl Default for ContentConfig {
             strict: false,
             exclude: Vec::new(),
             rules: Vec::new(),
-            languages: std::collections::HashMap::new(),
         }
     }
 }
@@ -120,27 +115,6 @@ pub struct ContentRule {
     /// Optional expiration date (YYYY-MM-DD). Past dates emit warnings.
     #[serde(default)]
     pub expires: Option<String>,
-}
-
-/// Language-based shorthand rule [content.languages.X].
-/// Equivalent to [[content.rules]] pattern = "**/*.X".
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-pub struct LanguageRule {
-    /// Maximum lines for this language.
-    #[serde(default)]
-    pub max_lines: Option<usize>,
-
-    /// Warning threshold for this language.
-    #[serde(default)]
-    pub warn_threshold: Option<f64>,
-
-    /// Skip comment lines for this language.
-    #[serde(default)]
-    pub skip_comments: Option<bool>,
-
-    /// Skip blank lines for this language.
-    #[serde(default)]
-    pub skip_blank: Option<bool>,
 }
 
 // ============================================================================
@@ -181,7 +155,7 @@ pub struct Config {
     #[serde(default, skip_serializing)]
     pub default: DefaultConfig,
 
-    /// Legacy: extension-based rules (migrated to content.languages).
+    /// Legacy: extension-based rules (migrated to content.rules).
     #[serde(default, skip_serializing)]
     pub rules: std::collections::HashMap<String, RuleConfig>,
 

@@ -41,7 +41,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
 Config { version, extends, extends_sha256, scanner, content, structure }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
-ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules, languages }  // exclude: glob patterns to skip SLOC but keep for structure
+ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank, reason, expires }  // [[content.rules]]
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
 StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, file_pattern, require_sibling, reason, expires }  // [[structure.rules]]
@@ -133,7 +133,6 @@ CLI args → load_config() → [if --offline] use cache only, error on miss
          → [if extends] resolve chain (local/remote/preset:*, cycle detection)
          → [if extends_sha256] verify remote config hash, error on mismatch
          → [if v1 config] migrate_v1_to_v2() auto-conversion (path_rules rejected with error)
-         → expand_language_rules() → [content.languages.X] to [[content.rules]]
          → [if !--no-cache] load_cache(config_hash)
          → LanguageRegistry
          → [if gitignore] GitAwareScanner else DirectoryScanner
@@ -193,8 +192,7 @@ show: load_config() → format_config_text() or JSON
 
 **Content (SLOC limits):**
 1. `[[content.rules]]` - glob pattern, LAST declared match wins (use `reason`/`expires` for exemptions)
-2. `[content.languages.<ext>]` - extension shorthand
-3. `[content]` defaults
+2. `[content]` defaults
 
 **Structure (directory limits):**
 1. `[[structure.rules]]` - glob pattern, LAST declared match wins (use `reason`/`expires` for exemptions)
