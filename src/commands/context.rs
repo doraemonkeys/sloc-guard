@@ -324,18 +324,18 @@ impl CheckContext {
             }
         }
 
-        let structure_scan_config = StructureScanConfig::new(
-            &config.structure.count_exclude,
-            exclude_patterns,
-            allowlist_rules,
-            config.structure.allow_extensions.clone(),
-            &config.structure.allow_files,
-            &config.structure.allow_dirs,
-            config.structure.deny_extensions.clone(),
-            &config.structure.deny_patterns,
-            &config.structure.deny_files,
-            &config.structure.deny_dirs,
-        )?;
+        let structure_scan_config = StructureScanConfig::builder()
+            .count_exclude(config.structure.count_exclude.clone())
+            .scanner_exclude(exclude_patterns.to_vec())
+            .allowlist_rules(allowlist_rules)
+            .global_allow_extensions(config.structure.allow_extensions.clone())
+            .global_allow_files(config.structure.allow_files.clone())
+            .global_allow_dirs(config.structure.allow_dirs.clone())
+            .global_deny_extensions(config.structure.deny_extensions.clone())
+            .global_deny_patterns(config.structure.deny_patterns.clone())
+            .global_deny_files(config.structure.deny_files.clone())
+            .global_deny_dirs(config.structure.deny_dirs.clone())
+            .build()?;
 
         Ok(Some(structure_scan_config))
     }

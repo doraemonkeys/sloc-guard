@@ -92,12 +92,6 @@ impl StructureChecker {
     /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
-    #[cfg(test)]
-    #[allow(dead_code)]
-    fn get_limits(&self, path: &Path) -> StructureLimits {
-        self.resolve_limits(path)
-    }
-
     fn resolve_limits(&self, path: &Path) -> StructureLimits {
         // Check rules (glob patterns) - last match wins
         // Iterate in reverse to find the last matching rule

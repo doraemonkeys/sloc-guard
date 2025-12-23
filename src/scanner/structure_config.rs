@@ -48,11 +48,121 @@ pub struct StructureScanConfig {
     pub global_deny_dir_pattern_strs: Vec<String>,
 }
 
-impl StructureScanConfig {
-    /// Build from config components.
+/// Builder for `StructureScanConfig`.
+#[derive(Debug, Default)]
+pub struct StructureScanConfigBuilder {
+    count_exclude_patterns: Vec<String>,
+    scanner_exclude_patterns: Vec<String>,
+    allowlist_rules: Vec<AllowlistRule>,
+    global_allow_extensions: Vec<String>,
+    global_allow_files: Vec<String>,
+    global_allow_dirs: Vec<String>,
+    global_deny_extensions: Vec<String>,
+    global_deny_patterns: Vec<String>,
+    global_deny_files: Vec<String>,
+    global_deny_dirs: Vec<String>,
+}
+
+impl StructureScanConfigBuilder {
+    /// Create a new builder with default values.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set patterns to exclude from file/dir counting.
+    #[must_use]
+    pub fn count_exclude(mut self, patterns: Vec<String>) -> Self {
+        self.count_exclude_patterns = patterns;
+        self
+    }
+
+    /// Set scanner exclude patterns (skip entirely).
+    #[must_use]
+    pub fn scanner_exclude(mut self, patterns: Vec<String>) -> Self {
+        self.scanner_exclude_patterns = patterns;
+        self
+    }
+
+    /// Set allowlist rules from structure.rules.
+    #[must_use]
+    pub fn allowlist_rules(mut self, rules: Vec<AllowlistRule>) -> Self {
+        self.allowlist_rules = rules;
+        self
+    }
+
+    /// Set global allow extensions (e.g., ".rs", ".py").
+    #[must_use]
+    pub fn global_allow_extensions(mut self, extensions: Vec<String>) -> Self {
+        self.global_allow_extensions = extensions;
+        self
+    }
+
+    /// Set global allow file patterns (filename-only matching).
+    #[must_use]
+    pub fn global_allow_files(mut self, patterns: Vec<String>) -> Self {
+        self.global_allow_files = patterns;
+        self
+    }
+
+    /// Set global allow directory patterns (dirname-only matching).
+    #[must_use]
+    pub fn global_allow_dirs(mut self, patterns: Vec<String>) -> Self {
+        self.global_allow_dirs = patterns;
+        self
+    }
+
+    /// Set global deny extensions (e.g., ".exe", ".dll").
+    #[must_use]
+    pub fn global_deny_extensions(mut self, extensions: Vec<String>) -> Self {
+        self.global_deny_extensions = extensions;
+        self
+    }
+
+    /// Set global deny patterns for files.
+    #[must_use]
+    pub fn global_deny_patterns(mut self, patterns: Vec<String>) -> Self {
+        self.global_deny_patterns = patterns;
+        self
+    }
+
+    /// Set global deny file patterns (filename-only matching).
+    #[must_use]
+    pub fn global_deny_files(mut self, patterns: Vec<String>) -> Self {
+        self.global_deny_files = patterns;
+        self
+    }
+
+    /// Set global deny directory patterns (dirname-only matching).
+    #[must_use]
+    pub fn global_deny_dirs(mut self, patterns: Vec<String>) -> Self {
+        self.global_deny_dirs = patterns;
+        self
+    }
+
+    /// Build the `StructureScanConfig`.
     ///
     /// # Errors
     /// Returns an error if any pattern is invalid.
+    pub fn build(self) -> Result<StructureScanConfig> {
+        StructureScanConfig::from_builder(self)
+    }
+}
+
+impl StructureScanConfig {
+    /// Create a new builder.
+    #[must_use]
+    pub fn builder() -> StructureScanConfigBuilder {
+        StructureScanConfigBuilder::new()
+    }
+
+    /// Convenience constructor for tests that maintains the original function signature.
+    ///
+    /// Production code should use the builder pattern via `StructureScanConfig::builder()`.
+    ///
+    /// # Errors
+    /// Returns an error if any pattern is invalid.
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         count_exclude_patterns: &[String],
@@ -66,21 +176,39 @@ impl StructureScanConfig {
         global_deny_files: &[String],
         global_deny_dirs: &[String],
     ) -> Result<Self> {
-        let count_exclude = Self::build_glob_set(count_exclude_patterns)?;
-        let scanner_exclude = Self::build_glob_set(scanner_exclude_patterns)?;
-        let scanner_exclude_dir_names = Self::extract_dir_names(scanner_exclude_patterns);
+        Self::builder()
+            .count_exclude(count_exclude_patterns.to_vec())
+            .scanner_exclude(scanner_exclude_patterns.to_vec())
+            .allowlist_rules(allowlist_rules)
+            .global_allow_extensions(global_allow_extensions)
+            .global_allow_files(global_allow_files.to_vec())
+            .global_allow_dirs(global_allow_dirs.to_vec())
+            .global_deny_extensions(global_deny_extensions)
+            .global_deny_patterns(global_deny_patterns.to_vec())
+            .global_deny_files(global_deny_files.to_vec())
+            .global_deny_dirs(global_deny_dirs.to_vec())
+            .build()
+    }
+
+    /// Build from a `StructureScanConfigBuilder`.
+    fn from_builder(builder: StructureScanConfigBuilder) -> Result<Self> {
+        let count_exclude = Self::build_glob_set(&builder.count_exclude_patterns)?;
+        let scanner_exclude = Self::build_glob_set(&builder.scanner_exclude_patterns)?;
+        let scanner_exclude_dir_names = Self::extract_dir_names(&builder.scanner_exclude_patterns);
 
         // Build global allow file patterns (filename-only matching)
-        let global_allow_file_strs: Vec<String> = global_allow_files.to_vec();
+        let global_allow_file_strs = builder.global_allow_files;
         let global_allow_files_compiled = Self::build_glob_set(&global_allow_file_strs)?;
 
         // Build global allow dir patterns (dirname-only matching)
-        let global_allow_dir_strs: Vec<String> = global_allow_dirs.to_vec();
+        let global_allow_dir_strs = builder.global_allow_dirs;
         let global_allow_dirs_compiled = Self::build_glob_set(&global_allow_dir_strs)?;
 
         // Separate directory-only patterns (ending with `/`) from file patterns
-        let (dir_patterns, file_patterns): (Vec<_>, Vec<_>) =
-            global_deny_patterns.iter().partition(|p| p.ends_with('/'));
+        let (dir_patterns, file_patterns): (Vec<_>, Vec<_>) = builder
+            .global_deny_patterns
+            .iter()
+            .partition(|p| p.ends_with('/'));
 
         // For directory patterns, strip the trailing `/` for glob matching
         let dir_pattern_strs: Vec<String> = dir_patterns.iter().map(|s| (*s).clone()).collect();
@@ -96,24 +224,24 @@ impl StructureScanConfig {
         let global_deny_dir_patterns = Self::build_glob_set(&dir_patterns_for_glob)?;
 
         // Build global deny file patterns (filename-only matching)
-        let global_deny_file_strs: Vec<String> = global_deny_files.to_vec();
+        let global_deny_file_strs = builder.global_deny_files;
         let global_deny_files_compiled = Self::build_glob_set(&global_deny_file_strs)?;
 
         // Build global deny dir patterns (dirname-only matching, from deny_dirs config)
-        let global_deny_dir_basename_strs: Vec<String> = global_deny_dirs.to_vec();
+        let global_deny_dir_basename_strs = builder.global_deny_dirs;
         let global_deny_dir_basenames = Self::build_glob_set(&global_deny_dir_basename_strs)?;
 
         Ok(Self {
             count_exclude,
             scanner_exclude,
             scanner_exclude_dir_names,
-            allowlist_rules,
-            global_allow_extensions,
+            allowlist_rules: builder.allowlist_rules,
+            global_allow_extensions: builder.global_allow_extensions,
             global_allow_files: global_allow_files_compiled,
             global_allow_file_strs,
             global_allow_dirs: global_allow_dirs_compiled,
             global_allow_dir_strs,
-            global_deny_extensions,
+            global_deny_extensions: builder.global_deny_extensions,
             global_deny_patterns: global_deny_patterns_compiled,
             global_deny_pattern_strs: file_pattern_strs,
             global_deny_files: global_deny_files_compiled,

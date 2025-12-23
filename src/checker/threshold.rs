@@ -5,7 +5,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::config::Config;
 use crate::counter::LineStats;
-use crate::path_utils::path_matches_override;
+use crate::path_matching::path_matches_override;
 
 use super::Checker;
 use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
