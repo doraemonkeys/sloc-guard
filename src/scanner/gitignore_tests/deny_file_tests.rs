@@ -6,6 +6,7 @@
 use super::super::{FileScanner, GitAwareScanner, StructureScanConfig};
 use super::mock_filters::{AcceptAllFilter, init_git_repo};
 use crate::scanner::AllowlistRuleBuilder;
+use crate::scanner::TestConfigParams;
 use tempfile::TempDir;
 
 #[test]
@@ -26,18 +27,10 @@ fn deny_file_patterns_with_relative_pattern() {
         .with_deny_files(vec!["types.rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -73,18 +66,10 @@ fn deny_file_patterns_nested_directories() {
         .with_deny_files(vec!["utils.rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -111,18 +96,10 @@ fn global_deny_file_patterns() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("secrets.json"), "").unwrap(); // Should be denied globally
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &["secrets.json".to_string()],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_files: vec!["secrets.json".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -153,18 +130,10 @@ fn deny_file_patterns_does_not_match_allowed_files() {
         .with_deny_files(vec!["utils.rs".to_string(), "types.rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -197,18 +166,10 @@ fn deny_file_patterns_with_glob() {
         .with_deny_files(vec!["temp_*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner

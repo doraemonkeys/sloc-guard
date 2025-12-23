@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::*;
+use crate::scanner::TestConfigParams;
 
 #[test]
 fn allowlist_rule_builder_creates_rule() {
@@ -304,18 +305,10 @@ fn per_rule_deny_extensions_trigger_violation() {
         .with_deny_extensions(vec![".js".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -338,18 +331,10 @@ fn per_rule_deny_patterns_trigger_violation() {
         .with_deny_patterns(vec!["temp_*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -377,18 +362,10 @@ fn deny_takes_precedence_over_allowlist() {
         .with_deny_patterns(vec!["backup*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -418,18 +395,10 @@ fn per_rule_deny_dirs_trigger_violation() {
         .with_deny_dirs(vec!["temp*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -456,18 +425,10 @@ fn per_rule_deny_file_patterns_trigger_violation() {
         .with_deny_files(vec!["temp_*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -496,18 +457,10 @@ fn deny_file_patterns_takes_precedence_over_allowlist() {
         .with_deny_files(vec!["backup*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -533,18 +486,10 @@ fn per_rule_deny_still_takes_precedence_over_per_rule_allow() {
         .with_deny_files(vec!["backup*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -581,18 +526,11 @@ fn per_rule_allow_files_overrides_global_deny_files() {
         .with_allow_files(vec!["secrets.md".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &["secrets.*".to_string()], // global deny_files
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        global_deny_files: vec!["secrets.*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -641,18 +579,11 @@ fn per_rule_allow_extensions_overrides_global_deny_extensions() {
         .with_extensions(vec![".exe".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        vec![".exe".to_string()], // global deny_extensions
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        global_deny_extensions: vec![".exe".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -692,18 +623,11 @@ fn per_rule_allow_patterns_overrides_global_deny_patterns() {
         .with_patterns(vec!["*.bak".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &["*.bak".to_string()], // global deny_patterns
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        global_deny_patterns: vec!["*.bak".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -748,18 +672,11 @@ fn per_rule_allow_dirs_overrides_global_deny_dirs() {
         .with_allow_dirs(vec!["temp*".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["temp*".to_string()], // global deny_dirs
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        global_deny_dirs: vec!["temp*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner

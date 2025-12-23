@@ -7,6 +7,25 @@ use crate::error::Result;
 
 use super::AllowlistRule;
 
+/// Configuration parameters for test helper constructor.
+///
+/// Use with `StructureScanConfig::new()` in tests. Implements `Default` for easy
+/// struct update syntax: `TestConfigParams { field: value, ..Default::default() }`.
+#[cfg(test)]
+#[derive(Debug, Default)]
+pub struct TestConfigParams {
+    pub count_exclude_patterns: Vec<String>,
+    pub scanner_exclude_patterns: Vec<String>,
+    pub allowlist_rules: Vec<AllowlistRule>,
+    pub global_allow_extensions: Vec<String>,
+    pub global_allow_files: Vec<String>,
+    pub global_allow_dirs: Vec<String>,
+    pub global_deny_extensions: Vec<String>,
+    pub global_deny_patterns: Vec<String>,
+    pub global_deny_files: Vec<String>,
+    pub global_deny_dirs: Vec<String>,
+}
+
 /// Configuration for structure-aware scanning.
 #[derive(Debug, Clone, Default)]
 pub struct StructureScanConfig {
@@ -156,37 +175,25 @@ impl StructureScanConfig {
         StructureScanConfigBuilder::new()
     }
 
-    /// Convenience constructor for tests that maintains the original function signature.
+    /// Convenience constructor for tests using `TestConfigParams` struct.
     ///
     /// Production code should use the builder pattern via `StructureScanConfig::builder()`.
     ///
     /// # Errors
     /// Returns an error if any pattern is invalid.
     #[cfg(test)]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        count_exclude_patterns: &[String],
-        scanner_exclude_patterns: &[String],
-        allowlist_rules: Vec<AllowlistRule>,
-        global_allow_extensions: Vec<String>,
-        global_allow_files: &[String],
-        global_allow_dirs: &[String],
-        global_deny_extensions: Vec<String>,
-        global_deny_patterns: &[String],
-        global_deny_files: &[String],
-        global_deny_dirs: &[String],
-    ) -> Result<Self> {
+    pub fn new(params: TestConfigParams) -> Result<Self> {
         Self::builder()
-            .count_exclude(count_exclude_patterns.to_vec())
-            .scanner_exclude(scanner_exclude_patterns.to_vec())
-            .allowlist_rules(allowlist_rules)
-            .global_allow_extensions(global_allow_extensions)
-            .global_allow_files(global_allow_files.to_vec())
-            .global_allow_dirs(global_allow_dirs.to_vec())
-            .global_deny_extensions(global_deny_extensions)
-            .global_deny_patterns(global_deny_patterns.to_vec())
-            .global_deny_files(global_deny_files.to_vec())
-            .global_deny_dirs(global_deny_dirs.to_vec())
+            .count_exclude(params.count_exclude_patterns)
+            .scanner_exclude(params.scanner_exclude_patterns)
+            .allowlist_rules(params.allowlist_rules)
+            .global_allow_extensions(params.global_allow_extensions)
+            .global_allow_files(params.global_allow_files)
+            .global_allow_dirs(params.global_allow_dirs)
+            .global_deny_extensions(params.global_deny_extensions)
+            .global_deny_patterns(params.global_deny_patterns)
+            .global_deny_files(params.global_deny_files)
+            .global_deny_dirs(params.global_deny_dirs)
             .build()
     }
 

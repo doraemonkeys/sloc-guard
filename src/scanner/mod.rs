@@ -12,6 +12,9 @@ pub use filter::{FileFilter, GlobFilter};
 pub use gitignore::GitAwareScanner;
 pub use structure_config::StructureScanConfig;
 
+#[cfg(test)]
+pub use structure_config::TestConfigParams;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 

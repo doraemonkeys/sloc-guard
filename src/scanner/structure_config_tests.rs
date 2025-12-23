@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::*;
+use crate::scanner::TestConfigParams;
 
 // =============================================================================
 // ScanResult Tests
@@ -20,36 +21,16 @@ fn scan_result_default() {
 
 #[test]
 fn structure_scan_config_new_creates_config() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
-    .unwrap();
+    let config = StructureScanConfig::new(TestConfigParams::default()).unwrap();
     assert!(config.allowlist_rules.is_empty());
 }
 
 #[test]
 fn structure_scan_config_with_count_exclude() {
-    let config = StructureScanConfig::new(
-        &["*.generated".to_string()],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        count_exclude_patterns: vec!["*.generated".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let path = Path::new("foo.generated");
     assert!(config.count_exclude.is_match(path));
@@ -57,18 +38,10 @@ fn structure_scan_config_with_count_exclude() {
 
 #[test]
 fn structure_scan_config_with_scanner_exclude() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["**/target/**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["**/target/**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let path = Path::new("src/target/build.rs");
     assert!(config.scanner_exclude.is_match(path));
@@ -76,18 +49,10 @@ fn structure_scan_config_with_scanner_exclude() {
 
 #[test]
 fn structure_scan_config_extracts_dir_names() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["target/**".to_string(), "node_modules/**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["target/**".to_string(), "node_modules/**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     assert!(
         config
@@ -103,35 +68,19 @@ fn structure_scan_config_extracts_dir_names() {
 
 #[test]
 fn structure_scan_config_invalid_pattern_returns_error() {
-    let result = StructureScanConfig::new(
-        &["[invalid".to_string()],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    );
+    let result = StructureScanConfig::new(TestConfigParams {
+        count_exclude_patterns: vec!["[invalid".to_string()],
+        ..Default::default()
+    });
     assert!(result.is_err());
 }
 
 #[test]
 fn structure_scan_config_is_scanner_excluded_file() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["*.lock".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["*.lock".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     assert!(config.scanner_exclude.is_match(Path::new("Cargo.lock")));
     assert!(!config.scanner_exclude.is_match(Path::new("Cargo.toml")));
@@ -139,18 +88,10 @@ fn structure_scan_config_is_scanner_excluded_file() {
 
 #[test]
 fn structure_scan_config_is_count_excluded() {
-    let config = StructureScanConfig::new(
-        &["*.generated.rs".to_string()],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        count_exclude_patterns: vec!["*.generated.rs".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     assert!(
         config
@@ -166,18 +107,10 @@ fn structure_scan_config_find_matching_allowlist_rule() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![rule],
+        ..Default::default()
+    })
     .unwrap();
 
     assert!(
@@ -196,18 +129,10 @@ fn structure_scan_config_find_matching_allowlist_rule() {
 
 #[test]
 fn structure_scan_config_extract_dir_names_windows_paths() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["target\\**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["target\\**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     assert!(
         config
@@ -218,18 +143,10 @@ fn structure_scan_config_extract_dir_names_windows_paths() {
 
 #[test]
 fn structure_scan_config_is_scanner_excluded_by_dir_name() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["target/**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["target/**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     assert!(
         config
@@ -240,37 +157,18 @@ fn structure_scan_config_is_scanner_excluded_by_dir_name() {
 
 #[test]
 fn structure_scan_config_empty_patterns_match_nothing() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
-    .unwrap();
+    let config = StructureScanConfig::new(TestConfigParams::default()).unwrap();
     assert!(!config.count_exclude.is_match(Path::new("any.rs")));
     assert!(!config.scanner_exclude.is_match(Path::new("any.rs")));
 }
 
 #[test]
 fn structure_scan_config_combined_patterns() {
-    let config = StructureScanConfig::new(
-        &["*.gen".to_string()],
-        &["vendor/**".to_string(), "dist/**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        count_exclude_patterns: vec!["*.gen".to_string()],
+        scanner_exclude_patterns: vec!["vendor/**".to_string(), "dist/**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     assert!(config.count_exclude.is_match(Path::new("foo.gen")));
@@ -280,18 +178,10 @@ fn structure_scan_config_combined_patterns() {
 
 #[test]
 fn structure_scan_config_is_scanner_excluded_directory_by_name() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["node_modules/**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["node_modules/**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     assert!(
@@ -303,22 +193,14 @@ fn structure_scan_config_is_scanner_excluded_directory_by_name() {
 
 #[test]
 fn structure_scan_config_extract_dir_names_complex() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec![
             "**/node_modules/**".to_string(),
             "build/**".to_string(),
             "**/*.tmp".to_string(), // Not a dir pattern
         ],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+        ..Default::default()
+    })
     .unwrap();
 
     assert!(
@@ -341,18 +223,10 @@ fn structure_scan_config_extract_dir_names_complex() {
 
 #[test]
 fn structure_scan_config_pattern_without_trailing_glob() {
-    let config = StructureScanConfig::new(
-        &[],
-        &["*.log".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["*.log".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     assert!(config.scanner_exclude_dir_names.is_empty());
 }
@@ -363,18 +237,10 @@ fn structure_scan_config_find_no_matching_rule() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![rule],
+        ..Default::default()
+    })
     .unwrap();
 
     let result = config.find_matching_allowlist_rule(Path::new("docs/readme"));
@@ -392,18 +258,10 @@ fn find_matching_allowlist_rule_returns_first_match() {
         .build()
         .unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![rule1, rule2],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![rule1, rule2],
+        ..Default::default()
+    })
     .unwrap();
 
     let src_rule = config.find_matching_allowlist_rule(Path::new("project/src/lib"));

@@ -6,6 +6,7 @@
 use super::super::{FileScanner, GitAwareScanner, StructureScanConfig};
 use super::mock_filters::{AcceptAllFilter, init_git_repo};
 use crate::scanner::AllowlistRuleBuilder;
+use crate::scanner::TestConfigParams;
 use tempfile::TempDir;
 
 #[test]
@@ -37,18 +38,10 @@ fn global_deny_dirs_basename() {
     std::fs::write(pycache.join("cache.pyc"), "").unwrap();
 
     // Configure global deny_dirs (basename matching)
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["node_modules".to_string(), "__pycache__".to_string()],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_dirs: vec!["node_modules".to_string(), "__pycache__".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -102,18 +95,10 @@ fn global_deny_dirs_pattern_with_slash() {
     std::fs::write(dist_dir.join("bundle.js"), "").unwrap();
 
     // Configure global deny_patterns with directory patterns (ending with `/`)
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &["build/".to_string(), "**/dist/".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["build/".to_string(), "**/dist/".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -168,18 +153,10 @@ fn per_rule_deny_dirs() {
         .with_deny_dirs(vec!["utils".to_string(), "helpers".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -235,18 +212,10 @@ fn nested_deny_dirs() {
     std::fs::write(submodule_dir.join("mod.rs"), "").unwrap();
 
     // Configure global deny_dirs
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["__tests__".to_string()],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_dirs: vec!["__tests__".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -293,18 +262,10 @@ fn deny_dirs_glob_pattern() {
     std::fs::write(production.join("app.rs"), "").unwrap();
 
     // Configure global deny_dirs with glob patterns
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["test_*".to_string(), "*_backup".to_string()],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_dirs: vec!["test_*".to_string(), "*_backup".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -359,18 +320,10 @@ fn deny_dirs_no_duplicate_violations() {
     std::fs::write(node_modules.join("file3.js"), "").unwrap();
 
     // Configure global deny_dirs
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["node_modules".to_string()],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_dirs: vec!["node_modules".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -414,18 +367,11 @@ fn deny_dirs_combined_with_file_deny() {
     std::fs::write(pycache.join("cache.pyc"), "").unwrap();
 
     // Configure both file and directory deny patterns
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &["secrets.json".to_string()],
-        &["__pycache__".to_string()],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_files: vec!["secrets.json".to_string()],
+        global_deny_dirs: vec!["__pycache__".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
@@ -497,18 +443,10 @@ fn per_rule_deny_dirs_nested_rule_scope() {
         .with_deny_dirs(vec!["__mocks__".to_string(), "utils".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);

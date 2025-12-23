@@ -7,6 +7,7 @@
 use super::super::{FileScanner, GitAwareScanner, StructureScanConfig};
 use super::mock_filters::{AcceptAllFilter, init_git_repo};
 use crate::scanner::AllowlistRuleBuilder;
+use crate::scanner::TestConfigParams;
 use tempfile::TempDir;
 
 #[test]
@@ -60,18 +61,10 @@ fn with_allowlist() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -98,18 +91,10 @@ fn respects_count_exclude() {
     std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
     std::fs::write(src_dir.join("generated.txt"), "generated").unwrap();
 
-    let config = StructureScanConfig::new(
-        &["*.txt".to_string()],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        count_exclude_patterns: vec!["*.txt".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -136,18 +121,10 @@ fn respects_scanner_exclude() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(vendor_dir.join("lib.rs"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &["**/vendor/**".to_string()],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["**/vendor/**".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -356,18 +333,10 @@ fn no_violations_when_files_match() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        vec![allowlist_rule],
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner

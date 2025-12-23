@@ -4,6 +4,7 @@ use tempfile::TempDir;
 
 use super::*;
 use crate::checker::ViolationType;
+use crate::scanner::TestConfigParams;
 
 struct AcceptAllFilter;
 
@@ -25,18 +26,10 @@ fn global_deny_extensions_trigger_violation() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("script.exe"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![".exe".to_string()],
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_extensions: vec![".exe".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -59,18 +52,10 @@ fn global_deny_patterns_trigger_violation() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("file.bak"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["*.bak".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["*.bak".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -83,18 +68,10 @@ fn global_deny_patterns_trigger_violation() {
 
 #[test]
 fn structure_scan_config_file_matches_global_deny_extension() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![".exe".to_string(), ".dll".to_string()],
-        &[],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_extensions: vec![".exe".to_string(), ".dll".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     assert!(
@@ -116,18 +93,10 @@ fn structure_scan_config_file_matches_global_deny_extension() {
 
 #[test]
 fn structure_scan_config_file_matches_global_deny_pattern() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["*.bak".to_string(), "temp_*".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["*.bak".to_string(), "temp_*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     assert!(
@@ -164,18 +133,10 @@ fn deny_pattern_with_trailing_slash_only_matches_directories() {
 
     std::fs::write(src_dir.join("node_modules_legacy"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["**/node_modules/".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["**/node_modules/".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -206,18 +167,10 @@ fn deny_pattern_without_trailing_slash_only_matches_files() {
     std::fs::create_dir(&temp_dir_child).unwrap();
     std::fs::write(temp_dir_child.join("file.rs"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["temp_*".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["temp_*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -238,22 +191,14 @@ fn deny_pattern_without_trailing_slash_only_matches_files() {
 
 #[test]
 fn structure_scan_config_separates_dir_and_file_patterns() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &[
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec![
             "**/node_modules/".to_string(),
             "*.bak".to_string(),
             "**/mocks/".to_string(),
         ],
-        &[],
-        &[],
-    )
+        ..Default::default()
+    })
     .unwrap();
 
     assert_eq!(config.global_deny_dir_pattern_strs.len(), 2);
@@ -271,18 +216,10 @@ fn structure_scan_config_separates_dir_and_file_patterns() {
 
 #[test]
 fn dir_matches_global_deny_returns_original_pattern() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["**/node_modules/".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["**/node_modules/".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     let result = config.dir_matches_global_deny(Path::new("project/src/node_modules"));
@@ -308,18 +245,10 @@ fn multiple_directory_only_deny_patterns() {
     let valid_dir = src_dir.join("utils");
     std::fs::create_dir(&valid_dir).unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["**/node_modules/".to_string(), "**/mocks/".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["**/node_modules/".to_string(), "**/mocks/".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -346,18 +275,10 @@ fn deny_pattern_trailing_slash_with_simple_name() {
 
     std::fs::write(temp_dir.path().join("temp_file.txt"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &["temp_*/".to_string()],
-        &[],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["temp_*/".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -386,18 +307,10 @@ fn global_deny_dirs_trigger_violation() {
     std::fs::create_dir(&pycache).unwrap();
     std::fs::write(pycache.join("module.pyc"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["__pycache__".to_string()], // deny_dirs
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_dirs: vec!["__pycache__".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -430,18 +343,10 @@ fn deny_dirs_only_matches_directories_not_files() {
     std::fs::create_dir(&real_node_modules).unwrap();
     std::fs::write(real_node_modules.join("package.json"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-        &["node_modules".to_string()], // deny_dirs
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_dirs: vec!["node_modules".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -473,18 +378,10 @@ fn global_deny_file_patterns_trigger_violation() {
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("secrets.json"), "").unwrap();
 
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &[],
-        &["secrets.*".to_string()],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_files: vec!["secrets.*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -509,18 +406,10 @@ fn deny_file_patterns_only_matches_filename_not_path() {
 
     // This should NOT match because "secrets.*" only matches filenames
     // and "config.json" doesn't match "secrets.*"
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &[],
-        &["secrets.*".to_string()],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_files: vec!["secrets.*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
@@ -533,18 +422,10 @@ fn deny_file_patterns_only_matches_filename_not_path() {
 
 #[test]
 fn structure_scan_config_file_matches_global_deny_file_pattern() {
-    let config = StructureScanConfig::new(
-        &[],
-        &[],
-        Vec::new(),
-        Vec::new(),
-        &[],
-        &[],
-        vec![],
-        &[],
-        &["temp_*".to_string(), "secrets.*".to_string()],
-        &[],
-    )
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_files: vec!["temp_*".to_string(), "secrets.*".to_string()],
+        ..Default::default()
+    })
     .unwrap();
 
     // Should match filename patterns
