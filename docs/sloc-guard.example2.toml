@@ -117,13 +117,13 @@ deny_extensions = ["dll", "exe"]
 # 'scope' defines the directory range where the rule applies.
 
 [[structure.rules]]
-scope = "src/**"
-deny_files = ["util.rs", "helper.rs"]  # 在 src/** 范围内禁止这些 basename
+scope = "{src,src/**}"     # Match src directory AND all subdirectories
+deny_files = ["util.rs", "helper.rs"]  # 禁止这些 basename
 deny_dirs = ["temp_*"]
 
 [[structure.rules]]
-scope = "tests/**"
-deny_files = ["common.rs"]  # 只在 tests/** 范围内禁止
+scope = "{tests,tests/**}" # Match tests directory AND all subdirectories
+deny_files = ["common.rs"]
 
 # Scenario: Generated Code
 [[structure.rules]]
@@ -143,7 +143,7 @@ deny_extensions = ["css"]  # Enforce CSS-in-JS (no .css files)
 
 # Scenario: Feature Modules
 [[structure.rules]]
-scope = "src/features/**"
+scope = "{src/features,src/features/**}"
 max_files = 20
 max_depth = 8              # Allow deeper nesting here
 relative_depth = 3         # Max depth relative to the matching folder
