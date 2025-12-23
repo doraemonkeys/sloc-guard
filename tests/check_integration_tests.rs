@@ -360,7 +360,7 @@ max_lines = 100
 extensions = ["rs"]
 
 [[structure.rules]]
-pattern = "**/src"
+scope = "**/src"
 allow_extensions = [".rs"]
 "#,
     );

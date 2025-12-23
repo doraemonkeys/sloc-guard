@@ -51,25 +51,7 @@ Location: `src/output/html.rs`
 
 > **Performance Note**: Introducing allowlists and complex scope matching may increase computational cost. Ensure **`globset` compilation reuse** during implementation to avoid performance regression.
 
-### Task 11.3: Time-bound Overrides
 
-Add expiration dates to overrides for technical debt management.
-
-**Behavior**:
-- Add `expires = "YYYY-MM-DD"` to `[[content.override]]` and `[[structure.override]]`
-- Expired overrides become violations (treated as if override doesn't exist)
-- Optional: warning N days before expiration (configurable via `warn_expiry_days`)
-
-**Config Example**:
-```toml
-[[content.override]]
-path = "src/legacy/big_file.rs"
-max_lines = 2000
-reason = "Core legacy logic, too risky to split."
-expires = "2025-12-31"
-```
-
----
 
 ### Task 11.4: Baseline Ratchet
 
@@ -83,6 +65,60 @@ Enforce that violation count can only decrease over time.
   - `--ratchet=strict`: fail CI if baseline not updated
 - GitHub Action output: `baseline-outdated: true` for workflow conditionals
 
+### Task 11.14: Unify Rule and Override
+
+Add `reason` and `expires` fields to `ContentRule` and `StructureRule`, eliminating conceptual redundancy with Override.
+
+**Rationale**: Override is essentially "high-priority Rule with metadata". Rules already use "last match wins" priority model, so placing exemption rules at list end achieves the same effect.
+
+**Changes**:
+- Add to `ContentRule`: `reason: Option<String>`, `expires: Option<String>`
+- Add to `StructureRule`: `reason: Option<String>`, `expires: Option<String>`
+- Update `ThresholdChecker`/`StructureChecker` to use rule's `reason` in output/explain
+- Remove `[[content.override]]` and `[[structure.override]]` (no migration, clean break)
+- Add `expires` validation: warn when date is past, optionally fail in strict mode
+
+**Example**:
+```toml
+[[content.rules]]
+pattern = "src/legacy/big_file.rs"
+max_lines = 2000
+reason = "Legacy code, high-risk to refactor"
+expires = "2025-12-31"
+```
+
+### Task 11.15: Remove Language Shorthand
+
+Remove `[content.languages.<ext>]` syntax entirely.
+
+**Rationale**:
+- Semantic confusion: `[languages.<name>]` defines languages, `[content.languages.rs]` sets rules—same keyword, different meanings
+- Pure redundancy: Just shorthand for `[[content.rules]]` with `pattern = "**/*.ext"`
+- Limited expressiveness: Cannot specify paths like `src/**/*.rs`
+- Priority complexity: 4-level chain reduces to 3 levels
+
+**Changes**:
+- Remove `[content.languages]` table from `ContentConfig`
+- Remove `expand_language_rules()` from config loader
+- Update docs and examples
+
+**Migration**:
+```toml
+# Before (removed)
+[content.languages.rs]
+max_lines = 500
+
+# After
+[[content.rules]]
+pattern = "**/*.rs"
+max_lines = 500
+```
+
+**Priority chain after change**:
+```
+[[content.override]] > [[content.rules]] (last match) > [content] defaults
+```
+
 ---
 
 ## Priority Order
@@ -94,6 +130,7 @@ Enforce that violation count can only decrease over time.
 | ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
 | **4. Structure Naming** | ~~11.9 pattern→scope~~ ✅, ~~11.12 deny_file_patterns→deny_files + deny_dirs~~ ✅ |
 | **5. Governance Refinement** | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
-| **6. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
-| **7. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **6. Config Simplification** | 11.14 Unify Rule and Override, 11.15 Remove Language Shorthand |
+| **7. Debt Lifecycle** | 11.4 Baseline Ratchet |
+| **8. Visualization** | 7.1-7.2 HTML Charts/Trends |
 

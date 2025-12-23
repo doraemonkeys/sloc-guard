@@ -101,7 +101,7 @@ max_files = 20
 max_dirs = 10
 
 [[structure.rules]]
-pattern = "src/components/**"
+scope = "src/components/**"
 max_files = 30
 ```
 

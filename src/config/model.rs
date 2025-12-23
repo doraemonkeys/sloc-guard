@@ -442,7 +442,6 @@ pub struct StructureConfig {
 pub struct StructureRule {
     /// Glob pattern defining the directory scope where this rule applies.
     /// Example: `scope = "src/**"` applies to all directories under `src/`.
-    #[serde(alias = "pattern")]
     pub scope: String,
 
     /// Override limit for files in matched directories.

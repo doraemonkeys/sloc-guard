@@ -182,12 +182,12 @@ max_files = 10
 max_dirs = 5
 
 [[structure.rules]]
-pattern = "src/components/*"
+scope = "src/components/*"
 max_files = 3
 max_dirs = 0
 
 [[structure.rules]]
-pattern = "src/generated"
+scope = "src/generated"
 max_files = 100
 max_dirs = -1
 "#;

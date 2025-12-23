@@ -210,11 +210,11 @@ fn config_deserialize_structure_with_rules() {
         max_dirs = 5
 
         [[structure.rules]]
-        pattern = "src/generated/**"
+        scope = "src/generated/**"
         max_files = 50
 
         [[structure.rules]]
-        pattern = "tests/**"
+        scope = "tests/**"
         max_files = 20
         max_dirs = 10
     "#;
@@ -240,7 +240,7 @@ fn config_deserialize_structure_only_rules() {
         max_lines = 500
 
         [[structure.rules]]
-        pattern = "vendor/**"
+        scope = "vendor/**"
         max_files = 100
     "#;
 
@@ -280,7 +280,7 @@ fn config_deserialize_structure_rule_warn_threshold() {
         warn_threshold = 0.9
 
         [[structure.rules]]
-        pattern = 'src/generated/**'
+        scope = 'src/generated/**'
         max_files = 100
         warn_threshold = 0.8
     ";
