@@ -279,3 +279,95 @@ fn test_trend_history_load_or_default_invalid_json() {
     let history = TrendHistory::load_or_default(&invalid_path);
     assert!(history.is_empty());
 }
+
+#[test]
+fn test_trend_history_default_trait() {
+    let history = TrendHistory::default();
+    assert!(history.is_empty());
+    assert_eq!(history.len(), 0);
+    assert_eq!(history.version(), 1);
+}
+
+#[test]
+fn test_trend_entry_equality() {
+    let entry1 = TrendEntry {
+        timestamp: 1000,
+        total_files: 10,
+        total_lines: 100,
+        code: 50,
+        comment: 30,
+        blank: 20,
+    };
+    let entry2 = TrendEntry {
+        timestamp: 1000,
+        total_files: 10,
+        total_lines: 100,
+        code: 50,
+        comment: 30,
+        blank: 20,
+    };
+    let entry3 = TrendEntry {
+        timestamp: 2000,
+        total_files: 10,
+        total_lines: 100,
+        code: 50,
+        comment: 30,
+        blank: 20,
+    };
+
+    assert_eq!(entry1, entry2);
+    assert_ne!(entry1, entry3);
+}
+
+#[test]
+fn test_trend_history_equality() {
+    let mut history1 = TrendHistory::new();
+    let mut history2 = TrendHistory::new();
+
+    assert_eq!(history1, history2);
+
+    history1.add_entry(TrendEntry {
+        timestamp: 1000,
+        total_files: 10,
+        total_lines: 100,
+        code: 50,
+        comment: 30,
+        blank: 20,
+    });
+
+    assert_ne!(history1, history2);
+
+    history2.add_entry(TrendEntry {
+        timestamp: 1000,
+        total_files: 10,
+        total_lines: 100,
+        code: 50,
+        comment: 30,
+        blank: 20,
+    });
+
+    assert_eq!(history1, history2);
+}
+
+#[test]
+fn test_trend_history_load_or_default_valid_file() {
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp directory");
+    let history_path = temp_dir.path().join("history.json");
+
+    // Create and save a valid history file
+    let mut history = TrendHistory::new();
+    history.add_entry(TrendEntry {
+        timestamp: 5000,
+        total_files: 20,
+        total_lines: 2000,
+        code: 1000,
+        comment: 600,
+        blank: 400,
+    });
+    history.save(&history_path).unwrap();
+
+    // load_or_default should load the file successfully
+    let loaded = TrendHistory::load_or_default(&history_path);
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded.latest().unwrap().timestamp, 5000);
+}

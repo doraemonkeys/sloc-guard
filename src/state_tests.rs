@@ -279,3 +279,24 @@ fn unlock_file_is_idempotent() {
     unlock_file(&file);
     unlock_file(&file); // Should not panic on double unlock
 }
+
+#[test]
+fn lock_error_source_timeout_returns_none() {
+    let err = LockError::Timeout;
+    assert!(std::error::Error::source(&err).is_none());
+}
+
+#[test]
+fn lock_error_source_io_returns_source() {
+    let io_err = io::Error::new(io::ErrorKind::PermissionDenied, "access denied");
+    let err = LockError::Io(io_err);
+    let source = std::error::Error::source(&err);
+    assert!(source.is_some());
+}
+
+#[test]
+fn lock_error_from_io_error() {
+    let io_err = io::Error::new(io::ErrorKind::NotFound, "file not found");
+    let lock_err: LockError = io_err.into();
+    assert!(matches!(lock_err, LockError::Io(_)));
+}

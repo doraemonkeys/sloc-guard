@@ -18,6 +18,16 @@ pub struct StructureScanConfig {
     pub scanner_exclude_dir_names: Vec<String>,
     /// Allowlist rules from structure.rules with `allow_extensions`/`allow_patterns`.
     pub allowlist_rules: Vec<AllowlistRule>,
+    /// Global allow extensions (e.g., ".rs", ".py") - allowlist mode.
+    pub global_allow_extensions: Vec<String>,
+    /// Global allow patterns (compiled) for files - allowlist mode.
+    pub global_allow_files: GlobSet,
+    /// Original file-name-only allow pattern strings (for error messages).
+    pub global_allow_file_strs: Vec<String>,
+    /// Global allow directory-name-only patterns (compiled) - allowlist mode.
+    pub global_allow_dirs: GlobSet,
+    /// Original directory-name-only allow pattern strings (for error messages).
+    pub global_allow_dir_strs: Vec<String>,
     /// Global deny extensions (e.g., ".exe", ".dll") that apply everywhere.
     pub global_deny_extensions: Vec<String>,
     /// Global deny patterns (compiled) that apply to files everywhere.
@@ -43,10 +53,14 @@ impl StructureScanConfig {
     ///
     /// # Errors
     /// Returns an error if any pattern is invalid.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         count_exclude_patterns: &[String],
         scanner_exclude_patterns: &[String],
         allowlist_rules: Vec<AllowlistRule>,
+        global_allow_extensions: Vec<String>,
+        global_allow_files: &[String],
+        global_allow_dirs: &[String],
         global_deny_extensions: Vec<String>,
         global_deny_patterns: &[String],
         global_deny_files: &[String],
@@ -55,6 +69,14 @@ impl StructureScanConfig {
         let count_exclude = Self::build_glob_set(count_exclude_patterns)?;
         let scanner_exclude = Self::build_glob_set(scanner_exclude_patterns)?;
         let scanner_exclude_dir_names = Self::extract_dir_names(scanner_exclude_patterns);
+
+        // Build global allow file patterns (filename-only matching)
+        let global_allow_file_strs: Vec<String> = global_allow_files.to_vec();
+        let global_allow_files_compiled = Self::build_glob_set(&global_allow_file_strs)?;
+
+        // Build global allow dir patterns (dirname-only matching)
+        let global_allow_dir_strs: Vec<String> = global_allow_dirs.to_vec();
+        let global_allow_dirs_compiled = Self::build_glob_set(&global_allow_dir_strs)?;
 
         // Separate directory-only patterns (ending with `/`) from file patterns
         let (dir_patterns, file_patterns): (Vec<_>, Vec<_>) =
@@ -86,6 +108,11 @@ impl StructureScanConfig {
             scanner_exclude,
             scanner_exclude_dir_names,
             allowlist_rules,
+            global_allow_extensions,
+            global_allow_files: global_allow_files_compiled,
+            global_allow_file_strs,
+            global_allow_dirs: global_allow_dirs_compiled,
+            global_allow_dir_strs,
             global_deny_extensions,
             global_deny_patterns: global_deny_patterns_compiled,
             global_deny_pattern_strs: file_pattern_strs,
@@ -165,6 +192,47 @@ impl StructureScanConfig {
         self.allowlist_rules
             .iter()
             .find(|r| r.matches_directory(dir))
+    }
+
+    /// Check if global file allowlist mode is enabled.
+    #[allow(clippy::missing_const_for_fn)] // HashSet::is_empty() is not const
+    pub(crate) fn has_global_file_allowlist(&self) -> bool {
+        !self.global_allow_extensions.is_empty() || !self.global_allow_file_strs.is_empty()
+    }
+
+    /// Check if global directory allowlist mode is enabled.
+    pub(crate) const fn has_global_dir_allowlist(&self) -> bool {
+        !self.global_allow_dir_strs.is_empty()
+    }
+
+    /// Check if a file matches global allowlist.
+    /// Returns `true` if file is allowed, `false` if not allowed.
+    pub(crate) fn file_matches_global_allow(&self, file_path: &Path) -> bool {
+        // Check global allow extensions
+        if !self.global_allow_extensions.is_empty()
+            && let Some(ext) = file_path.extension()
+        {
+            let ext_with_dot = format!(".{}", ext.to_string_lossy());
+            if self.global_allow_extensions.contains(&ext_with_dot) {
+                return true;
+            }
+        }
+
+        let file_name = file_path.file_name().unwrap_or_default();
+
+        // Check global allow files (filename-only matching)
+        if self.global_allow_files.is_match(file_name) {
+            return true;
+        }
+
+        false
+    }
+
+    /// Check if a directory matches global allowlist.
+    /// Returns `true` if directory is allowed, `false` if not allowed.
+    pub(crate) fn dir_matches_global_allow(&self, dir_path: &Path) -> bool {
+        let dir_name = dir_path.file_name().unwrap_or_default();
+        self.global_allow_dirs.is_match(dir_name)
     }
 
     /// Check if a file matches global deny patterns.

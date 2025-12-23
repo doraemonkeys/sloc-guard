@@ -302,6 +302,8 @@ impl CheckContext {
             // Include rules that have allowlists, denylists, or naming patterns
             if !rule.allow_extensions.is_empty()
                 || !rule.allow_patterns.is_empty()
+                || !rule.allow_files.is_empty()
+                || !rule.allow_dirs.is_empty()
                 || !rule.deny_extensions.is_empty()
                 || !rule.deny_patterns.is_empty()
                 || !rule.deny_files.is_empty()
@@ -311,6 +313,8 @@ impl CheckContext {
                 let allowlist_rule = AllowlistRuleBuilder::new(rule.scope.clone())
                     .with_extensions(rule.allow_extensions.clone())
                     .with_patterns(rule.allow_patterns.clone())
+                    .with_allow_files(rule.allow_files.clone())
+                    .with_allow_dirs(rule.allow_dirs.clone())
                     .with_deny_extensions(rule.deny_extensions.clone())
                     .with_deny_patterns(rule.deny_patterns.clone())
                     .with_deny_files(rule.deny_files.clone())
@@ -325,6 +329,9 @@ impl CheckContext {
             &config.structure.count_exclude,
             exclude_patterns,
             allowlist_rules,
+            config.structure.allow_extensions.clone(),
+            &config.structure.allow_files,
+            &config.structure.allow_dirs,
             config.structure.deny_extensions.clone(),
             &config.structure.deny_patterns,
             &config.structure.deny_files,

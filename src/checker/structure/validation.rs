@@ -118,3 +118,55 @@ pub(super) fn validate_sibling_rules(rules: &[StructureRule]) -> Result<()> {
     }
     Ok(())
 }
+
+/// Validate mutual exclusion between allow and deny fields.
+/// At each level (global or rule), only allow-mode OR deny-mode is permitted, not both.
+pub(super) fn validate_allow_deny_mutual_exclusion(config: &StructureConfig) -> Result<()> {
+    validate_global_allow_deny_exclusion(config)?;
+    validate_rule_allow_deny_exclusion(&config.rules)?;
+    Ok(())
+}
+
+fn validate_global_allow_deny_exclusion(config: &StructureConfig) -> Result<()> {
+    let has_allow = !config.allow_files.is_empty()
+        || !config.allow_dirs.is_empty()
+        || !config.allow_extensions.is_empty();
+
+    let has_deny = !config.deny_files.is_empty()
+        || !config.deny_dirs.is_empty()
+        || !config.deny_extensions.is_empty()
+        || !config.deny_patterns.is_empty();
+
+    if has_allow && has_deny {
+        return Err(SlocGuardError::Config(
+            "Global structure config cannot mix allow_* and deny_* fields. \
+             Use either allowlist mode OR denylist mode, not both."
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_rule_allow_deny_exclusion(rules: &[StructureRule]) -> Result<()> {
+    for (i, rule) in rules.iter().enumerate() {
+        let has_allow = !rule.allow_files.is_empty()
+            || !rule.allow_dirs.is_empty()
+            || !rule.allow_extensions.is_empty()
+            || !rule.allow_patterns.is_empty();
+
+        let has_deny = !rule.deny_files.is_empty()
+            || !rule.deny_dirs.is_empty()
+            || !rule.deny_extensions.is_empty()
+            || !rule.deny_patterns.is_empty();
+
+        if has_allow && has_deny {
+            return Err(SlocGuardError::Config(format!(
+                "Rule {} (scope '{}') cannot mix allow_* and deny_* fields. \
+                 Use either allowlist mode OR denylist mode, not both.",
+                i + 1,
+                rule.scope
+            )));
+        }
+    }
+    Ok(())
+}

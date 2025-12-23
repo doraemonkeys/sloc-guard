@@ -44,6 +44,9 @@ fn global_deny_dirs_basename() {
         Vec::new(),
         &[],
         &[],
+        Vec::new(),
+        &[],
+        &[],
         &["node_modules".to_string(), "__pycache__".to_string()],
     )
     .unwrap();
@@ -104,6 +107,9 @@ fn global_deny_dirs_pattern_with_slash() {
         &[],
         Vec::new(),
         Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
         &["build/".to_string(), "**/dist/".to_string()],
         &[],
         &[],
@@ -162,9 +168,19 @@ fn per_rule_deny_dirs() {
         .with_deny_dirs(vec!["utils".to_string(), "helpers".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
@@ -226,6 +242,9 @@ fn nested_deny_dirs() {
         Vec::new(),
         &[],
         &[],
+        Vec::new(),
+        &[],
+        &[],
         &["__tests__".to_string()],
     )
     .unwrap();
@@ -278,6 +297,9 @@ fn deny_dirs_glob_pattern() {
         &[],
         &[],
         Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
         Vec::new(),
         &[],
         &[],
@@ -344,6 +366,9 @@ fn deny_dirs_no_duplicate_violations() {
         Vec::new(),
         &[],
         &[],
+        Vec::new(),
+        &[],
+        &[],
         &["node_modules".to_string()],
     )
     .unwrap();
@@ -393,6 +418,9 @@ fn deny_dirs_combined_with_file_deny() {
         &[],
         &[],
         Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
         Vec::new(),
         &[],
         &["secrets.json".to_string()],
@@ -469,9 +497,19 @@ fn per_rule_deny_dirs_nested_rule_scope() {
         .with_deny_dirs(vec!["__mocks__".to_string(), "utils".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
 
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner

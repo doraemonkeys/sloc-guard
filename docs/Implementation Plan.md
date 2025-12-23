@@ -20,7 +20,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, SARIF Guidance.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
-- **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.2 File Co-location Check, 11.6 Config Presets, 11.7 Deny Patterns, 11.8 Terminology Modernization, 11.9 Rename pattern→scope, 11.10 Content Exclude Patterns, 11.11 Granular Warn Thresholds, 11.12 deny_files + deny_dirs.
+- **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.2 File Co-location Check, 11.6 Config Presets, 11.7 Deny Patterns, 11.8 Terminology Modernization, 11.9 Rename pattern→scope, 11.10 Content Exclude Patterns, 11.11 Granular Warn Thresholds, 11.12 deny_files + deny_dirs, 11.13 Structure Allowlist Mode.
 - **Phase 12**: Structure Rule Priority, State File Consolidation, .gitignore Support, Remote Config (Fetch Warning, Offline Mode, Hash Lock), Rule Matching Override, Relative max_depth, --diff A..B Range.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 - **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
@@ -50,39 +50,6 @@ Location: `src/output/html.rs`
 ## Phase 11: Advanced Governance (Pending)
 
 > **Performance Note**: Introducing allowlists and complex scope matching may increase computational cost. Ensure **`globset` compilation reuse** during implementation to avoid performance regression.
-
-### Task 11.13: Structure Allowlist Mode
-
-Add allowlist-based filtering as an alternative to deny-based filtering.
-
-**Behavior**:
-- Add `allow_files`, `allow_dirs`, `allow_extensions` fields (global and rule-level)
-- Rule-level mutual exclusion: a rule can only use allow-mode OR deny-mode, not both
-- Global-level mutual exclusion: global config can only use allow-mode OR deny-mode
-- Allow-mode semantics: only matching items are permitted; everything else is denied
-
-**Config Example**:
-```toml
-# Deny mode (default)
-[structure]
-deny_files = ["*.bak", "secrets.*"]
-deny_dirs = ["__pycache__", "node_modules"]
-
-# Allow mode (mutually exclusive with deny at same level)
-# [structure]
-# allow_files = ["README.md", "LICENSE"]
-# allow_dirs = ["src", "tests"]
-# allow_extensions = ["rs", "go", "py"]
-
-[[structure.rules]]
-scope = "src/generated"
-max_files = -1
-allow_extensions = ["rs"]  # Only allow .rs files here
-```
-
-**Validation**: Error if both allow and deny fields are set at the same level.
-
----
 
 ### Task 11.3: Time-bound Overrides
 
@@ -126,7 +93,7 @@ Enforce that violation count can only decrease over time.
 | ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
 | ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
 | **4. Structure Naming** | ~~11.9 pattern→scope~~ ✅, ~~11.12 deny_file_patterns→deny_files + deny_dirs~~ ✅ |
-| **5. Governance Refinement** | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, 11.13 Allowlist Mode |
+| **5. Governance Refinement** | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
 | **6. Debt Lifecycle** | 11.3 Time-bound Overrides, 11.4 Baseline Ratchet |
 | **7. Visualization** | 7.1-7.2 HTML Charts/Trends |
 

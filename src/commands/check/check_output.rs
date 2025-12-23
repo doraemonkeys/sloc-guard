@@ -61,6 +61,13 @@ pub fn structure_violation_to_check_result(violation: &StructureViolation) -> Ch
                 .unwrap_or("unknown");
             Some(format!("structure: disallowed file (rule: {rule})"))
         }
+        ViolationType::DisallowedDirectory => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("unknown");
+            Some(format!("structure: disallowed directory (rule: {rule})"))
+        }
         ViolationType::DeniedFile {
             pattern_or_extension,
         } => {

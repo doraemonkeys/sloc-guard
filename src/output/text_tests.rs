@@ -415,3 +415,152 @@ fn format_structure_dir_count_violation() {
     assert!(!output.contains("Lines:"));
     assert!(!output.contains("Breakdown:"));
 }
+
+#[test]
+fn format_structure_max_depth_violation() {
+    use crate::checker::{ViolationCategory, ViolationType};
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("deeply/nested/path"),
+        stats: LineStats {
+            total: 6,
+            code: 6,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        limit: 3,
+        override_reason: Some("structure: max depth exceeded".to_string()),
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::MaxDepth,
+            triggering_rule: None,
+        }),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("Depth: 6 (limit: 3)"));
+    assert!(!output.contains("Lines:"));
+}
+
+#[test]
+fn format_structure_disallowed_file_violation() {
+    use crate::checker::{ViolationCategory, ViolationType};
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("src/bad_file.txt"),
+        stats: LineStats::default(),
+        limit: 0,
+        override_reason: Some("file not in allowlist".to_string()),
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::DisallowedFile,
+            triggering_rule: Some("src/**".to_string()),
+        }),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("FAILED"));
+    assert!(output.contains("src/bad_file.txt"));
+    // DisallowedFile doesn't show metrics, only reason
+    assert!(!output.contains("Files:"));
+    assert!(!output.contains("Directories:"));
+}
+
+#[test]
+fn format_structure_denied_file_violation() {
+    use crate::checker::{ViolationCategory, ViolationType};
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("src/debug.log"),
+        stats: LineStats::default(),
+        limit: 0,
+        override_reason: Some("denied by pattern: *.log".to_string()),
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::DeniedFile {
+                pattern_or_extension: "*.log".to_string(),
+            },
+            triggering_rule: None,
+        }),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("FAILED"));
+    assert!(output.contains("debug.log"));
+}
+
+#[test]
+fn format_structure_naming_convention_violation() {
+    use crate::checker::{ViolationCategory, ViolationType};
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("src/BadFile.rs"),
+        stats: LineStats::default(),
+        limit: 0,
+        override_reason: Some("naming convention violation".to_string()),
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::NamingConvention {
+                expected_pattern: "^[a-z_]+\\.rs$".to_string(),
+            },
+            triggering_rule: Some("src/**".to_string()),
+        }),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("FAILED"));
+    assert!(output.contains("BadFile.rs"));
+}
+
+#[test]
+fn format_content_violation_category() {
+    use crate::checker::ViolationCategory;
+    let formatter = TextFormatter::new(ColorMode::Never);
+    let results = vec![CheckResult::Failed {
+        path: PathBuf::from("big_file.rs"),
+        stats: LineStats {
+            total: 610,
+            code: 600,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Content),
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("Lines: 600 (limit: 500)"));
+    assert!(output.contains("Breakdown: code=600, comment=5, blank=5"));
+}
+
+#[test]
+fn grandfathered_with_reason_shown() {
+    let formatter = TextFormatter::with_verbose(ColorMode::Never, 1);
+    let results = vec![CheckResult::Grandfathered {
+        path: PathBuf::from("legacy.rs"),
+        stats: LineStats {
+            total: 710,
+            code: 700,
+            comment: 5,
+            blank: 5,
+            ignored: 0,
+        },
+        limit: 500,
+        override_reason: Some("legacy code from initial import".to_string()),
+        violation_category: None,
+    }];
+
+    let output = formatter.format(&results).unwrap();
+
+    assert!(output.contains("GRANDFATHERED"));
+    assert!(output.contains("Reason: legacy code from initial import"));
+}

@@ -8,6 +8,7 @@ TODO
 !gitignore_tests.toml
 !gitignore_tests.go
 !src/scanner/gitignore_tests
+!gitignore_tests*
 
 *local.json
 .sloc-guard-*.json

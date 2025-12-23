@@ -216,24 +216,45 @@ impl<'a> StructureScanState<'a> {
             return;
         };
 
-        // 1. Check global deny patterns first (applies to all files)
-        if let Some(matched) = cfg.file_matches_global_deny(abs_path) {
-            self.result
-                .allowlist_violations
-                .push(StructureViolation::denied_file(
-                    path.to_path_buf(),
-                    "global".to_string(),
-                    matched,
-                ));
-            return; // Denied files don't need further checks
+        // Find matching per-rule first (needed for override checks)
+        let matching_rule = cfg.find_matching_allowlist_rule(parent);
+
+        // 1. Check global level patterns
+        if cfg.has_global_file_allowlist() {
+            // Allow mode: file must match global allowlist
+            if !cfg.file_matches_global_allow(abs_path) {
+                self.result
+                    .allowlist_violations
+                    .push(StructureViolation::disallowed_file(
+                        path.to_path_buf(),
+                        "global".to_string(),
+                    ));
+                return;
+            }
+        } else {
+            // Deny mode: check global deny patterns
+            // But first check if a per-rule allow would override global deny
+            let overridden_by_rule = matching_rule
+                .is_some_and(|rule| rule.has_allowlist() && rule.file_matches(abs_path));
+
+            if !overridden_by_rule && let Some(matched) = cfg.file_matches_global_deny(abs_path) {
+                self.result
+                    .allowlist_violations
+                    .push(StructureViolation::denied_file(
+                        path.to_path_buf(),
+                        "global".to_string(),
+                        matched,
+                    ));
+                return; // Denied files don't need further checks
+            }
         }
 
-        // 2. Check per-rule deny and allowlist patterns
-        let Some(rule) = cfg.find_matching_allowlist_rule(parent) else {
+        // 2. Check per-rule patterns
+        let Some(rule) = matching_rule else {
             return;
         };
 
-        // 2a. Check per-rule deny patterns
+        // Check per-rule deny patterns first (they take precedence over per-rule allow)
         if let Some(matched) = rule.file_matches_deny(abs_path) {
             self.result
                 .allowlist_violations
@@ -245,17 +266,20 @@ impl<'a> StructureScanState<'a> {
             return; // Denied files don't need further checks
         }
 
-        // 2b. Check allowlist (extensions/patterns) - only if configured
-        if rule.has_allowlist() && !rule.file_matches(abs_path) {
-            self.result
-                .allowlist_violations
-                .push(StructureViolation::disallowed_file(
-                    path.to_path_buf(),
-                    rule.scope.clone(),
-                ));
+        // Then check if rule is in allow mode
+        if rule.has_allowlist() {
+            // Allow mode: file must match allowlist
+            if !rule.file_matches(abs_path) {
+                self.result
+                    .allowlist_violations
+                    .push(StructureViolation::disallowed_file(
+                        path.to_path_buf(),
+                        rule.scope.clone(),
+                    ));
+            }
         }
 
-        // 2c. Check naming convention
+        // Check naming convention (applies regardless of mode)
         if !rule.filename_matches_naming_pattern(abs_path)
             && let Some(ref pattern_str) = rule.naming_pattern_str
         {
@@ -277,45 +301,77 @@ impl<'a> StructureScanState<'a> {
             return;
         }
 
-        // Check directory-only deny patterns (patterns ending with `/`)
-        if let Some(cfg) = self.structure_config
-            && let Some(pattern) = cfg.dir_matches_global_deny(path)
-        {
-            self.result
-                .allowlist_violations
-                .push(StructureViolation::denied_directory(
-                    path.to_path_buf(),
-                    "global".to_string(),
-                    pattern,
-                ));
+        // Find matching per-rule for parent directory (needed for override checks)
+        let matching_rule = self.structure_config.and_then(|cfg| {
+            path.parent()
+                .and_then(|p| cfg.find_matching_allowlist_rule(p))
+        });
+
+        // Check global level directory patterns
+        if let Some(cfg) = self.structure_config {
+            if cfg.has_global_dir_allowlist() {
+                // Allow mode: directory must match global allowlist
+                if !cfg.dir_matches_global_allow(path) {
+                    self.result.allowlist_violations.push(
+                        StructureViolation::disallowed_directory(
+                            path.to_path_buf(),
+                            "global".to_string(),
+                        ),
+                    );
+                }
+            } else {
+                // Check if a per-rule allow would override global deny
+                let overridden_by_rule = matching_rule
+                    .is_some_and(|rule| rule.has_dir_allowlist() && rule.dir_matches(path));
+
+                if !overridden_by_rule {
+                    // Deny mode: check directory-only deny patterns (patterns ending with `/`)
+                    if let Some(pattern) = cfg.dir_matches_global_deny(path) {
+                        self.result.allowlist_violations.push(
+                            StructureViolation::denied_directory(
+                                path.to_path_buf(),
+                                "global".to_string(),
+                                pattern,
+                            ),
+                        );
+                    }
+
+                    // Check deny_dirs (basename-only matching from structure.deny_dirs)
+                    if let Some(pattern) = cfg.dir_matches_global_deny_basename(path) {
+                        self.result.allowlist_violations.push(
+                            StructureViolation::denied_directory(
+                                path.to_path_buf(),
+                                "global".to_string(),
+                                pattern,
+                            ),
+                        );
+                    }
+                }
+            }
         }
 
-        // Check deny_dirs (basename-only matching from structure.deny_dirs)
-        if let Some(cfg) = self.structure_config
-            && let Some(pattern) = cfg.dir_matches_global_deny_basename(path)
-        {
-            self.result
-                .allowlist_violations
-                .push(StructureViolation::denied_directory(
-                    path.to_path_buf(),
-                    "global".to_string(),
-                    pattern,
-                ));
-        }
-
-        // Check per-rule deny_dirs
-        if let Some(cfg) = self.structure_config
-            && let Some(parent) = path.parent()
-            && let Some(rule) = cfg.find_matching_allowlist_rule(parent)
-            && let Some(pattern) = rule.dir_matches_deny(path)
-        {
-            self.result
-                .allowlist_violations
-                .push(StructureViolation::denied_directory(
-                    path.to_path_buf(),
-                    rule.scope.clone(),
-                    pattern,
-                ));
+        // Check per-rule directory patterns
+        if let Some(rule) = matching_rule {
+            if rule.has_dir_allowlist() {
+                // Allow mode: directory must match allowlist
+                if !rule.dir_matches(path) {
+                    self.result.allowlist_violations.push(
+                        StructureViolation::disallowed_directory(
+                            path.to_path_buf(),
+                            rule.scope.clone(),
+                        ),
+                    );
+                }
+            } else if let Some(pattern) = rule.dir_matches_deny(path) {
+                // Deny mode: check per-rule deny_dirs
+                self.result
+                    .allowlist_violations
+                    .push(StructureViolation::denied_directory(
+                        path.to_path_buf(),
+                        rule.scope.clone(),
+                        pattern,
+                    ));
+            }
         }
 
         // Check count_exclude

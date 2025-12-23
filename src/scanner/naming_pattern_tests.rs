@@ -90,9 +90,19 @@ fn scan_with_structure_detects_naming_violations() {
         .with_naming_pattern(Some("^[A-Z][a-zA-Z0-9]*\\.tsx$".to_string()))
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -122,9 +132,19 @@ fn scan_with_structure_no_naming_violation_when_pattern_matches() {
         .with_naming_pattern(Some("^[A-Z][a-zA-Z0-9]*\\.tsx$".to_string()))
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -145,9 +165,19 @@ fn scan_with_structure_naming_violation_includes_pattern() {
         .with_naming_pattern(Some(pattern.clone()))
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -176,9 +206,19 @@ fn scan_with_structure_combined_allowlist_and_naming_violations() {
         .with_naming_pattern(Some("^[A-Z][a-zA-Z0-9]*\\.tsx$".to_string()))
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))

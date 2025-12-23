@@ -92,9 +92,11 @@ mod allowlist_tests;
 #[cfg(test)]
 mod composite_tests;
 #[cfg(test)]
-mod deny_pattern_tests;
-#[cfg(test)]
 mod directory_tests;
+#[cfg(test)]
+mod global_allow_tests;
+#[cfg(test)]
+mod global_deny_tests;
 #[cfg(test)]
 mod naming_pattern_tests;
 #[cfg(test)]

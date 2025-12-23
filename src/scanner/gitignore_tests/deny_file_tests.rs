@@ -26,9 +26,19 @@ fn deny_file_patterns_with_relative_pattern() {
         .with_deny_files(vec!["types.rs".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -63,9 +73,19 @@ fn deny_file_patterns_nested_directories() {
         .with_deny_files(vec!["utils.rs".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -95,6 +115,9 @@ fn global_deny_file_patterns() {
         &[],
         &[],
         Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
         Vec::new(),
         &[],
         &["secrets.json".to_string()],
@@ -130,9 +153,19 @@ fn deny_file_patterns_does_not_match_allowed_files() {
         .with_deny_files(vec!["utils.rs".to_string(), "types.rs".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -164,9 +197,19 @@ fn deny_file_patterns_with_glob() {
         .with_deny_files(vec!["temp_*".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))

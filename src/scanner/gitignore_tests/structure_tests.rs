@@ -60,9 +60,19 @@ fn with_allowlist() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
@@ -92,6 +102,9 @@ fn respects_count_exclude() {
         &["*.txt".to_string()],
         &[],
         Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
         Vec::new(),
         &[],
         &[],
@@ -127,6 +140,9 @@ fn respects_scanner_exclude() {
         &[],
         &["**/vendor/**".to_string()],
         Vec::new(),
+        Vec::new(),
+        &[],
+        &[],
         Vec::new(),
         &[],
         &[],
@@ -340,9 +356,19 @@ fn no_violations_when_files_match() {
         .with_extensions(vec![".rs".to_string()])
         .build()
         .unwrap();
-    let config =
-        StructureScanConfig::new(&[], &[], vec![allowlist_rule], Vec::new(), &[], &[], &[])
-            .unwrap();
+    let config = StructureScanConfig::new(
+        &[],
+        &[],
+        vec![allowlist_rule],
+        Vec::new(),
+        &[],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+        &[],
+    )
+    .unwrap();
     let scanner = GitAwareScanner::new(AcceptAllFilter);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))

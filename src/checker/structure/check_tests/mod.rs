@@ -6,6 +6,7 @@ mod limit_tests;
 mod override_tests;
 mod rule_priority_tests;
 mod sibling_tests;
+mod validation_tests;
 
 use crate::checker::structure::*;
 use crate::config::{StructureConfig, StructureOverride, StructureRule, UNLIMITED};
@@ -53,6 +54,8 @@ fn make_rule(scope: &str, max_files: Option<i64>) -> StructureRule {
         warn_dirs_threshold: None,
         allow_extensions: vec![],
         allow_patterns: vec![],
+        allow_files: vec![],
+        allow_dirs: vec![],
         file_naming_pattern: None,
         relative_depth: false,
         file_pattern: None,

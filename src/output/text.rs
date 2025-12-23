@@ -171,6 +171,7 @@ impl TextFormatter {
             }
             // File-level structure violations: the reason message is self-explanatory
             ViolationType::DisallowedFile
+            | ViolationType::DisallowedDirectory
             | ViolationType::DeniedFile { .. }
             | ViolationType::DeniedDirectory { .. }
             | ViolationType::NamingConvention { .. }

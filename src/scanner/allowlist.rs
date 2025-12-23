@@ -16,6 +16,14 @@ pub struct AllowlistRule {
     pub allow_extensions: Vec<String>,
     /// Compiled patterns for allowlist matching.
     pub allow_patterns: GlobSet,
+    /// Compiled file-name-only allow patterns.
+    pub allow_files: GlobSet,
+    /// Original file-name-only allow pattern strings (for error messages).
+    pub allow_file_strs: Vec<String>,
+    /// Compiled directory-name-only allow patterns.
+    pub allow_dirs: GlobSet,
+    /// Original directory-name-only allow pattern strings (for error messages).
+    pub allow_dir_strs: Vec<String>,
     /// Deny list of file extensions (with leading dot, e.g., ".exe").
     pub deny_extensions: Vec<String>,
     /// Compiled patterns for deny matching.
@@ -35,9 +43,16 @@ pub struct AllowlistRule {
 }
 
 impl AllowlistRule {
-    /// Check if allowlist is configured (extensions or patterns).
+    /// Check if file allowlist is configured (extensions, patterns, or files).
     pub(crate) fn has_allowlist(&self) -> bool {
-        !self.allow_extensions.is_empty() || !self.allow_patterns.is_empty()
+        !self.allow_extensions.is_empty()
+            || !self.allow_patterns.is_empty()
+            || !self.allow_file_strs.is_empty()
+    }
+
+    /// Check if directory allowlist is configured.
+    pub(crate) const fn has_dir_allowlist(&self) -> bool {
+        !self.allow_dir_strs.is_empty()
     }
 
     /// Check if a file matches this denylist.
@@ -84,7 +99,7 @@ impl AllowlistRule {
         None
     }
 
-    /// Check if a file matches this allowlist (extensions OR patterns).
+    /// Check if a file matches this allowlist (extensions OR patterns OR `allow_files`).
     pub(crate) fn file_matches(&self, file_path: &Path) -> bool {
         // Check extensions first (OR logic)
         if !self.allow_extensions.is_empty()
@@ -96,13 +111,25 @@ impl AllowlistRule {
             }
         }
 
-        // Check patterns (OR logic with extensions)
         let file_name = file_path.file_name().unwrap_or_default();
+
+        // Check allow_files (filename only, OR logic)
+        if self.allow_files.is_match(file_name) {
+            return true;
+        }
+
+        // Check patterns (OR logic with extensions and files)
         if self.allow_patterns.is_match(file_name) || self.allow_patterns.is_match(file_path) {
             return true;
         }
 
         false
+    }
+
+    /// Check if a directory matches this allowlist (`allow_dirs`).
+    pub(crate) fn dir_matches(&self, dir_path: &Path) -> bool {
+        let dir_name = dir_path.file_name().unwrap_or_default();
+        self.allow_dirs.is_match(dir_name)
     }
 
     /// Check if a directory path matches this rule's pattern.
@@ -133,6 +160,8 @@ pub struct AllowlistRuleBuilder {
     scope: String,
     allow_extensions: Vec<String>,
     allow_patterns: Vec<String>,
+    allow_files: Vec<String>,
+    allow_dirs: Vec<String>,
     deny_extensions: Vec<String>,
     deny_patterns: Vec<String>,
     deny_files: Vec<String>,
@@ -147,6 +176,8 @@ impl AllowlistRuleBuilder {
             scope,
             allow_extensions: Vec::new(),
             allow_patterns: Vec::new(),
+            allow_files: Vec::new(),
+            allow_dirs: Vec::new(),
             deny_extensions: Vec::new(),
             deny_patterns: Vec::new(),
             deny_files: Vec::new(),
@@ -164,6 +195,18 @@ impl AllowlistRuleBuilder {
     #[must_use]
     pub fn with_patterns(mut self, patterns: Vec<String>) -> Self {
         self.allow_patterns = patterns;
+        self
+    }
+
+    #[must_use]
+    pub fn with_allow_files(mut self, patterns: Vec<String>) -> Self {
+        self.allow_files = patterns;
+        self
+    }
+
+    #[must_use]
+    pub fn with_allow_dirs(mut self, patterns: Vec<String>) -> Self {
+        self.allow_dirs = patterns;
         self
     }
 
@@ -222,6 +265,39 @@ impl AllowlistRuleBuilder {
                     pattern: "allow_patterns".to_string(),
                     source: e,
                 })?;
+
+        // Build allow file patterns GlobSet (filename-only matching)
+        let mut allow_file_builder = GlobSetBuilder::new();
+        for p in &self.allow_files {
+            let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: p.clone(),
+                source: e,
+            })?;
+            allow_file_builder.add(g);
+        }
+        let allow_files =
+            allow_file_builder
+                .build()
+                .map_err(|e| SlocGuardError::InvalidPattern {
+                    pattern: "allow_files".to_string(),
+                    source: e,
+                })?;
+
+        // Build allow dirs GlobSet (dirname-only matching)
+        let mut allow_dir_builder = GlobSetBuilder::new();
+        for p in &self.allow_dirs {
+            let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: p.clone(),
+                source: e,
+            })?;
+            allow_dir_builder.add(g);
+        }
+        let allow_dirs = allow_dir_builder
+            .build()
+            .map_err(|e| SlocGuardError::InvalidPattern {
+                pattern: "allow_dirs".to_string(),
+                source: e,
+            })?;
 
         // Build deny patterns GlobSet
         let mut deny_pattern_builder = GlobSetBuilder::new();
@@ -290,6 +366,10 @@ impl AllowlistRuleBuilder {
             matcher: glob.compile_matcher(),
             allow_extensions: self.allow_extensions,
             allow_patterns,
+            allow_files,
+            allow_file_strs: self.allow_files,
+            allow_dirs,
+            allow_dir_strs: self.allow_dirs,
             deny_extensions: self.deny_extensions,
             deny_patterns,
             deny_files,

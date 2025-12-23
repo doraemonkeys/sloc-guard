@@ -49,6 +49,8 @@ fn override_takes_priority_over_rules() {
             warn_dirs_threshold: None,
             allow_extensions: vec![],
             allow_patterns: vec![],
+            allow_files: vec![],
+            allow_dirs: vec![],
             file_naming_pattern: None,
             relative_depth: false,
             file_pattern: None,

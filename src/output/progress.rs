@@ -28,24 +28,40 @@ impl ScanProgress {
     /// The template is a compile-time constant, so this should never happen.
     #[must_use]
     pub fn new(total: u64, quiet: bool) -> Self {
-        let progress_bar = if quiet || !std::io::stderr().is_terminal() {
+        let is_tty = std::io::stderr().is_terminal();
+        Self::new_with_visibility(total, quiet, is_tty)
+    }
+
+    /// Creates a new progress bar with explicit visibility control.
+    ///
+    /// This is an internal constructor that allows testing the visible progress bar path
+    /// even when running in non-TTY environments.
+    fn new_with_visibility(total: u64, quiet: bool, is_tty: bool) -> Self {
+        let progress_bar = if quiet || !is_tty {
             ProgressBar::hidden()
         } else {
-            let pb = ProgressBar::new(total);
-            pb.set_style(
-                ProgressStyle::default_bar()
-                    .template("{spinner:.green} Scanning [{bar:40.cyan/blue}] {pos}/{len} files ({percent}%)")
-                    // SAFETY: Template is a static string with valid format specifiers
-                    .expect("valid template")
-                    .progress_chars("█▓░"),
-            );
-            pb
+            Self::create_visible_progress_bar(total)
         };
 
         Self {
             progress_bar,
             counter: Arc::new(AtomicU64::new(0)),
         }
+    }
+
+    /// Creates a visible progress bar with styling.
+    fn create_visible_progress_bar(total: u64) -> ProgressBar {
+        let pb = ProgressBar::new(total);
+        pb.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "{spinner:.green} Scanning [{bar:40.cyan/blue}] {pos}/{len} files ({percent}%)",
+                )
+                // SAFETY: Template is a static string with valid format specifiers
+                .expect("valid template")
+                .progress_chars("█▓░"),
+        );
+        pb
     }
 
     /// Increments the progress counter by 1.

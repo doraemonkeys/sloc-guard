@@ -26,7 +26,7 @@ pub use violation::{DirStats, StructureViolation, ViolationType};
 
 use builder::{build_rules, build_sibling_rules};
 use compiled_rules::{CompiledSiblingRule, CompiledStructureRule, StructureLimits};
-use validation::{validate_limits, validate_sibling_rules};
+use validation::{validate_allow_deny_mutual_exclusion, validate_limits, validate_sibling_rules};
 
 /// Checker for directory structure limits.
 pub struct StructureChecker {
@@ -52,6 +52,7 @@ impl StructureChecker {
     pub fn new(config: &StructureConfig) -> Result<Self> {
         validate_limits(config)?;
         validate_sibling_rules(&config.rules)?;
+        validate_allow_deny_mutual_exclusion(config)?;
         let rules = build_rules(&config.rules)?;
         let sibling_rules = build_sibling_rules(&config.rules)?;
 

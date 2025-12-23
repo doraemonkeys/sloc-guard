@@ -410,6 +410,24 @@ pub struct StructureConfig {
     #[serde(default)]
     pub deny_dirs: Vec<String>,
 
+    /// Global allowlist of file name patterns (glob patterns, e.g., "README.md", "LICENSE").
+    /// When set, only matching files are permitted; all others trigger violations.
+    /// Mutually exclusive with deny_* fields at global level.
+    #[serde(default)]
+    pub allow_files: Vec<String>,
+
+    /// Global allowlist of directory name patterns (glob patterns, e.g., "src", "tests").
+    /// When set, only matching directories are permitted; all others trigger violations.
+    /// Mutually exclusive with deny_* fields at global level.
+    #[serde(default)]
+    pub allow_dirs: Vec<String>,
+
+    /// Global allowlist of file extensions (with leading dot, e.g., ".rs", ".py").
+    /// When set, only files with matching extensions are permitted.
+    /// Mutually exclusive with deny_* fields at global level.
+    #[serde(default)]
+    pub allow_extensions: Vec<String>,
+
     /// Per-directory rules that override global limits.
     #[serde(default)]
     pub rules: Vec<StructureRule>,
@@ -420,7 +438,7 @@ pub struct StructureConfig {
 }
 
 /// Rule for overriding structure limits on specific directories.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct StructureRule {
     /// Glob pattern defining the directory scope where this rule applies.
     /// Example: `scope = "src/**"` applies to all directories under `src/`.
@@ -480,6 +498,19 @@ pub struct StructureRule {
     /// Combined with `allow_extensions` using OR logic.
     #[serde(default)]
     pub allow_patterns: Vec<String>,
+
+    /// Allowlist of file name patterns (glob patterns, e.g., "README.md", "config.*").
+    /// When set, only matching file names are permitted in this scope.
+    /// Combined with `allow_extensions` and `allow_patterns` using OR logic.
+    /// Mutually exclusive with deny_* fields at rule level.
+    #[serde(default)]
+    pub allow_files: Vec<String>,
+
+    /// Allowlist of directory name patterns (glob patterns, e.g., "utils", "helpers").
+    /// When set, only matching directory names are permitted in this scope.
+    /// Mutually exclusive with deny_* fields at rule level.
+    #[serde(default)]
+    pub allow_dirs: Vec<String>,
 
     /// Deny list of file extensions (with leading dot, e.g., ".exe", ".dll").
     /// Files matching these extensions trigger immediate violations.
