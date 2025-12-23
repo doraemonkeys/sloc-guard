@@ -224,7 +224,7 @@ reason = "Legacy code"
         .args(["config", "show"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("[[override]]"))
+        .stdout(predicate::str::contains("[[override]]  # DEPRECATED"))
         .stdout(predicate::str::contains("src/legacy.rs"))
         .stdout(predicate::str::contains("Legacy code"));
 }

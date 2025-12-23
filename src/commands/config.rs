@@ -189,8 +189,9 @@ pub(crate) fn format_config_text(config: &Config) -> String {
 
     if !config.overrides.is_empty() {
         output.push('\n');
+        output.push_str("# Legacy V1 overrides (migrate to [[content.rules]]):\n");
         for override_cfg in &config.overrides {
-            output.push_str("[[override]]\n");
+            output.push_str("[[override]]  # DEPRECATED\n");
             let _ = writeln!(output, "  path = \"{}\"", override_cfg.path);
             let _ = writeln!(output, "  max_lines = {}", override_cfg.max_lines);
             if let Some(reason) = &override_cfg.reason {

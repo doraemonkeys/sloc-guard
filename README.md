@@ -91,8 +91,8 @@ skip_blank = true
 pattern = "**/*_test.rs"
 max_lines = 500
 
-[[content.override]]
-path = "src/legacy/huge_file.rs"
+[[content.rules]]
+pattern = "src/legacy/huge_file.rs"
 max_lines = 1000
 reason = "Legacy code pending refactor"
 
@@ -108,14 +108,13 @@ max_files = 30
 ### Rule Priority
 
 **Content (SLOC limits):**
-1. `[[content.override]]` - exact path match
-2. `[[content.rules]]` - glob pattern (last match wins)
+1. `[[content.rules]]` - glob pattern (last declared match wins)
+2. `[content.languages.X]` - extension shorthand
 3. `[content]` defaults
 
 **Structure (directory limits):**
-1. `[[structure.override]]` - exact path match
-2. `[[structure.rules]]` - glob pattern (last match wins)
-3. `[structure]` defaults
+1. `[[structure.rules]]` - glob pattern (last declared match wins)
+2. `[structure]` defaults
 
 ## GitHub Actions
 

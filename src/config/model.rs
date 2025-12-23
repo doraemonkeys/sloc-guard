@@ -194,7 +194,8 @@ pub struct Config {
     #[serde(default, skip_serializing)]
     pub exclude: ExcludeConfig,
 
-    /// Legacy: file overrides (migrated to content.overrides).
+    /// Legacy V1: file overrides. DEPRECATED - use [[content.rules]] instead.
+    /// Kept only for V1 config deserialization and migration.
     #[serde(default, skip_serializing, rename = "override")]
     pub overrides: Vec<FileOverride>,
 

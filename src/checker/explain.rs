@@ -33,7 +33,7 @@ pub enum ContentRuleMatch {
 /// A candidate rule evaluated during content rule matching.
 #[derive(Debug, Clone, Serialize)]
 pub struct ContentRuleCandidate {
-    /// Source identifier (e.g., "content.overrides[0]", "content.rules[2]")
+    /// Source identifier (e.g., "content.rules[0]", "content.rules[2]")
     pub source: String,
     /// Glob pattern or path (if applicable)
     pub pattern: Option<String>,
@@ -81,7 +81,7 @@ pub enum StructureRuleMatch {
 /// A candidate rule evaluated during structure rule matching.
 #[derive(Debug, Clone, Serialize)]
 pub struct StructureRuleCandidate {
-    /// Source identifier (e.g., "structure.overrides[0]", "structure.rules[1]")
+    /// Source identifier (e.g., "structure.rules[0]", "structure.rules[1]")
     pub source: String,
     /// Glob pattern or path (if applicable)
     pub pattern: Option<String>,

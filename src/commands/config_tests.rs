@@ -251,7 +251,7 @@ fn format_config_text_includes_all_sections() {
     assert!(output.contains("[default]"));
     assert!(output.contains("[rules.rust]"));
     assert!(output.contains("[exclude]"));
-    assert!(output.contains("[[override]]"));
+    assert!(output.contains("[[override]]  # DEPRECATED"));
     assert!(output.contains("src/legacy.rs"));
     assert!(output.contains("Legacy code"));
 }

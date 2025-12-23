@@ -98,11 +98,12 @@ patterns = [
     "**/vendor/**",
 ]
 
-# Per-file overrides (highest priority)
-# [[override]]
-# path = "src/legacy/parser.rs"
+# Per-file exemptions (use reason and expires for technical debt tracking)
+# [[content.rules]]
+# pattern = "src/legacy/parser.rs"
 # max_lines = 800
 # reason = "Legacy code, scheduled for refactor"
+# expires = "2025-12-31"
 "#
     .to_string()
 }

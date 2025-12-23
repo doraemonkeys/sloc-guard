@@ -5,12 +5,12 @@
 # 
 # Sections:
 # 1. [scanner]   - What files to look for (Discovery)
-# 2. [content]   - Code size limits (SLOC Guard) + [[content.override]]
-# 3. [structure] - File/Directory count limits (Structure Guard) + [[structure.override]]
+# 2. [content]   - Code size limits (SLOC Guard) + [[content.rules]]
+# 3. [structure] - File/Directory count limits (Structure Guard) + [[structure.rules]]
 #
 # Rule Priority Chain (high → low):
-#   Content: [[content.override]] > [[content.rules]] (last match) > [content.languages.X] > [content]
-#   Structure: [[structure.override]] > [[structure.rules]] (last match) > [structure]
+#   Content: [[content.rules]] (last match) > [content.languages.X] > [content]
+#   Structure: [[structure.rules]] (last match) > [structure]
 # ==============================================================================
 
 version = "2.0" # Schema version
@@ -154,28 +154,26 @@ pattern = "tests/**"
 max_depth = 10  # Allow deeper nesting for test fixtures
 
 # ------------------------------------------------------------------------------
-# 4. Grandfathering / Overrides
+# 4. Grandfathering / Exemptions
 # ------------------------------------------------------------------------------
 # Use this to adopt sloc-guard in existing projects without fixing everything immediately.
-# Separated by concern: content (file SLOC) vs structure (directory counts).
-# This provides type safety - can't accidentally set max_files on a file path.
+# Use [[content.rules]] with specific patterns and `reason`/`expires` fields.
 
-# --- Content Overrides (File SLOC limits) ---
-# Only for FILES. Loader validates path points to a file.
-[[content.override]]
-path = "src/legacy/god_object.rs"
+# --- Content Exemptions (File SLOC limits) ---
+[[content.rules]]
+pattern = "src/legacy/god_object.rs"
 max_lines = 5000
 reason = "Legacy core, too risky to refactor. Scheduled for Q4."
 
-[[content.override]]
-path = "src/utils/complex_math.ts"
+[[content.rules]]
+pattern = "src/utils/complex_math.ts"
 max_lines = 800
 reason = "Algorithm implementation, irreducible complexity."
 
-# --- Structure Overrides (Directory limits) ---
-# Only for DIRECTORIES. Loader validates path points to a directory.
-[[structure.override]]
-path = "src/legacy_module"
+# --- Structure Exemptions (Directory limits) ---
+# Use [[structure.rules]] with specific scope patterns.
+[[structure.rules]]
+scope = "src/legacy_module"
 max_files = 500
 max_dirs = 100
 max_depth = 8     # Allow deeper nesting for legacy code

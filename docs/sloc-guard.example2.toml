@@ -5,12 +5,12 @@
 #
 # Sections:
 # 1. [scanner]   - Physical discovery (files/folders to find on disk)
-# 2. [content]   - Code size limits (SLOC Guard) + [[content.override]]
-# 3. [structure] - File/Directory count & topology limits (Structure Guard) + [[structure.override]]
+# 2. [content]   - Code size limits (SLOC Guard) + [[content.rules]]
+# 3. [structure] - File/Directory count & topology limits (Structure Guard) + [[structure.rules]]
 #
 # Rule Priority Chain (high → low):
-#   Content:   [[content.override]] > [[content.rules]] (last match) > [content.languages.X] > [content]
-#   Structure: [[structure.override]] > [[structure.rules]] (last match) > [structure]
+#   Content:   [[content.rules]] (last match) > [content.languages.X] > [content]
+#   Structure: [[structure.rules]] (last match) > [structure]
 # ==============================================================================
 
 version = "2.1" # Schema version
@@ -152,21 +152,21 @@ relative_depth = 3         # Max depth relative to the matching folder
 require_sibling = "README.md" # Every feature folder must have a README
 
 # ------------------------------------------------------------------------------
-# 4. Overrides (Grandfathering)
+# 4. Exemptions (Grandfathering)
 # ------------------------------------------------------------------------------
-# Exemptions for specific files/directories.
+# Exemptions for specific files/directories using rules with reason/expires.
 # Supports expiration dates for technical debt management.
 
-# --- Content Overrides (Files) ---
-[[content.override]]
-path = "src/legacy/big_file.rs"
+# --- Content Exemptions (Files) ---
+[[content.rules]]
+pattern = "src/legacy/big_file.rs"
 max_lines = 2000
 reason = "Core legacy logic, too risky to split."
 expires = "2025-12-31"     # Warning/Error after this date
 
-# --- Structure Overrides (Directories) ---
-[[structure.override]]
-path = "src/legacy_module"
+# --- Structure Exemptions (Directories) ---
+[[structure.rules]]
+scope = "src/legacy_module"
 max_files = 500
 max_dirs = 100
 reason = "Monolith module."
