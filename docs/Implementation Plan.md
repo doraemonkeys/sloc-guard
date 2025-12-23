@@ -20,7 +20,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, SARIF Guidance.
 - **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
 - **Phase 10**: IO Abstraction, error handling cleanup.
-- **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.2 File Co-location Check, 11.6 Config Presets, 11.7 Deny Patterns, 11.8 Terminology Modernization, 11.9 Rename pattern→scope, 11.10 Content Exclude Patterns, 11.11 Granular Warn Thresholds, 11.12 deny_files + deny_dirs, 11.13 Structure Allowlist Mode.
+- **Phase 11 (Partial)**: 11.1 Naming Convention Enforcement, 11.2 File Co-location Check, 11.6 Config Presets, 11.7 Deny Patterns, 11.8 Terminology Modernization, 11.9 Rename pattern→scope, 11.10 Content Exclude Patterns, 11.11 Granular Warn Thresholds, 11.12 deny_files + deny_dirs, 11.13 Structure Allowlist Mode, 11.14 Unify Rule and Override.
 - **Phase 12**: Structure Rule Priority, State File Consolidation, .gitignore Support, Remote Config (Fetch Warning, Offline Mode, Hash Lock), Rule Matching Override, Relative max_depth, --diff A..B Range.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 - **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
@@ -65,28 +65,6 @@ Enforce that violation count can only decrease over time.
   - `--ratchet=strict`: fail CI if baseline not updated
 - GitHub Action output: `baseline-outdated: true` for workflow conditionals
 
-### Task 11.14: Unify Rule and Override
-
-Add `reason` and `expires` fields to `ContentRule` and `StructureRule`, eliminating conceptual redundancy with Override.
-
-**Rationale**: Override is essentially "high-priority Rule with metadata". Rules already use "last match wins" priority model, so placing exemption rules at list end achieves the same effect.
-
-**Changes**:
-- Add to `ContentRule`: `reason: Option<String>`, `expires: Option<String>`
-- Add to `StructureRule`: `reason: Option<String>`, `expires: Option<String>`
-- Update `ThresholdChecker`/`StructureChecker` to use rule's `reason` in output/explain
-- Remove `[[content.override]]` and `[[structure.override]]` (no migration, clean break)
-- Add `expires` validation: warn when date is past, optionally fail in strict mode
-
-**Example**:
-```toml
-[[content.rules]]
-pattern = "src/legacy/big_file.rs"
-max_lines = 2000
-reason = "Legacy code, high-risk to refactor"
-expires = "2025-12-31"
-```
-
 ### Task 11.15: Remove Language Shorthand
 
 Remove `[content.languages.<ext>]` syntax entirely.
@@ -116,7 +94,7 @@ max_lines = 500
 
 **Priority chain after change**:
 ```
-[[content.override]] > [[content.rules]] (last match) > [content] defaults
+[[content.rules]] (last match) > [content] defaults
 ```
 
 ---
@@ -130,7 +108,7 @@ max_lines = 500
 | ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
 | **4. Structure Naming** | ~~11.9 pattern→scope~~ ✅, ~~11.12 deny_file_patterns→deny_files + deny_dirs~~ ✅ |
 | **5. Governance Refinement** | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
-| **6. Config Simplification** | 11.14 Unify Rule and Override, 11.15 Remove Language Shorthand |
+| **6. Config Simplification** | ~~11.14 Unify Rule and Override~~ ✅, 11.15 Remove Language Shorthand |
 | **7. Debt Lifecycle** | 11.4 Baseline Ratchet |
 | **8. Visualization** | 7.1-7.2 HTML Charts/Trends |
 

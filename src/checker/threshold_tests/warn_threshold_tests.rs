@@ -13,6 +13,8 @@ fn path_rule_warn_threshold_overrides_default() {
         warn_threshold: Some(1.0), // Disable warnings
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -32,6 +34,8 @@ fn path_rule_without_warn_threshold_uses_default() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
@@ -52,6 +56,8 @@ fn rule_warn_threshold_overrides_default() {
         warn_threshold: Some(0.8),
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
@@ -72,6 +78,8 @@ fn rule_without_warn_threshold_uses_default() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
@@ -92,6 +100,8 @@ fn path_rule_warn_threshold_overrides_extension_rule() {
         warn_threshold: Some(0.8),
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
     config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
@@ -99,6 +109,8 @@ fn path_rule_warn_threshold_overrides_extension_rule() {
         warn_threshold: Some(1.0), // Disable warnings
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -125,6 +137,8 @@ fn multiple_rules_winner_takes_all_warn_threshold() {
         warn_threshold: Some(0.5),
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     // Rule 2: Override for specific file, default warn threshold (None)
@@ -134,6 +148,8 @@ fn multiple_rules_winner_takes_all_warn_threshold() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);

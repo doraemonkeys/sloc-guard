@@ -16,7 +16,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | Purpose |
 |--------|---------|
 | `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`), `stats`, `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
-| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `ContentOverride`, `StructureOverride`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification) |
+| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `types.rs`: `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `gitignore.rs`: `GitAwareScanner` (gix with .gitignore); `composite.rs`: `CompositeScanner` (git/non-git fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
@@ -41,12 +41,10 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
 Config { version, extends, extends_sha256, scanner, content, structure }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
-ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules, languages, overrides }  // exclude: glob patterns to skip SLOC but keep for structure
-ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank }  // [[content.rules]]
-ContentOverride { path, max_lines, reason }  // [[content.override]] - file only
-StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules, overrides }
-StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, file_pattern, require_sibling }  // [[structure.rules]]
-StructureOverride { path, max_files, max_dirs, max_depth, reason }  // [[structure.override]] - dir only
+ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules, languages }  // exclude: glob patterns to skip SLOC but keep for structure
+ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank, reason, expires }  // [[content.rules]]
+StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
+StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, file_pattern, require_sibling, reason, expires }  // [[structure.rules]]
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
 // Line counting (ignore directives: ignore-file, ignore-next N, ignore-start/end)
@@ -70,9 +68,9 @@ StructureViolation { path, violation_type, actual, limit, is_warning, override_r
 
 // Explain (rule chain debugging)
 MatchStatus::Matched | Superseded | NoMatch
-ContentRuleMatch::Excluded { pattern } | Override { index, reason } | Rule { index, pattern } | Default
+ContentRuleMatch::Excluded { pattern } | Rule { index, pattern, reason } | Default
 ContentExplanation { path, is_excluded, matched_rule, effective_limit, warn_threshold, skip_*, rule_chain }
-StructureRuleMatch::Override { index, reason } | Rule { index, pattern } | Default
+StructureRuleMatch::Rule { index, pattern, reason } | Default
 StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, rule_chain }
 
 // Output
@@ -154,7 +152,6 @@ CLI args → load_config() → [if --offline] use cache only, error on miss
 → [if --files] Pure incremental mode: skip directory scan, use provided files, disable structure checks
    [else] ctx.scanner.scan_all_with_structure(paths, structure_scan_config) → ScanResult { files, dir_stats, allowlist_violations }
    (single WalkDir traversal collects both file list AND directory statistics)
-→ validate_override_paths(): error if ContentOverride matches directory or StructureOverride matches file
 → [if --baseline] load_baseline() | [if --diff] filter changed files
 → get_skip_settings_for_path() → per-file skip_comments/skip_blank
 → process_file_with_cache(ctx.file_reader) → ThresholdChecker::check() → CheckResult (parallel)
@@ -195,15 +192,13 @@ show: load_config() → format_config_text() or JSON
 ## Rule Priority (high→low)
 
 **Content (SLOC limits):**
-1. `[[content.override]]` - exact path match (file only)
-2. `[[content.rules]]` - glob pattern, LAST declared match wins
-3. `[content.languages.<ext>]` - extension shorthand
-4. `[content]` defaults
+1. `[[content.rules]]` - glob pattern, LAST declared match wins (use `reason`/`expires` for exemptions)
+2. `[content.languages.<ext>]` - extension shorthand
+3. `[content]` defaults
 
 **Structure (directory limits):**
-1. `[[structure.override]]` - exact path match (dir only)
-2. `[[structure.rules]]` - glob pattern, LAST declared match wins
-3. `[structure]` defaults
+1. `[[structure.rules]]` - glob pattern, LAST declared match wins (use `reason`/`expires` for exemptions)
+2. `[structure]` defaults
 
 ## Dependencies
 

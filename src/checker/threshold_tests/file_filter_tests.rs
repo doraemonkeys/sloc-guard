@@ -51,6 +51,8 @@ fn should_process_extension_less_file_with_content_rule() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -63,24 +65,25 @@ fn should_process_extension_less_file_with_content_rule() {
 }
 
 #[test]
-fn should_process_extension_less_file_with_content_override() {
+fn should_process_extension_less_file_with_rule_exact_path() {
     let mut config = default_config();
     config.content.extensions = vec!["rs".to_string()];
-    config
-        .content
-        .overrides
-        .push(crate::config::ContentOverride {
-            path: "Jenkinsfile".to_string(),
-            max_lines: 200,
-            reason: "CI pipeline".to_string(),
-        });
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/Jenkinsfile".to_string(),
+        max_lines: 200,
+        warn_threshold: None,
+        skip_comments: None,
+        skip_blank: None,
+        reason: Some("CI pipeline".to_string()),
+        expires: None,
+    });
 
     let checker = ThresholdChecker::new(config);
 
-    // Jenkinsfile should be processed because it matches an override
+    // Jenkinsfile should be processed because it matches a rule
     assert!(checker.should_process(Path::new("Jenkinsfile")));
     assert!(checker.should_process(Path::new("ci/Jenkinsfile")));
-    // Dockerfile still skipped (no matching rule or override)
+    // Dockerfile still skipped (no matching rule)
     assert!(!checker.should_process(Path::new("Dockerfile")));
 }
 
@@ -113,6 +116,8 @@ fn should_process_extension_less_file_with_glob_rule() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);

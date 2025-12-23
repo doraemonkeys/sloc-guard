@@ -2,37 +2,9 @@ use std::path::PathBuf;
 
 use crate::checker::{ContentRuleMatch, MatchStatus, StructureRuleMatch};
 use crate::cli::ExplainFormat;
-use crate::config::{
-    Config, ContentConfig, ContentOverride, ContentRule, StructureConfig, StructureOverride,
-    StructureRule,
-};
+use crate::config::{Config, ContentConfig, ContentRule, StructureConfig, StructureRule};
 
 use super::{format_content_explanation, format_structure_explanation};
-
-#[test]
-fn explain_content_override_matches() {
-    let config = Config {
-        content: ContentConfig {
-            max_lines: 500,
-            overrides: vec![ContentOverride {
-                path: "src/legacy/parser.rs".to_string(),
-                max_lines: 1000,
-                reason: "Legacy code".to_string(),
-            }],
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let checker = crate::checker::ThresholdChecker::new(config);
-    let explanation = checker.explain(&PathBuf::from("src/legacy/parser.rs"));
-
-    assert!(matches!(
-        explanation.matched_rule,
-        ContentRuleMatch::Override { index: 0, .. }
-    ));
-    assert_eq!(explanation.effective_limit, 1000);
-}
 
 #[test]
 fn explain_content_rule_matches() {
@@ -45,6 +17,8 @@ fn explain_content_rule_matches() {
                 warn_threshold: None,
                 skip_comments: None,
                 skip_blank: None,
+                reason: None,
+                expires: None,
             }],
             ..Default::default()
         },
@@ -56,9 +30,38 @@ fn explain_content_rule_matches() {
 
     assert!(matches!(
         explanation.matched_rule,
-        ContentRuleMatch::Rule { index: 0, pattern } if pattern == "**/*.rs"
+        ContentRuleMatch::Rule { index: 0, pattern, .. } if pattern == "**/*.rs"
     ));
     assert_eq!(explanation.effective_limit, 300);
+}
+
+#[test]
+fn explain_content_rule_with_reason() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            rules: vec![ContentRule {
+                pattern: "src/legacy/**".to_string(),
+                max_lines: 1000,
+                warn_threshold: None,
+                skip_comments: None,
+                skip_blank: None,
+                reason: Some("Legacy code".to_string()),
+                expires: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let checker = crate::checker::ThresholdChecker::new(config);
+    let explanation = checker.explain(&PathBuf::from("src/legacy/parser.rs"));
+
+    assert!(matches!(
+        &explanation.matched_rule,
+        ContentRuleMatch::Rule { index: 0, reason, .. } if *reason == Some("Legacy code".to_string())
+    ));
+    assert_eq!(explanation.effective_limit, 1000);
 }
 
 #[test]
@@ -93,6 +96,8 @@ fn explain_content_last_rule_wins() {
                     warn_threshold: None,
                     skip_comments: None,
                     skip_blank: None,
+                    reason: None,
+                    expires: None,
                 },
                 ContentRule {
                     pattern: "src/generated/**".to_string(),
@@ -100,6 +105,8 @@ fn explain_content_last_rule_wins() {
                     warn_threshold: None,
                     skip_comments: None,
                     skip_blank: None,
+                    reason: None,
+                    expires: None,
                 },
             ],
             ..Default::default()
@@ -113,7 +120,7 @@ fn explain_content_last_rule_wins() {
     // Both rules match, but the last one (index 1) should win
     assert!(matches!(
         explanation.matched_rule,
-        ContentRuleMatch::Rule { index: 1, pattern } if pattern == "src/generated/**"
+        ContentRuleMatch::Rule { index: 1, pattern, .. } if pattern == "src/generated/**"
     ));
     assert_eq!(explanation.effective_limit, 1000);
 
@@ -130,22 +137,30 @@ fn explain_content_last_rule_wins() {
 }
 
 #[test]
-fn explain_content_override_beats_rule() {
+fn explain_content_specific_rule_beats_general() {
     let config = Config {
         content: ContentConfig {
             max_lines: 500,
-            rules: vec![ContentRule {
-                pattern: "**/*.rs".to_string(),
-                max_lines: 300,
-                warn_threshold: None,
-                skip_comments: None,
-                skip_blank: None,
-            }],
-            overrides: vec![ContentOverride {
-                path: "src/main.rs".to_string(),
-                max_lines: 2000,
-                reason: "Special file".to_string(),
-            }],
+            rules: vec![
+                ContentRule {
+                    pattern: "**/*.rs".to_string(),
+                    max_lines: 300,
+                    warn_threshold: None,
+                    skip_comments: None,
+                    skip_blank: None,
+                    reason: None,
+                    expires: None,
+                },
+                ContentRule {
+                    pattern: "src/main.rs".to_string(),
+                    max_lines: 2000,
+                    warn_threshold: None,
+                    skip_comments: None,
+                    skip_blank: None,
+                    reason: Some("Special file".to_string()),
+                    expires: None,
+                },
+            ],
             ..Default::default()
         },
         ..Default::default()
@@ -154,41 +169,12 @@ fn explain_content_override_beats_rule() {
     let checker = crate::checker::ThresholdChecker::new(config);
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
-    // Override should beat rule
+    // Last matching rule should win
     assert!(matches!(
         explanation.matched_rule,
-        ContentRuleMatch::Override { index: 0, .. }
+        ContentRuleMatch::Rule { index: 1, .. }
     ));
     assert_eq!(explanation.effective_limit, 2000);
-}
-
-#[test]
-fn explain_structure_override_matches() {
-    let config = StructureConfig {
-        max_files: Some(10),
-        max_dirs: Some(5),
-        overrides: vec![StructureOverride {
-            path: "src/legacy".to_string(),
-            max_files: Some(100),
-            max_dirs: None,
-            max_depth: None,
-            reason: "Legacy directory".to_string(),
-        }],
-        ..Default::default()
-    };
-
-    let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src/legacy"));
-
-    assert!(matches!(
-        explanation.matched_rule,
-        StructureRuleMatch::Override { index: 0, .. }
-    ));
-    assert_eq!(explanation.effective_max_files, Some(100));
-    assert_eq!(
-        explanation.override_reason,
-        Some("Legacy directory".to_string())
-    );
 }
 
 #[test]
@@ -218,6 +204,8 @@ fn explain_structure_rule_matches() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -227,10 +215,57 @@ fn explain_structure_rule_matches() {
 
     assert!(matches!(
         explanation.matched_rule,
-        StructureRuleMatch::Rule { index: 0, pattern } if pattern == "src/components/*"
+        StructureRuleMatch::Rule { index: 0, pattern, .. } if pattern == "src/components/*"
     ));
     assert_eq!(explanation.effective_max_files, Some(50));
     assert_eq!(explanation.effective_max_dirs, Some(10));
+}
+
+#[test]
+fn explain_structure_rule_with_reason() {
+    let config = StructureConfig {
+        max_files: Some(10),
+        max_dirs: Some(5),
+        rules: vec![StructureRule {
+            scope: "src/legacy/*".to_string(),
+            max_files: Some(100),
+            max_dirs: None,
+            max_depth: None,
+            warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            allow_files: vec![],
+            allow_dirs: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
+            reason: Some("Legacy directory".to_string()),
+            expires: None,
+        }],
+        ..Default::default()
+    };
+
+    let checker = crate::checker::StructureChecker::new(&config).unwrap();
+    let explanation = checker.explain(&PathBuf::from("src/legacy/module"));
+
+    assert!(matches!(
+        &explanation.matched_rule,
+        StructureRuleMatch::Rule { index: 0, reason, .. } if *reason == Some("Legacy directory".to_string())
+    ));
+    assert_eq!(explanation.effective_max_files, Some(100));
+    assert_eq!(
+        explanation.override_reason,
+        Some("Legacy directory".to_string())
+    );
 }
 
 #[test]
@@ -280,6 +315,8 @@ fn explain_structure_rule_chain_statuses() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "test/*".to_string(),
@@ -303,15 +340,10 @@ fn explain_structure_rule_chain_statuses() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
         ],
-        overrides: vec![StructureOverride {
-            path: "build".to_string(),
-            max_files: Some(100),
-            max_dirs: Some(50),
-            max_depth: None,
-            reason: "Build output".to_string(),
-        }],
         ..Default::default()
     };
 
@@ -321,10 +353,6 @@ fn explain_structure_rule_chain_statuses() {
     let explanation = checker.explain(&PathBuf::from("src/components"));
 
     let chain = &explanation.rule_chain;
-
-    // Override should not match
-    let override_entry = chain.iter().find(|c| c.source == "structure.overrides[0]");
-    assert_eq!(override_entry.unwrap().status, MatchStatus::NoMatch);
 
     // First rule should match
     let first_rule = chain.iter().find(|c| c.source == "structure.rules[0]");
@@ -425,22 +453,40 @@ fn format_structure_json_output_is_valid() {
 }
 
 #[test]
-fn format_structure_with_override_shows_reason() {
+fn format_structure_with_rule_reason_shows_reason() {
     let config = StructureConfig {
         max_files: Some(10),
         max_dirs: Some(5),
-        overrides: vec![StructureOverride {
-            path: "legacy".to_string(),
+        rules: vec![StructureRule {
+            scope: "legacy/*".to_string(),
             max_files: Some(100),
             max_dirs: None,
             max_depth: None,
-            reason: "Legacy directory needs more files".to_string(),
+            warn_threshold: None,
+            warn_files_at: None,
+            warn_dirs_at: None,
+            warn_files_threshold: None,
+            warn_dirs_threshold: None,
+            allow_extensions: vec![],
+            allow_patterns: vec![],
+            allow_files: vec![],
+            allow_dirs: vec![],
+            file_naming_pattern: None,
+            relative_depth: false,
+            file_pattern: None,
+            require_sibling: None,
+            deny_extensions: vec![],
+            deny_patterns: vec![],
+            deny_files: vec![],
+            deny_dirs: vec![],
+            reason: Some("Legacy directory needs more files".to_string()),
+            expires: None,
         }],
         ..Default::default()
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("legacy"));
+    let explanation = checker.explain(&PathBuf::from("legacy/module"));
     let output = format_structure_explanation(&explanation, ExplainFormat::Text);
 
     assert!(output.contains("Reason:"));
@@ -463,29 +509,6 @@ fn format_structure_with_unlimited_shows_unlimited() {
 }
 
 #[test]
-fn format_content_with_override_shows_override_info() {
-    let config = Config {
-        content: ContentConfig {
-            max_lines: 500,
-            overrides: vec![ContentOverride {
-                path: "legacy.rs".to_string(),
-                max_lines: 2000,
-                reason: "Legacy code".to_string(),
-            }],
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-
-    let checker = crate::checker::ThresholdChecker::new(config);
-    let explanation = checker.explain(&PathBuf::from("legacy.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Text);
-
-    assert!(output.contains("[[content.overrides]]"));
-    assert!(output.contains("Legacy code"));
-}
-
-#[test]
 fn format_content_with_rule_shows_pattern() {
     let config = Config {
         content: ContentConfig {
@@ -496,6 +519,8 @@ fn format_content_with_rule_shows_pattern() {
                 warn_threshold: None,
                 skip_comments: None,
                 skip_blank: None,
+                reason: None,
+                expires: None,
             }],
             ..Default::default()
         },
@@ -508,4 +533,31 @@ fn format_content_with_rule_shows_pattern() {
 
     assert!(output.contains("[[content.rules]]"));
     assert!(output.contains("**/*.rs"));
+}
+
+#[test]
+fn format_content_with_rule_reason_shows_reason() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            rules: vec![ContentRule {
+                pattern: "legacy/**".to_string(),
+                max_lines: 2000,
+                warn_threshold: None,
+                skip_comments: None,
+                skip_blank: None,
+                reason: Some("Legacy code".to_string()),
+                expires: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let checker = crate::checker::ThresholdChecker::new(config);
+    let explanation = checker.explain(&PathBuf::from("legacy/old.rs"));
+    let output = format_content_explanation(&explanation, ExplainFormat::Text);
+
+    assert!(output.contains("[[content.rules]]"));
+    assert!(output.contains("Legacy code"));
 }

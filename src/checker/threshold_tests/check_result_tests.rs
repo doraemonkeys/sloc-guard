@@ -45,6 +45,8 @@ fn check_uses_rule_specific_limit() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);

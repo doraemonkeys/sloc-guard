@@ -102,6 +102,8 @@ fn rule_overrides_global_limit() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -148,6 +150,8 @@ fn rule_inherits_unset_limit_from_global() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -302,6 +306,8 @@ fn warn_threshold_rule_overrides_global() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -426,6 +432,8 @@ fn rule_can_set_unlimited_to_override_global() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -542,6 +550,8 @@ fn invalid_rule_max_files_returns_error() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -579,6 +589,8 @@ fn invalid_rule_max_dirs_returns_error() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -758,6 +770,8 @@ fn granular_warn_in_rule_overrides_global() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -831,6 +845,8 @@ fn rule_inherits_granular_threshold_from_global() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };

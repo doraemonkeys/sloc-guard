@@ -20,10 +20,12 @@ pub enum MatchStatus {
 pub enum ContentRuleMatch {
     /// File excluded from content checks via `content.exclude`
     Excluded { pattern: String },
-    /// Matched a `[[content.overrides]]` entry
-    Override { index: usize, reason: String },
     /// Matched a `[[content.rules]]` pattern
-    Rule { index: usize, pattern: String },
+    Rule {
+        index: usize,
+        pattern: String,
+        reason: Option<String>,
+    },
     /// No explicit rule matched; using global defaults
     Default,
 }
@@ -66,10 +68,12 @@ pub struct ContentExplanation {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum StructureRuleMatch {
-    /// Matched a `[[structure.overrides]]` entry
-    Override { index: usize, reason: String },
     /// Matched a `[[structure.rules]]` pattern
-    Rule { index: usize, pattern: String },
+    Rule {
+        index: usize,
+        pattern: String,
+        reason: Option<String>,
+    },
     /// No explicit rule matched; using global defaults
     Default,
 }

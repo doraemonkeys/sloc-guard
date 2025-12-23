@@ -13,6 +13,8 @@ fn path_rule_matches_glob_pattern() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -33,6 +35,8 @@ fn path_rule_does_not_match_unrelated_path() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -53,6 +57,8 @@ fn path_rule_has_lower_priority_than_override() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
     config.overrides.push(crate::config::FileOverride {
         path: "special.rs".to_string(),
@@ -80,6 +86,8 @@ fn path_rule_has_higher_priority_than_extension_rule() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
     config.content.rules.push(crate::config::ContentRule {
         pattern: "**/proto/**".to_string(),
@@ -87,6 +95,8 @@ fn path_rule_has_higher_priority_than_extension_rule() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -112,6 +122,8 @@ fn multiple_path_rules_last_match_wins() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
     config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
@@ -119,6 +131,8 @@ fn multiple_path_rules_last_match_wins() {
         warn_threshold: None,
         skip_comments: None,
         skip_blank: None,
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);

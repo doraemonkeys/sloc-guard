@@ -74,10 +74,6 @@ pub struct ContentConfig {
     /// Language-based shorthand rules [content.languages.X].
     #[serde(default)]
     pub languages: std::collections::HashMap<String, LanguageRule>,
-
-    /// File-level overrides [[content.override]].
-    #[serde(default, rename = "override")]
-    pub overrides: Vec<ContentOverride>,
 }
 
 impl Default for ContentConfig {
@@ -92,7 +88,6 @@ impl Default for ContentConfig {
             exclude: Vec::new(),
             rules: Vec::new(),
             languages: std::collections::HashMap::new(),
-            overrides: Vec::new(),
         }
     }
 }
@@ -117,6 +112,14 @@ pub struct ContentRule {
     /// Override `skip_blank` for matched files.
     #[serde(default)]
     pub skip_blank: Option<bool>,
+
+    /// Optional reason for this rule (audit trail, displayed in explain output).
+    #[serde(default)]
+    pub reason: Option<String>,
+
+    /// Optional expiration date (YYYY-MM-DD). Past dates emit warnings.
+    #[serde(default)]
+    pub expires: Option<String>,
 }
 
 /// Language-based shorthand rule [content.languages.X].
@@ -138,20 +141,6 @@ pub struct LanguageRule {
     /// Skip blank lines for this language.
     #[serde(default)]
     pub skip_blank: Option<bool>,
-}
-
-/// Content override for specific files [[content.override]].
-/// Only for FILES. Use to grandfather legacy files.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ContentOverride {
-    /// Exact path to the file.
-    pub path: String,
-
-    /// Maximum lines allowed for this file.
-    pub max_lines: usize,
-
-    /// Reason for the override (required for audit trail).
-    pub reason: String,
 }
 
 // ============================================================================
@@ -431,10 +420,6 @@ pub struct StructureConfig {
     /// Per-directory rules that override global limits.
     #[serde(default)]
     pub rules: Vec<StructureRule>,
-
-    /// Directory-level overrides [[structure.override]].
-    #[serde(default, rename = "override")]
-    pub overrides: Vec<StructureOverride>,
 }
 
 /// Rule for overriding structure limits on specific directories.
@@ -554,29 +539,14 @@ pub struct StructureRule {
     /// Example: `{stem}.test.tsx` requires `Button.test.tsx` for `Button.tsx`.
     #[serde(default)]
     pub require_sibling: Option<String>,
-}
 
-/// Structure override for specific directories [[structure.override]].
-/// Only for DIRECTORIES. Use to grandfather legacy directories.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StructureOverride {
-    /// Exact path to the directory.
-    pub path: String,
-
-    /// Maximum files allowed (-1 = unlimited).
+    /// Optional reason for this rule (audit trail, displayed in explain output).
     #[serde(default)]
-    pub max_files: Option<i64>,
+    pub reason: Option<String>,
 
-    /// Maximum subdirs allowed (-1 = unlimited).
+    /// Optional expiration date (YYYY-MM-DD). Past dates emit warnings.
     #[serde(default)]
-    pub max_dirs: Option<i64>,
-
-    /// Maximum depth allowed (-1 = unlimited).
-    #[serde(default)]
-    pub max_depth: Option<i64>,
-
-    /// Reason for the override (required for audit trail).
-    pub reason: String,
+    pub expires: Option<String>,
 }
 
 #[cfg(test)]

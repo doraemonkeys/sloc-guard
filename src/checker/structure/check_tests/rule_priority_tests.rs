@@ -36,6 +36,8 @@ fn multiple_matching_rules_last_match_wins() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "src/generated/**".to_string(),
@@ -59,6 +61,8 @@ fn multiple_matching_rules_last_match_wins() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
         ],
         ..Default::default()
@@ -108,6 +112,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "src/core/**".to_string(),
@@ -131,6 +137,8 @@ fn last_match_wins_more_restrictive_rule_last() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
         ],
         ..Default::default()
@@ -180,6 +188,8 @@ fn three_rules_last_matching_wins() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "src/**".to_string(),
@@ -203,6 +213,8 @@ fn three_rules_last_matching_wins() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "src/lib/**".to_string(),
@@ -226,6 +238,8 @@ fn three_rules_last_matching_wins() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
         ],
         ..Default::default()
@@ -274,6 +288,8 @@ fn non_matching_rules_skipped_in_priority() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "tests/**".to_string(), // Does NOT match src/lib
@@ -297,6 +313,8 @@ fn non_matching_rules_skipped_in_priority() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
         ],
         ..Default::default()
@@ -345,6 +363,8 @@ fn explain_reports_last_matching_rule() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
             StructureRule {
                 scope: "src/lib/**".to_string(),
@@ -368,6 +388,8 @@ fn explain_reports_last_matching_rule() {
                 deny_patterns: vec![],
                 deny_files: vec![],
                 deny_dirs: vec![],
+                reason: None,
+                expires: None,
             },
         ],
         ..Default::default()
@@ -378,11 +400,11 @@ fn explain_reports_last_matching_rule() {
 
     // The matched rule should be the LAST one (index 1)
     match explanation.matched_rule {
-        StructureRuleMatch::Rule { index, pattern } => {
+        StructureRuleMatch::Rule { index, pattern, .. } => {
             assert_eq!(index, 1);
             assert_eq!(pattern, "src/lib/**");
         }
-        _ => panic!("Expected Rule match, got {:?}", explanation.matched_rule),
+        StructureRuleMatch::Default => panic!("Expected Rule match, got Default"),
     }
 
     // Check rule chain statuses

@@ -286,7 +286,6 @@ impl CheckContext {
             || config.structure.max_dirs.is_some()
             || config.structure.max_depth.is_some()
             || !config.structure.rules.is_empty()
-            || !config.structure.overrides.is_empty()
             || !config.structure.deny_extensions.is_empty()
             || !config.structure.deny_patterns.is_empty()
             || !config.structure.deny_files.is_empty()

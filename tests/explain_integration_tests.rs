@@ -167,7 +167,7 @@ max_dirs = 5
 }
 
 #[test]
-fn explain_shows_override_takes_precedence() {
+fn explain_shows_rule_with_reason() {
     let fixture = TestFixture::new();
     fixture.create_config(
         r#"
@@ -180,8 +180,8 @@ gitignore = false
 extensions = ["rs"]
 max_lines = 100
 
-[[content.override]]
-path = "src/legacy.rs"
+[[content.rules]]
+pattern = "**/legacy.rs"
 max_lines = 500
 reason = "Legacy code"
 

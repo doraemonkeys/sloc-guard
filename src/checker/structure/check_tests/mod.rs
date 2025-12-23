@@ -3,13 +3,12 @@
 mod basic_tests;
 mod depth_tests;
 mod limit_tests;
-mod override_tests;
 mod rule_priority_tests;
 mod sibling_tests;
 mod validation_tests;
 
 use crate::checker::structure::*;
-use crate::config::{StructureConfig, StructureOverride, StructureRule, UNLIMITED};
+use crate::config::{StructureConfig, StructureRule, UNLIMITED};
 
 /// Create a default config with no limits set.
 fn default_config() -> StructureConfig {
@@ -64,5 +63,7 @@ fn make_rule(scope: &str, max_files: Option<i64>) -> StructureRule {
         deny_patterns: vec![],
         deny_files: vec![],
         deny_dirs: vec![],
+        reason: None,
+        expires: None,
     }
 }

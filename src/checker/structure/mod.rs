@@ -15,9 +15,8 @@ pub mod violation;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::config::{StructureConfig, StructureOverride, UNLIMITED};
+use crate::config::{StructureConfig, UNLIMITED};
 use crate::error::Result;
-use crate::path_utils::path_matches_override;
 
 use super::explain::{
     MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
@@ -39,7 +38,6 @@ pub struct StructureChecker {
     warn_files_threshold: Option<f64>,
     warn_dirs_threshold: Option<f64>,
     rules: Vec<CompiledStructureRule>,
-    overrides: Vec<StructureOverride>,
     sibling_rules: Vec<CompiledSiblingRule>,
 }
 
@@ -66,7 +64,6 @@ impl StructureChecker {
             warn_files_threshold: config.warn_files_threshold,
             warn_dirs_threshold: config.warn_dirs_threshold,
             rules,
-            overrides: config.overrides.clone(),
             sibling_rules,
         })
     }
@@ -79,7 +76,6 @@ impl StructureChecker {
             || self.max_dirs.is_some()
             || self.max_depth.is_some()
             || !self.rules.is_empty()
-            || !self.overrides.is_empty()
     }
 
     /// Get limits for a directory path.
@@ -88,9 +84,8 @@ impl StructureChecker {
     ///
     /// # Priority Chain (high → low)
     ///
-    /// 1. `[[structure.override]]` - exact path match (highest)
-    /// 2. `[[structure.rules]]` - glob pattern, last match wins
-    /// 3. `[structure]` defaults (lowest)
+    /// 1. `[[structure.rules]]` - glob pattern, last match wins
+    /// 2. `[structure]` defaults (lowest)
     ///
     /// # Glob Semantics (structure rules only match directories)
     ///
@@ -98,33 +93,13 @@ impl StructureChecker {
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
     #[cfg(test)]
+    #[allow(dead_code)]
     fn get_limits(&self, path: &Path) -> StructureLimits {
         self.resolve_limits(path)
     }
 
     fn resolve_limits(&self, path: &Path) -> StructureLimits {
-        // 1. Check overrides first (highest priority)
-        // Note: Overrides don't support relative_depth or granular warn thresholds
-        // (they inherit global warn settings)
-        for ovr in &self.overrides {
-            if path_matches_override(path, &ovr.path) {
-                return StructureLimits {
-                    max_files: ovr.max_files.or(self.max_files),
-                    max_dirs: ovr.max_dirs.or(self.max_dirs),
-                    max_depth: ovr.max_depth.or(self.max_depth),
-                    relative_depth: false,
-                    base_depth: 0,
-                    warn_threshold: self.warn_threshold,
-                    warn_files_at: self.warn_files_at,
-                    warn_dirs_at: self.warn_dirs_at,
-                    warn_files_threshold: self.warn_files_threshold,
-                    warn_dirs_threshold: self.warn_dirs_threshold,
-                    override_reason: Some(ovr.reason.clone()),
-                };
-            }
-        }
-
-        // 2. Check rules (glob patterns) - last match wins
+        // Check rules (glob patterns) - last match wins
         // Iterate in reverse to find the last matching rule
         for rule in self.rules.iter().rev() {
             if rule.matcher.is_match(path) {
@@ -139,12 +114,12 @@ impl StructureChecker {
                     warn_dirs_at: rule.warn_dirs_at.or(self.warn_dirs_at),
                     warn_files_threshold: rule.warn_files_threshold.or(self.warn_files_threshold),
                     warn_dirs_threshold: rule.warn_dirs_threshold.or(self.warn_dirs_threshold),
-                    override_reason: None,
+                    override_reason: rule.reason.clone(),
                 };
             }
         }
 
-        // 3. Fall back to global defaults
+        // Fall back to global defaults
         StructureLimits {
             max_files: self.max_files,
             max_dirs: self.max_dirs,
@@ -398,34 +373,7 @@ impl StructureChecker {
         let mut found_match = false;
         let mut override_reason = None;
 
-        // 1. Check overrides first (highest priority)
-        for (i, ovr) in self.overrides.iter().enumerate() {
-            let matches = path_matches_override(path, &ovr.path);
-            let status = if matches && !found_match {
-                found_match = true;
-                override_reason = Some(ovr.reason.clone());
-                matched_rule = StructureRuleMatch::Override {
-                    index: i,
-                    reason: ovr.reason.clone(),
-                };
-                MatchStatus::Matched
-            } else if matches {
-                MatchStatus::Superseded
-            } else {
-                MatchStatus::NoMatch
-            };
-
-            rule_chain.push(StructureRuleCandidate {
-                source: format!("structure.overrides[{i}]"),
-                pattern: Some(ovr.path.clone()),
-                max_files: ovr.max_files,
-                max_dirs: ovr.max_dirs,
-                max_depth: ovr.max_depth,
-                status,
-            });
-        }
-
-        // 2. Check rules (last match wins for consistency with content rules)
+        // Check rules (last match wins for consistency with content rules)
         // First find the index of the last matching rule
         let last_matching_rule_idx = self
             .rules
@@ -441,9 +389,11 @@ impl StructureChecker {
             let is_last_match = last_matching_rule_idx == Some(i);
             let status = if is_last_match && !found_match {
                 found_match = true;
+                override_reason.clone_from(&rule.reason);
                 matched_rule = StructureRuleMatch::Rule {
                     index: i,
                     pattern: rule.scope.clone(),
+                    reason: rule.reason.clone(),
                 };
                 MatchStatus::Matched
             } else if matches {
@@ -462,7 +412,7 @@ impl StructureChecker {
             });
         }
 
-        // 3. Add default
+        // Add default
         rule_chain.push(StructureRuleCandidate {
             source: "structure (default)".to_string(),
             pattern: None,

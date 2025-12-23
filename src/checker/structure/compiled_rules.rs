@@ -26,6 +26,8 @@ pub(super) struct CompiledStructureRule {
     pub warn_files_threshold: Option<f64>,
     /// Percentage threshold for directory count warnings.
     pub warn_dirs_threshold: Option<f64>,
+    /// Optional reason for this rule (audit trail).
+    pub reason: Option<String>,
 }
 
 /// Compiled sibling rule for file co-location checking.

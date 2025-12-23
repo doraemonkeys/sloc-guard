@@ -95,14 +95,17 @@ fn format_content_text(exp: &ContentExplanation) -> String {
             );
             return output;
         }
-        ContentRuleMatch::Override { index, reason } => {
+        ContentRuleMatch::Rule {
+            index,
+            pattern,
+            reason,
+        } => {
+            let reason_str = reason
+                .as_ref()
+                .map(|r| format!(" (reason: {r})"))
+                .unwrap_or_default();
             output.push_str(&format!(
-                "  Matched: [[content.overrides]] index {index} (reason: {reason})\n"
-            ));
-        }
-        ContentRuleMatch::Rule { index, pattern } => {
-            output.push_str(&format!(
-                "  Matched: [[content.rules]] index {index} pattern \"{pattern}\"\n"
+                "  Matched: [[content.rules]] index {index} pattern \"{pattern}\"{reason_str}\n"
             ));
         }
         ContentRuleMatch::Default => {
@@ -163,14 +166,17 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
 
     // Show matched rule
     match &exp.matched_rule {
-        StructureRuleMatch::Override { index, reason } => {
+        StructureRuleMatch::Rule {
+            index,
+            pattern,
+            reason,
+        } => {
+            let reason_str = reason
+                .as_ref()
+                .map(|r| format!(" (reason: {r})"))
+                .unwrap_or_default();
             output.push_str(&format!(
-                "  Matched: [[structure.overrides]] index {index} (reason: {reason})\n"
-            ));
-        }
-        StructureRuleMatch::Rule { index, pattern } => {
-            output.push_str(&format!(
-                "  Matched: [[structure.rules]] index {index} pattern \"{pattern}\"\n"
+                "  Matched: [[structure.rules]] index {index} pattern \"{pattern}\"{reason_str}\n"
             ));
         }
         StructureRuleMatch::Default => {

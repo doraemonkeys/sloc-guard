@@ -139,6 +139,8 @@ fn rule_overrides_global_depth_limit() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -221,6 +223,8 @@ fn invalid_rule_max_depth_returns_error() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -231,25 +235,6 @@ fn invalid_rule_max_depth_returns_error() {
         let msg = err.to_string();
         assert!(msg.contains("Invalid max_depth value in rule 1"));
     }
-}
-
-#[test]
-fn override_with_max_depth_only() {
-    let config = StructureConfig {
-        max_depth: Some(2),
-        overrides: vec![StructureOverride {
-            path: "deep".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: Some(10), // Only max_depth set
-            reason: "Deep nesting allowed".to_string(),
-        }],
-        ..Default::default()
-    };
-
-    // Should succeed because at least one limit (max_depth) is set
-    let result = StructureChecker::new(&config);
-    assert!(result.is_ok());
 }
 
 // ============================================================================
@@ -282,6 +267,8 @@ fn calculate_base_depth_simple_pattern() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -330,6 +317,8 @@ fn relative_depth_allows_deep_nesting_within_base() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -377,6 +366,8 @@ fn relative_depth_violates_when_too_deep() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -425,6 +416,8 @@ fn relative_depth_false_uses_absolute_depth() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -474,6 +467,8 @@ fn relative_depth_with_wildcard_in_middle() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -522,6 +517,8 @@ fn relative_depth_with_double_star_at_start() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -568,6 +565,8 @@ fn relative_depth_warn_threshold() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -619,6 +618,8 @@ fn relative_depth_moving_base_works() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -668,6 +669,8 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };

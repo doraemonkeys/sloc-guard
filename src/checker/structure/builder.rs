@@ -33,6 +33,7 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
                 warn_dirs_at: rule.warn_dirs_at,
                 warn_files_threshold: rule.warn_files_threshold,
                 warn_dirs_threshold: rule.warn_dirs_threshold,
+                reason: rule.reason.clone(),
             })
         })
         .collect()

@@ -1,13 +1,15 @@
+mod expires;
 mod loader;
 mod model;
 pub mod presets;
 mod remote;
 
+pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
 pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
 pub use model::{
-    CONFIG_VERSION, CONFIG_VERSION_V1, Config, ContentConfig, ContentOverride, ContentRule,
-    CustomLanguageConfig, DefaultConfig, ExcludeConfig, FileOverride, LanguageRule, RuleConfig,
-    ScannerConfig, StructureConfig, StructureOverride, StructureRule, UNLIMITED,
+    CONFIG_VERSION, CONFIG_VERSION_V1, Config, ContentConfig, ContentRule, CustomLanguageConfig,
+    DefaultConfig, ExcludeConfig, FileOverride, LanguageRule, RuleConfig, ScannerConfig,
+    StructureConfig, StructureRule, UNLIMITED,
 };
 pub use remote::{
     clear_cache as clear_remote_cache, fetch_remote_config, fetch_remote_config_offline,

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{Result, SlocGuardError};
 
 use super::Config;
-use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentOverride, ContentRule, LanguageRule};
+use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentRule, LanguageRule};
 use super::presets;
 use super::remote::{fetch_remote_config, fetch_remote_config_offline, is_remote_url};
 
@@ -91,18 +91,8 @@ fn migrate_v1_to_v2(config: &mut Config) {
 
     // Note: path_rules migration removed - V1 path_rules are now rejected with an error.
     // Users must manually migrate to [[content.rules]] format.
-
-    // Migrate overrides -> content.overrides
-    for ovr in &config.overrides {
-        config.content.overrides.push(ContentOverride {
-            path: ovr.path.clone(),
-            max_lines: ovr.max_lines,
-            reason: ovr
-                .reason
-                .clone()
-                .unwrap_or_else(|| "Legacy override (migrated from v1)".to_string()),
-        });
-    }
+    // Note: overrides migration removed - V1 overrides are no longer supported.
+    // Users must manually migrate to [[content.rules]] with reason field.
 
     // Migrate rules (extension-based) -> content.languages
     // V1 format: [rules.python] with extensions = ["py"]
@@ -147,6 +137,8 @@ fn expand_language_rules(config: &mut Config) {
                 warn_threshold: lang_rule.warn_threshold,
                 skip_comments: lang_rule.skip_comments,
                 skip_blank: lang_rule.skip_blank,
+                reason: None,
+                expires: None,
             }
         })
         .collect();

@@ -8,6 +8,7 @@ use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
 use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
+use crate::config::collect_expired_rules;
 use crate::output::{ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter};
 use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
@@ -18,7 +19,6 @@ use super::check_baseline_ops::{
 use super::check_git_diff::filter_by_git_diff;
 use super::check_output::{format_output, structure_violation_to_check_result};
 use super::check_processing::process_file_for_check;
-use super::check_validation::validate_override_paths;
 use crate::commands::context::{
     CheckContext, color_choice_to_mode, load_cache, load_config, resolve_scan_paths, save_cache,
     write_output,
@@ -67,6 +67,19 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
 
     // 2. Apply CLI argument overrides
     apply_cli_overrides(&mut config, args);
+
+    // 2.1 Check for expired rules and emit warnings
+    let expired_rules = collect_expired_rules(&config);
+    for expired in &expired_rules {
+        let reason_suffix = expired
+            .reason
+            .as_ref()
+            .map_or(String::new(), |r| format!(" (reason: {r})"));
+        eprintln!(
+            "Warning: {}.rules[{}] (pattern: '{}') expired on {}{}",
+            expired.rule_type, expired.index, expired.pattern, expired.expires, reason_suffix
+        );
+    }
 
     // 3. Load baseline if specified (allow non-existent if update-baseline is specified)
     let baseline = if args.update_baseline.is_some() {
@@ -137,15 +150,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
             .scanner
             .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
 
-        // 2.1 Validate override paths against scanned files/directories
-        validate_override_paths(
-            &config.content.overrides,
-            &config.structure.overrides,
-            &scan_result.files,
-            &scan_result.dir_stats,
-        )?;
-
-        // 2.2 Filter by git diff if --diff or --staged is specified
+        // 2.1 Filter by git diff if --diff or --staged is specified
         let files = filter_by_git_diff(
             scan_result.files.clone(),
             args.diff.as_deref(),

@@ -17,6 +17,7 @@ struct CompiledPathRule {
     warn_threshold: Option<f64>,
     skip_comments: Option<bool>,
     skip_blank: Option<bool>,
+    reason: Option<String>,
 }
 
 pub struct ThresholdChecker {
@@ -74,7 +75,7 @@ impl ThresholdChecker {
     /// - NOT in `content.exclude` patterns, AND
     /// - (`content.extensions` is empty (no filter), OR
     ///   File extension is in `content.extensions`, OR
-    ///   File matches any content override or rule pattern)
+    ///   File matches any legacy override or rule pattern)
     ///
     /// This ensures extension-less files (Dockerfile, Jenkinsfile, etc.) can be
     /// checked if there's an explicit rule targeting them.
@@ -98,16 +99,9 @@ impl ThresholdChecker {
             return true;
         }
 
-        // Check if file matches any content override
-        for override_config in &self.config.content.overrides {
-            if path_matches_override(path, &override_config.path) {
-                return true;
-            }
-        }
-
         // Check if file matches any legacy override
-        for override_config in &self.config.overrides {
-            if path_matches_override(path, &override_config.path) {
+        for override_cfg in &self.config.overrides {
+            if path_matches_override(path, &override_cfg.path) {
                 return true;
             }
         }
@@ -137,6 +131,7 @@ impl ThresholdChecker {
                     warn_threshold: rule.warn_threshold,
                     skip_comments: rule.skip_comments,
                     skip_blank: rule.skip_blank,
+                    reason: rule.reason.clone(),
                 });
             }
         }
@@ -147,31 +142,22 @@ impl ThresholdChecker {
 
     /// Returns (`max_lines`, `override_reason`) for a path.
     fn get_limit_for_path(&self, path: &Path) -> (usize, Option<String>) {
-        // 1. Check content.overrides first (highest priority, V2)
-        for override_config in &self.config.content.overrides {
-            if path_matches_override(path, &override_config.path) {
-                return (
-                    override_config.max_lines,
-                    Some(override_config.reason.clone()),
-                );
+        // Check legacy overrides first (highest priority)
+        for override_cfg in &self.config.overrides {
+            if path_matches_override(path, &override_cfg.path) {
+                return (override_cfg.max_lines, override_cfg.reason.clone());
             }
         }
 
-        // 2. Check legacy overrides (for V1 migration)
-        for override_config in &self.config.overrides {
-            if path_matches_override(path, &override_config.path) {
-                return (override_config.max_lines, override_config.reason.clone());
-            }
-        }
-
-        // 3. Check path_rules (glob patterns) - last match wins
+        // Check path_rules (glob patterns) - last match wins
         // Use GlobSet::matches() for O(n) matching where n = path length
         let matches = self.path_rules_set.matches(path);
         if let Some(&last_idx) = matches.last() {
-            return (self.path_rules[last_idx].max_lines, None);
+            let rule = &self.path_rules[last_idx];
+            return (rule.max_lines, rule.reason.clone());
         }
 
-        // 4. Fall back to content.max_lines (V2) with legacy fallback
+        // Fall back to content.max_lines
         (self.config.content.max_lines, None)
     }
 
@@ -236,58 +222,7 @@ impl ThresholdChecker {
         let mut matched_rule = ContentRuleMatch::Default;
         let mut found_match = false;
 
-        // 1. Check content.overrides (highest priority)
-        for (i, ovr) in self.config.content.overrides.iter().enumerate() {
-            let matches = path_matches_override(path, &ovr.path);
-            let status = if matches && !found_match {
-                found_match = true;
-                matched_rule = ContentRuleMatch::Override {
-                    index: i,
-                    reason: ovr.reason.clone(),
-                };
-                MatchStatus::Matched
-            } else if matches {
-                MatchStatus::Superseded
-            } else {
-                MatchStatus::NoMatch
-            };
-
-            rule_chain.push(ContentRuleCandidate {
-                source: format!("content.overrides[{i}]"),
-                pattern: Some(ovr.path.clone()),
-                limit: ovr.max_lines,
-                status,
-            });
-        }
-
-        // 2. Check legacy overrides (for V1 migration)
-        for (i, ovr) in self.config.overrides.iter().enumerate() {
-            let matches = path_matches_override(path, &ovr.path);
-            let status = if matches && !found_match {
-                found_match = true;
-                matched_rule = ContentRuleMatch::Override {
-                    index: i,
-                    reason: ovr
-                        .reason
-                        .clone()
-                        .unwrap_or_else(|| "legacy override".to_string()),
-                };
-                MatchStatus::Matched
-            } else if matches {
-                MatchStatus::Superseded
-            } else {
-                MatchStatus::NoMatch
-            };
-
-            rule_chain.push(ContentRuleCandidate {
-                source: format!("overrides[{i}] (legacy)"),
-                pattern: Some(ovr.path.clone()),
-                limit: ovr.max_lines,
-                status,
-            });
-        }
-
-        // 3. Check content.rules (last match wins) via GlobSet
+        // Check content.rules (last match wins) via GlobSet
         // Get all matching indices in one pass
         let rule_matches = self.path_rules_set.matches(path);
         let matching_set: HashSet<usize> = rule_matches.iter().copied().collect();
@@ -314,6 +249,7 @@ impl ThresholdChecker {
                 matched_rule = ContentRuleMatch::Rule {
                     index: i,
                     pattern: pattern.clone(),
+                    reason: rule.reason.clone(),
                 };
             }
 

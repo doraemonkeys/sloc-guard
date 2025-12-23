@@ -15,6 +15,8 @@ fn get_skip_settings_from_path_rule() {
         warn_threshold: None,
         skip_comments: Some(false),
         skip_blank: Some(false),
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -37,6 +39,8 @@ fn get_skip_settings_falls_back_to_global() {
         warn_threshold: None,
         skip_comments: None, // Not specified
         skip_blank: None,    // Not specified
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -73,6 +77,8 @@ fn get_skip_settings_last_match_wins() {
         warn_threshold: None,
         skip_comments: Some(false),
         skip_blank: Some(false),
+        reason: None,
+        expires: None,
     });
     config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
@@ -80,6 +86,8 @@ fn get_skip_settings_last_match_wins() {
         warn_threshold: None,
         skip_comments: Some(true),
         skip_blank: Some(false),
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -111,6 +119,8 @@ fn language_rule_expanded_skip_settings_work() {
         warn_threshold: None,
         skip_comments: Some(false),
         skip_blank: Some(true),
+        reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);

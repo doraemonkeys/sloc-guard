@@ -34,22 +34,6 @@ fn checker_enabled_with_rules() {
 }
 
 #[test]
-fn checker_enabled_with_overrides() {
-    let config = StructureConfig {
-        overrides: vec![StructureOverride {
-            path: "src/legacy".to_string(),
-            max_files: Some(100),
-            max_dirs: None,
-            max_depth: None,
-            reason: "Legacy module".to_string(),
-        }],
-        ..Default::default()
-    };
-    let checker = StructureChecker::new(&config).unwrap();
-    assert!(checker.is_enabled());
-}
-
-#[test]
 fn checker_enabled_with_allowlist_rule() {
     let config = StructureConfig {
         rules: vec![StructureRule {
@@ -74,6 +58,8 @@ fn checker_enabled_with_allowlist_rule() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
@@ -197,6 +183,8 @@ fn invalid_rule_pattern_returns_error() {
             deny_patterns: vec![],
             deny_files: vec![],
             deny_dirs: vec![],
+            reason: None,
+            expires: None,
         }],
         ..Default::default()
     };
