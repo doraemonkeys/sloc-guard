@@ -1,7 +1,0 @@
----
-alwaysApply: false
----
-
-*   **Ownership & Borrowing:**
-    *   Don't overuse `.clone()` to satisfy the borrow checker. Rethink the architecture or use references (`&` or `&mut`) first.
-    *   Minimize the use of `Rc`/`Arc`/`RefCell`/`Mutex` unless shared ownership or interior mutability is strictly necessary.
