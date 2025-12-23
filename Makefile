@@ -19,7 +19,7 @@ ci:
 	@mkdir -p .tmp
 	@set -o pipefail && $(TEMP_ENV) cargo tarpaulin --config tarpaulin.toml 2>&1 | tail -n 30
 	@cargo clippy --all-targets --all-features -q -- -D warnings
-	@$(TEMP_ENV) cargo run -q -- check src
+	@$(TEMP_ENV) cargo run -q -- check
 
 # 正常模式
 verify: tarpaulin clippy sloc fmt
@@ -33,11 +33,11 @@ tarpaulin:
 
 sloc:
 	mkdir -p .tmp
-	$(TEMP_ENV) cargo run -- check src
+	$(TEMP_ENV) cargo run -- check
 
 sloc-strict:
 	mkdir -p .tmp
-	$(TEMP_ENV) cargo run -- check --strict src
+	$(TEMP_ENV) cargo run -- check --strict
 
 clean_tmp:
 	rm -rf .tmp
