@@ -58,10 +58,10 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
             }
         }
     } else {
-        return Err(SlocGuardError::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            format!("Path not found: {}", path.display()),
-        )));
+        return Err(SlocGuardError::io_with_path(
+            std::io::Error::new(std::io::ErrorKind::NotFound, "Path not found"),
+            path.clone(),
+        ));
     }
 
     Ok(())

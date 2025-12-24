@@ -382,7 +382,8 @@ pub fn generate_detected_config(result: &DetectionResult) -> String {
 /// Returns an error if the directory cannot be read.
 pub fn generate_detected_config_from_dir(dir: &Path) -> Result<String> {
     let detector = RealProjectDetector;
-    let result = detect_projects(&detector, dir).map_err(SlocGuardError::Io)?;
+    let result = detect_projects(&detector, dir)
+        .map_err(|e| SlocGuardError::io_with_context(e, dir.to_path_buf(), "detecting projects"))?;
 
     if let Some(ref root_type) = result.root {
         eprintln!("Detected root project: {}", root_type.name());

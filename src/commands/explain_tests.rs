@@ -561,3 +561,34 @@ fn format_content_with_rule_reason_shows_reason() {
     assert!(output.contains("[[content.rules]]"));
     assert!(output.contains("Legacy code"));
 }
+
+#[test]
+fn explain_non_existent_path_returns_error() {
+    use crate::cli::{Cli, ColorChoice, Commands};
+
+    let args = crate::cli::ExplainArgs {
+        path: PathBuf::from("non-existent-path-XYZ"),
+        config: None,
+        format: ExplainFormat::Text,
+    };
+
+    let cli = Cli {
+        verbose: 0,
+        quiet: false,
+        color: ColorChoice::Auto,
+        no_config: true,
+        no_extends: false,
+        offline: false,
+        command: Commands::Explain(crate::cli::ExplainArgs {
+            path: PathBuf::from("non-existent-path-XYZ"),
+            config: None,
+            format: ExplainFormat::Text,
+        }),
+    };
+
+    let result = super::run_explain_impl(&args, &cli);
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(err.to_string().contains("Path not found"));
+}

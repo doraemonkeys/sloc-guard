@@ -21,8 +21,13 @@ pub enum SlocGuardError {
         source: globset::Error,
     },
 
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("{}", format_io_error(source, path, operation))]
+    Io {
+        #[source]
+        source: std::io::Error,
+        path: Option<PathBuf>,
+        operation: Option<&'static str>,
+    },
 
     #[error("TOML parse error: {0}")]
     TomlParse(#[from] toml::de::Error),
@@ -44,7 +49,57 @@ pub enum SlocGuardError {
     },
 }
 
+/// Formats IO error with optional context for display.
+/// Uses references to Options as required by thiserror's `#[error(...)]` macro expansion.
+#[allow(clippy::ref_option, clippy::ref_option_ref)]
+fn format_io_error(
+    source: &std::io::Error,
+    path: &Option<PathBuf>,
+    operation: &Option<&'static str>,
+) -> String {
+    match (path.as_ref(), *operation) {
+        (Some(p), Some(op)) => format!("IO error ({op} '{}'): {source}", p.display()),
+        (Some(p), None) => format!("IO error ('{}'): {source}", p.display()),
+        (None, Some(op)) => format!("IO error ({op}): {source}"),
+        (None, None) => format!("IO error: {source}"),
+    }
+}
+
+impl From<std::io::Error> for SlocGuardError {
+    fn from(e: std::io::Error) -> Self {
+        Self::Io {
+            source: e,
+            path: None,
+            operation: None,
+        }
+    }
+}
+
 impl SlocGuardError {
+    /// Creates an IO error with path context.
+    #[must_use]
+    pub const fn io_with_path(source: std::io::Error, path: PathBuf) -> Self {
+        Self::Io {
+            source,
+            path: Some(path),
+            operation: None,
+        }
+    }
+
+    /// Creates an IO error with path and operation context.
+    #[must_use]
+    pub const fn io_with_context(
+        source: std::io::Error,
+        path: PathBuf,
+        operation: &'static str,
+    ) -> Self {
+        Self::Io {
+            source,
+            path: Some(path),
+            operation: Some(operation),
+        }
+    }
+
     /// Returns the error type as a short string identifier.
     #[must_use]
     pub const fn error_type(&self) -> &'static str {
@@ -52,7 +107,7 @@ impl SlocGuardError {
             Self::Config(_) => "Config",
             Self::FileRead { .. } => "FileRead",
             Self::InvalidPattern { .. } => "InvalidPattern",
-            Self::Io(_) => "IO",
+            Self::Io { .. } => "IO",
             Self::TomlParse(_) => "TOML",
             Self::JsonSerialize(_) => "JSON",
             Self::Git(_) | Self::GitRepoNotFound(_) => "Git",
@@ -61,12 +116,26 @@ impl SlocGuardError {
     }
 
     /// Returns the error message without the type prefix.
+    /// Includes error kind for `FileRead` and glob error for `InvalidPattern`.
     #[must_use]
     pub fn message(&self) -> String {
         match self {
-            Self::FileRead { path, .. } => path.display().to_string(),
-            Self::InvalidPattern { pattern, .. } => pattern.clone(),
-            Self::Io(e) => e.to_string(),
+            Self::FileRead { path, source } => {
+                format!("{} ({})", path.display(), source.kind())
+            }
+            Self::InvalidPattern { pattern, source } => {
+                format!("{pattern}: {source}")
+            }
+            Self::Io {
+                source,
+                path,
+                operation,
+            } => match (path, operation) {
+                (Some(p), Some(op)) => format!("{op} '{}': {source}", p.display()),
+                (Some(p), None) => format!("'{}': {source}", p.display()),
+                (None, Some(op)) => format!("{op}: {source}"),
+                (None, None) => source.to_string(),
+            },
             Self::TomlParse(e) => e.to_string(),
             Self::JsonSerialize(e) => e.to_string(),
             Self::Config(msg) | Self::Git(msg) | Self::GitRepoNotFound(msg) => msg.clone(),
@@ -78,8 +147,23 @@ impl SlocGuardError {
     #[must_use]
     pub fn detail(&self) -> Option<String> {
         match self {
-            Self::FileRead { source, .. } => Some(format!("{} ({})", source, source.kind())),
+            Self::FileRead { source, .. } => Some(format!("{source} ({})", source.kind())),
             Self::InvalidPattern { source, .. } => Some(source.to_string()),
+            Self::Io {
+                source,
+                path,
+                operation,
+            } => {
+                let kind = source.kind();
+                match (path, operation) {
+                    (Some(p), Some(op)) => {
+                        Some(format!("{op} '{}': {source} ({kind})", p.display()))
+                    }
+                    (Some(p), None) => Some(format!("'{}': {source} ({kind})", p.display())),
+                    (None, Some(op)) => Some(format!("{op}: {source} ({kind})")),
+                    (None, None) => Some(format!("{source} ({kind})")),
+                }
+            }
             Self::RemoteConfigHashMismatch {
                 expected, actual, ..
             } => Some(format!("expected {expected}, got {actual}")),
@@ -94,11 +178,12 @@ impl SlocGuardError {
             Self::Config(_) => {
                 Some("Check the config file format and value ranges in .sloc-guard.toml")
             }
-            Self::FileRead { source, .. } => Self::io_suggestion(source.kind()),
+            Self::FileRead { source, .. } | Self::Io { source, .. } => {
+                Self::io_suggestion(source.kind())
+            }
             Self::InvalidPattern { .. } => Some(
                 "Check glob pattern syntax: use '*' for wildcards, '**' for recursive matching",
             ),
-            Self::Io(e) => Self::io_suggestion(e.kind()),
             Self::TomlParse(_) => {
                 Some("Check TOML syntax: ensure proper quoting and bracket matching")
             }

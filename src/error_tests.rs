@@ -52,7 +52,7 @@ fn error_type_returns_correct_type() {
         "Git"
     );
     assert_eq!(
-        SlocGuardError::Io(std::io::Error::other("test")).error_type(),
+        SlocGuardError::from(std::io::Error::other("test")).error_type(),
         "IO"
     );
 }
@@ -62,14 +62,34 @@ fn error_message_extracts_message() {
     let err = SlocGuardError::Config("invalid config".to_string());
     assert_eq!(err.message(), "invalid config");
 
+    let err = SlocGuardError::Git("git error".to_string());
+    assert_eq!(err.message(), "git error");
+}
+
+#[test]
+fn error_message_file_read_includes_error_kind() {
     let err = SlocGuardError::FileRead {
         path: PathBuf::from("test.rs"),
         source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
     };
-    assert_eq!(err.message(), "test.rs");
+    let message = err.message();
+    assert!(message.contains("test.rs"));
+    // Error kind format varies by platform (NotFound vs "not found")
+    // Just verify the message is longer than just the path
+    assert!(message.len() > "test.rs".len());
+}
 
-    let err = SlocGuardError::Git("git error".to_string());
-    assert_eq!(err.message(), "git error");
+#[test]
+fn error_message_invalid_pattern_includes_glob_error() {
+    let glob_err = globset::Glob::new("[invalid").unwrap_err();
+    let err = SlocGuardError::InvalidPattern {
+        pattern: "[invalid".to_string(),
+        source: glob_err,
+    };
+    let message = err.message();
+    assert!(message.contains("[invalid"));
+    // Glob error message should be included
+    assert!(message.len() > "[invalid".len());
 }
 
 #[test]
@@ -146,7 +166,7 @@ fn suggestion_invalid_pattern() {
 
 #[test]
 fn suggestion_io_error_not_found() {
-    let err = SlocGuardError::Io(std::io::Error::new(
+    let err = SlocGuardError::from(std::io::Error::new(
         std::io::ErrorKind::NotFound,
         "not found",
     ));
@@ -156,7 +176,7 @@ fn suggestion_io_error_not_found() {
 
 #[test]
 fn suggestion_io_error_permission_denied() {
-    let err = SlocGuardError::Io(std::io::Error::new(
+    let err = SlocGuardError::from(std::io::Error::new(
         std::io::ErrorKind::PermissionDenied,
         "denied",
     ));
@@ -166,7 +186,7 @@ fn suggestion_io_error_permission_denied() {
 
 #[test]
 fn suggestion_io_error_other_has_none() {
-    let err = SlocGuardError::Io(std::io::Error::other("custom error"));
+    let err = SlocGuardError::from(std::io::Error::other("custom error"));
     assert!(err.suggestion().is_none());
 }
 
@@ -217,14 +237,14 @@ fn suggestion_remote_config_hash_mismatch() {
 
 #[test]
 fn suggestion_io_timeout() {
-    let err = SlocGuardError::Io(std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout"));
+    let err = SlocGuardError::from(std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout"));
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("network connectivity"));
 }
 
 #[test]
 fn suggestion_io_connection_refused() {
-    let err = SlocGuardError::Io(std::io::Error::new(
+    let err = SlocGuardError::from(std::io::Error::new(
         std::io::ErrorKind::ConnectionRefused,
         "refused",
     ));
@@ -234,7 +254,7 @@ fn suggestion_io_connection_refused() {
 
 #[test]
 fn suggestion_io_connection_reset() {
-    let err = SlocGuardError::Io(std::io::Error::new(
+    let err = SlocGuardError::from(std::io::Error::new(
         std::io::ErrorKind::ConnectionReset,
         "reset",
     ));
@@ -244,7 +264,7 @@ fn suggestion_io_connection_reset() {
 
 #[test]
 fn suggestion_io_invalid_data() {
-    let err = SlocGuardError::Io(std::io::Error::new(
+    let err = SlocGuardError::from(std::io::Error::new(
         std::io::ErrorKind::InvalidData,
         "corrupted",
     ));
@@ -260,4 +280,96 @@ fn suggestion_file_read_invalid_data() {
     };
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("corrupted"));
+}
+
+// Tests for IO error context enrichment (Task 15.3)
+
+#[test]
+fn io_with_path_includes_path_in_message() {
+    let err = SlocGuardError::io_with_path(
+        std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
+        PathBuf::from("config.toml"),
+    );
+    let message = err.message();
+    assert!(message.contains("config.toml"));
+    assert!(message.contains("not found"));
+}
+
+#[test]
+fn io_with_context_includes_path_and_operation() {
+    let err = SlocGuardError::io_with_context(
+        std::io::Error::new(std::io::ErrorKind::PermissionDenied, "denied"),
+        PathBuf::from("secret.key"),
+        "reading",
+    );
+    let message = err.message();
+    assert!(message.contains("secret.key"));
+    assert!(message.contains("reading"));
+    assert!(message.contains("denied"));
+}
+
+#[test]
+fn io_without_context_shows_error_only() {
+    let err = SlocGuardError::from(std::io::Error::other("generic error"));
+    let message = err.message();
+    assert_eq!(message, "generic error");
+}
+
+#[test]
+fn io_detail_includes_path_operation_and_kind() {
+    let err = SlocGuardError::io_with_context(
+        std::io::Error::new(std::io::ErrorKind::NotFound, "file missing"),
+        PathBuf::from("data.json"),
+        "opening",
+    );
+    let detail = err.detail().unwrap();
+    assert!(detail.contains("data.json"));
+    assert!(detail.contains("opening"));
+    assert!(detail.contains("file missing"));
+    // Error kind is included but format varies by platform
+    assert!(detail.len() > "opening 'data.json': file missing".len());
+}
+
+#[test]
+fn io_detail_without_context_shows_kind() {
+    let err = SlocGuardError::from(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "access denied",
+    ));
+    let detail = err.detail().unwrap();
+    assert!(detail.contains("access denied"));
+    // Error kind is included but format varies by platform
+    assert!(detail.len() > "access denied".len());
+}
+
+#[test]
+fn io_display_with_full_context() {
+    let err = SlocGuardError::io_with_context(
+        std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),
+        PathBuf::from("cache.json"),
+        "writing",
+    );
+    let display = err.to_string();
+    assert!(display.contains("IO error"));
+    assert!(display.contains("cache.json"));
+    assert!(display.contains("writing"));
+}
+
+#[test]
+fn io_display_with_path_only() {
+    let err = SlocGuardError::io_with_path(
+        std::io::Error::new(std::io::ErrorKind::NotFound, "missing"),
+        PathBuf::from("data.txt"),
+    );
+    let display = err.to_string();
+    assert!(display.contains("data.txt"));
+    assert!(display.contains("missing"));
+}
+
+#[test]
+fn io_from_conversion_preserves_error() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::InvalidInput, "bad input");
+    let err: SlocGuardError = io_err.into();
+    assert_eq!(err.error_type(), "IO");
+    assert!(err.message().contains("bad input"));
 }

@@ -38,16 +38,10 @@ impl<F: FileFilter> GitAwareScanner<F> {
 
         // Compute relative path from workdir to root
         let root_abs = root.canonicalize().map_err(|e| {
-            SlocGuardError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Cannot canonicalize path {}: {e}", root.display()),
-            ))
+            SlocGuardError::io_with_context(e, root.to_path_buf(), "canonicalizing")
         })?;
         let workdir_abs = workdir.canonicalize().map_err(|e| {
-            SlocGuardError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Cannot canonicalize workdir {}: {e}", workdir.display()),
-            ))
+            SlocGuardError::io_with_context(e, workdir.to_path_buf(), "canonicalizing workdir")
         })?;
 
         // Calculate the prefix for filtering entries within the scan root
@@ -115,16 +109,10 @@ impl<F: FileFilter> GitAwareScanner<F> {
             .ok_or_else(|| SlocGuardError::Git("Repository has no working directory".into()))?;
 
         let root_abs = root.canonicalize().map_err(|e| {
-            SlocGuardError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Cannot canonicalize path {}: {e}", root.display()),
-            ))
+            SlocGuardError::io_with_context(e, root.to_path_buf(), "canonicalizing")
         })?;
         let workdir_abs = workdir.canonicalize().map_err(|e| {
-            SlocGuardError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("Cannot canonicalize workdir {}: {e}", workdir.display()),
-            ))
+            SlocGuardError::io_with_context(e, workdir.to_path_buf(), "canonicalizing workdir")
         })?;
 
         let prefix = if root_abs == workdir_abs {
