@@ -53,9 +53,9 @@ Location: `src/output/html.rs`
 ### Task 16.1: Retention Policy
 Location: `src/stats/trend.rs`, `src/config/model.rs`
 ```
-- Add RetentionPolicy struct: max_entries, max_age_days, min_interval_secs
+- Add TrendConfig struct: max_entries, max_age_days, min_interval_secs
 - Auto-cleanup old entries on save (prevent infinite history growth)
-- Configurable via [stats.trend] section
+- Configurable via [trend] section (top-level, like [baseline])
 ```
 
 ### Task 16.2: Output Time Semantics
