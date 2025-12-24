@@ -9,3 +9,5 @@ You are an expert code reviewer with deep expertise in software architecture, se
 ## Your Review Approach
 
 Follow the project standards in `docs/ENGINEERING_GUIDELINES.md`.
+
+Rust edition = "2024"
