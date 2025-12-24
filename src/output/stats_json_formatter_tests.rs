@@ -124,6 +124,8 @@ fn sample_trend_delta() -> TrendDelta {
         comment_delta: 30,
         blank_delta: 20,
         previous_timestamp: Some(12345),
+        previous_git_ref: None,
+        previous_git_branch: None,
     }
 }
 
@@ -146,4 +148,97 @@ fn json_formatter_without_trend() {
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("trend").is_none());
+}
+
+#[test]
+fn json_formatter_trend_with_git_context() {
+    let trend_with_git = TrendDelta {
+        files_delta: 3,
+        lines_delta: 75,
+        code_delta: 40,
+        comment_delta: 20,
+        blank_delta: 15,
+        previous_timestamp: Some(1_700_000_000),
+        previous_git_ref: Some("a1b2c3d".to_string()),
+        previous_git_branch: Some("main".to_string()),
+    };
+
+    let stats = ProjectStatistics::new(vec![]).with_trend(trend_with_git);
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let trend = parsed.get("trend").expect("trend should be present");
+
+    // Verify git context fields are included in JSON output
+    assert_eq!(
+        trend.get("previous_commit").unwrap().as_str().unwrap(),
+        "a1b2c3d",
+        "previous_commit should contain the git ref"
+    );
+    assert_eq!(
+        trend.get("previous_branch").unwrap().as_str().unwrap(),
+        "main",
+        "previous_branch should contain the branch name"
+    );
+}
+
+#[test]
+fn json_formatter_trend_git_context_omitted_when_none() {
+    // When git context is None, the fields should be omitted (not null)
+    let trend_without_git = TrendDelta {
+        files_delta: 1,
+        lines_delta: 10,
+        code_delta: 5,
+        comment_delta: 3,
+        blank_delta: 2,
+        previous_timestamp: Some(1_700_000_000),
+        previous_git_ref: None,
+        previous_git_branch: None,
+    };
+
+    let stats = ProjectStatistics::new(vec![]).with_trend(trend_without_git);
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let trend = parsed.get("trend").expect("trend should be present");
+
+    // Fields should be omitted entirely, not present as null
+    assert!(
+        trend.get("previous_commit").is_none(),
+        "previous_commit should be omitted when git_ref is None"
+    );
+    assert!(
+        trend.get("previous_branch").is_none(),
+        "previous_branch should be omitted when git_branch is None"
+    );
+}
+
+#[test]
+fn json_formatter_trend_partial_git_context() {
+    // Test with only commit (detached HEAD scenario - no branch)
+    let trend_commit_only = TrendDelta {
+        files_delta: 2,
+        lines_delta: 20,
+        code_delta: 10,
+        comment_delta: 5,
+        blank_delta: 5,
+        previous_timestamp: Some(1_700_000_000),
+        previous_git_ref: Some("deadbeef".to_string()),
+        previous_git_branch: None,
+    };
+
+    let stats = ProjectStatistics::new(vec![]).with_trend(trend_commit_only);
+    let output = StatsJsonFormatter.format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let trend = parsed.get("trend").expect("trend should be present");
+
+    assert_eq!(
+        trend.get("previous_commit").unwrap().as_str().unwrap(),
+        "deadbeef"
+    );
+    assert!(
+        trend.get("previous_branch").is_none(),
+        "previous_branch should be omitted for detached HEAD"
+    );
 }

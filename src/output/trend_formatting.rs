@@ -4,6 +4,7 @@
 
 use super::ColorMode;
 use super::ansi;
+use crate::stats::TrendDelta;
 
 // Time thresholds in seconds for relative time formatting
 const MINUTE: u64 = 60;
@@ -153,6 +154,45 @@ impl TrendLineFormatter {
             format!("  {name}: {arrow} {delta_str}{pct_str}")
         }
     }
+}
+
+/// Format the trend section header with git context and/or relative time.
+///
+/// Examples:
+/// - With git: "Changes since commit a1b2c3d (2 hours ago):"
+/// - With git + branch: "Changes since commit a1b2c3d on main (2 hours ago):"
+/// - Without git: "Changes since previous run (2 hours ago):"
+/// - No timestamp: "Changes from previous run:"
+#[must_use]
+pub fn format_trend_header(trend: &TrendDelta) -> String {
+    let relative_time = trend
+        .previous_timestamp
+        .and_then(format_relative_time)
+        .map(|rel| format!(" ({rel})"))
+        .unwrap_or_default();
+
+    match (&trend.previous_git_ref, &trend.previous_git_branch) {
+        (Some(commit), Some(branch)) => {
+            format!("Changes since commit {commit} on {branch}{relative_time}:")
+        }
+        (Some(commit), None) => {
+            format!("Changes since commit {commit}{relative_time}:")
+        }
+        (None, _) if !relative_time.is_empty() => {
+            format!("Changes since previous run{relative_time}:")
+        }
+        (None, _) => "Changes from previous run:".to_string(),
+    }
+}
+
+/// Format the trend section header for markdown (no trailing colon).
+///
+/// Same as `format_trend_header` but without trailing colon for use in headings.
+#[must_use]
+pub fn format_trend_header_markdown(trend: &TrendDelta) -> String {
+    let header = format_trend_header(trend);
+    // Remove trailing colon if present
+    header.strip_suffix(':').unwrap_or(&header).to_string()
 }
 
 #[cfg(test)]
@@ -363,5 +403,86 @@ mod tests {
         let line = formatter.format_line("Code", -10, 90);
         assert!(line.contains('\x1b')); // ANSI escape
         assert!(line.contains("↓"));
+    }
+
+    #[test]
+    fn trend_header_with_git_and_branch() {
+        let trend = TrendDelta {
+            files_delta: 0,
+            lines_delta: 0,
+            code_delta: 0,
+            comment_delta: 0,
+            blank_delta: 0,
+            previous_timestamp: None,
+            previous_git_ref: Some("a1b2c3d".to_string()),
+            previous_git_branch: Some("main".to_string()),
+        };
+        let header = format_trend_header(&trend);
+        assert_eq!(header, "Changes since commit a1b2c3d on main:");
+    }
+
+    #[test]
+    fn trend_header_with_git_no_branch() {
+        let trend = TrendDelta {
+            files_delta: 0,
+            lines_delta: 0,
+            code_delta: 0,
+            comment_delta: 0,
+            blank_delta: 0,
+            previous_timestamp: None,
+            previous_git_ref: Some("a1b2c3d".to_string()),
+            previous_git_branch: None,
+        };
+        let header = format_trend_header(&trend);
+        assert_eq!(header, "Changes since commit a1b2c3d:");
+    }
+
+    #[test]
+    fn trend_header_no_git_no_timestamp() {
+        let trend = TrendDelta::default();
+        let header = format_trend_header(&trend);
+        assert_eq!(header, "Changes from previous run:");
+    }
+
+    #[test]
+    fn trend_header_no_git_with_timestamp() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let trend = TrendDelta {
+            previous_timestamp: Some(now - 2 * HOUR),
+            ..Default::default()
+        };
+        let header = format_trend_header(&trend);
+        assert_eq!(header, "Changes since previous run (2 hours ago):");
+    }
+
+    #[test]
+    fn trend_header_with_git_and_timestamp() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let trend = TrendDelta {
+            previous_timestamp: Some(now - 2 * HOUR),
+            previous_git_ref: Some("a1b2c3d".to_string()),
+            previous_git_branch: None,
+            ..Default::default()
+        };
+        let header = format_trend_header(&trend);
+        assert_eq!(header, "Changes since commit a1b2c3d (2 hours ago):");
+    }
+
+    #[test]
+    fn trend_header_markdown_removes_colon() {
+        let trend = TrendDelta {
+            previous_git_ref: Some("a1b2c3d".to_string()),
+            previous_git_branch: Some("main".to_string()),
+            ..Default::default()
+        };
+        let header = format_trend_header_markdown(&trend);
+        assert_eq!(header, "Changes since commit a1b2c3d on main");
+        assert!(!header.ends_with(':'));
     }
 }

@@ -41,5 +41,7 @@ pub(super) fn make_entry(timestamp: u64) -> TrendEntry {
         code: 50,
         comment: 30,
         blank: 20,
+        git_ref: None,
+        git_branch: None,
     }
 }

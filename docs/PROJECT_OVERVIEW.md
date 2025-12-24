@@ -21,7 +21,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `types.rs`: `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `gitignore.rs`: `GitAwareScanner` (gix with .gitignore); `composite.rs`: `CompositeScanner` (git/non-git fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
 | `checker/*` | `Checker` trait; `result.rs`: `CheckResult` enum; `threshold.rs`: `ThresholdChecker` with pre-indexed extension lookup; `explain.rs`: `ContentExplanation`, `StructureExplanation` for rule chain debugging; `structure/`: `StructureChecker` (split into `builder.rs`, `compiled_rules.rs`, `validation.rs`, `violation.rs`) |
-| `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode) |
+| `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode); `GitContext` - current commit hash and branch for trend entries |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation, file locking for concurrent access) |
 | `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter`; `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`; `ScanProgress` (progress bar); `ErrorOutput` (colored error/warning output); `trend_formatting.rs`: relative time, trend arrows/colors/percentages |
@@ -86,13 +86,16 @@ ProjectStatistics { files, total_*, by_language, by_directory, top_files, averag
 GroupBy::None | Lang | Dir
 
 // Trend (state::history_path() → .git/sloc-guard/history.json or .sloc-guard/history.json)
-TrendEntry { timestamp, total_files, total_lines, code, comment, blank }
-TrendDelta { *_delta, previous_timestamp }
+TrendEntry { timestamp, total_files, total_lines, code, comment, blank, git_ref?, git_branch? }
+TrendDelta { *_delta, previous_timestamp, previous_git_ref?, previous_git_branch? }
+// Git context: TrendEntry stores optional git_ref (short commit hash) and git_branch at snapshot time
 // Retention: TrendHistory::apply_retention() removes old entries, should_add() respects min_interval_secs
 // Significance: TrendDelta::is_significant(config) → true if |code_delta| > min_code_delta OR files_delta != 0
 // Flexible comparison: --since <duration> (7d, 1w, 12h) → find_entry_at_or_before(), compute_delta_since()
 
 // Git/Baseline/Cache
+GitContext { commit, branch? }  // Git repository state at a point in time
+GitContext::from_path(path) → Option<GitContext>  // Get current git context for a path
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff ref (compares to HEAD)
 GitDiff::get_changed_files_range(base, target) → HashSet<PathBuf>  // --diff base..target
 GitDiff::get_staged_files() → HashSet<PathBuf>  // --staged mode

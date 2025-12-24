@@ -10,7 +10,9 @@ use crate::error::Result;
 use crate::stats::TrendDelta;
 
 use super::ColorMode;
-use super::trend_formatting::{TrendLineFormatter, format_delta, format_relative_time};
+use super::trend_formatting::{
+    TrendLineFormatter, format_delta, format_trend_header, format_trend_header_markdown,
+};
 
 #[derive(Debug, Clone)]
 pub struct FileStatistics {
@@ -154,7 +156,7 @@ impl ProjectStatistics {
 
     /// Set trend delta from previous run.
     #[must_use]
-    pub const fn with_trend(mut self, trend: TrendDelta) -> Self {
+    pub fn with_trend(mut self, trend: TrendDelta) -> Self {
         self.trend = Some(trend);
         self
     }
@@ -268,14 +270,8 @@ impl StatsFormatter for StatsTextFormatter {
         if let Some(ref trend) = stats.trend {
             writeln!(output).ok();
 
-            // Format header with relative time if available
-            let header = if let Some(ts) = trend.previous_timestamp
-                && let Some(relative) = format_relative_time(ts)
-            {
-                format!("Changes since previous run ({relative}):")
-            } else {
-                "Changes from previous run:".to_string()
-            };
+            // Format header with git context and/or relative time
+            let header = format_trend_header(trend);
             writeln!(output, "{header}").ok();
 
             // Format each metric with arrows, colors, and percentages
@@ -354,13 +350,16 @@ struct JsonStatsSummary {
 }
 
 #[derive(Serialize)]
-
 struct JsonTrendDelta {
     files: i64,
     lines: i64,
     code: i64,
     comment: i64,
     blank: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    previous_commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    previous_branch: Option<String>,
 }
 
 impl From<&TrendDelta> for JsonTrendDelta {
@@ -371,6 +370,8 @@ impl From<&TrendDelta> for JsonTrendDelta {
             code: trend.code_delta,
             comment: trend.comment_delta,
             blank: trend.blank_delta,
+            previous_commit: trend.previous_git_ref.clone(),
+            previous_branch: trend.previous_git_branch.clone(),
         }
     }
 }
@@ -454,7 +455,8 @@ impl StatsFormatter for StatsMarkdownFormatter {
 
         // Trend section if available
         if let Some(ref trend) = stats.trend {
-            writeln!(output, "### Changes from Previous Run\n").ok();
+            let header = format_trend_header_markdown(trend);
+            writeln!(output, "### {header}\n").ok();
             writeln!(output, "| Metric | Delta |").ok();
             writeln!(output, "|--------|------:|").ok();
             writeln!(output, "| Files | {} |", format_delta(trend.files_delta)).ok();

@@ -5,6 +5,7 @@ use rayon::prelude::*;
 
 use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{Cli, GroupBy, StatsArgs};
+use crate::git::GitContext;
 use crate::language::LanguageRegistry;
 use crate::output::{
     ColorMode, FileStatistics, OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter,
@@ -144,6 +145,9 @@ pub(crate) fn run_stats_with_context(
         let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
 
+        // Capture git context for trend entry (commit hash and branch name)
+        let git_context = GitContext::from_path(project_root);
+
         // Get current time for delta computation
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -169,7 +173,8 @@ pub(crate) fn run_stats_with_context(
         );
 
         // Add entry only if retention policy allows (respects min_interval_secs)
-        history.add_if_allowed(&project_stats, &config.trend);
+        // Git context is captured to record commit hash and branch for later delta display
+        history.add_if_allowed_with_context(&project_stats, &config.trend, git_context.as_ref());
 
         // Ensure parent directory exists before saving
         if let Some(parent) = history_path.parent() {

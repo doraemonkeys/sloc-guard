@@ -221,6 +221,8 @@ fn sample_trend_delta() -> TrendDelta {
         comment_delta: 30,
         blank_delta: 20,
         previous_timestamp: Some(12345),
+        previous_git_ref: None,
+        previous_git_branch: None,
     }
 }
 

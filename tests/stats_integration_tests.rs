@@ -322,13 +322,13 @@ fn stats_trend_shows_delta_on_second_run() {
     // Add more code
     fixture.create_rust_file("src/lib.rs", 30);
 
-    // Second run should show delta with relative time (Changes since previous run)
+    // Second run should show delta (may include git context or fallback to "previous run")
     sloc_guard!()
         .current_dir(fixture.path())
         .args(["stats", "--no-cache", "--trend"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Changes since previous run"));
+        .stdout(predicate::str::contains("Changes since"));
 }
 
 // =============================================================================

@@ -119,6 +119,8 @@ fn text_formatter_with_trend_shows_arrows() {
         comment_delta: 1,
         blank_delta: 1,
         previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
     let output = formatter().format(&stats).unwrap();
@@ -139,6 +141,8 @@ fn text_formatter_with_negative_trend_shows_down_arrow() {
         comment_delta: -1,
         blank_delta: -1,
         previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
     let output = formatter().format(&stats).unwrap();
@@ -158,6 +162,8 @@ fn text_formatter_with_zero_trend_shows_tilde() {
         comment_delta: 0,
         blank_delta: 0,
         previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
     let output = formatter().format(&stats).unwrap();
@@ -189,6 +195,8 @@ fn text_formatter_trend_shows_percentage() {
         comment_delta: 30,
         blank_delta: 10,
         previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
     let output = formatter().format(&stats).unwrap();
@@ -214,6 +222,8 @@ fn text_formatter_trend_with_relative_time() {
         comment_delta: 1,
         blank_delta: 1,
         previous_timestamp: Some(two_hours_ago),
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
     let output = formatter().format(&stats).unwrap();
@@ -232,6 +242,8 @@ fn text_formatter_trend_with_colors() {
         comment_delta: 5,
         blank_delta: 5,
         previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
 
@@ -262,6 +274,8 @@ fn text_formatter_trend_percentage_from_zero_base() {
         comment_delta: 0,
         blank_delta: 0,
         previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let stats = ProjectStatistics::new(files).with_trend(trend);
     let output = formatter().format(&stats).unwrap();

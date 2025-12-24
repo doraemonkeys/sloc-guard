@@ -106,6 +106,8 @@ fn test_compute_delta_since_finds_entry() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     });
 
     let current = sample_project_stats(15, 600);
@@ -148,6 +150,8 @@ fn test_compute_delta_since_picks_nearest_entry() {
         code: 250,
         comment: 150,
         blank: 100,
+        git_ref: None,
+        git_branch: None,
     });
     history.add_entry(TrendEntry {
         timestamp: current_time - 10 * SECONDS_PER_DAY,
@@ -156,6 +160,8 @@ fn test_compute_delta_since_picks_nearest_entry() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     });
     history.add_entry(TrendEntry {
         timestamp: current_time - 5 * SECONDS_PER_DAY,
@@ -164,6 +170,8 @@ fn test_compute_delta_since_picks_nearest_entry() {
         code: 600,
         comment: 360,
         blank: 240,
+        git_ref: None,
+        git_branch: None,
     });
 
     // 15 files with 750 / 15 = 50 code lines each = 750 total code
@@ -192,6 +200,8 @@ fn test_compute_delta_since_exact_boundary() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     });
 
     let current = sample_project_stats(15, 600);

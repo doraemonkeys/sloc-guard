@@ -170,6 +170,8 @@ fn test_only_comment_blank_changes_not_significant() {
         comment_delta: 50,
         blank_delta: 50,
         previous_timestamp: Some(1000),
+        previous_git_ref: None,
+        previous_git_branch: None,
     };
     let config = TrendConfig::default();
 

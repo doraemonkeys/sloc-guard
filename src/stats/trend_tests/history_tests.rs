@@ -35,6 +35,8 @@ fn test_add_entry() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     };
 
     history.add_entry(entry);
@@ -63,6 +65,8 @@ fn test_compute_delta_with_entry() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     };
     history.add_entry(entry);
 
@@ -86,6 +90,8 @@ fn test_entries() {
         code: 50,
         comment: 30,
         blank: 20,
+        git_ref: None,
+        git_branch: None,
     });
     history.add_entry(TrendEntry {
         timestamp: 2000,
@@ -94,6 +100,8 @@ fn test_entries() {
         code: 75,
         comment: 45,
         blank: 30,
+        git_ref: None,
+        git_branch: None,
     });
 
     let entries = history.entries();
@@ -116,6 +124,8 @@ fn test_save_and_load() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     });
     history.save(&history_path).unwrap();
 
@@ -177,6 +187,8 @@ fn test_equality() {
         code: 50,
         comment: 30,
         blank: 20,
+        git_ref: None,
+        git_branch: None,
     });
 
     assert_ne!(history1, history2);
@@ -188,6 +200,8 @@ fn test_equality() {
         code: 50,
         comment: 30,
         blank: 20,
+        git_ref: None,
+        git_branch: None,
     });
 
     assert_eq!(history1, history2);
@@ -207,6 +221,8 @@ fn test_load_or_default_valid_file() {
         code: 1000,
         comment: 600,
         blank: 400,
+        git_ref: None,
+        git_branch: None,
     });
     history.save(&history_path).unwrap();
 
@@ -214,4 +230,140 @@ fn test_load_or_default_valid_file() {
     let loaded = TrendHistory::load_or_default(&history_path);
     assert_eq!(loaded.len(), 1);
     assert_eq!(loaded.latest().unwrap().timestamp, 5000);
+}
+
+// ============================================================================
+// Git Context Tests
+// ============================================================================
+
+#[test]
+fn test_add_with_context() {
+    use crate::git::GitContext;
+
+    let mut history = TrendHistory::new();
+    let stats = sample_project_stats(5, 100);
+    let git_context = GitContext {
+        commit: "a1b2c3d".to_string(),
+        branch: Some("main".to_string()),
+    };
+
+    history.add_with_context(&stats, Some(&git_context));
+
+    assert_eq!(history.len(), 1);
+    let entry = history.latest().unwrap();
+    assert_eq!(entry.git_ref, Some("a1b2c3d".to_string()));
+    assert_eq!(entry.git_branch, Some("main".to_string()));
+}
+
+#[test]
+fn test_add_with_context_none() {
+    let mut history = TrendHistory::new();
+    let stats = sample_project_stats(5, 100);
+
+    history.add_with_context(&stats, None);
+
+    assert_eq!(history.len(), 1);
+    let entry = history.latest().unwrap();
+    assert!(entry.git_ref.is_none());
+    assert!(entry.git_branch.is_none());
+}
+
+#[test]
+fn test_add_with_context_detached_head() {
+    use crate::git::GitContext;
+
+    let mut history = TrendHistory::new();
+    let stats = sample_project_stats(5, 100);
+    let git_context = GitContext {
+        commit: "deadbeef".to_string(),
+        branch: None, // Detached HEAD
+    };
+
+    history.add_with_context(&stats, Some(&git_context));
+
+    let entry = history.latest().unwrap();
+    assert_eq!(entry.git_ref, Some("deadbeef".to_string()));
+    assert!(entry.git_branch.is_none());
+}
+
+#[test]
+fn test_add_if_allowed_with_context() {
+    use crate::git::GitContext;
+
+    let mut history = TrendHistory::new();
+    let stats = sample_project_stats(5, 100);
+    let config = TrendConfig::default();
+    let git_context = GitContext {
+        commit: "abc1234".to_string(),
+        branch: Some("feature/test".to_string()),
+    };
+
+    let added = history.add_if_allowed_with_context(&stats, &config, Some(&git_context));
+
+    assert!(added);
+    assert_eq!(history.len(), 1);
+    let entry = history.latest().unwrap();
+    assert_eq!(entry.git_ref, Some("abc1234".to_string()));
+    assert_eq!(entry.git_branch, Some("feature/test".to_string()));
+}
+
+#[test]
+fn test_add_if_allowed_with_context_respects_interval() {
+    use crate::git::GitContext;
+
+    let mut history = TrendHistory::new();
+    let stats = sample_project_stats(5, 100);
+    let config = TrendConfig {
+        min_interval_secs: Some(3600), // 1 hour minimum
+        ..TrendConfig::default()
+    };
+    let git_context = GitContext {
+        commit: "first123".to_string(),
+        branch: Some("main".to_string()),
+    };
+
+    // First add should succeed
+    let added1 = history.add_if_allowed_with_context(&stats, &config, Some(&git_context));
+    assert!(added1);
+
+    // Immediate second add should be rejected (interval not elapsed)
+    let git_context2 = GitContext {
+        commit: "second45".to_string(),
+        branch: Some("main".to_string()),
+    };
+    let added2 = history.add_if_allowed_with_context(&stats, &config, Some(&git_context2));
+    assert!(!added2);
+
+    // Only one entry should exist
+    assert_eq!(history.len(), 1);
+    assert_eq!(
+        history.latest().unwrap().git_ref,
+        Some("first123".to_string())
+    );
+}
+
+#[test]
+fn test_git_context_preserved_in_save_load() {
+    let temp_dir = tempfile::tempdir().expect("Failed to create temp directory");
+    let history_path = temp_dir.path().join("history_git.json");
+
+    // Create history with git context
+    let mut history = TrendHistory::new();
+    history.add_entry(TrendEntry {
+        timestamp: 12345,
+        total_files: 10,
+        total_lines: 1000,
+        code: 500,
+        comment: 300,
+        blank: 200,
+        git_ref: Some("abc1234".to_string()),
+        git_branch: Some("develop".to_string()),
+    });
+    history.save(&history_path).unwrap();
+
+    // Load and verify git context is preserved
+    let loaded = TrendHistory::load(&history_path).unwrap();
+    let entry = loaded.latest().unwrap();
+    assert_eq!(entry.git_ref, Some("abc1234".to_string()));
+    assert_eq!(entry.git_branch, Some("develop".to_string()));
 }

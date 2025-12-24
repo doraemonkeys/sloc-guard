@@ -13,6 +13,8 @@ fn test_compute_increase() {
         code: 500,
         comment: 300,
         blank: 200,
+        git_ref: None,
+        git_branch: None,
     };
     let current = sample_project_stats(15, 600);
 
@@ -33,6 +35,8 @@ fn test_compute_decrease() {
         code: 1000,
         comment: 600,
         blank: 400,
+        git_ref: None,
+        git_branch: None,
     };
     let current = sample_project_stats(10, 500);
 
@@ -52,6 +56,8 @@ fn test_no_changes() {
         code: 100,
         comment: 50,
         blank: 50,
+        git_ref: None,
+        git_branch: None,
     };
 
     // Create stats with same totals
@@ -91,5 +97,27 @@ fn test_default() {
     assert_eq!(delta.comment_delta, 0);
     assert_eq!(delta.blank_delta, 0);
     assert!(delta.previous_timestamp.is_none());
+    assert!(delta.previous_git_ref.is_none());
+    assert!(delta.previous_git_branch.is_none());
     assert!(!delta.has_changes());
+}
+
+#[test]
+fn test_compute_copies_git_context() {
+    let prev = TrendEntry {
+        timestamp: 1000,
+        total_files: 10,
+        total_lines: 1000,
+        code: 500,
+        comment: 300,
+        blank: 200,
+        git_ref: Some("a1b2c3d".to_string()),
+        git_branch: Some("main".to_string()),
+    };
+    let current = sample_project_stats(15, 600);
+
+    let delta = TrendDelta::compute(&prev, &current);
+
+    assert_eq!(delta.previous_git_ref, Some("a1b2c3d".to_string()));
+    assert_eq!(delta.previous_git_branch, Some("main".to_string()));
 }

@@ -113,6 +113,8 @@ fn sample_trend_delta() -> TrendDelta {
         comment_delta: 30,
         blank_delta: 20,
         previous_timestamp: Some(12345),
+        previous_git_ref: None,
+        previous_git_branch: None,
     }
 }
 
@@ -121,7 +123,8 @@ fn markdown_formatter_with_trend() {
     let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
     let output = StatsMarkdownFormatter.format(&stats).unwrap();
 
-    assert!(output.contains("### Changes from Previous Run"));
+    // Header contains "Changes" and trend metrics
+    assert!(output.contains("### Changes"));
     assert!(output.contains("| Metric | Delta |"));
     assert!(output.contains("| Files | +5 |"));
     assert!(output.contains("| Code | +50 |"));
@@ -132,5 +135,5 @@ fn markdown_formatter_without_trend() {
     let stats = ProjectStatistics::new(vec![]);
     let output = StatsMarkdownFormatter.format(&stats).unwrap();
 
-    assert!(!output.contains("### Changes from Previous Run"));
+    assert!(!output.contains("### Changes"));
 }

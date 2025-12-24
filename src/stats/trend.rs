@@ -5,6 +5,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use crate::config::TrendConfig;
+use crate::git::GitContext;
 use crate::output::ProjectStatistics;
 use crate::state::{
     DEFAULT_LOCK_TIMEOUT_MS, try_lock_exclusive_with_timeout, try_lock_shared_with_timeout,
@@ -27,10 +28,21 @@ pub struct TrendEntry {
     pub code: usize,
     pub comment: usize,
     pub blank: usize,
+    /// Git commit hash (short form, e.g., "a1b2c3d") at the time of snapshot.
+    /// None if not in a git repository.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub git_ref: Option<String>,
+    /// Git branch name at the time of snapshot.
+    /// None if not in a git repository or in detached HEAD state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub git_branch: Option<String>,
 }
 
 impl TrendEntry {
     /// Creates a new trend entry from current project statistics.
+    ///
+    /// Git context (commit hash and branch) is not set by this constructor.
+    /// Use `with_git_context` to add git information after creation.
     ///
     /// # Panics
     /// Panics if the system clock is set to a time before the UNIX epoch.
@@ -48,12 +60,22 @@ impl TrendEntry {
             code: stats.total_code,
             comment: stats.total_comment,
             blank: stats.total_blank,
+            git_ref: None,
+            git_branch: None,
         }
     }
 
     #[must_use]
     pub const fn with_timestamp(mut self, timestamp: u64) -> Self {
         self.timestamp = timestamp;
+        self
+    }
+
+    /// Set git context (commit hash and branch name).
+    #[must_use]
+    pub fn with_git_context(mut self, git_ref: Option<String>, git_branch: Option<String>) -> Self {
+        self.git_ref = git_ref;
+        self.git_branch = git_branch;
         self
     }
 }
@@ -68,6 +90,12 @@ pub struct TrendDelta {
     pub blank_delta: i64,
     /// Timestamp of the previous entry for context
     pub previous_timestamp: Option<u64>,
+    /// Git commit hash from the previous entry (for display context)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_git_ref: Option<String>,
+    /// Git branch from the previous entry
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_git_branch: Option<String>,
 }
 
 /// Default threshold for significant code changes.
@@ -78,7 +106,7 @@ impl TrendDelta {
     /// Compute delta from previous entry to current stats.
     #[must_use]
     #[allow(clippy::cast_possible_wrap)] // Delta values can be negative and fit in i64
-    pub const fn compute(previous: &TrendEntry, current: &ProjectStatistics) -> Self {
+    pub fn compute(previous: &TrendEntry, current: &ProjectStatistics) -> Self {
         Self {
             files_delta: current.total_files as i64 - previous.total_files as i64,
             lines_delta: current.total_lines as i64 - previous.total_lines as i64,
@@ -86,6 +114,8 @@ impl TrendDelta {
             comment_delta: current.total_comment as i64 - previous.comment as i64,
             blank_delta: current.total_blank as i64 - previous.blank as i64,
             previous_timestamp: Some(previous.timestamp),
+            previous_git_ref: previous.git_ref.clone(),
+            previous_git_branch: previous.git_branch.clone(),
         }
     }
 
@@ -232,8 +262,27 @@ impl TrendHistory {
     }
 
     /// Add a new entry from current statistics.
+    ///
+    /// **Note**: This method does not capture git context. Use `add_with_context`
+    /// if you need to record the current git commit and branch.
     pub fn add(&mut self, stats: &ProjectStatistics) {
         self.entries.push(TrendEntry::new(stats));
+    }
+
+    /// Add a new entry from current statistics with git context.
+    ///
+    /// The git context (commit hash and branch name) is recorded in the entry
+    /// for later reference when computing deltas.
+    pub fn add_with_context(
+        &mut self,
+        stats: &ProjectStatistics,
+        git_context: Option<&GitContext>,
+    ) {
+        let entry = TrendEntry::new(stats).with_git_context(
+            git_context.map(|ctx| ctx.commit.clone()),
+            git_context.and_then(|ctx| ctx.branch.clone()),
+        );
+        self.entries.push(entry);
     }
 
     /// Add a new entry.
@@ -363,11 +412,32 @@ impl TrendHistory {
 
     /// Add a new entry only if retention policy allows (respects `min_interval_secs`).
     ///
+    /// **Note**: This method does not capture git context. Use `add_if_allowed_with_context`
+    /// if you need to record the current git commit and branch.
+    ///
     /// Returns `true` if the entry was added, `false` if skipped due to interval.
     ///
     /// # Panics
     /// Panics if the system clock is set to a time before the UNIX epoch.
     pub fn add_if_allowed(&mut self, stats: &ProjectStatistics, config: &TrendConfig) -> bool {
+        self.add_if_allowed_with_context(stats, config, None)
+    }
+
+    /// Add a new entry with git context only if retention policy allows.
+    ///
+    /// The git context (commit hash and branch name) is recorded in the entry
+    /// for later reference when computing deltas.
+    ///
+    /// Returns `true` if the entry was added, `false` if skipped due to interval.
+    ///
+    /// # Panics
+    /// Panics if the system clock is set to a time before the UNIX epoch.
+    pub fn add_if_allowed_with_context(
+        &mut self,
+        stats: &ProjectStatistics,
+        config: &TrendConfig,
+        git_context: Option<&GitContext>,
+    ) -> bool {
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("system time before UNIX_EPOCH")
@@ -377,7 +447,11 @@ impl TrendHistory {
             return false;
         }
 
-        self.entries.push(TrendEntry::new(stats));
+        let entry = TrendEntry::new(stats).with_git_context(
+            git_context.map(|ctx| ctx.commit.clone()),
+            git_context.and_then(|ctx| ctx.branch.clone()),
+        );
+        self.entries.push(entry);
         true
     }
 
