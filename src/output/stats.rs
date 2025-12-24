@@ -9,6 +9,9 @@ use crate::counter::LineStats;
 use crate::error::Result;
 use crate::stats::TrendDelta;
 
+use super::ColorMode;
+use super::trend_formatting::{TrendLineFormatter, format_delta, format_relative_time};
+
 #[derive(Debug, Clone)]
 pub struct FileStatistics {
     pub path: PathBuf,
@@ -157,16 +160,6 @@ impl ProjectStatistics {
     }
 }
 
-/// Format a delta value with +/- sign.
-fn format_delta(value: i64) -> String {
-    use std::cmp::Ordering;
-    match value.cmp(&0) {
-        Ordering::Greater => format!("+{value}"),
-        Ordering::Less => format!("{value}"),
-        Ordering::Equal => "0".to_string(),
-    }
-}
-
 pub trait StatsFormatter {
     /// Format the project statistics into a string.
     ///
@@ -175,7 +168,24 @@ pub trait StatsFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String>;
 }
 
-pub struct StatsTextFormatter;
+pub struct StatsTextFormatter {
+    trend_formatter: TrendLineFormatter,
+}
+
+impl Default for StatsTextFormatter {
+    fn default() -> Self {
+        Self::new(ColorMode::Auto)
+    }
+}
+
+impl StatsTextFormatter {
+    #[must_use]
+    pub fn new(mode: ColorMode) -> Self {
+        Self {
+            trend_formatter: TrendLineFormatter::new(mode),
+        }
+    }
+}
 
 impl StatsFormatter for StatsTextFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
@@ -257,12 +267,59 @@ impl StatsFormatter for StatsTextFormatter {
         // Show trend delta if available
         if let Some(ref trend) = stats.trend {
             writeln!(output).ok();
-            writeln!(output, "Changes from previous run:").ok();
-            writeln!(output, "  Files: {}", format_delta(trend.files_delta)).ok();
-            writeln!(output, "  Total lines: {}", format_delta(trend.lines_delta)).ok();
-            writeln!(output, "  Code: {}", format_delta(trend.code_delta)).ok();
-            writeln!(output, "  Comments: {}", format_delta(trend.comment_delta)).ok();
-            writeln!(output, "  Blank: {}", format_delta(trend.blank_delta)).ok();
+
+            // Format header with relative time if available
+            let header = if let Some(ts) = trend.previous_timestamp
+                && let Some(relative) = format_relative_time(ts)
+            {
+                format!("Changes since previous run ({relative}):")
+            } else {
+                "Changes from previous run:".to_string()
+            };
+            writeln!(output, "{header}").ok();
+
+            // Format each metric with arrows, colors, and percentages
+            writeln!(
+                output,
+                "{}",
+                self.trend_formatter
+                    .format_line("Files", trend.files_delta, stats.total_files)
+            )
+            .ok();
+            writeln!(
+                output,
+                "{}",
+                self.trend_formatter.format_line(
+                    "Total lines",
+                    trend.lines_delta,
+                    stats.total_lines
+                )
+            )
+            .ok();
+            writeln!(
+                output,
+                "{}",
+                self.trend_formatter
+                    .format_line("Code", trend.code_delta, stats.total_code)
+            )
+            .ok();
+            writeln!(
+                output,
+                "{}",
+                self.trend_formatter.format_line(
+                    "Comments",
+                    trend.comment_delta,
+                    stats.total_comment
+                )
+            )
+            .ok();
+            writeln!(
+                output,
+                "{}",
+                self.trend_formatter
+                    .format_line("Blank", trend.blank_delta, stats.total_blank)
+            )
+            .ok();
         }
 
         Ok(String::from_utf8_lossy(&output).to_string())

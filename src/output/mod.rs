@@ -7,6 +7,7 @@ mod progress;
 mod sarif;
 mod stats;
 mod text;
+mod trend_formatting;
 
 pub use error_output::{print_error, print_error_full, print_warning, print_warning_full};
 pub use html::HtmlFormatter;

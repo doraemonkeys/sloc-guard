@@ -31,13 +31,8 @@ impl ErrorOutput {
         }
     }
 
-    #[allow(dead_code)] // Used by new() which is public API
     fn should_use_colors(mode: ColorMode) -> bool {
-        match mode {
-            ColorMode::Always => true,
-            ColorMode::Never => false,
-            ColorMode::Auto => Self::stderr_supports_color(),
-        }
+        mode.should_enable_for_stderr()
     }
 
     fn stderr_supports_color() -> bool {

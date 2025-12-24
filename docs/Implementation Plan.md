@@ -51,8 +51,8 @@ Location: `src/output/html.rs`
 ## Phase 16: Trend Enhancement (Pending)
 
 ### ~~Task 16.1: Retention Policy~~ ✅
-### Task 16.2: Output Time Semantics
-Location: `src/output/stats_text.rs`
+### ~~Task 16.2: Output Time Semantics~~ ✅
+Location: `src/output/stats.rs`, `src/output/trend_formatting.rs`
 ```
 - Display relative time ("2 hours ago") instead of raw timestamp
 - Show percentage change for each metric
@@ -105,7 +105,7 @@ Location: `src/cli.rs`, `src/commands/stats.rs`
 | ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
 | ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
 | ~~**8. Error UX**~~              | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, ~~15.3 Error Context Enrichment~~ ✅ |
-| **9. Trend Core**                | 16.1 Retention Policy, 16.2 Output Semantics, 16.3 Significance Threshold |
+| **9. Trend Core**                | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, 16.3 Significance Threshold |
 | **10. Trend Extended**           | 16.4 Flexible Comparison, 16.5 Git Context, 16.6 History Command |
 | **11. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
 

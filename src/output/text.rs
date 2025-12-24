@@ -19,6 +19,42 @@ pub enum ColorMode {
     Never,
 }
 
+impl ColorMode {
+    /// Determines if colors should be enabled for stdout.
+    ///
+    /// Respects `NO_COLOR` environment variable and checks if stdout is a TTY.
+    #[must_use]
+    pub fn should_enable_for_stdout(self) -> bool {
+        match self {
+            Self::Always => true,
+            Self::Never => false,
+            Self::Auto => {
+                if std::env::var("NO_COLOR").is_ok() {
+                    return false;
+                }
+                std::io::IsTerminal::is_terminal(&std::io::stdout())
+            }
+        }
+    }
+
+    /// Determines if colors should be enabled for stderr.
+    ///
+    /// Respects `NO_COLOR` environment variable and checks if stderr is a TTY.
+    #[must_use]
+    pub fn should_enable_for_stderr(self) -> bool {
+        match self {
+            Self::Always => true,
+            Self::Never => false,
+            Self::Auto => {
+                if std::env::var("NO_COLOR").is_ok() {
+                    return false;
+                }
+                std::io::IsTerminal::is_terminal(&std::io::stderr())
+            }
+        }
+    }
+}
+
 pub struct TextFormatter {
     use_colors: bool,
     verbose: u8,
@@ -48,18 +84,7 @@ impl TextFormatter {
     }
 
     fn should_use_colors(mode: ColorMode) -> bool {
-        match mode {
-            ColorMode::Always => true,
-            ColorMode::Never => false,
-            ColorMode::Auto => {
-                // Respect NO_COLOR environment variable
-                if std::env::var("NO_COLOR").is_ok() {
-                    return false;
-                }
-                // Check if stdout is a TTY
-                std::io::IsTerminal::is_terminal(&std::io::stdout())
-            }
-        }
+        mode.should_enable_for_stdout()
     }
 
     const fn status_icon(result: &CheckResult) -> &'static str {

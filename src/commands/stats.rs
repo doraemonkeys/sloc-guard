@@ -7,7 +7,7 @@ use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{Cli, GroupBy, StatsArgs};
 use crate::language::LanguageRegistry;
 use crate::output::{
-    FileStatistics, OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter,
+    ColorMode, FileStatistics, OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter,
     StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 use crate::scanner::scan_files;
@@ -165,7 +165,8 @@ pub(crate) fn run_stats_with_context(
     };
 
     // 6. Format output
-    let output = format_stats_output(args.format, &project_stats)?;
+    let color_mode = super::context::color_choice_to_mode(cli.color);
+    let output = format_stats_output(args.format, &project_stats, color_mode)?;
 
     // 7. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -190,9 +191,10 @@ fn collect_file_stats(
 pub(crate) fn format_stats_output(
     format: OutputFormat,
     stats: &ProjectStatistics,
+    color_mode: ColorMode,
 ) -> crate::Result<String> {
     match format {
-        OutputFormat::Text => StatsTextFormatter.format(stats),
+        OutputFormat::Text => StatsTextFormatter::new(color_mode).format(stats),
         OutputFormat::Json => StatsJsonFormatter.format(stats),
         OutputFormat::Sarif => Err(crate::SlocGuardError::Config(
             "SARIF output format is not supported for stats command".to_string(),
