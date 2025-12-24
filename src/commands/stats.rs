@@ -143,13 +143,18 @@ pub(crate) fn run_stats_with_context(
         let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
         let trend = history.compute_delta(&project_stats);
-        history.add(&project_stats);
+
+        // Add entry only if retention policy allows (respects min_interval_secs)
+        history.add_if_allowed(&project_stats, &config.trend);
+
         // Ensure parent directory exists before saving
         if let Some(parent) = history_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        // Save history (silently ignore errors)
-        let _ = history.save(history_path);
+
+        // Save with retention policy applied (cleanup old entries)
+        let _ = history.save_with_retention(history_path, &config.trend);
+
         if let Some(delta) = trend {
             project_stats.with_trend(delta)
         } else {

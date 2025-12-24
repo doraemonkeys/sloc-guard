@@ -50,14 +50,7 @@ Location: `src/output/html.rs`
 
 ## Phase 16: Trend Enhancement (Pending)
 
-### Task 16.1: Retention Policy
-Location: `src/stats/trend.rs`, `src/config/model.rs`
-```
-- Add TrendConfig struct: max_entries, max_age_days, min_interval_secs
-- Auto-cleanup old entries on save (prevent infinite history growth)
-- Configurable via [trend] section (top-level, like [baseline])
-```
-
+### ~~Task 16.1: Retention Policy~~ ✅
 ### Task 16.2: Output Time Semantics
 Location: `src/output/stats_text.rs`
 ```

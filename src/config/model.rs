@@ -44,6 +44,29 @@ pub struct BaselineConfig {
     pub ratchet: Option<RatchetMode>,
 }
 
+/// Trend tracking configuration for history retention policy.
+///
+/// Controls how many historical entries are kept and how often new entries
+/// are recorded. This prevents unbounded growth of the history file.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TrendConfig {
+    /// Maximum number of entries to keep. Oldest entries are removed when exceeded.
+    /// Default: None (unlimited).
+    #[serde(default)]
+    pub max_entries: Option<usize>,
+
+    /// Maximum age of entries in days. Entries older than this are removed.
+    /// Default: None (no age limit).
+    #[serde(default)]
+    pub max_age_days: Option<u64>,
+
+    /// Minimum seconds between consecutive entries. New entries within this
+    /// interval are skipped (deduplicated).
+    /// Default: None (no minimum interval).
+    #[serde(default)]
+    pub min_interval_secs: Option<u64>,
+}
+
 /// Scanner configuration for physical file discovery.
 /// Scanner finds ALL files - no extension filtering here.
 /// This ensures Structure Guard sees the complete directory structure.
@@ -185,6 +208,10 @@ pub struct Config {
     /// Baseline configuration (grandfathering/ratchet).
     #[serde(default)]
     pub baseline: BaselineConfig,
+
+    /// Trend tracking configuration (history retention policy).
+    #[serde(default)]
+    pub trend: TrendConfig,
 
     // ========== V1 Legacy Fields (for migration) ==========
     // These fields are deserialized but not serialized (skip_serializing).

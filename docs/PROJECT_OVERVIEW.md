@@ -16,7 +16,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | Purpose |
 |--------|---------|
 | `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats`, `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
-| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
+| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `types.rs`: `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `gitignore.rs`: `GitAwareScanner` (gix with .gitignore); `composite.rs`: `CompositeScanner` (git/non-git fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
@@ -29,7 +29,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `message()` includes error kind for `FileRead`/`Io` and glob details for `InvalidPattern` |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; check split into: `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_validation.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
-| `stats` | `TrendHistory` - historical stats with delta computation, file locking for concurrent access |
+| `stats` | `TrendHistory` - historical stats with delta computation, file locking, retention policy (max_entries, max_age_days, min_interval_secs) |
 | `main` | CLI parsing, command dispatch to `commands/*` |
 
 ## Key Types
@@ -39,9 +39,10 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // V2 schema separates scanner/content/structure concerns
 // Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
-Config { version, extends, extends_sha256, scanner, content, structure, baseline }
+Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
+TrendConfig { max_entries, max_age_days, min_interval_secs }  // Retention policy for history
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank, reason, expires }  // [[content.rules]]
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
@@ -86,6 +87,7 @@ GroupBy::None | Lang | Dir
 // Trend (state::history_path() → .git/sloc-guard/history.json or .sloc-guard/history.json)
 TrendEntry { timestamp, total_files, total_lines, code, comment, blank }
 TrendDelta { *_delta, previous_timestamp }
+// Retention: TrendHistory::apply_retention() removes old entries, should_add() respects min_interval_secs
 
 // Git/Baseline/Cache
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff ref (compares to HEAD)

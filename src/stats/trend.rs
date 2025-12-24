@@ -4,12 +4,16 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::config::TrendConfig;
 use crate::output::ProjectStatistics;
 use crate::state::{
     DEFAULT_LOCK_TIMEOUT_MS, try_lock_exclusive_with_timeout, try_lock_shared_with_timeout,
     unlock_file,
 };
 use crate::{Result, SlocGuardError};
+
+/// Seconds per day for age calculation.
+const SECONDS_PER_DAY: u64 = 86400;
 
 const HISTORY_VERSION: u32 = 1;
 
@@ -237,6 +241,92 @@ impl TrendHistory {
     #[must_use]
     pub const fn version(&self) -> u32 {
         self.version
+    }
+
+    // ========================================================================
+    // Retention Policy Methods
+    // ========================================================================
+
+    /// Check if a new entry should be added based on `min_interval_secs`.
+    ///
+    /// Returns `true` if:
+    /// - History is empty, or
+    /// - No `min_interval_secs` configured, or
+    /// - Enough time has elapsed since the last entry
+    #[must_use]
+    pub fn should_add(&self, config: &TrendConfig, current_time: u64) -> bool {
+        let Some(min_interval) = config.min_interval_secs else {
+            return true;
+        };
+
+        let Some(latest) = self.latest() else {
+            return true;
+        };
+
+        current_time.saturating_sub(latest.timestamp) >= min_interval
+    }
+
+    /// Apply retention policy: remove old entries based on config.
+    ///
+    /// Applies in order:
+    /// 1. Remove entries older than `max_age_days`
+    /// 2. Remove oldest entries exceeding `max_entries`
+    ///
+    /// Returns the number of entries removed.
+    pub fn apply_retention(&mut self, config: &TrendConfig, current_time: u64) -> usize {
+        let original_count = self.entries.len();
+
+        // 1. Remove entries older than max_age_days
+        if let Some(max_age_days) = config.max_age_days {
+            let cutoff = current_time.saturating_sub(max_age_days * SECONDS_PER_DAY);
+            self.entries.retain(|e| e.timestamp >= cutoff);
+        }
+
+        // 2. Trim to max_entries (keep newest, remove oldest)
+        if let Some(max_entries) = config.max_entries
+            && self.entries.len() > max_entries
+        {
+            // Entries are chronological (oldest first), so drain from the front
+            let excess = self.entries.len() - max_entries;
+            self.entries.drain(0..excess);
+        }
+
+        original_count - self.entries.len()
+    }
+
+    /// Add a new entry only if retention policy allows (respects `min_interval_secs`).
+    ///
+    /// Returns `true` if the entry was added, `false` if skipped due to interval.
+    pub fn add_if_allowed(&mut self, stats: &ProjectStatistics, config: &TrendConfig) -> bool {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        if !self.should_add(config, current_time) {
+            return false;
+        }
+
+        self.entries.push(TrendEntry::new(stats));
+        true
+    }
+
+    /// Save history with retention policy applied.
+    ///
+    /// Applies cleanup before writing to disk:
+    /// 1. Remove entries older than `max_age_days`
+    /// 2. Trim to `max_entries`
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be written.
+    pub fn save_with_retention(&mut self, path: &Path, config: &TrendConfig) -> Result<()> {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        self.apply_retention(config, current_time);
+        self.save(path)
     }
 }
 
