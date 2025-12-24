@@ -87,8 +87,33 @@ Location: `src/cli.rs`, `src/commands/stats.rs`
 | ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
 | ~~**8. Error UX**~~              | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, ~~15.3 Error Context Enrichment~~ ✅ |
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
-| **10. Trend Extended**           | ~~16.4 Flexible Comparison~~ ✅, 16.5 Git Context, 16.6 History Command |
-| **11. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
+| **10. Content Warn Granularity** | 17.1 Content warn_at Field                                   |
+| **11. Trend Extended**           | ~~16.4 Flexible Comparison~~ ✅, 16.5 Git Context, 16.6 History Command |
+| **12. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
 
 ---
+
+## Phase 17: Content Configuration Enhancement (Pending)
+
+### Task 17.1: Content `warn_at` Absolute Threshold
+Location: `src/config/model.rs`, `src/checker/threshold.rs`, `src/checker/explain.rs`
+
+Add absolute line count warning threshold (`warn_at`) to Content configuration, matching Structure's granular warning design.
+
+**Config Changes:**
+- `ContentConfig.warn_at: Option<usize>` - global absolute threshold
+- `ContentRule.warn_at: Option<usize>` - rule-level absolute threshold
+
+**Priority Logic:**
+1. `rule.warn_at` → use absolute value
+2. `rule.warn_threshold` → calculate `rule.max_lines * threshold`
+3. `global.warn_at` → use absolute value
+4. `global.warn_threshold` → calculate `effective_max_lines * threshold`
+5. None set → no warning
+
+**Affected Modules:**
+- Config parsing/validation
+- `ThresholdChecker::check()` warn calculation
+- `ContentExplanation` output
+- Tests for warn_at precedence
 
