@@ -1,6 +1,7 @@
 mod ansi;
 mod error_output;
 mod html;
+mod html_template;
 mod json;
 mod markdown;
 mod progress;

@@ -13,6 +13,7 @@ mod format;
 mod histogram;
 mod language_chart;
 mod style;
+mod trend_chart;
 
 pub use builder::SvgBuilder;
 pub use chart::{BarChart, HorizontalBarChart, LineChart};
@@ -21,6 +22,7 @@ pub use element::{Axis, AxisOrientation, Bar, Line, SvgElement};
 pub use histogram::FileSizeHistogram;
 pub use language_chart::LanguageBreakdownChart;
 pub use style::{ChartColor, TextAnchor};
+pub use trend_chart::TrendLineChart;
 
 #[cfg(test)]
 #[path = "mod_tests.rs"]

@@ -59,13 +59,15 @@ Location: `src/output/svg/language_chart.rs`, `src/output/html.rs`
 - CSS variable --color-chart-primary for theming
 ```
 
-### Task 7.4: Trend Line Chart
+### ~~Task 7.4: Trend Line Chart~~ ✅
+Location: `src/output/svg/trend_chart.rs`, `src/output/html.rs`
 ```
-- Line chart: X=timestamp, Y=code lines (auto-scaled)
-- Data source: TrendHistory passed to HtmlFormatter
-- Downsample to max 30 points if history longer
-- Git context: show git_ref/git_branch as data point labels
-- Fallback: show "No trend data" if history unavailable
+- TrendLineChart: line chart X=timestamp (MM/DD format), Y=code lines (auto-scaled)
+- Data source: TrendHistory via HtmlFormatter.with_trend_history()
+- Downsample to max 30 points (evenly sampled, preserves first/last)
+- Git context: git_ref/branch in X-axis labels and tooltips
+- Empty state: "No trend data" message when history empty
+- CSS variable --color-chart-primary for theming
 ```
 
 ### Task 7.5: Chart Interactivity & Polish
@@ -99,7 +101,7 @@ Location: `src/output/svg/language_chart.rs`, `src/output/html.rs`
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram ✅ → 7.3 Language Chart ✅ → 7.4 Trend Line → 7.5 Polish |
+| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram ✅ → 7.3 Language Chart ✅ → 7.4 Trend Line ✅ → 7.5 Polish |
 
 ---
 
