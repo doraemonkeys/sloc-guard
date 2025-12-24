@@ -253,8 +253,22 @@ pub struct CheckArgs {
     pub files: Vec<PathBuf>,
 }
 
+/// Output format for stats history command
+#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+pub enum HistoryOutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output
+    Json,
+}
+
 #[derive(Parser, Debug)]
 pub struct StatsArgs {
+    /// Subcommand for stats (omit for default stats behavior)
+    #[command(subcommand)]
+    pub action: Option<StatsAction>,
+
     /// Paths to analyze
     #[arg(default_value = ".")]
     pub paths: Vec<PathBuf>,
@@ -312,6 +326,27 @@ pub struct StatsArgs {
     /// Implies --trend. Supported units: s, m, h, d, w.
     #[arg(long, value_name = "DURATION")]
     pub since: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum StatsAction {
+    /// List recent history entries
+    History(HistoryArgs),
+}
+
+#[derive(Parser, Debug)]
+pub struct HistoryArgs {
+    /// Maximum number of entries to display (default: 10)
+    #[arg(short, long, default_value = "10")]
+    pub limit: usize,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: HistoryOutputFormat,
+
+    /// Path to history file (default: .sloc-guard-history.json in project state dir)
+    #[arg(long, value_name = "PATH")]
+    pub history_file: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]

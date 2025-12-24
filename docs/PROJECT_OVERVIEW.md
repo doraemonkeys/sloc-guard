@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (with `--trend`, `--since`), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (with `--trend`, `--since`, `history` subcommand), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
 | `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -92,6 +92,7 @@ TrendDelta { *_delta, previous_timestamp, previous_git_ref?, previous_git_branch
 // Retention: TrendHistory::apply_retention() removes old entries, should_add() respects min_interval_secs
 // Significance: TrendDelta::is_significant(config) → true if |code_delta| > min_code_delta OR files_delta != 0
 // Flexible comparison: --since <duration> (7d, 1w, 12h) → find_entry_at_or_before(), compute_delta_since()
+// History command: `stats history` subcommand lists recent entries (--limit N, --format text|json)
 
 // Git/Baseline/Cache
 GitContext { commit, branch? }  // Git repository state at a point in time
@@ -176,6 +177,7 @@ CLI args → load_config() → [if --offline] use cache only, error on miss
 ### stats-specific
 
 ```
+→ [if stats history] run_history(): load TrendHistory, format entries (text/json), output
 → StatsContext::from_config() creates injectable context
 → collect FileStatistics → ProjectStatistics
 → [if --group-by] language/directory breakdown | [if --top N] top files

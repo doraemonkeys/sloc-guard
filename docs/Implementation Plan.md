@@ -58,13 +58,7 @@ Location: `src/output/html.rs`
 
 ### ~~Task 16.5: Git Context~~ ✅
 
-### Task 16.6: History Command
-Location: `src/cli.rs`, `src/commands/stats.rs`
-```
-- Add `stats history` subcommand
-- List recent entries (--limit N, default 10)
-- Support --format json for machine parsing
-```
+### ~~Task 16.6: History Command~~ ✅
 
 ---
 
@@ -82,7 +76,7 @@ Location: `src/cli.rs`, `src/commands/stats.rs`
 | ~~**8. Error UX**~~              | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, ~~15.3 Error Context Enrichment~~ ✅ |
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
-| **11. Trend Extended**           | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, 16.6 History Command |
+| ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
 | **12. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
 
 ---
