@@ -5,6 +5,7 @@ use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::error::Result;
 
 use super::OutputFormatter;
+use super::ansi;
 
 /// Color output mode for terminal display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -16,15 +17,6 @@ pub enum ColorMode {
     Always,
     /// Never use colors
     Never,
-}
-
-/// ANSI color codes
-mod ansi {
-    pub const RED: &str = "\x1b[31m";
-    pub const GREEN: &str = "\x1b[32m";
-    pub const YELLOW: &str = "\x1b[33m";
-    pub const CYAN: &str = "\x1b[36m";
-    pub const RESET: &str = "\x1b[0m";
 }
 
 pub struct TextFormatter {

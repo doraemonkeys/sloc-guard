@@ -197,8 +197,10 @@ pub fn fetch_remote_config_with_client(
 
     // Emit warning on first remote fetch per session
     if !WARNING_SHOWN.swap(true, Ordering::SeqCst) {
-        eprintln!(
-            "Warning: Fetching remote config from {url}. Consider using --offline or extends_sha256 for reproducible builds."
+        crate::output::print_warning_full(
+            &format!("Fetching remote config from {url}"),
+            None,
+            Some("Consider using --offline or extends_sha256 for reproducible builds"),
         );
     }
 

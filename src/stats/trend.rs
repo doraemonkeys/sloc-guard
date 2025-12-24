@@ -134,9 +134,10 @@ impl TrendHistory {
 
         // Acquire shared lock for reading (allows multiple readers)
         if let Err(e) = try_lock_shared_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            eprintln!(
-                "Warning: Failed to acquire read lock on history file '{}': {e}",
-                path.display()
+            crate::output::print_warning_full(
+                "Failed to acquire read lock on history file",
+                Some(&format!("{}: {e}", path.display())),
+                None,
             );
             // Continue without lock - better than failing
         }
@@ -175,9 +176,10 @@ impl TrendHistory {
 
         // Acquire exclusive lock for writing
         if let Err(e) = try_lock_exclusive_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            eprintln!(
-                "Warning: Failed to acquire write lock on history file '{}': {e}. Skipping history save.",
-                path.display()
+            crate::output::print_warning_full(
+                "Failed to acquire write lock on history file",
+                Some(&format!("{}: {e}", path.display())),
+                Some("History save skipped"),
             );
             // Drop file without writing to avoid corruption
             return Ok(());

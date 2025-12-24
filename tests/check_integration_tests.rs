@@ -623,7 +623,7 @@ fn check_invalid_config_returns_error() {
         .args(["check", "--no-cache"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("Error"));
+        .stderr(predicate::str::contains("TOML"));
 }
 
 #[test]

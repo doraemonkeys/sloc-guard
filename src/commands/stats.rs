@@ -25,7 +25,12 @@ pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
     match run_stats_impl(args, cli) {
         Ok(exit_code) => exit_code,
         Err(e) => {
-            eprintln!("Error: {e}");
+            crate::output::print_error_full(
+                e.error_type(),
+                &e.message(),
+                e.detail().as_deref(),
+                None,
+            );
             EXIT_CONFIG_ERROR
         }
     }

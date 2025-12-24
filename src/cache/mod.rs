@@ -131,9 +131,10 @@ impl Cache {
 
         // Acquire shared lock for reading (allows multiple readers)
         if let Err(e) = try_lock_shared_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            eprintln!(
-                "Warning: Failed to acquire read lock on cache file '{}': {e}",
-                path.display()
+            crate::output::print_warning_full(
+                "Failed to acquire read lock on cache file",
+                Some(&format!("{}: {e}", path.display())),
+                None,
             );
             // Continue without lock - better than failing
         }
@@ -162,9 +163,10 @@ impl Cache {
 
         // Acquire exclusive lock for writing
         if let Err(e) = try_lock_exclusive_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            eprintln!(
-                "Warning: Failed to acquire write lock on cache file '{}': {e}. Skipping cache save.",
-                path.display()
+            crate::output::print_warning_full(
+                "Failed to acquire write lock on cache file",
+                Some(&format!("{}: {e}", path.display())),
+                Some("Cache save skipped"),
             );
             // Drop file without writing to avoid corruption
             return Ok(());

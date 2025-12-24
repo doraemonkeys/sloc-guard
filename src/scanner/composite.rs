@@ -45,8 +45,10 @@ impl FileScanner for CompositeScanner {
                 }
                 Err(SlocGuardError::Git(msg)) => {
                     // Warn user about git error and fallback
-                    eprintln!(
-                        "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                    crate::output::print_warning_full(
+                        "Git error occurred, falling back to filesystem scanner",
+                        Some(&msg),
+                        None,
                     );
                     let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
                     let scanner = DirectoryScanner::with_gitignore(filter, true);
@@ -77,8 +79,10 @@ impl FileScanner for CompositeScanner {
                     }
                     Err(SlocGuardError::Git(msg)) => {
                         // Warn user about git error and fallback
-                        eprintln!(
-                            "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                        crate::output::print_warning_full(
+                            "Git error occurred, falling back to filesystem scanner",
+                            Some(&msg),
+                            None,
                         );
                         return self.scan_all_without_git(paths);
                     }
@@ -110,8 +114,10 @@ impl FileScanner for CompositeScanner {
                 }
                 Err(SlocGuardError::Git(msg)) => {
                     // Warn user about git error and fallback
-                    eprintln!(
-                        "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                    crate::output::print_warning_full(
+                        "Git error occurred, falling back to filesystem scanner",
+                        Some(&msg),
+                        None,
                     );
                     let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
                     let scanner = DirectoryScanner::with_gitignore(filter, true);
@@ -152,8 +158,10 @@ impl FileScanner for CompositeScanner {
                     }
                     Err(SlocGuardError::Git(msg)) => {
                         // Warn user about git error and fallback
-                        eprintln!(
-                            "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                        crate::output::print_warning_full(
+                            "Git error occurred, falling back to filesystem scanner",
+                            Some(&msg),
+                            None,
                         );
                         return self.scan_all_with_structure_without_git(paths, structure_config);
                     }
@@ -231,8 +239,10 @@ pub fn scan_files(
                 }
                 Err(SlocGuardError::Git(msg)) => {
                     // Warn user about git error and fallback
-                    eprintln!(
-                        "Warning: Git error occurred, falling back to filesystem scanner: {msg}"
+                    crate::output::print_warning_full(
+                        "Git error occurred, falling back to filesystem scanner",
+                        Some(&msg),
+                        None,
                     );
                     return scan_files(paths, exclude_patterns, false);
                 }

@@ -101,7 +101,7 @@ patterns = ["[invalid"]
         .args(["config", "validate"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("pattern"));
+        .stderr(predicate::str::contains("InvalidPattern"));
 }
 
 #[test]

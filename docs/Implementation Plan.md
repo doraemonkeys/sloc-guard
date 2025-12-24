@@ -49,14 +49,15 @@ Location: `src/output/html.rs`
 
 
 
-## Phase 15: Error Message Enhancement (Pending)
+## Phase 15: Error Message Enhancement (Partial)
 
-### Task 15.1: Colored Error Output
-Location: `src/error.rs`, `src/commands/check/runner.rs`
+### ~~Task 15.1: Colored Error Output~~ ✅
+Location: `src/output/error_output.rs`, `src/error.rs`
 ```
-- Add colored crate for visual distinction (red=error, yellow=warning)
-- Create unified print_error() helper with consistent formatting
-- Format: ✖ Error Type / × Detail / help: Suggestion
+- Unified print_error()/print_warning() helpers with ANSI color support
+- Format: ✖ Error Type: message / × detail / help: suggestion
+- ErrorOutput struct with ColorMode (Auto/Always/Never) + stderr TTY detection
+- SlocGuardError methods: error_type(), message(), detail()
 ```
 
 ### Task 15.2: Structured Error Suggestions
@@ -91,7 +92,7 @@ Location: `src/error.rs`
 | ~~**5. Governance Refinement**~~ | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
 | ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
 | ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
-| **8. Error UX**                  | 15.1 Colored Error Output, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment |
+| **8. Error UX**                  | ~~15.1 Colored Error Output~~ ✅, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment |
 | **9. Visualization**             | 7.1-7.2 HTML Charts/Trends                                   |
 
 ---

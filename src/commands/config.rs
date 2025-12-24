@@ -20,7 +20,12 @@ fn run_config_validate(config_path: &Path) -> i32 {
             EXIT_SUCCESS
         }
         Err(e) => {
-            eprintln!("Configuration error: {e}");
+            crate::output::print_error_full(
+                e.error_type(),
+                &e.message(),
+                e.detail().as_deref(),
+                None,
+            );
             EXIT_CONFIG_ERROR
         }
     }
@@ -92,7 +97,12 @@ fn run_config_show(config_path: Option<&Path>, format: ConfigOutputFormat, cli: 
             EXIT_SUCCESS
         }
         Err(e) => {
-            eprintln!("Error: {e}");
+            crate::output::print_error_full(
+                e.error_type(),
+                &e.message(),
+                e.detail().as_deref(),
+                None,
+            );
             EXIT_CONFIG_ERROR
         }
     }

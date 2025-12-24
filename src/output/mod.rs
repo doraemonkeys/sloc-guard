@@ -1,3 +1,5 @@
+mod ansi;
+mod error_output;
 mod html;
 mod json;
 mod markdown;
@@ -6,6 +8,7 @@ mod sarif;
 mod stats;
 mod text;
 
+pub use error_output::{print_error, print_error_full, print_warning, print_warning_full};
 pub use html::HtmlFormatter;
 pub use json::JsonFormatter;
 pub use markdown::MarkdownFormatter;

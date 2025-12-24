@@ -9,7 +9,12 @@ pub fn run_init(args: &crate::cli::InitArgs) -> i32 {
     match run_init_impl(args) {
         Ok(()) => EXIT_SUCCESS,
         Err(e) => {
-            eprintln!("Error: {e}");
+            crate::output::print_error_full(
+                e.error_type(),
+                &e.message(),
+                e.detail().as_deref(),
+                None,
+            );
             EXIT_CONFIG_ERROR
         }
     }

@@ -45,7 +45,12 @@ pub fn run_check(args: &CheckArgs, cli: &Cli) -> i32 {
     match run_check_impl(args, cli) {
         Ok(exit_code) => exit_code,
         Err(e) => {
-            eprintln!("Error: {e}");
+            crate::output::print_error_full(
+                e.error_type(),
+                &e.message(),
+                e.detail().as_deref(),
+                None,
+            );
             EXIT_CONFIG_ERROR
         }
     }
@@ -76,9 +81,13 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
             .reason
             .as_ref()
             .map_or(String::new(), |r| format!(" (reason: {r})"));
-        eprintln!(
-            "Warning: {}.rules[{}] (pattern: '{}') expired on {}{}",
-            expired.rule_type, expired.index, expired.pattern, expired.expires, reason_suffix
+        crate::output::print_warning_full(
+            &format!(
+                "{}.rules[{}] (pattern: '{}') expired on {}{}",
+                expired.rule_type, expired.index, expired.pattern, expired.expires, reason_suffix
+            ),
+            None,
+            Some("Update the expiration date or remove the rule"),
         );
     }
 
@@ -324,8 +333,10 @@ fn handle_baseline_ratchet(
     let Some(current_baseline) = baseline else {
         // If ratchet is enabled but no baseline exists, emit warning
         if !quiet {
-            eprintln!(
-                "Warning: --ratchet specified but no baseline found. Use --baseline to specify a baseline file."
+            crate::output::print_warning_full(
+                "--ratchet specified but no baseline found",
+                None,
+                Some("Use --baseline to specify a baseline file"),
             );
         }
         return Ok(false);
@@ -346,15 +357,19 @@ fn handle_baseline_ratchet(
     match mode {
         RatchetMode::Warn => {
             if !quiet {
-                eprintln!(
-                    "Warning: Baseline can be tightened - {} violation(s) resolved:",
-                    ratchet_result.stale_entries
-                );
-                for path in &ratchet_result.stale_paths {
-                    eprintln!("  - {path}");
-                }
-                eprintln!(
-                    "Hint: Run with --ratchet=auto to auto-update, or --update-baseline to replace."
+                let paths_str = ratchet_result
+                    .stale_paths
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                crate::output::print_warning_full(
+                    &format!(
+                        "Baseline can be tightened - {} violation(s) resolved",
+                        ratchet_result.stale_entries
+                    ),
+                    Some(&paths_str),
+                    Some("Run with --ratchet=auto to auto-update, or --update-baseline to replace"),
                 );
             }
             Ok(false)
@@ -374,14 +389,21 @@ fn handle_baseline_ratchet(
             Ok(false)
         }
         RatchetMode::Strict => {
-            eprintln!(
-                "Error: Baseline is outdated - {} violation(s) resolved but not removed:",
-                ratchet_result.stale_entries
+            let paths_str = ratchet_result
+                .stale_paths
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+                .join(", ");
+            crate::output::print_error_full(
+                "Baseline",
+                &format!(
+                    "outdated - {} violation(s) resolved but not removed",
+                    ratchet_result.stale_entries
+                ),
+                Some(&paths_str),
+                Some("Update the baseline with --update-baseline or use --ratchet=auto"),
             );
-            for path in &ratchet_result.stale_paths {
-                eprintln!("  - {path}");
-            }
-            eprintln!("Update the baseline with --update-baseline or use --ratchet=auto.");
             Ok(true) // Signal failure
         }
     }
