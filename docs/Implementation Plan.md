@@ -28,35 +28,57 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 
 ---
 
-## Phase 7: Statistics Extension (Pending)
+## Phase 7: HTML Report Visualization (Pending)
 
-### Task 7.1: HTML Charts (Pure CSS)
+### Task 7.1: SVG Chart Generation Core
+Location: `src/output/svg/`
+```
+- New svg module with chart primitives (axes, labels, bars, lines)
+- viewBox-based responsive scaling
+- CSS variable integration for dark mode support
+- Accessibility: <title> elements, ≥4.5:1 color contrast
+```
+
+### Task 7.2: File Size Distribution Histogram
 Location: `src/output/html.rs`
 ```
-- File size distribution bar chart (pure CSS)
-- Language/extension breakdown pie chart
-- No external dependencies
+- Histogram by line count ranges (0-50, 51-100, 101-200, 201-500, 500+)
+- Data source: ProjectStatistics (reuse --report-json flow)
+- Hover: show exact file count per range
+- Empty state: graceful handling (<3 files)
 ```
 
-### Task 7.2: HTML Trend Visualization
+### Task 7.3: Language Breakdown Chart
 Location: `src/output/html.rs`
 ```
-- Integrate with .sloc-guard-history.json (if exists)
-- Line chart showing SLOC over time
-- Delta indicators (+/-) from previous run
+- Horizontal bar chart sorted by SLOC
+- Data source: ProjectStatistics.by_language
+- Hover: show language name + exact line count
+- Empty state: show "No language data" message
+```
+
+### Task 7.4: Trend Line Chart
+Location: `src/output/html.rs`
+```
+- Line chart: X=timestamp, Y=code lines (auto-scaled)
+- Data source: TrendHistory passed to HtmlFormatter
+- Downsample to max 30 points if history longer
+- Git context: show git_ref/git_branch as data point labels
+- Fallback: show "No trend data" if history unavailable
+```
+
+### Task 7.5: Chart Interactivity & Polish
+Location: `src/output/html.rs`
+```
+- Delta indicators: ↓green (decrease=good), ↑red (increase)
+- Hover tooltips via CSS :hover + <title> fallback
+- @media print styles (no color-only encoding)
+- Smart X-axis labels (days/weeks based on range)
 ```
 
 ---
 
 ## Phase 16: Trend Enhancement (Pending)
-
-### ~~Task 16.1: Retention Policy~~ ✅
-### ~~Task 16.2: Output Time Semantics~~ ✅
-### ~~Task 16.3: Significance Threshold~~ ✅
-
-### ~~Task 16.4: Flexible Time Comparison~~ ✅
-
-### ~~Task 16.5: Git Context~~ ✅
 
 ### ~~Task 16.6: History Command~~ ✅
 
@@ -77,7 +99,7 @@ Location: `src/output/html.rs`
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| **12. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
+| **12. Visualization**            | 7.1 SVG Core → 7.2 Histogram → 7.3 Language Chart → 7.4 Trend Line → 7.5 Polish |
 
 ---
 
