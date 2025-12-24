@@ -8,21 +8,44 @@ use super::{format_output, structure_violation_to_check_result};
 #[test]
 fn format_output_text() {
     let results: Vec<CheckResult> = vec![];
-    let output = format_output(OutputFormat::Text, &results, ColorMode::Never, 0, false).unwrap();
+    let output = format_output(
+        OutputFormat::Text,
+        &results,
+        ColorMode::Never,
+        0,
+        false,
+        None,
+    )
+    .unwrap();
     assert!(output.contains("Summary"));
 }
 
 #[test]
 fn format_output_json() {
     let results: Vec<CheckResult> = vec![];
-    let output = format_output(OutputFormat::Json, &results, ColorMode::Never, 0, false).unwrap();
+    let output = format_output(
+        OutputFormat::Json,
+        &results,
+        ColorMode::Never,
+        0,
+        false,
+        None,
+    )
+    .unwrap();
     assert!(output.contains("summary"));
 }
 
 #[test]
 fn format_output_sarif_works() {
     let results: Vec<CheckResult> = vec![];
-    let result = format_output(OutputFormat::Sarif, &results, ColorMode::Never, 0, false);
+    let result = format_output(
+        OutputFormat::Sarif,
+        &results,
+        ColorMode::Never,
+        0,
+        false,
+        None,
+    );
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("$schema"));
@@ -32,7 +55,14 @@ fn format_output_sarif_works() {
 #[test]
 fn format_output_markdown_works() {
     let results: Vec<CheckResult> = vec![];
-    let result = format_output(OutputFormat::Markdown, &results, ColorMode::Never, 0, false);
+    let result = format_output(
+        OutputFormat::Markdown,
+        &results,
+        ColorMode::Never,
+        0,
+        false,
+        None,
+    );
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("## SLOC Guard Results"));

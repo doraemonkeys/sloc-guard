@@ -3,7 +3,8 @@ use std::fmt::Write;
 use crate::checker::CheckResult;
 use crate::error::Result;
 
-use super::OutputFormatter;
+use super::svg::{FileSizeHistogram, SvgElement};
+use super::{OutputFormatter, ProjectStatistics};
 
 const HTML_HEADER: &str = r#"<!DOCTYPE html>
 <html lang="en">
@@ -22,6 +23,7 @@ const HTML_HEADER: &str = r#"<!DOCTYPE html>
             --color-border: #e2e8f0;
             --color-text: #1e293b;
             --color-text-muted: #64748b;
+            --color-chart-primary: #6366f1;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -73,6 +75,10 @@ const HTML_HEADER: &str = r#"<!DOCTYPE html>
         .suggestions li { padding: 0.25rem 0; font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; }
         .footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--color-border); font-size: 0.75rem; color: var(--color-text-muted); text-align: center; }
         .no-results { padding: 2rem; text-align: center; color: var(--color-text-muted); }
+        .charts-section { margin: 2rem 0; }
+        .chart-container { background: var(--color-card); border-radius: 0.5rem; padding: 1.25rem; border: 1px solid var(--color-border); margin-bottom: 1rem; }
+        .chart-container h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--color-text); }
+        .chart-container svg { width: 100%; height: auto; max-width: 500px; }
     </style>
 </head>
 <body>
@@ -158,6 +164,7 @@ const HTML_FOOTER: &str = r#"        <div class="footer">
 /// HTML formatter for generating standalone HTML reports.
 pub struct HtmlFormatter {
     show_suggestions: bool,
+    project_stats: Option<ProjectStatistics>,
 }
 
 impl HtmlFormatter {
@@ -165,12 +172,20 @@ impl HtmlFormatter {
     pub const fn new() -> Self {
         Self {
             show_suggestions: false,
+            project_stats: None,
         }
     }
 
     #[must_use]
     pub const fn with_suggestions(mut self, show: bool) -> Self {
         self.show_suggestions = show;
+        self
+    }
+
+    /// Attach project statistics for chart generation.
+    #[must_use]
+    pub fn with_stats(mut self, stats: ProjectStatistics) -> Self {
+        self.project_stats = Some(stats);
         self
     }
 
@@ -207,6 +222,29 @@ impl HtmlFormatter {
 
     fn write_html_footer(output: &mut String) {
         output.push_str(HTML_FOOTER);
+    }
+
+    fn write_charts_section(output: &mut String, stats: &ProjectStatistics) {
+        let histogram = FileSizeHistogram::from_stats(stats);
+
+        // Only show charts section if there's sufficient data
+        if !histogram.has_sufficient_data() {
+            return;
+        }
+
+        output.push_str("        <div class=\"charts-section\">\n");
+        output.push_str("            <h2>Visualizations</h2>\n");
+
+        // File Size Distribution Histogram
+        output.push_str("            <div class=\"chart-container\">\n");
+        output.push_str("                <h3>File Size Distribution (by SLOC)</h3>\n");
+        let svg = histogram.render();
+        for line in svg.lines() {
+            let _ = writeln!(output, "                {line}");
+        }
+        output.push_str("            </div>\n");
+
+        output.push_str("        </div>\n");
     }
 
     fn write_summary(
@@ -467,6 +505,12 @@ impl OutputFormatter for HtmlFormatter {
             failed,
             grandfathered,
         );
+
+        // Render charts if project stats are available
+        if let Some(stats) = &self.project_stats {
+            Self::write_charts_section(&mut output, stats);
+        }
+
         self.write_file_table(&mut output, results);
         Self::write_html_footer(&mut output);
 

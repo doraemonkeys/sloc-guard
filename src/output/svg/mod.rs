@@ -10,12 +10,14 @@ mod chart;
 mod data;
 mod element;
 mod format;
+mod histogram;
 mod style;
 
 pub use builder::SvgBuilder;
 pub use chart::{BarChart, HorizontalBarChart, LineChart};
 pub use data::DataPoint;
 pub use element::{Axis, AxisOrientation, Bar, Line, SvgElement};
+pub use histogram::FileSizeHistogram;
 pub use style::{ChartColor, TextAnchor};
 
 #[cfg(test)]

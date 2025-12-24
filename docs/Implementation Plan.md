@@ -39,13 +39,14 @@ Location: `src/output/svg/`
 - Accessibility: <title> elements, role="img", aria-labelledby
 ```
 
-### Task 7.2: File Size Distribution Histogram
-Location: `src/output/html.rs`
+### ~~Task 7.2: File Size Distribution Histogram~~ ✅
+Location: `src/output/svg/histogram.rs`, `src/output/html.rs`
 ```
-- Histogram by line count ranges (0-50, 51-100, 101-200, 201-500, 500+)
-- Data source: ProjectStatistics (reuse --report-json flow)
-- Hover: show exact file count per range
-- Empty state: graceful handling (<3 files)
+- FileSizeHistogram: vertical bar chart by SLOC ranges (0-50, 51-100, 101-200, 201-500, 500+)
+- Data source: ProjectStatistics via HtmlFormatter.with_stats()
+- Hover: <title> tooltips with file count per bucket
+- Empty state: "Not enough files for histogram" (<3 files)
+- CSS variable --color-chart-primary for theming
 ```
 
 ### Task 7.3: Language Breakdown Chart
@@ -99,7 +100,7 @@ Location: `src/output/html.rs`
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram → 7.3 Language Chart → 7.4 Trend Line → 7.5 Polish |
+| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram ✅ → 7.3 Language Chart → 7.4 Trend Line → 7.5 Polish |
 
 ---
 

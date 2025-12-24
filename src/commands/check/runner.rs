@@ -9,7 +9,9 @@ use crate::cache::{Cache, compute_config_hash};
 use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
 use crate::config::collect_expired_rules;
-use crate::output::{ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter};
+use crate::output::{
+    OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter,
+};
 use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
@@ -273,16 +275,32 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         generate_split_suggestions(&mut results, &ctx.registry);
     }
 
-    // 7.2 Write stats JSON if --report-json is specified
-    if let Some(ref report_path) = args.report_json {
-        let stats = ProjectStatistics::new(file_stats).with_language_breakdown();
-        let stats_json = StatsJsonFormatter.format(&stats)?;
+    // 7.2 Build project statistics for report-json or HTML charts
+    let needs_stats = args.report_json.is_some() || args.format == OutputFormat::Html;
+    let project_stats = if needs_stats {
+        Some(ProjectStatistics::new(file_stats).with_language_breakdown())
+    } else {
+        None
+    };
+
+    // 7.3 Write stats JSON if --report-json is specified
+    if let Some(ref report_path) = args.report_json
+        && let Some(ref stats) = project_stats
+    {
+        let stats_json = StatsJsonFormatter.format(stats)?;
         write_output(Some(report_path), &stats_json, cli.quiet)?;
     }
 
     // 8. Format output
     let color_mode = color_choice_to_mode(cli.color);
-    let output = format_output(args.format, &results, color_mode, cli.verbose, args.suggest)?;
+    let output = format_output(
+        args.format,
+        &results,
+        color_mode,
+        cli.verbose,
+        args.suggest,
+        project_stats,
+    )?;
 
     // 9. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;

@@ -1,8 +1,8 @@
 use crate::checker::{CheckResult, StructureViolation, ViolationCategory, ViolationType};
 use crate::counter::LineStats;
 use crate::output::{
-    HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter, SarifFormatter,
-    TextFormatter,
+    HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
+    ProjectStatistics, SarifFormatter, TextFormatter,
 };
 
 pub fn format_output(
@@ -11,6 +11,7 @@ pub fn format_output(
     color_mode: crate::output::ColorMode,
     verbose: u8,
     show_suggestions: bool,
+    project_stats: Option<ProjectStatistics>,
 ) -> crate::Result<String> {
     match format {
         OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose)
@@ -25,9 +26,13 @@ pub fn format_output(
         OutputFormat::Markdown => MarkdownFormatter::new()
             .with_suggestions(show_suggestions)
             .format(results),
-        OutputFormat::Html => HtmlFormatter::new()
-            .with_suggestions(show_suggestions)
-            .format(results),
+        OutputFormat::Html => {
+            let mut formatter = HtmlFormatter::new().with_suggestions(show_suggestions);
+            if let Some(stats) = project_stats {
+                formatter = formatter.with_stats(stats);
+            }
+            formatter.format(results)
+        }
     }
 }
 
