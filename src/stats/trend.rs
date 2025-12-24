@@ -66,6 +66,10 @@ pub struct TrendDelta {
     pub previous_timestamp: Option<u64>,
 }
 
+/// Default threshold for significant code changes.
+/// Changes of 10 lines or fewer are considered trivial unless files were added/removed.
+pub const DEFAULT_MIN_CODE_DELTA: u64 = 10;
+
 impl TrendDelta {
     /// Compute delta from previous entry to current stats.
     #[must_use]
@@ -89,6 +93,26 @@ impl TrendDelta {
             || self.code_delta != 0
             || self.comment_delta != 0
             || self.blank_delta != 0
+    }
+
+    /// Check if the delta is significant enough to display.
+    ///
+    /// A delta is significant if:
+    /// - Any files were added or removed (`files_delta` != 0), OR
+    /// - The absolute code delta exceeds the configured threshold
+    ///
+    /// Use this to suppress noise from trivial changes (e.g., ±5 lines of code
+    /// with no file changes).
+    #[must_use]
+    pub fn is_significant(&self, config: &TrendConfig) -> bool {
+        // File changes are always significant
+        if self.files_delta != 0 {
+            return true;
+        }
+
+        // Check code delta against threshold
+        let threshold = config.min_code_delta.unwrap_or(DEFAULT_MIN_CODE_DELTA);
+        self.code_delta.unsigned_abs() > threshold
     }
 }
 

@@ -155,7 +155,10 @@ pub(crate) fn run_stats_with_context(
         // Save with retention policy applied (cleanup old entries)
         let _ = history.save_with_retention(history_path, &config.trend);
 
-        if let Some(delta) = trend {
+        // Only show trend if delta is significant (reduces noise from trivial changes)
+        if let Some(delta) = trend
+            && delta.is_significant(&config.trend)
+        {
             project_stats.with_trend(delta)
         } else {
             project_stats

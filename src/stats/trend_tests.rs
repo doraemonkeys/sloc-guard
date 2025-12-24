@@ -649,6 +649,7 @@ fn test_trend_config_serialization() {
         max_entries: Some(1000),
         max_age_days: Some(365),
         min_interval_secs: Some(60),
+        min_code_delta: Some(20),
     };
 
     let json = serde_json::to_string(&config).unwrap();
@@ -657,6 +658,7 @@ fn test_trend_config_serialization() {
     assert_eq!(parsed.max_entries, Some(1000));
     assert_eq!(parsed.max_age_days, Some(365));
     assert_eq!(parsed.min_interval_secs, Some(60));
+    assert_eq!(parsed.min_code_delta, Some(20));
 }
 
 #[test]
@@ -665,12 +667,14 @@ fn test_trend_config_toml_deserialization() {
 max_entries = 500
 max_age_days = 90
 min_interval_secs = 300
+min_code_delta = 25
 ";
     let config: TrendConfig = toml::from_str(toml_str).unwrap();
 
     assert_eq!(config.max_entries, Some(500));
     assert_eq!(config.max_age_days, Some(90));
     assert_eq!(config.min_interval_secs, Some(300));
+    assert_eq!(config.min_code_delta, Some(25));
 }
 
 #[test]
@@ -683,6 +687,7 @@ max_entries = 100
     assert_eq!(config.max_entries, Some(100));
     assert!(config.max_age_days.is_none());
     assert!(config.min_interval_secs.is_none());
+    assert!(config.min_code_delta.is_none());
 }
 
 #[test]
@@ -734,4 +739,183 @@ fn test_should_add_with_zero_interval() {
 
     // Zero interval means always allow
     assert!(history.should_add(&config, 1000));
+}
+
+// ============================================================================
+// Significance Threshold Tests
+// ============================================================================
+
+#[test]
+fn test_is_significant_file_change_always_significant() {
+    let delta = TrendDelta {
+        files_delta: 1, // File added
+        code_delta: 0,  // No code change
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_file_removed_always_significant() {
+    let delta = TrendDelta {
+        files_delta: -1, // File removed
+        code_delta: 5,   // Small code change
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_code_above_default_threshold() {
+    // Default threshold is 10, so 11 lines should be significant
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 11,
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_code_at_default_threshold_not_significant() {
+    // Exactly 10 lines is NOT significant (threshold is >10, not >=10)
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 10,
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(!delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_code_below_default_threshold_not_significant() {
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 5,
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(!delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_negative_code_delta_uses_absolute_value() {
+    // -15 lines should be significant (abs > 10)
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: -15,
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_negative_code_below_threshold() {
+    // -5 lines should NOT be significant (abs <= 10)
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: -5,
+        ..Default::default()
+    };
+    let config = TrendConfig::default();
+
+    assert!(!delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_custom_threshold() {
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 50,
+        ..Default::default()
+    };
+    let config = TrendConfig {
+        min_code_delta: Some(100), // Custom high threshold
+        ..Default::default()
+    };
+
+    // 50 lines is below the 100-line threshold
+    assert!(!delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_custom_threshold_exceeded() {
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 150,
+        ..Default::default()
+    };
+    let config = TrendConfig {
+        min_code_delta: Some(100),
+        ..Default::default()
+    };
+
+    assert!(delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_zero_threshold_always_significant() {
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 1,
+        ..Default::default()
+    };
+    let config = TrendConfig {
+        min_code_delta: Some(0), // Any change is significant
+        ..Default::default()
+    };
+
+    assert!(delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_zero_delta_with_zero_threshold() {
+    let delta = TrendDelta {
+        files_delta: 0,
+        code_delta: 0,
+        ..Default::default()
+    };
+    let config = TrendConfig {
+        min_code_delta: Some(0),
+        ..Default::default()
+    };
+
+    // 0 > 0 is false, so not significant
+    assert!(!delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_no_changes_not_significant() {
+    let delta = TrendDelta::default();
+    let config = TrendConfig::default();
+
+    assert!(!delta.is_significant(&config));
+}
+
+#[test]
+fn test_is_significant_only_comment_blank_changes_not_significant() {
+    // Only comment and blank changes, no code or file changes
+    let delta = TrendDelta {
+        files_delta: 0,
+        lines_delta: 100,
+        code_delta: 0,
+        comment_delta: 50,
+        blank_delta: 50,
+        previous_timestamp: Some(1000),
+    };
+    let config = TrendConfig::default();
+
+    // Comment/blank changes don't count toward significance threshold
+    assert!(!delta.is_significant(&config));
 }

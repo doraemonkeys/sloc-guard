@@ -563,11 +563,13 @@ fn trend_config_equality() {
         max_entries: Some(100),
         max_age_days: Some(30),
         min_interval_secs: Some(60),
+        min_code_delta: Some(10),
     };
     let config2 = TrendConfig {
         max_entries: Some(100),
         max_age_days: Some(30),
         min_interval_secs: Some(60),
+        min_code_delta: Some(10),
     };
     let config3 = TrendConfig {
         max_entries: Some(200),
@@ -596,6 +598,7 @@ fn trend_config_roundtrip_serialization() {
         max_entries: Some(1000),
         max_age_days: Some(365),
         min_interval_secs: Some(3600),
+        min_code_delta: Some(25),
     };
 
     let json = serde_json::to_string(&original).unwrap();

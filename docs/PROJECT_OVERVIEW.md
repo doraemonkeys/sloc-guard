@@ -42,7 +42,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
-TrendConfig { max_entries, max_age_days, min_interval_secs }  // Retention policy for history
+TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta }  // Retention and significance thresholds
 ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure
 ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank, reason, expires }  // [[content.rules]]
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
@@ -88,6 +88,7 @@ GroupBy::None | Lang | Dir
 TrendEntry { timestamp, total_files, total_lines, code, comment, blank }
 TrendDelta { *_delta, previous_timestamp }
 // Retention: TrendHistory::apply_retention() removes old entries, should_add() respects min_interval_secs
+// Significance: TrendDelta::is_significant(config) → true if |code_delta| > min_code_delta OR files_delta != 0
 
 // Git/Baseline/Cache
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff ref (compares to HEAD)

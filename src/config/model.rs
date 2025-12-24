@@ -65,6 +65,19 @@ pub struct TrendConfig {
     /// Default: None (no minimum interval).
     #[serde(default)]
     pub min_interval_secs: Option<u64>,
+
+    /// Minimum absolute code line delta to be considered significant.
+    /// Trend output is suppressed when changes are below this threshold
+    /// AND no files were added/removed. Reduces noise from trivial changes.
+    ///
+    /// Default: [`crate::stats::DEFAULT_MIN_CODE_DELTA`] (changes at or below this
+    /// threshold without file changes are hidden).
+    ///
+    /// **Note**: Setting this to `0` means changes must *exceed* 0 lines (i.e., any
+    /// non-zero change is significant). A delta of exactly `0` is never significant
+    /// when this is set to `0`, because `0 > 0` is false.
+    #[serde(default)]
+    pub min_code_delta: Option<u64>,
 }
 
 /// Scanner configuration for physical file discovery.
