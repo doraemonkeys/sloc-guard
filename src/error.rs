@@ -86,6 +86,52 @@ impl SlocGuardError {
             _ => None,
         }
     }
+
+    /// Returns an actionable suggestion for resolving the error.
+    #[must_use]
+    pub fn suggestion(&self) -> Option<&'static str> {
+        match self {
+            Self::Config(_) => {
+                Some("Check the config file format and value ranges in .sloc-guard.toml")
+            }
+            Self::FileRead { source, .. } => Self::io_suggestion(source.kind()),
+            Self::InvalidPattern { .. } => Some(
+                "Check glob pattern syntax: use '*' for wildcards, '**' for recursive matching",
+            ),
+            Self::Io(e) => Self::io_suggestion(e.kind()),
+            Self::TomlParse(_) => {
+                Some("Check TOML syntax: ensure proper quoting and bracket matching")
+            }
+            Self::JsonSerialize(_) => {
+                Some("Check for non-serializable data types or malformed structures")
+            }
+            Self::Git(_) => Some("Ensure git is installed and the repository is accessible"),
+            Self::GitRepoNotFound(_) => Some(
+                "Run 'git init' to create a repository, or run from within an existing git repository",
+            ),
+            Self::RemoteConfigHashMismatch { .. } => {
+                Some("Update extends_sha256 in config, or verify the remote config URL is correct")
+            }
+        }
+    }
+
+    /// Returns a suggestion based on IO error kind.
+    const fn io_suggestion(kind: std::io::ErrorKind) -> Option<&'static str> {
+        match kind {
+            std::io::ErrorKind::NotFound => Some("Verify the file path exists"),
+            std::io::ErrorKind::PermissionDenied => {
+                Some("Check file permissions or run with appropriate access rights")
+            }
+            std::io::ErrorKind::InvalidData => {
+                Some("The file may be corrupted or in an unexpected format")
+            }
+            std::io::ErrorKind::TimedOut => Some("Check network connectivity or increase timeout"),
+            std::io::ErrorKind::ConnectionRefused | std::io::ErrorKind::ConnectionReset => {
+                Some("Check network connectivity and ensure the remote server is available")
+            }
+            _ => None,
+        }
+    }
 }
 
 pub type Result<T> = std::result::Result<T, SlocGuardError>;

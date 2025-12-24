@@ -60,15 +60,18 @@ Location: `src/output/error_output.rs`, `src/error.rs`
 - SlocGuardError methods: error_type(), message(), detail()
 ```
 
-### Task 15.2: Structured Error Suggestions
+### ~~Task 15.2: Structured Error Suggestions~~ ✅
 Location: `src/error.rs`
 ```
-- Add suggestion() method to SlocGuardError
-- Provide actionable hints per error variant:
-  - GitRepoNotFound → "Run 'git init' or run inside a git repository"
-  - Config → Include expected format/range
-  - FileRead → Show underlying reason (not found / permission denied)
-  - InvalidPattern → Show globset parse error details
+- suggestion() method on SlocGuardError
+- Actionable hints per error variant:
+  - GitRepoNotFound → "Run 'git init' or run from within git repository"
+  - Config → "Check config file format and value ranges"
+  - FileRead/Io → Context-aware by ErrorKind (NotFound/PermissionDenied/Timeout/Connection*)
+  - InvalidPattern → "Check glob pattern syntax"
+  - TomlParse/JsonSerialize → Syntax/serialization hints
+  - RemoteConfigHashMismatch → "Update extends_sha256"
+- io_suggestion() helper: maps ErrorKind to specific suggestions
 ```
 
 ### Task 15.3: Error Context Enrichment
@@ -92,7 +95,7 @@ Location: `src/error.rs`
 | ~~**5. Governance Refinement**~~ | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
 | ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
 | ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
-| **8. Error UX**                  | ~~15.1 Colored Error Output~~ ✅, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment |
+| **8. Error UX**                  | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, 15.3 Error Context Enrichment |
 | **9. Visualization**             | 7.1-7.2 HTML Charts/Trends                                   |
 
 ---

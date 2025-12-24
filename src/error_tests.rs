@@ -95,3 +95,169 @@ fn error_detail_returns_source_info() {
     assert!(detail.contains("abc123"));
     assert!(detail.contains("def456"));
 }
+
+#[test]
+fn suggestion_config_error() {
+    let err = SlocGuardError::Config("invalid threshold".to_string());
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("config file format"));
+}
+
+#[test]
+fn suggestion_file_read_not_found() {
+    let err = SlocGuardError::FileRead {
+        path: PathBuf::from("missing.rs"),
+        source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("file path exists"));
+}
+
+#[test]
+fn suggestion_file_read_permission_denied() {
+    let err = SlocGuardError::FileRead {
+        path: PathBuf::from("protected.rs"),
+        source: std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied"),
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("permissions"));
+}
+
+#[test]
+fn suggestion_file_read_other_error_has_none() {
+    let err = SlocGuardError::FileRead {
+        path: PathBuf::from("unknown.rs"),
+        source: std::io::Error::other("unknown error"),
+    };
+    // Other IO errors may not have specific suggestions
+    assert!(err.suggestion().is_none());
+}
+
+#[test]
+fn suggestion_invalid_pattern() {
+    let glob_err = globset::Glob::new("[invalid").unwrap_err();
+    let err = SlocGuardError::InvalidPattern {
+        pattern: "[invalid".to_string(),
+        source: glob_err,
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("glob pattern syntax"));
+}
+
+#[test]
+fn suggestion_io_error_not_found() {
+    let err = SlocGuardError::Io(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "not found",
+    ));
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("file path exists"));
+}
+
+#[test]
+fn suggestion_io_error_permission_denied() {
+    let err = SlocGuardError::Io(std::io::Error::new(
+        std::io::ErrorKind::PermissionDenied,
+        "denied",
+    ));
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("permissions"));
+}
+
+#[test]
+fn suggestion_io_error_other_has_none() {
+    let err = SlocGuardError::Io(std::io::Error::other("custom error"));
+    assert!(err.suggestion().is_none());
+}
+
+#[test]
+fn suggestion_toml_parse() {
+    let toml_err: std::result::Result<toml::Value, _> = toml::from_str("invalid = [");
+    let err = SlocGuardError::TomlParse(toml_err.unwrap_err());
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("TOML syntax"));
+}
+
+#[test]
+fn suggestion_json_serialize() {
+    // Create a true serialization error using a map with non-string keys
+    use std::collections::HashMap;
+    let mut map: HashMap<Vec<u8>, i32> = HashMap::new();
+    map.insert(vec![1, 2, 3], 42);
+    let json_err = serde_json::to_string(&map).unwrap_err();
+    let err = SlocGuardError::JsonSerialize(json_err);
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("non-serializable"));
+}
+
+#[test]
+fn suggestion_git_error() {
+    let err = SlocGuardError::Git("failed to read index".to_string());
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("git is installed"));
+}
+
+#[test]
+fn suggestion_git_repo_not_found() {
+    let err = SlocGuardError::GitRepoNotFound("/some/path".to_string());
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("git init"));
+}
+
+#[test]
+fn suggestion_remote_config_hash_mismatch() {
+    let err = SlocGuardError::RemoteConfigHashMismatch {
+        url: "https://example.com/config.toml".to_string(),
+        expected: "abc123".to_string(),
+        actual: "def456".to_string(),
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("extends_sha256"));
+}
+
+#[test]
+fn suggestion_io_timeout() {
+    let err = SlocGuardError::Io(std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout"));
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("network connectivity"));
+}
+
+#[test]
+fn suggestion_io_connection_refused() {
+    let err = SlocGuardError::Io(std::io::Error::new(
+        std::io::ErrorKind::ConnectionRefused,
+        "refused",
+    ));
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("remote server"));
+}
+
+#[test]
+fn suggestion_io_connection_reset() {
+    let err = SlocGuardError::Io(std::io::Error::new(
+        std::io::ErrorKind::ConnectionReset,
+        "reset",
+    ));
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("remote server"));
+}
+
+#[test]
+fn suggestion_io_invalid_data() {
+    let err = SlocGuardError::Io(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "corrupted",
+    ));
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("corrupted"));
+}
+
+#[test]
+fn suggestion_file_read_invalid_data() {
+    let err = SlocGuardError::FileRead {
+        path: PathBuf::from("corrupted.rs"),
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, "corrupted"),
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("corrupted"));
+}
