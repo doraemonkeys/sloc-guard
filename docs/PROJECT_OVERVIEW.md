@@ -43,8 +43,8 @@ Config { version, extends, extends_sha256, scanner, content, structure, baseline
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
 TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta }  // Retention and significance thresholds
-ContentConfig { extensions, max_lines, warn_threshold, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure
-ContentRule { pattern, max_lines, warn_threshold, skip_comments, skip_blank, reason, expires }  // [[content.rules]]
+ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure, warn_at: absolute line threshold
+ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }  // [[content.rules]], warn_at takes precedence over warn_threshold
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
 StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, file_pattern, require_sibling, reason, expires }  // [[structure.rules]]
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
@@ -71,7 +71,8 @@ StructureViolation { path, violation_type, actual, limit, is_warning, override_r
 // Explain (rule chain debugging)
 MatchStatus::Matched | Superseded | NoMatch
 ContentRuleMatch::Excluded { pattern } | Rule { index, pattern, reason } | Default
-ContentExplanation { path, is_excluded, matched_rule, effective_limit, warn_threshold, skip_*, rule_chain }
+WarnAtSource::RuleAbsolute { index } | RulePercentage { index, threshold } | GlobalAbsolute | GlobalPercentage { threshold }
+ContentExplanation { path, is_excluded, matched_rule, effective_limit, effective_warn_at, warn_at_source, warn_threshold, skip_*, rule_chain }
 StructureRuleMatch::Rule { index, pattern, reason } | Default
 StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, rule_chain }
 

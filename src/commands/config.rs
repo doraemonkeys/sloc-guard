@@ -55,13 +55,35 @@ pub(crate) fn run_config_validate_impl(config_path: &Path) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if `warn_threshold` is out of range, glob patterns are invalid,
-/// override paths are empty, or rules are misconfigured.
+/// override paths are empty, `warn_at >= max_lines`, or rules are misconfigured.
 pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
     if !(0.0..=1.0).contains(&config.default.warn_threshold) {
         return Err(SlocGuardError::Config(format!(
             "warn_threshold must be between 0.0 and 1.0, got {}",
             config.default.warn_threshold
         )));
+    }
+
+    // Validate content.warn_at < content.max_lines
+    if let Some(warn_at) = config.content.warn_at
+        && warn_at >= config.content.max_lines
+    {
+        return Err(SlocGuardError::Config(format!(
+            "content.warn_at ({}) must be less than content.max_lines ({})",
+            warn_at, config.content.max_lines
+        )));
+    }
+
+    // Validate content.rules[i].warn_at < content.rules[i].max_lines
+    for (i, rule) in config.content.rules.iter().enumerate() {
+        if let Some(warn_at) = rule.warn_at
+            && warn_at >= rule.max_lines
+        {
+            return Err(SlocGuardError::Config(format!(
+                "content.rules[{}].warn_at ({}) must be less than content.rules[{}].max_lines ({})",
+                i, warn_at, i, rule.max_lines
+            )));
+        }
     }
 
     for pattern in &config.exclude.patterns {

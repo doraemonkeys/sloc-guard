@@ -2,6 +2,20 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
+/// Source of the effective `warn_at` value for debugging.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WarnAtSource {
+    /// Absolute value from a content rule's `warn_at` field.
+    RuleAbsolute { index: usize },
+    /// Percentage threshold from a content rule.
+    RulePercentage { index: usize, threshold: f64 },
+    /// Absolute value from global `content.warn_at`.
+    GlobalAbsolute,
+    /// Percentage threshold from global `content.warn_threshold`.
+    GlobalPercentage { threshold: f64 },
+}
+
 /// Match status for a rule candidate in the evaluation chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -54,7 +68,11 @@ pub struct ContentExplanation {
     pub matched_rule: ContentRuleMatch,
     /// Effective line limit applied (0 if excluded)
     pub effective_limit: usize,
-    /// Warning threshold (0.0-1.0)
+    /// Effective line count at which warnings are triggered
+    pub effective_warn_at: usize,
+    /// Source of the effective `warn_at` value (for debugging).
+    pub warn_at_source: WarnAtSource,
+    /// Warning threshold (0.0-1.0) - retained for reference/debugging
     pub warn_threshold: f64,
     /// Whether comments are skipped
     pub skip_comments: bool,

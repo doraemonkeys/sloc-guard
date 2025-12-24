@@ -43,6 +43,7 @@ fn check_uses_rule_specific_limit() {
         pattern: "**/*.rs".to_string(),
         max_lines: 300,
         warn_threshold: None,
+        warn_at: None,
         skip_comments: None,
         skip_blank: None,
         reason: None,

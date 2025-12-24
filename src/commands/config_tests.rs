@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::cli::{Cli, ColorChoice, Commands, ConfigOutputFormat, InitArgs};
-use crate::config::{Config, FileOverride, RuleConfig};
+use crate::config::{Config, ContentConfig, ContentRule, FileOverride, RuleConfig};
 use tempfile::TempDir;
 
 use super::*;
@@ -293,4 +293,104 @@ fn format_config_text_shows_strict() {
 
     let output = format_config_text(&config);
     assert!(output.contains("strict = true"));
+}
+
+#[test]
+fn validate_config_semantics_warn_at_greater_than_max_lines() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            warn_at: Some(600), // warn_at > max_lines is invalid
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("content.warn_at"));
+    assert!(err_msg.contains("must be less than"));
+}
+
+#[test]
+fn validate_config_semantics_warn_at_equal_to_max_lines() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            warn_at: Some(500), // warn_at == max_lines is invalid
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("content.warn_at"));
+    assert!(err_msg.contains("must be less than"));
+}
+
+#[test]
+fn validate_config_semantics_warn_at_less_than_max_lines_is_valid() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            warn_at: Some(400), // warn_at < max_lines is valid
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_rule_warn_at_greater_than_rule_max_lines() {
+    let config = Config {
+        content: ContentConfig {
+            rules: vec![ContentRule {
+                pattern: "**/*.rs".to_string(),
+                max_lines: 300,
+                warn_at: Some(400), // warn_at > max_lines is invalid
+                warn_threshold: None,
+                skip_comments: None,
+                skip_blank: None,
+                reason: None,
+                expires: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("content.rules[0].warn_at"));
+    assert!(err_msg.contains("must be less than"));
+}
+
+#[test]
+fn validate_config_semantics_rule_warn_at_less_than_rule_max_lines_is_valid() {
+    let config = Config {
+        content: ContentConfig {
+            rules: vec![ContentRule {
+                pattern: "**/*.rs".to_string(),
+                max_lines: 300,
+                warn_at: Some(250), // warn_at < max_lines is valid
+                warn_threshold: None,
+                skip_comments: None,
+                skip_blank: None,
+                reason: None,
+                expires: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
 }

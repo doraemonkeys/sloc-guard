@@ -120,6 +120,12 @@ pub struct ContentConfig {
     #[serde(default = "default_warn_threshold")]
     pub warn_threshold: f64,
 
+    /// Absolute line count at or above which warnings are triggered
+    /// (takes precedence over percentage thresholds).
+    /// Example: `max_lines=500`, `warn_at=450` → warns at 450+ lines.
+    #[serde(default)]
+    pub warn_at: Option<usize>,
+
     /// Skip comment lines in SLOC count.
     #[serde(default = "default_true")]
     pub skip_comments: bool,
@@ -148,6 +154,7 @@ impl Default for ContentConfig {
             extensions: default_extensions(),
             max_lines: default_max_lines(),
             warn_threshold: default_warn_threshold(),
+            warn_at: None,
             skip_comments: true,
             skip_blank: true,
             strict: false,
@@ -169,6 +176,12 @@ pub struct ContentRule {
     /// Override warning threshold for matched files.
     #[serde(default)]
     pub warn_threshold: Option<f64>,
+
+    /// Absolute line count at or above which warnings are triggered
+    /// (takes precedence over percentage thresholds).
+    /// Example: `max_lines=1000`, `warn_at=800` → warns at 800+ lines.
+    #[serde(default)]
+    pub warn_at: Option<usize>,
 
     /// Override `skip_comments` for matched files.
     #[serde(default)]
@@ -407,13 +420,15 @@ pub struct StructureConfig {
     #[serde(default)]
     pub warn_threshold: Option<f64>,
 
-    /// Absolute file count at which to warn (takes precedence over percentage thresholds).
-    /// Example: `max_files=50`, `warn_files_at=45` → warns at exactly 45 files.
+    /// Absolute file count at or above which warnings are triggered
+    /// (takes precedence over percentage thresholds).
+    /// Example: `max_files=50`, `warn_files_at=45` → warns at 45+ files.
     #[serde(default)]
     pub warn_files_at: Option<i64>,
 
-    /// Absolute directory count at which to warn (takes precedence over percentage thresholds).
-    /// Example: `max_dirs=10`, `warn_dirs_at=8` → warns at exactly 8 directories.
+    /// Absolute directory count at or above which warnings are triggered
+    /// (takes precedence over percentage thresholds).
+    /// Example: `max_dirs=10`, `warn_dirs_at=8` → warns at 8+ directories.
     #[serde(default)]
     pub warn_dirs_at: Option<i64>,
 
@@ -508,11 +523,13 @@ pub struct StructureRule {
     #[serde(default)]
     pub warn_threshold: Option<f64>,
 
-    /// Absolute file count at which to warn (takes precedence over percentage thresholds).
+    /// Absolute file count at or above which warnings are triggered
+    /// (takes precedence over percentage thresholds).
     #[serde(default)]
     pub warn_files_at: Option<i64>,
 
-    /// Absolute directory count at which to warn (takes precedence over percentage thresholds).
+    /// Absolute directory count at or above which warnings are triggered
+    /// (takes precedence over percentage thresholds).
     #[serde(default)]
     pub warn_dirs_at: Option<i64>,
 

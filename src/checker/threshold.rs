@@ -8,13 +8,16 @@ use crate::counter::LineStats;
 use crate::path_matching::path_matches_override;
 
 use super::Checker;
-use super::explain::{ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus};
+use super::explain::{
+    ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus, WarnAtSource,
+};
 use super::result::CheckResult;
 
 /// Compiled rule data (pattern metadata stored separately from matcher).
 struct CompiledPathRule {
     max_lines: usize,
     warn_threshold: Option<f64>,
+    warn_at: Option<usize>,
     skip_comments: Option<bool>,
     skip_blank: Option<bool>,
     reason: Option<String>,
@@ -129,6 +132,7 @@ impl ThresholdChecker {
                 rules.push(CompiledPathRule {
                     max_lines: rule.max_lines,
                     warn_threshold: rule.warn_threshold,
+                    warn_at: rule.warn_at,
                     skip_comments: rule.skip_comments,
                     skip_blank: rule.skip_blank,
                     reason: rule.reason.clone(),
@@ -174,6 +178,71 @@ impl ThresholdChecker {
         self.warning_threshold
     }
 
+    /// Calculate the effective warn limit (absolute line count) for a path.
+    ///
+    /// Priority:
+    /// 1. `rule.warn_at` → absolute value
+    /// 2. `rule.warn_threshold` → calculate `rule.max_lines * threshold`
+    /// 3. `global.warn_at` → absolute value
+    /// 4. `global.warn_threshold` → calculate `effective_max_lines * threshold`
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
+    fn get_warn_limit_for_path(&self, path: &Path, effective_limit: usize) -> usize {
+        self.get_warn_limit_with_source(path, effective_limit).0
+    }
+
+    /// Calculate the effective warn limit and its source for a path.
+    ///
+    /// Returns `(warn_limit, WarnAtSource)` for debugging/explain output.
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
+    fn get_warn_limit_with_source(
+        &self,
+        path: &Path,
+        effective_limit: usize,
+    ) -> (usize, WarnAtSource) {
+        // Check path_rules (last match wins) via GlobSet
+        let matches = self.path_rules_set.matches(path);
+        if let Some(&last_idx) = matches.last() {
+            let rule = &self.path_rules[last_idx];
+
+            // 1. rule.warn_at takes highest precedence
+            if let Some(warn_at) = rule.warn_at {
+                return (warn_at, WarnAtSource::RuleAbsolute { index: last_idx });
+            }
+
+            // 2. rule.warn_threshold (percentage of rule's max_lines)
+            if let Some(threshold) = rule.warn_threshold {
+                return (
+                    (rule.max_lines as f64 * threshold).ceil() as usize,
+                    WarnAtSource::RulePercentage {
+                        index: last_idx,
+                        threshold,
+                    },
+                );
+            }
+        }
+
+        // 3. global.warn_at (content.warn_at)
+        if let Some(warn_at) = self.config.content.warn_at {
+            return (warn_at, WarnAtSource::GlobalAbsolute);
+        }
+
+        // 4. global.warn_threshold (calculated from effective limit)
+        (
+            (effective_limit as f64 * self.warning_threshold).ceil() as usize,
+            WarnAtSource::GlobalPercentage {
+                threshold: self.warning_threshold,
+            },
+        )
+    }
+
     /// Returns (`skip_comments`, `skip_blank`) settings for a path.
     /// Priority: `path_rules` (last match) > global defaults
     #[must_use]
@@ -211,6 +280,10 @@ impl ThresholdChecker {
                 is_excluded: true,
                 matched_rule: ContentRuleMatch::Excluded { pattern },
                 effective_limit: 0,
+                effective_warn_at: 0,
+                warn_at_source: WarnAtSource::GlobalPercentage {
+                    threshold: self.warning_threshold,
+                },
                 warn_threshold: self.get_warn_threshold_for_path(path),
                 skip_comments,
                 skip_blank,
@@ -274,12 +347,17 @@ impl ThresholdChecker {
         });
 
         let (skip_comments, skip_blank) = self.get_skip_settings_for_path(path);
+        let effective_limit = self.get_limit_for_path(path).0;
+        let (effective_warn_at, warn_at_source) =
+            self.get_warn_limit_with_source(path, effective_limit);
 
         ContentExplanation {
             path: path.to_path_buf(),
             is_excluded: false,
             matched_rule,
-            effective_limit: self.get_limit_for_path(path).0,
+            effective_limit,
+            effective_warn_at,
+            warn_at_source,
             warn_threshold: self.get_warn_threshold_for_path(path),
             skip_comments,
             skip_blank,
@@ -303,13 +381,11 @@ impl ThresholdChecker {
 impl Checker for ThresholdChecker {
     fn check(&self, path: &Path, line_stats: &LineStats) -> CheckResult {
         let (limit, override_reason) = self.get_limit_for_path(path);
-        let warn_threshold = self.get_warn_threshold_for_path(path);
+        let warn_limit = self.get_warn_limit_for_path(path, limit);
         let sloc = line_stats.sloc();
         let path = path.to_path_buf();
         let stats = line_stats.clone();
 
-        #[allow(clippy::cast_precision_loss)]
-        // Precision loss is acceptable for threshold comparison
         if sloc > limit {
             CheckResult::Failed {
                 path,
@@ -319,7 +395,7 @@ impl Checker for ThresholdChecker {
                 suggestions: None,
                 violation_category: None, // Content violations don't need explicit category
             }
-        } else if sloc as f64 >= limit as f64 * warn_threshold {
+        } else if sloc >= warn_limit {
             CheckResult::Warning {
                 path,
                 stats,

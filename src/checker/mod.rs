@@ -5,7 +5,7 @@ mod threshold;
 
 pub use explain::{
     ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus, StructureExplanation,
-    StructureRuleCandidate, StructureRuleMatch,
+    StructureRuleCandidate, StructureRuleMatch, WarnAtSource,
 };
 pub use result::CheckResult;
 pub use structure::StructureChecker;

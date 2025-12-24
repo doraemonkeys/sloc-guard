@@ -1,6 +1,6 @@
 use crate::checker::{
     ContentExplanation, ContentRuleMatch, MatchStatus, StructureChecker, StructureExplanation,
-    StructureRuleMatch, ThresholdChecker,
+    StructureRuleMatch, ThresholdChecker, WarnAtSource,
 };
 use crate::cli::{Cli, ExplainArgs, ExplainFormat};
 use crate::error::SlocGuardError;
@@ -119,17 +119,23 @@ fn format_content_text(exp: &ContentExplanation) -> String {
     }
 
     output.push_str(&format!("  Limit:   {} lines\n", exp.effective_limit));
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )] // Precision loss is acceptable for display purposes
-    let warn_at = (exp.effective_limit as f64 * exp.warn_threshold) as usize;
-    output.push_str(&format!(
-        "  Warn at: {} lines ({:.0}%)\n",
-        warn_at,
-        exp.warn_threshold * 100.0
-    ));
+
+    // Show warn_at with context based on source
+    let warn_at_str = match &exp.warn_at_source {
+        WarnAtSource::RuleAbsolute { .. } | WarnAtSource::GlobalAbsolute => {
+            format!("{} lines (absolute)", exp.effective_warn_at)
+        }
+        WarnAtSource::RulePercentage { threshold, .. }
+        | WarnAtSource::GlobalPercentage { threshold } => {
+            format!(
+                "{} lines ({:.0}%)",
+                exp.effective_warn_at,
+                threshold * 100.0
+            )
+        }
+    };
+    output.push_str(&format!("  Warn at: {warn_at_str}\n"));
+
     output.push_str(&format!(
         "  Skip:    comments={}, blank={}\n",
         exp.skip_comments, exp.skip_blank

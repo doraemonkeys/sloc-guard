@@ -113,6 +113,7 @@ fn migrate_v1_to_v2(config: &mut Config) {
             pattern: format!("**/*.{ext}"),
             max_lines: rule.max_lines.unwrap_or(config.content.max_lines),
             warn_threshold: rule.warn_threshold,
+            warn_at: None,
             skip_comments: rule.skip_comments,
             skip_blank: rule.skip_blank,
             reason: None,
