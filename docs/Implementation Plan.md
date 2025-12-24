@@ -30,13 +30,13 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 
 ## Phase 7: HTML Report Visualization (Pending)
 
-### Task 7.1: SVG Chart Generation Core
+### ~~Task 7.1: SVG Chart Generation Core~~ ✅
 Location: `src/output/svg/`
 ```
-- New svg module with chart primitives (axes, labels, bars, lines)
-- viewBox-based responsive scaling
-- CSS variable integration for dark mode support
-- Accessibility: <title> elements, ≥4.5:1 color contrast
+- svg module with chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart)
+- viewBox-based responsive scaling via SvgBuilder
+- CSS variable integration (ChartColor::CssVar) for dark mode support
+- Accessibility: <title> elements, role="img", aria-labelledby
 ```
 
 ### Task 7.2: File Size Distribution Histogram
@@ -99,7 +99,7 @@ Location: `src/output/html.rs`
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| **12. Visualization**            | 7.1 SVG Core → 7.2 Histogram → 7.3 Language Chart → 7.4 Trend Line → 7.5 Polish |
+| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram → 7.3 Language Chart → 7.4 Trend Line → 7.5 Polish |
 
 ---
 

@@ -6,6 +6,7 @@ mod markdown;
 mod progress;
 mod sarif;
 mod stats;
+pub mod svg;
 mod text;
 mod trend_formatting;
 
