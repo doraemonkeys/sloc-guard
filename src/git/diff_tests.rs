@@ -406,3 +406,274 @@ fn changed_files_range_matches_trait_behavior() {
         "Trait method and range method should produce same results"
     );
 }
+
+// ============================================================================
+// Optimized Tree Comparison Tests
+// ============================================================================
+
+#[test]
+fn changed_files_detects_deleted_file() {
+    let dir = create_git_repo();
+
+    // Create files and commit
+    create_file(dir.path(), "keep.rs", "fn keep() {}");
+    create_file(dir.path(), "delete_me.rs", "fn delete() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Delete one file and commit
+    std::fs::remove_file(dir.path().join("delete_me.rs")).unwrap();
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Delete file");
+
+    // Restore the file locally (simulates uncommitted restoration)
+    create_file(dir.path(), "delete_me.rs", "fn restored() {}");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // The deleted file should be in changed set since it still exists locally
+    let deleted_path = dir.path().join("delete_me.rs").canonicalize().unwrap();
+    assert!(
+        changed
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(deleted_path.clone())),
+        "Deleted file that exists locally should be in changed set"
+    );
+}
+
+#[test]
+fn changed_files_skips_deleted_file_not_on_disk() {
+    let dir = create_git_repo();
+
+    // Create files and commit
+    create_file(dir.path(), "keep.rs", "fn keep() {}");
+    create_file(dir.path(), "delete_me.rs", "fn delete() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Delete one file and commit
+    std::fs::remove_file(dir.path().join("delete_me.rs")).unwrap();
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Delete file");
+
+    // Don't restore the file - it's gone from disk
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // The deleted file should NOT be in changed set since it doesn't exist locally
+    let has_deleted = changed
+        .iter()
+        .any(|p| p.file_name().is_some_and(|name| name == "delete_me.rs"));
+    assert!(
+        !has_deleted,
+        "Deleted file that doesn't exist locally should not be in changed set"
+    );
+}
+
+#[test]
+fn changed_files_detects_file_to_directory_change() {
+    let dir = create_git_repo();
+
+    // Create a file and commit
+    create_file(dir.path(), "module", "// single file module");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit with file");
+
+    // Replace file with directory containing files
+    std::fs::remove_file(dir.path().join("module")).unwrap();
+    std::fs::create_dir(dir.path().join("module")).unwrap();
+    create_file(dir.path(), "module/mod.rs", "mod sub;");
+    create_file(dir.path(), "module/sub.rs", "pub fn sub() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Convert file to directory");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // Should detect the new files in the directory
+    let has_mod = changed
+        .iter()
+        .any(|p| p.to_string_lossy().contains("module") && p.to_string_lossy().contains("mod.rs"));
+    let has_sub = changed
+        .iter()
+        .any(|p| p.to_string_lossy().contains("module") && p.to_string_lossy().contains("sub.rs"));
+
+    assert!(has_mod, "Expected module/mod.rs to be in changed files");
+    assert!(has_sub, "Expected module/sub.rs to be in changed files");
+}
+
+#[test]
+fn changed_files_detects_directory_to_file_change() {
+    let dir = create_git_repo();
+
+    // Create a directory with files and commit
+    std::fs::create_dir(dir.path().join("module")).unwrap();
+    create_file(dir.path(), "module/mod.rs", "mod sub;");
+    create_file(dir.path(), "module/sub.rs", "pub fn sub() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit with directory");
+
+    // Replace directory with file
+    std::fs::remove_dir_all(dir.path().join("module")).unwrap();
+    create_file(dir.path(), "module", "// single file module");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Convert directory to file");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // Should detect the new file
+    let has_module = changed
+        .iter()
+        .any(|p| p.file_name().is_some_and(|name| name == "module"));
+    assert!(has_module, "Expected module file to be in changed files");
+}
+
+#[test]
+fn changed_files_handles_nested_directory_addition() {
+    let dir = create_git_repo();
+
+    // Create initial file and commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Add nested directory structure
+    std::fs::create_dir_all(dir.path().join("src/deep/nested")).unwrap();
+    create_file(dir.path(), "src/lib.rs", "mod deep;");
+    create_file(dir.path(), "src/deep/mod.rs", "mod nested;");
+    create_file(dir.path(), "src/deep/nested/mod.rs", "pub fn deep() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Add nested directories");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // Should detect all new files
+    assert!(changed.len() >= 3, "Expected at least 3 new files");
+
+    let has_nested = changed
+        .iter()
+        .any(|p| p.to_string_lossy().contains("nested"));
+    assert!(has_nested, "Expected nested directory files to be detected");
+}
+
+#[test]
+fn changed_files_handles_nested_directory_deletion() {
+    let dir = create_git_repo();
+
+    // Create nested directory structure and commit
+    std::fs::create_dir_all(dir.path().join("src/deep/nested")).unwrap();
+    create_file(dir.path(), "src/lib.rs", "mod deep;");
+    create_file(dir.path(), "src/deep/mod.rs", "mod nested;");
+    create_file(dir.path(), "src/deep/nested/mod.rs", "pub fn deep() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit with nested dirs");
+
+    // Delete nested directory and commit
+    std::fs::remove_dir_all(dir.path().join("src/deep")).unwrap();
+    std::fs::write(dir.path().join("src/lib.rs"), "// no more deep").unwrap();
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Remove nested directories");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // Should detect lib.rs as changed
+    let has_lib = changed
+        .iter()
+        .any(|p| p.file_name().is_some_and(|name| name == "lib.rs"));
+    assert!(has_lib, "Expected lib.rs to be in changed files");
+
+    // Deleted files should not appear (they don't exist on disk)
+    let has_nested = changed
+        .iter()
+        .any(|p| p.to_string_lossy().contains("nested"));
+    assert!(
+        !has_nested,
+        "Deleted nested files should not appear (don't exist on disk)"
+    );
+}
+
+#[test]
+fn staged_files_in_new_repo_without_commits() {
+    let dir = create_git_repo();
+
+    // Stage a file without committing (no HEAD exists yet)
+    create_file(dir.path(), "new.rs", "fn new() {}");
+    git_add_all(dir.path());
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let staged = git_diff.get_staged_files().unwrap();
+
+    // All staged files should be detected
+    let new_path = dir.path().join("new.rs").canonicalize().unwrap();
+    assert!(
+        staged
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(new_path.clone())),
+        "Staged file in repo without commits should be detected"
+    );
+}
+
+#[test]
+fn staged_files_detects_modified_staged_file() {
+    let dir = create_git_repo();
+
+    // Create file, commit
+    create_file(dir.path(), "main.rs", "fn main() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Modify and stage (but don't commit)
+    create_file(dir.path(), "main.rs", "fn main() { println!(\"staged\"); }");
+    git_add_all(dir.path());
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let staged = git_diff.get_staged_files().unwrap();
+
+    let main_path = dir.path().join("main.rs").canonicalize().unwrap();
+    assert!(
+        staged
+            .iter()
+            .any(|p| p.canonicalize().ok() == Some(main_path.clone())),
+        "Modified staged file should be detected"
+    );
+}
+
+#[test]
+fn changed_files_skips_unchanged_subtrees() {
+    let dir = create_git_repo();
+
+    // Create multiple directories with files
+    std::fs::create_dir_all(dir.path().join("unchanged/deep")).unwrap();
+    std::fs::create_dir_all(dir.path().join("changed")).unwrap();
+    create_file(dir.path(), "unchanged/a.rs", "fn a() {}");
+    create_file(dir.path(), "unchanged/deep/b.rs", "fn b() {}");
+    create_file(dir.path(), "changed/c.rs", "fn c() {}");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Initial commit");
+
+    // Only modify file in 'changed' directory
+    create_file(dir.path(), "changed/c.rs", "fn c() { /* modified */ }");
+    git_add_all(dir.path());
+    git_commit(dir.path(), "Modify only changed/c.rs");
+
+    let git_diff = GitDiff::discover(dir.path()).unwrap();
+    let changed = git_diff.get_changed_files("HEAD~1").unwrap();
+
+    // Only the modified file should be in the result
+    assert_eq!(changed.len(), 1, "Expected exactly 1 changed file");
+    let has_c = changed
+        .iter()
+        .any(|p| p.file_name().is_some_and(|name| name == "c.rs"));
+    assert!(has_c, "Expected c.rs to be in changed files");
+
+    // Files in unchanged directory should not be included
+    let has_unchanged = changed
+        .iter()
+        .any(|p| p.to_string_lossy().contains("unchanged"));
+    assert!(!has_unchanged, "Unchanged subtree should be skipped");
+}

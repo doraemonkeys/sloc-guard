@@ -1,5 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+
+use gix::object::tree::EntryKind;
 
 use crate::{Result, SlocGuardError};
 
@@ -47,19 +49,17 @@ impl GitDiff {
             .map_err(|e| SlocGuardError::Git(format!("Failed to open git repository: {e}")))
     }
 
-    fn collect_tree_paths(
-        tree: &gix::Tree<'_>,
-        prefix: &Path,
-    ) -> Result<HashSet<(PathBuf, gix::ObjectId)>> {
-        let mut paths = HashSet::new();
-        Self::collect_tree_paths_recursive(tree, prefix, &mut paths)?;
+    /// Collect all blob paths from a tree (used when adding/removing entire subtrees).
+    fn collect_all_blob_paths(tree: &gix::Tree<'_>, prefix: &Path) -> Result<Vec<PathBuf>> {
+        let mut paths = Vec::new();
+        Self::collect_all_blob_paths_recursive(tree, prefix, &mut paths)?;
         Ok(paths)
     }
 
-    fn collect_tree_paths_recursive(
+    fn collect_all_blob_paths_recursive(
         tree: &gix::Tree<'_>,
         prefix: &Path,
-        paths: &mut HashSet<(PathBuf, gix::ObjectId)>,
+        paths: &mut Vec<PathBuf>,
     ) -> Result<()> {
         for entry in tree.iter() {
             let entry = entry
@@ -69,18 +69,58 @@ impl GitDiff {
             let path = prefix.join(name);
 
             match entry.mode().kind() {
-                gix::object::tree::EntryKind::Blob
-                | gix::object::tree::EntryKind::BlobExecutable => {
-                    paths.insert((path, entry.oid().into()));
+                EntryKind::Blob | EntryKind::BlobExecutable => {
+                    paths.push(path);
                 }
-                gix::object::tree::EntryKind::Tree => {
+                EntryKind::Tree => {
                     let subtree = entry.object().map_err(|e| {
                         SlocGuardError::Git(format!("Failed to get subtree object: {e}"))
                     })?;
-                    let subtree = subtree.into_tree();
-                    Self::collect_tree_paths_recursive(&subtree, &path, paths)?;
+                    Self::collect_all_blob_paths_recursive(&subtree.into_tree(), &path, paths)?;
                 }
-                _ => {}
+                // Submodules (Commit) and symbolic links (Link) are intentionally skipped.
+                // We only track regular file changes, not submodule pointer updates.
+                EntryKind::Commit | EntryKind::Link => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// Build a map of HEAD tree entries for efficient O(1) lookups.
+    fn build_head_path_map(
+        tree: &gix::Tree<'_>,
+        prefix: &Path,
+    ) -> Result<HashMap<PathBuf, gix::ObjectId>> {
+        let mut map = HashMap::new();
+        Self::build_head_path_map_recursive(tree, prefix, &mut map)?;
+        Ok(map)
+    }
+
+    fn build_head_path_map_recursive(
+        tree: &gix::Tree<'_>,
+        prefix: &Path,
+        map: &mut HashMap<PathBuf, gix::ObjectId>,
+    ) -> Result<()> {
+        for entry in tree.iter() {
+            let entry = entry
+                .map_err(|e| SlocGuardError::Git(format!("Failed to read tree entry: {e}")))?;
+            let name = std::str::from_utf8(entry.filename())
+                .map_err(|e| SlocGuardError::Git(format!("Invalid filename encoding: {e}")))?;
+            let path = prefix.join(name);
+
+            match entry.mode().kind() {
+                EntryKind::Blob | EntryKind::BlobExecutable => {
+                    map.insert(path, entry.oid().into());
+                }
+                EntryKind::Tree => {
+                    let subtree = entry.object().map_err(|e| {
+                        SlocGuardError::Git(format!("Failed to get subtree object: {e}"))
+                    })?;
+                    Self::build_head_path_map_recursive(&subtree.into_tree(), &path, map)?;
+                }
+                // Submodules (Commit) and symbolic links (Link) are intentionally skipped.
+                // We only track regular file changes, not submodule pointer updates.
+                EntryKind::Commit | EntryKind::Link => {}
             }
         }
         Ok(())
@@ -99,14 +139,15 @@ impl GitDiff {
             .map_err(|e| SlocGuardError::Git(format!("Failed to open git index: {e}")))?;
 
         // Get HEAD tree (if exists) - new repos have no commits yet
-        let head_paths = match repo.head_commit() {
+        // Use HashMap for O(1) lookup instead of HashSet with O(n) search
+        let head_paths: HashMap<PathBuf, gix::ObjectId> = match repo.head_commit() {
             Ok(commit) => {
                 let head_tree = commit
                     .tree()
                     .map_err(|e| SlocGuardError::Git(format!("Failed to get HEAD tree: {e}")))?;
-                Self::collect_tree_paths(&head_tree, Path::new(""))?
+                Self::build_head_path_map(&head_tree, Path::new(""))?
             }
-            Err(_) => HashSet::new(),
+            Err(_) => HashMap::new(),
         };
 
         let mut staged_files = HashSet::new();
@@ -114,10 +155,10 @@ impl GitDiff {
             let path_str = String::from_utf8_lossy(entry.path(&index)).to_string();
             let path = PathBuf::from(&path_str);
 
+            // O(1) lookup instead of O(n) search
             let is_staged = head_paths
-                .iter()
-                .find(|(p, _)| p == &path)
-                .is_none_or(|(_, head_oid)| *head_oid != entry.id);
+                .get(&path)
+                .is_none_or(|head_oid| *head_oid != entry.id);
 
             if is_staged {
                 staged_files.insert(self.workdir.join(path));
@@ -130,6 +171,10 @@ impl GitDiff {
 
 impl GitDiff {
     /// Get files changed between two git references.
+    ///
+    /// Uses optimized tree comparison that short-circuits when subtree OIDs match,
+    /// avoiding unnecessary traversal of identical subtrees. This is significantly
+    /// faster for large repositories where only a small portion of files changed.
     ///
     /// # Errors
     /// Returns an error if either reference cannot be parsed or the repository cannot be accessed.
@@ -178,35 +223,224 @@ impl GitDiff {
             SlocGuardError::Git(format!("Failed to get tree for '{target_ref}': {e}"))
         })?;
 
-        // Collect all file paths from both trees
-        let base_paths = Self::collect_tree_paths(&base_tree, Path::new(""))?;
-        let target_paths = Self::collect_tree_paths(&target_tree, Path::new(""))?;
-
-        // Find changed files: files that exist in only one tree or have different OIDs
+        // Use optimized comparison that skips identical subtrees
         let mut changed_files = HashSet::new();
+        let mut deleted_paths = Vec::new();
+        Self::compare_trees_recursive(
+            &base_tree,
+            &target_tree,
+            Path::new(""),
+            &mut changed_files,
+            &mut deleted_paths,
+        )?;
 
-        // Files in target but not in base, or changed
-        for (path, oid) in &target_paths {
-            let is_changed = base_paths
-                .iter()
-                .find(|(p, _)| p == path)
-                .is_none_or(|(_, base_oid)| base_oid != oid);
-            if is_changed {
-                changed_files.insert(self.workdir.join(path));
+        // Prepend workdir to all changed paths
+        let changed_files: HashSet<PathBuf> = changed_files
+            .into_iter()
+            .map(|p| self.workdir.join(p))
+            .collect();
+
+        // For deleted files, only include them if they still exist locally
+        let mut result = changed_files;
+        for path in deleted_paths {
+            let full_path = self.workdir.join(&path);
+            if full_path.exists() {
+                result.insert(full_path);
             }
         }
 
-        // Files deleted (in base but not in target) - include them as they might still exist locally
-        for (path, _) in &base_paths {
-            if !target_paths.iter().any(|(p, _)| p == path) {
-                let full_path = self.workdir.join(path);
-                if full_path.exists() {
-                    changed_files.insert(full_path);
+        Ok(result)
+    }
+
+    /// Compare two trees recursively, short-circuiting when subtree OIDs match.
+    ///
+    /// When a subtree has the same OID in both trees, we skip traversing it entirely
+    /// since identical OIDs guarantee identical contents. This dramatically reduces
+    /// the number of git objects we need to load for large repositories.
+    ///
+    /// # Parameters
+    /// - `deleted_candidates`: Paths that were deleted in git but may still exist locally
+    ///   (e.g., uncommitted changes). These require existence checks after traversal.
+    fn compare_trees_recursive(
+        base_tree: &gix::Tree<'_>,
+        target_tree: &gix::Tree<'_>,
+        prefix: &Path,
+        changed: &mut HashSet<PathBuf>,
+        deleted_candidates: &mut Vec<PathBuf>,
+    ) -> Result<()> {
+        // Build entry maps for efficient lookup by filename
+        let base_entries = Self::build_entry_map(base_tree)?;
+        let target_entries = Self::build_entry_map(target_tree)?;
+
+        // Process entries in target tree (additions and modifications)
+        for (name, target_entry) in &target_entries {
+            let path = prefix.join(name);
+
+            if let Some(base_entry) = base_entries.get(name) {
+                // Entry exists in both trees - check if OIDs differ
+                if base_entry.oid != target_entry.oid {
+                    Self::process_changed_entry(
+                        base_entry,
+                        target_entry,
+                        &path,
+                        changed,
+                        deleted_candidates,
+                    )?;
                 }
+                // If OIDs are equal, entire subtree is identical - skip it
+            } else {
+                // Entry only in target - it's new, add all its blobs
+                Self::process_added_entry(target_entry, &path, changed)?;
             }
         }
 
-        Ok(changed_files)
+        // Process entries only in base tree (deletions)
+        for (name, base_entry) in &base_entries {
+            if !target_entries.contains_key(name) {
+                let path = prefix.join(name);
+                Self::process_deleted_entry(base_entry, &path, deleted_candidates)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Process an entry that changed between base and target trees.
+    fn process_changed_entry(
+        base_entry: &TreeEntry<'_, '_>,
+        target_entry: &TreeEntry<'_, '_>,
+        path: &Path,
+        changed: &mut HashSet<PathBuf>,
+        deleted_candidates: &mut Vec<PathBuf>,
+    ) -> Result<()> {
+        match (base_entry.kind, target_entry.kind) {
+            // Both are blobs - file content changed
+            (
+                EntryKind::Blob | EntryKind::BlobExecutable,
+                EntryKind::Blob | EntryKind::BlobExecutable,
+            ) => {
+                changed.insert(path.to_path_buf());
+            }
+            // Both are trees - recurse to find specific changes
+            (EntryKind::Tree, EntryKind::Tree) => {
+                let base_subtree = base_entry
+                    .entry
+                    .object()
+                    .map_err(|e| SlocGuardError::Git(format!("Failed to get base subtree: {e}")))?;
+                let target_subtree = target_entry.entry.object().map_err(|e| {
+                    SlocGuardError::Git(format!("Failed to get target subtree: {e}"))
+                })?;
+                Self::compare_trees_recursive(
+                    &base_subtree.into_tree(),
+                    &target_subtree.into_tree(),
+                    path,
+                    changed,
+                    deleted_candidates,
+                )?;
+            }
+            // Type changed: tree -> blob (directory became file)
+            (EntryKind::Tree, EntryKind::Blob | EntryKind::BlobExecutable) => {
+                // All files in the old directory are "deleted"
+                Self::process_deleted_entry(base_entry, path, deleted_candidates)?;
+                // The new file is added
+                changed.insert(path.to_path_buf());
+            }
+            // Type changed: blob -> tree (file became directory)
+            (EntryKind::Blob | EntryKind::BlobExecutable, EntryKind::Tree) => {
+                // Old file is "deleted"
+                deleted_candidates.push(path.to_path_buf());
+                // All files in the new directory are added
+                Self::process_added_entry(target_entry, path, changed)?;
+            }
+            // Submodules (Commit) and symbolic links (Link) are intentionally skipped.
+            // We only track regular file changes, not submodule pointer updates.
+            (EntryKind::Commit | EntryKind::Link, _) | (_, EntryKind::Commit | EntryKind::Link) => {
+            }
+        }
+        Ok(())
+    }
+
+    /// Process an entry that only exists in the target tree (addition).
+    fn process_added_entry(
+        entry: &TreeEntry<'_, '_>,
+        path: &Path,
+        changed: &mut HashSet<PathBuf>,
+    ) -> Result<()> {
+        match entry.kind {
+            EntryKind::Blob | EntryKind::BlobExecutable => {
+                changed.insert(path.to_path_buf());
+            }
+            EntryKind::Tree => {
+                let subtree = entry.object().map_err(|e| {
+                    SlocGuardError::Git(format!("Failed to get subtree object: {e}"))
+                })?;
+                let paths = Self::collect_all_blob_paths(&subtree.into_tree(), path)?;
+                changed.extend(paths);
+            }
+            // Submodules (Commit) and symbolic links (Link) are intentionally skipped.
+            // We only track regular file changes, not submodule pointer updates.
+            EntryKind::Commit | EntryKind::Link => {}
+        }
+        Ok(())
+    }
+
+    /// Process an entry that only exists in the base tree (deletion).
+    fn process_deleted_entry(
+        entry: &TreeEntry<'_, '_>,
+        path: &Path,
+        deleted_candidates: &mut Vec<PathBuf>,
+    ) -> Result<()> {
+        match entry.kind {
+            EntryKind::Blob | EntryKind::BlobExecutable => {
+                deleted_candidates.push(path.to_path_buf());
+            }
+            EntryKind::Tree => {
+                let subtree = entry.object().map_err(|e| {
+                    SlocGuardError::Git(format!("Failed to get subtree object: {e}"))
+                })?;
+                let paths = Self::collect_all_blob_paths(&subtree.into_tree(), path)?;
+                deleted_candidates.extend(paths);
+            }
+            // Submodules (Commit) and symbolic links (Link) are intentionally skipped.
+            // We only track regular file changes, not submodule pointer updates.
+            EntryKind::Commit | EntryKind::Link => {}
+        }
+        Ok(())
+    }
+
+    /// Build a map of tree entries by filename for efficient lookup.
+    fn build_entry_map<'repo, 'a>(
+        tree: &'a gix::Tree<'repo>,
+    ) -> Result<HashMap<String, TreeEntry<'repo, 'a>>> {
+        let mut map = HashMap::new();
+        for entry in tree.iter() {
+            let entry = entry
+                .map_err(|e| SlocGuardError::Git(format!("Failed to read tree entry: {e}")))?;
+            let name = std::str::from_utf8(entry.filename())
+                .map_err(|e| SlocGuardError::Git(format!("Invalid filename encoding: {e}")))?
+                .to_string();
+            let kind = entry.mode().kind();
+            let oid = entry.oid().into();
+            map.insert(name, TreeEntry { entry, kind, oid });
+        }
+        Ok(map)
+    }
+}
+
+/// Helper struct to hold tree entry data for efficient comparison.
+///
+/// Caches the entry's kind and OID to avoid repeated lookups during
+/// tree comparison. Holds a reference to the underlying `EntryRef`
+/// for deferred object loading when we need to recurse into subtrees.
+struct TreeEntry<'repo, 'a> {
+    entry: gix::object::tree::EntryRef<'repo, 'a>,
+    kind: EntryKind,
+    oid: gix::ObjectId,
+}
+
+impl TreeEntry<'_, '_> {
+    fn object(&self) -> std::result::Result<gix::Object<'_>, gix::object::find::existing::Error> {
+        self.entry.object()
     }
 }
 
