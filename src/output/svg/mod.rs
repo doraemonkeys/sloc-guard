@@ -11,6 +11,7 @@ mod data;
 mod element;
 mod format;
 mod histogram;
+mod language_chart;
 mod style;
 
 pub use builder::SvgBuilder;
@@ -18,6 +19,7 @@ pub use chart::{BarChart, HorizontalBarChart, LineChart};
 pub use data::DataPoint;
 pub use element::{Axis, AxisOrientation, Bar, Line, SvgElement};
 pub use histogram::FileSizeHistogram;
+pub use language_chart::LanguageBreakdownChart;
 pub use style::{ChartColor, TextAnchor};
 
 #[cfg(test)]

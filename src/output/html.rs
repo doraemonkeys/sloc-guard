@@ -3,7 +3,7 @@ use std::fmt::Write;
 use crate::checker::CheckResult;
 use crate::error::Result;
 
-use super::svg::{FileSizeHistogram, SvgElement};
+use super::svg::{FileSizeHistogram, LanguageBreakdownChart, SvgElement};
 use super::{OutputFormatter, ProjectStatistics};
 
 const HTML_HEADER: &str = r#"<!DOCTYPE html>
@@ -226,9 +226,10 @@ impl HtmlFormatter {
 
     fn write_charts_section(output: &mut String, stats: &ProjectStatistics) {
         let histogram = FileSizeHistogram::from_stats(stats);
+        let language_chart = LanguageBreakdownChart::from_stats(stats);
 
-        // Only show charts section if there's sufficient data
-        if !histogram.has_sufficient_data() {
+        // Only show charts section if there's sufficient data for any chart
+        if !histogram.has_sufficient_data() && !language_chart.has_data() {
             return;
         }
 
@@ -236,13 +237,26 @@ impl HtmlFormatter {
         output.push_str("            <h2>Visualizations</h2>\n");
 
         // File Size Distribution Histogram
-        output.push_str("            <div class=\"chart-container\">\n");
-        output.push_str("                <h3>File Size Distribution (by SLOC)</h3>\n");
-        let svg = histogram.render();
-        for line in svg.lines() {
-            let _ = writeln!(output, "                {line}");
+        if histogram.has_sufficient_data() {
+            output.push_str("            <div class=\"chart-container\">\n");
+            output.push_str("                <h3>File Size Distribution (by SLOC)</h3>\n");
+            let svg = histogram.render();
+            for line in svg.lines() {
+                let _ = writeln!(output, "                {line}");
+            }
+            output.push_str("            </div>\n");
         }
-        output.push_str("            </div>\n");
+
+        // Language Breakdown Chart
+        if language_chart.has_data() {
+            output.push_str("            <div class=\"chart-container\">\n");
+            output.push_str("                <h3>Language Breakdown</h3>\n");
+            let svg = language_chart.render();
+            for line in svg.lines() {
+                let _ = writeln!(output, "                {line}");
+            }
+            output.push_str("            </div>\n");
+        }
 
         output.push_str("        </div>\n");
     }

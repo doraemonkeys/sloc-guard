@@ -49,17 +49,17 @@ Location: `src/output/svg/histogram.rs`, `src/output/html.rs`
 - CSS variable --color-chart-primary for theming
 ```
 
-### Task 7.3: Language Breakdown Chart
-Location: `src/output/html.rs`
+### ~~Task 7.3: Language Breakdown Chart~~ ✅
+Location: `src/output/svg/language_chart.rs`, `src/output/html.rs`
 ```
-- Horizontal bar chart sorted by SLOC
-- Data source: ProjectStatistics.by_language
-- Hover: show language name + exact line count
-- Empty state: show "No language data" message
+- LanguageBreakdownChart: horizontal bar chart sorted by SLOC (descending)
+- Data source: ProjectStatistics.by_language (pre-sorted)
+- Hover: <title> tooltips with language name + exact line count
+- Empty state: "No language data" message (when by_language is None or empty)
+- CSS variable --color-chart-primary for theming
 ```
 
 ### Task 7.4: Trend Line Chart
-Location: `src/output/html.rs`
 ```
 - Line chart: X=timestamp, Y=code lines (auto-scaled)
 - Data source: TrendHistory passed to HtmlFormatter
@@ -69,7 +69,6 @@ Location: `src/output/html.rs`
 ```
 
 ### Task 7.5: Chart Interactivity & Polish
-Location: `src/output/html.rs`
 ```
 - Delta indicators: ↓green (decrease=good), ↑red (increase)
 - Hover tooltips via CSS :hover + <title> fallback
@@ -100,7 +99,7 @@ Location: `src/output/html.rs`
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram ✅ → 7.3 Language Chart → 7.4 Trend Line → 7.5 Polish |
+| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram ✅ → 7.3 Language Chart ✅ → 7.4 Trend Line → 7.5 Polish |
 
 ---
 
