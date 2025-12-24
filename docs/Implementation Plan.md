@@ -93,7 +93,3 @@ Location: `src/cli.rs`, `src/commands/stats.rs`
 
 ---
 
-## Phase 17: Content Configuration Enhancement (Pending)
-
-### ~~Task 17.1: Content `warn_at` Absolute Threshold~~ ✅
-
