@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats`, `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (with `--trend`, `--since`), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
 | `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -29,7 +29,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `message()` includes error kind for `FileRead`/`Io` and glob details for `InvalidPattern` |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; check split into: `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_validation.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
-| `stats` | `TrendHistory` - historical stats with delta computation, file locking, retention policy (max_entries, max_age_days, min_interval_secs) |
+| `stats` | `TrendHistory` - historical stats with delta computation, file locking, retention policy (max_entries, max_age_days, min_interval_secs); `parse_duration` - human-readable duration parsing for `--since` |
 | `main` | CLI parsing, command dispatch to `commands/*` |
 
 ## Key Types
@@ -89,6 +89,7 @@ TrendEntry { timestamp, total_files, total_lines, code, comment, blank }
 TrendDelta { *_delta, previous_timestamp }
 // Retention: TrendHistory::apply_retention() removes old entries, should_add() respects min_interval_secs
 // Significance: TrendDelta::is_significant(config) → true if |code_delta| > min_code_delta OR files_delta != 0
+// Flexible comparison: --since <duration> (7d, 1w, 12h) → find_entry_at_or_before(), compute_delta_since()
 
 // Git/Baseline/Cache
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff ref (compares to HEAD)

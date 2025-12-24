@@ -306,6 +306,12 @@ pub struct StatsArgs {
     /// Path to history file for trend tracking (default: .sloc-guard-history.json)
     #[arg(long, value_name = "PATH")]
     pub history_file: Option<PathBuf>,
+
+    /// Compare against a specific time ago (e.g., 7d, 30d, 1w, 12h).
+    /// Finds the nearest entry before the specified time point.
+    /// Implies --trend. Supported units: s, m, h, d, w.
+    #[arg(long, value_name = "DURATION")]
+    pub since: Option<String>,
 }
 
 #[derive(Parser, Debug)]

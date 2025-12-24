@@ -54,13 +54,7 @@ Location: `src/output/html.rs`
 ### ~~Task 16.2: Output Time Semantics~~ ✅
 ### ~~Task 16.3: Significance Threshold~~ ✅
 
-### Task 16.4: Flexible Time Comparison
-Location: `src/stats/trend.rs`, `src/cli.rs`
-```
-- Add --since <duration> flag (e.g., 7d, 30d)
-- compute_delta_since(Duration) method
-- Find nearest entry before specified time point
-```
+### ~~Task 16.4: Flexible Time Comparison~~ ✅
 
 ### Task 16.5: Git Context
 Location: `src/stats/trend.rs`
@@ -93,7 +87,7 @@ Location: `src/cli.rs`, `src/commands/stats.rs`
 | ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
 | ~~**8. Error UX**~~              | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, ~~15.3 Error Context Enrichment~~ ✅ |
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
-| **10. Trend Extended**           | 16.4 Flexible Comparison, 16.5 Git Context, 16.6 History Command |
+| **10. Trend Extended**           | ~~16.4 Flexible Comparison~~ ✅, 16.5 Git Context, 16.6 History Command |
 | **11. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
 
 ---

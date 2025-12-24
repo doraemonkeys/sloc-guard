@@ -30,12 +30,16 @@ pub struct TrendEntry {
 }
 
 impl TrendEntry {
+    /// Creates a new trend entry from current project statistics.
+    ///
+    /// # Panics
+    /// Panics if the system clock is set to a time before the UNIX epoch.
     #[must_use]
     pub fn new(stats: &ProjectStatistics) -> Self {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+            .expect("system time before UNIX_EPOCH")
+            .as_secs();
 
         Self {
             timestamp,
@@ -243,6 +247,45 @@ impl TrendHistory {
         self.latest().map(|prev| TrendDelta::compute(prev, current))
     }
 
+    /// Find the nearest entry at or before a given timestamp.
+    ///
+    /// Searches backwards through entries (newest to oldest) to find the first
+    /// entry with a timestamp <= `at_or_before`.
+    ///
+    /// Returns `None` if no entry exists at or before the specified time.
+    #[must_use]
+    pub fn find_entry_at_or_before(&self, at_or_before: u64) -> Option<&TrendEntry> {
+        // Entries are chronological (oldest first), so search backwards
+        self.entries
+            .iter()
+            .rev()
+            .find(|entry| entry.timestamp <= at_or_before)
+    }
+
+    /// Compute delta from an entry at a specific time ago to current stats.
+    ///
+    /// Finds the nearest entry at or before `(current_time - duration_secs)` and
+    /// computes the delta to the current statistics. This allows comparing against
+    /// a snapshot from a specific point in time.
+    ///
+    /// # Arguments
+    /// * `duration_secs` - How far back to look (in seconds)
+    /// * `current` - Current project statistics
+    /// * `current_time` - Current timestamp (seconds since epoch)
+    ///
+    /// Returns `None` if no entry exists at or before the specified time point.
+    #[must_use]
+    pub fn compute_delta_since(
+        &self,
+        duration_secs: u64,
+        current: &ProjectStatistics,
+        current_time: u64,
+    ) -> Option<TrendDelta> {
+        let target_time = current_time.saturating_sub(duration_secs);
+        self.find_entry_at_or_before(target_time)
+            .map(|prev| TrendDelta::compute(prev, current))
+    }
+
     /// Get number of entries.
     #[must_use]
     pub const fn len(&self) -> usize {
@@ -321,11 +364,14 @@ impl TrendHistory {
     /// Add a new entry only if retention policy allows (respects `min_interval_secs`).
     ///
     /// Returns `true` if the entry was added, `false` if skipped due to interval.
+    ///
+    /// # Panics
+    /// Panics if the system clock is set to a time before the UNIX epoch.
     pub fn add_if_allowed(&mut self, stats: &ProjectStatistics, config: &TrendConfig) -> bool {
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+            .expect("system time before UNIX_EPOCH")
+            .as_secs();
 
         if !self.should_add(config, current_time) {
             return false;
@@ -341,13 +387,16 @@ impl TrendHistory {
     /// 1. Remove entries older than `max_age_days`
     /// 2. Trim to `max_entries`
     ///
+    /// # Panics
+    /// Panics if the system clock is set to a time before the UNIX epoch.
+    ///
     /// # Errors
     /// Returns an error if the file cannot be written.
     pub fn save_with_retention(&mut self, path: &Path, config: &TrendConfig) -> Result<()> {
         let current_time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+            .expect("system time before UNIX_EPOCH")
+            .as_secs();
 
         self.apply_retention(config, current_time);
         self.save(path)
@@ -355,5 +404,5 @@ impl TrendHistory {
 }
 
 #[cfg(test)]
-#[path = "trend_tests.rs"]
+#[path = "trend_tests/mod.rs"]
 mod tests;

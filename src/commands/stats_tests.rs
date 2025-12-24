@@ -72,6 +72,7 @@ fn run_stats_impl_with_valid_directory() {
         no_gitignore: false,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -100,6 +101,7 @@ fn run_stats_impl_with_json_output() {
         no_gitignore: false,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -128,6 +130,7 @@ fn run_stats_impl_with_include_paths() {
         no_gitignore: false,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -156,6 +159,7 @@ fn run_stats_returns_config_error_on_invalid_config() {
         no_gitignore: true,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, false);
@@ -182,6 +186,7 @@ fn run_stats_impl_with_markdown_output() {
         no_gitignore: false,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
@@ -210,6 +215,7 @@ fn run_stats_impl_with_group_by_lang() {
         no_gitignore: false,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -234,6 +240,7 @@ fn run_stats_impl_with_top_files() {
         no_gitignore: false,
         trend: false,
         history_file: None,
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
@@ -261,6 +268,7 @@ fn run_stats_impl_with_custom_history_file() {
         no_gitignore: false,
         trend: true,
         history_file: Some(history_path.clone()),
+        since: None,
     };
 
     let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);

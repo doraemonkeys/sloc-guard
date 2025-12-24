@@ -12,7 +12,7 @@ use crate::output::{
 };
 use crate::scanner::scan_files;
 use crate::state;
-use crate::stats::TrendHistory;
+use crate::stats::{TrendHistory, parse_duration};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::context::{
@@ -137,12 +137,36 @@ pub(crate) fn run_stats_with_context(
         project_stats
     };
 
-    // 5.2 Trend tracking if enabled
-    let project_stats = if args.trend {
+    // 5.2 Trend tracking if enabled (--trend or --since implies trend)
+    let trend_enabled = args.trend || args.since.is_some();
+    let project_stats = if trend_enabled {
         let default_path = state::history_path(project_root);
         let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
-        let trend = history.compute_delta(&project_stats);
+
+        // Get current time for delta computation
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX_EPOCH")
+            .as_secs();
+
+        // Compute trend: either from --since duration or from latest entry
+        let trend = args.since.as_ref().map_or_else(
+            || history.compute_delta(&project_stats),
+            |since_str| match parse_duration(since_str) {
+                Ok(duration_secs) => {
+                    history.compute_delta_since(duration_secs, &project_stats, current_time)
+                }
+                Err(e) => {
+                    crate::output::print_warning_full(
+                        "Invalid --since duration",
+                        Some(&e.message()),
+                        Some("Falling back to latest entry comparison"),
+                    );
+                    history.compute_delta(&project_stats)
+                }
+            },
+        );
 
         // Add entry only if retention policy allows (respects min_interval_secs)
         history.add_if_allowed(&project_stats, &config.trend);
