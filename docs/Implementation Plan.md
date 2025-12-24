@@ -48,6 +48,58 @@ Location: `src/output/html.rs`
 
 ---
 
+## Phase 16: Trend Enhancement (Pending)
+
+### Task 16.1: Retention Policy
+Location: `src/stats/trend.rs`, `src/config/model.rs`
+```
+- Add RetentionPolicy struct: max_entries, max_age_days, min_interval_secs
+- Auto-cleanup old entries on save (prevent infinite history growth)
+- Configurable via [stats.trend] section
+```
+
+### Task 16.2: Output Time Semantics
+Location: `src/output/stats_text.rs`
+```
+- Display relative time ("2 hours ago") instead of raw timestamp
+- Show percentage change for each metric
+- Add trend arrows (↑↓~) with color coding
+```
+
+### Task 16.3: Significance Threshold
+Location: `src/stats/trend.rs`
+```
+- Add is_significant() method with configurable threshold
+- Skip trend output when delta is trivial (reduce noise)
+- Default: code_delta > 10 || files_delta > 0
+```
+
+### Task 16.4: Flexible Time Comparison
+Location: `src/stats/trend.rs`, `src/cli.rs`
+```
+- Add --since <duration> flag (e.g., 7d, 30d)
+- compute_delta_since(Duration) method
+- Find nearest entry before specified time point
+```
+
+### Task 16.5: Git Context
+Location: `src/stats/trend.rs`
+```
+- Add optional git_ref (commit hash) and git_branch to TrendEntry
+- Populate via gix when in git repo (optional dependency)
+- Output: "Changes since commit a1b2c3d (2 hours ago)"
+```
+
+### Task 16.6: History Command
+Location: `src/cli.rs`, `src/commands/stats.rs`
+```
+- Add `stats history` subcommand
+- List recent entries (--limit N, default 10)
+- Support --format json for machine parsing
+```
+
+---
+
 ## Priority Order
 
 | Priority                         | Tasks                                                        |
@@ -60,7 +112,9 @@ Location: `src/output/html.rs`
 | ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
 | ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
 | ~~**8. Error UX**~~              | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, ~~15.3 Error Context Enrichment~~ ✅ |
-| **9. Visualization**             | 7.1-7.2 HTML Charts/Trends                                   |
+| **9. Trend Core**                | 16.1 Retention Policy, 16.2 Output Semantics, 16.3 Significance Threshold |
+| **10. Trend Extended**           | 16.4 Flexible Comparison, 16.5 Git Context, 16.6 History Command |
+| **11. Visualization**            | 7.1-7.2 HTML Charts/Trends                                   |
 
 ---
 
