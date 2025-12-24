@@ -65,4 +65,35 @@ Location: `src/output/html.rs`
 | ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
 | ~~**7. Debt Lifecycle**~~ | ~~11.4 Baseline Ratchet~~ ✅ |
 | **8. Visualization** | 7.1-7.2 HTML Charts/Trends |
+| **9. Error UX** | 15.1-15.3 Error Message Enhancement |
 
+---
+
+## Phase 15: Error Message Enhancement (Pending)
+
+### Task 15.1: Colored Error Output
+Location: `src/error.rs`, `src/commands/check/runner.rs`
+```
+- Add colored crate for visual distinction (red=error, yellow=warning)
+- Create unified print_error() helper with consistent formatting
+- Format: ✖ Error Type / × Detail / help: Suggestion
+```
+
+### Task 15.2: Structured Error Suggestions
+Location: `src/error.rs`
+```
+- Add suggestion() method to SlocGuardError
+- Provide actionable hints per error variant:
+  - GitRepoNotFound → "Run 'git init' or run inside a git repository"
+  - Config → Include expected format/range
+  - FileRead → Show underlying reason (not found / permission denied)
+  - InvalidPattern → Show globset parse error details
+```
+
+### Task 15.3: Error Context Enrichment
+Location: `src/error.rs`
+```
+- FileRead: Display source error kind
+- InvalidPattern: Include globset error message
+- IO: Add path/operation context where available
+```
