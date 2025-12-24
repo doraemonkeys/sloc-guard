@@ -70,12 +70,14 @@ Location: `src/output/svg/trend_chart.rs`, `src/output/html.rs`
 - CSS variable --color-chart-primary for theming
 ```
 
-### Task 7.5: Chart Interactivity & Polish
+### ~~Task 7.5: Chart Interactivity & Polish~~ ✅
+Location: `src/output/svg/trend_chart.rs`, `src/output/html_template.rs`
 ```
-- Delta indicators: ↓green (decrease=good), ↑red (increase)
-- Hover tooltips via CSS :hover + <title> fallback
-- @media print styles (no color-only encoding)
-- Smart X-axis labels (days/weeks based on range)
+- Delta indicators: ↓green (decrease=good), ↑red (increase) with significance threshold
+- Hover tooltips via CSS :hover + <title> fallback with delta info
+- @media print styles: status prefixes, border fallbacks for color-only encoding
+- Smart X-axis labels: MM/DD for short range, W## (week) for >1 month range
+- CSS variables: --color-delta-good, --color-delta-bad, --color-delta-neutral
 ```
 
 ---
@@ -101,7 +103,7 @@ Location: `src/output/svg/trend_chart.rs`, `src/output/html.rs`
 | ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| **12. Visualization**            | 7.1 SVG Core ✅ → 7.2 Histogram ✅ → 7.3 Language Chart ✅ → 7.4 Trend Line ✅ → 7.5 Polish |
+| ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
 
 ---
 

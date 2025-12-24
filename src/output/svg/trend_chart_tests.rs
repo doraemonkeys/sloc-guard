@@ -190,9 +190,18 @@ fn is_leap_year_check() {
 }
 
 #[test]
-fn format_timestamp_produces_mm_dd() {
-    let formatted = TrendLineChart::format_timestamp(TS_2023_12_25);
+fn format_timestamp_smart_short_range_produces_mm_dd() {
+    // Short range (< 1 month): produces MM/DD format
+    let formatted = TrendLineChart::format_timestamp_smart(TS_2023_12_25, 7 * SECS_PER_DAY);
     assert_eq!(formatted, "12/25");
+}
+
+#[test]
+fn format_timestamp_smart_long_range_produces_week() {
+    // Long range (> 1 month): produces week format
+    let formatted = TrendLineChart::format_timestamp_smart(TS_2023_12_25, 60 * SECS_PER_DAY);
+    // Dec 25, 2023 is in week 52
+    assert!(formatted.starts_with('W'));
 }
 
 #[test]
@@ -258,4 +267,62 @@ fn chart_renders_accessible_title() {
     assert!(svg.contains("<title>"));
     assert!(svg.contains("Code Lines Over Time"));
     assert!(svg.contains(r#"role="img""#));
+}
+
+#[test]
+fn delta_indicator_decrease_is_good() {
+    // For SLOC, decrease is good (green)
+    let (arrow, class) = TrendLineChart::delta_indicator(500.0, 400.0);
+    assert_eq!(arrow, "↓");
+    assert_eq!(class, "delta-good");
+}
+
+#[test]
+fn delta_indicator_increase_is_bad() {
+    // For SLOC, increase is potentially concerning (red)
+    let (arrow, class) = TrendLineChart::delta_indicator(400.0, 500.0);
+    assert_eq!(arrow, "↑");
+    assert_eq!(class, "delta-bad");
+}
+
+#[test]
+fn delta_indicator_no_change_is_neutral() {
+    let (arrow, class) = TrendLineChart::delta_indicator(500.0, 500.0);
+    assert_eq!(arrow, "");
+    assert_eq!(class, "delta-neutral");
+}
+
+#[test]
+fn chart_with_deltas_disabled() {
+    let mut history = TrendHistory::new();
+    history.add_entry(create_test_entry(TS_2023_12_24, 400));
+    history.add_entry(create_test_entry(TS_2023_12_25, 600)); // Big increase
+
+    let chart = TrendLineChart::from_history(&history).with_deltas(false);
+    let svg = chart.render();
+
+    // Should not contain delta indicators
+    assert!(!svg.contains("delta-indicator"));
+}
+
+#[test]
+fn chart_tooltips_include_delta() {
+    let mut history = TrendHistory::new();
+    history.add_entry(create_test_entry(TS_2023_12_24, 400));
+    history.add_entry(create_test_entry(TS_2023_12_25, 450));
+
+    let chart = TrendLineChart::from_history(&history);
+    let svg = chart.render();
+
+    // Second point tooltip should include delta (+50)
+    assert!(svg.contains("+50"));
+}
+
+#[test]
+fn week_of_year_calculation() {
+    // Jan 1, 2024 is a Monday, so week 1
+    assert_eq!(TrendLineChart::week_of_year(2024, 1, 1), 1);
+    // Dec 31, 2024 is day 366, should be week 52/53
+    let week = TrendLineChart::week_of_year(2024, 12, 31);
+    assert!(week >= 52);
 }

@@ -21,6 +21,9 @@ pub const HTML_HEADER: &str = r#"<!DOCTYPE html>
             --color-text: #1e293b;
             --color-text-muted: #64748b;
             --color-chart-primary: #6366f1;
+            --color-delta-good: #22c55e;
+            --color-delta-bad: #ef4444;
+            --color-delta-neutral: #64748b;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -76,6 +79,31 @@ pub const HTML_HEADER: &str = r#"<!DOCTYPE html>
         .chart-container { background: var(--color-card); border-radius: 0.5rem; padding: 1.25rem; border: 1px solid var(--color-border); margin-bottom: 1rem; }
         .chart-container h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: var(--color-text); }
         .chart-container svg { width: 100%; height: auto; max-width: 500px; }
+        /* SVG chart hover effects */
+        .chart-container svg rect { transition: opacity 0.15s ease; }
+        .chart-container svg rect:hover { opacity: 0.85; }
+        .chart-container svg circle { transition: r 0.15s ease, stroke-width 0.15s ease; }
+        .chart-container svg circle:hover { stroke-width: 3; }
+        /* Delta indicators */
+        .delta-good { fill: var(--color-delta-good); }
+        .delta-bad { fill: var(--color-delta-bad); }
+        .delta-neutral { fill: var(--color-delta-neutral); }
+        /* Print styles: ensure information isn't lost without color */
+        @media print {
+            body { background: white; color: black; padding: 1rem; }
+            .summary-card, .chart-container, table { border: 1px solid #333; }
+            .summary-card .value { color: inherit !important; }
+            .summary-card.passed .label::before { content: '✓ '; }
+            .summary-card.warning .label::before { content: '⚠ '; }
+            .summary-card.failed .label::before { content: '✗ '; }
+            .summary-card.grandfathered .label::before { content: '◉ '; }
+            .filter-controls { display: none; }
+            .status { background: transparent !important; border: 1px solid currentColor; }
+            /* Print-friendly delta indicators with text labels */
+            svg text.delta-label { display: inline !important; }
+            /* Note: ::after pseudo-elements don't work with SVG <text> elements.
+               Delta values are shown directly in the data-delta attribute for screen readers. */
+        }
     </style>
 </head>
 <body>
