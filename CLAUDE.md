@@ -4,4 +4,5 @@
 2. **Design for Testability (DfT)**: Favor Dependency Injection and decoupled components. Define interfaces via Traits to allow easy mocking, and prefer small, pure functions that can be unit-tested in isolation.
 3. **Prefer Static Dispatch**: Use Generics and Trait Bounds over Trait Objects (e.g., `Box<dyn Trait>`) to leverage monomorphization and compiler optimizations, unless runtime polymorphism is strictly necessary.
 4. **Make Illegal States Unrepresentable**: Use Enums with associated data to model state machines, rather than Structs with many optional fields.
-5. **Hard Requirement**: Project CI enforces a **90% minimum test coverage**. Ensure all new features, logic changes, and bug fixes include comprehensive tests to maintain this threshold.
+5. **No Backward Compatibility**: Prioritize clean design over legacy support. Do **not** preserve compatibility layers "just in case." Break old patterns, remove deprecated code—adapt old to new, never vice versa.
+6. **Hard Requirement**: Project CI enforces a **90% minimum test coverage**. 
