@@ -12,7 +12,7 @@ description: Execute next task from Implementation Plan. Use when user asks to i
 3. Assess task size and choose approach:
    - **Small**: Implement directly
    - **Medium**: Design complete solution before coding
-   - **Large**: Invoke `.cursor\skills\task-splitting\SKILL.md` to break into 2-3 subtasks
+   - **Large**: Review `.cursor\skills\task-splitting\SKILL.md` to break into 2-3 subtasks
 4. Implement with edge case tests to maintain coverage (Design for Testability)
 5. Run `make ci` to verify
-6. Invoke `.cursor\skills\docs-maintenance\SKILL.md` to update documentation
+6. Review `.cursor\skills\docs-maintenance\SKILL.md` to update documentation

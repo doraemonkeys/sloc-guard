@@ -47,27 +47,7 @@ Location: `src/output/html.rs`
 
 ---
 
-## Phase 11: Advanced Governance (Completed)
 
-> **Performance Note**: Introducing allowlists and complex scope matching may increase computational cost. Ensure **`globset` compilation reuse** during implementation to avoid performance regression.
-
----
-
-## Priority Order
-
-| Priority | Tasks |
-|----------|-------|
-| ~~**1. State File Cleanup**~~ | ~~12.7 Remove V1 path_rules~~ ✅ |
-| ~~**2. Git Diff Enhancement**~~ | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅ |
-| ~~**3. Code Quality**~~ | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
-| ~~**4. Structure Naming**~~ | ~~11.9 pattern→scope~~ ✅, ~~11.12 deny_file_patterns→deny_files + deny_dirs~~ ✅ |
-| ~~**5. Governance Refinement**~~ | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
-| ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
-| ~~**7. Debt Lifecycle**~~ | ~~11.4 Baseline Ratchet~~ ✅ |
-| **8. Visualization** | 7.1-7.2 HTML Charts/Trends |
-| **9. Error UX** | 15.1-15.3 Error Message Enhancement |
-
----
 
 ## Phase 15: Error Message Enhancement (Pending)
 
@@ -97,3 +77,22 @@ Location: `src/error.rs`
 - InvalidPattern: Include globset error message
 - IO: Add path/operation context where available
 ```
+
+
+
+## Priority Order
+
+| Priority                         | Tasks                                                        |
+| -------------------------------- | ------------------------------------------------------------ |
+| ~~**1. State File Cleanup**~~    | ~~12.7 Remove V1 path_rules~~ ✅                              |
+| ~~**2. Git Diff Enhancement**~~  | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅                |
+| ~~**3. Code Quality**~~          | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
+| ~~**4. Structure Naming**~~      | ~~11.9 pattern→scope~~ ✅, ~~11.12 deny_file_patterns→deny_files + deny_dirs~~ ✅ |
+| ~~**5. Governance Refinement**~~ | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
+| ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
+| ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
+| **8. Error UX**                  | 15.1 Colored Error Output, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment |
+| **9. Visualization**             | 7.1-7.2 HTML Charts/Trends                                   |
+
+---
+
