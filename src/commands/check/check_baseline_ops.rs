@@ -65,6 +65,7 @@ pub fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baselin
                 CheckResult::Passed {
                     path: std::path::PathBuf::new(),
                     stats: LineStats::default(),
+                    raw_stats: None,
                     limit: 0,
                     override_reason: None,
                     violation_category: None,

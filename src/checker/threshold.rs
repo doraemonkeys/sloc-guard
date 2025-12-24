@@ -379,17 +379,24 @@ impl ThresholdChecker {
 }
 
 impl Checker for ThresholdChecker {
-    fn check(&self, path: &Path, line_stats: &LineStats) -> CheckResult {
+    fn check(
+        &self,
+        path: &Path,
+        line_stats: &LineStats,
+        raw_stats: Option<&LineStats>,
+    ) -> CheckResult {
         let (limit, override_reason) = self.get_limit_for_path(path);
         let warn_limit = self.get_warn_limit_for_path(path, limit);
         let sloc = line_stats.sloc();
         let path = path.to_path_buf();
         let stats = line_stats.clone();
+        let raw_stats = raw_stats.cloned();
 
         if sloc > limit {
             CheckResult::Failed {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 suggestions: None,
@@ -399,6 +406,7 @@ impl Checker for ThresholdChecker {
             CheckResult::Warning {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 suggestions: None,
@@ -408,6 +416,7 @@ impl Checker for ThresholdChecker {
             CheckResult::Passed {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 violation_category: None,

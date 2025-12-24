@@ -9,7 +9,7 @@ fn check_passes_under_threshold() {
     let checker = ThresholdChecker::new(default_config());
     let stats = stats_with_code(100);
 
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_passed());
     assert_eq!(result.limit(), 500);
@@ -20,7 +20,7 @@ fn check_fails_over_threshold() {
     let checker = ThresholdChecker::new(default_config());
     let stats = stats_with_code(600);
 
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_failed());
 }
@@ -30,7 +30,7 @@ fn check_warns_near_threshold() {
     let checker = ThresholdChecker::new(default_config());
     let stats = stats_with_code(460);
 
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_warning());
 }
@@ -53,7 +53,7 @@ fn check_uses_rule_specific_limit() {
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(350);
 
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_failed());
     assert_eq!(result.limit(), 300);
@@ -71,7 +71,7 @@ fn check_uses_override_for_specific_file() {
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(700);
 
-    let result = checker.check(Path::new("src/legacy.rs"), &stats);
+    let result = checker.check(Path::new("src/legacy.rs"), &stats, None);
 
     assert!(result.is_passed());
     assert_eq!(result.limit(), 800);
@@ -90,7 +90,7 @@ fn check_override_without_reason() {
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(700);
 
-    let result = checker.check(Path::new("src/special.rs"), &stats);
+    let result = checker.check(Path::new("src/special.rs"), &stats, None);
 
     assert!(result.is_passed());
     assert_eq!(result.limit(), 800);
@@ -102,7 +102,7 @@ fn check_no_override_reason_when_using_default() {
     let checker = ThresholdChecker::new(default_config());
     let stats = stats_with_code(100);
 
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_passed());
     assert_eq!(result.override_reason(), None);
@@ -119,6 +119,7 @@ fn check_result_usage_percent() {
             blank: 5,
             ignored: 0,
         },
+        raw_stats: None,
         limit: 500,
         override_reason: None,
         violation_category: None,
@@ -132,7 +133,7 @@ fn custom_warning_threshold() {
     let checker = ThresholdChecker::new(default_config()).with_warning_threshold(0.8);
     let stats = stats_with_code(410);
 
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_warning());
 }
@@ -142,6 +143,7 @@ fn check_result_is_methods() {
     let passed = CheckResult::Passed {
         path: PathBuf::from("test.rs"),
         stats: stats_with_code(100),
+        raw_stats: None,
         limit: 500,
         override_reason: None,
         violation_category: None,
@@ -149,6 +151,7 @@ fn check_result_is_methods() {
     let failed = CheckResult::Failed {
         path: PathBuf::from("test.rs"),
         stats: stats_with_code(600),
+        raw_stats: None,
         limit: 500,
         override_reason: None,
         suggestions: None,
@@ -157,6 +160,7 @@ fn check_result_is_methods() {
     let warning = CheckResult::Warning {
         path: PathBuf::from("test.rs"),
         stats: stats_with_code(450),
+        raw_stats: None,
         limit: 500,
         override_reason: None,
         suggestions: None,
@@ -169,4 +173,103 @@ fn check_result_is_methods() {
     assert!(!failed.is_passed());
     assert!(warning.is_warning());
     assert!(!warning.is_failed());
+}
+
+#[test]
+fn raw_stats_returns_raw_when_present() {
+    let raw = LineStats {
+        total: 160,
+        code: 100,
+        comment: 50,
+        blank: 10,
+        ignored: 0,
+    };
+    let effective = LineStats {
+        total: 100,
+        code: 100,
+        comment: 0,
+        blank: 0,
+        ignored: 0,
+    };
+
+    let result = CheckResult::Passed {
+        path: PathBuf::from("test.rs"),
+        stats: effective,
+        raw_stats: Some(raw),
+        limit: 500,
+        override_reason: None,
+        violation_category: None,
+    };
+
+    assert_eq!(result.raw_stats().comment, 50);
+    assert_eq!(result.raw_stats().blank, 10);
+    assert_eq!(result.raw_stats().code, 100);
+}
+
+#[test]
+fn raw_stats_falls_back_to_stats_when_none() {
+    let result = CheckResult::Passed {
+        path: PathBuf::from("test.rs"),
+        stats: LineStats {
+            total: 135,
+            code: 100,
+            comment: 25,
+            blank: 10,
+            ignored: 0,
+        },
+        raw_stats: None,
+        limit: 500,
+        override_reason: None,
+        violation_category: None,
+    };
+
+    assert_eq!(result.raw_stats().comment, 25);
+    assert_eq!(result.raw_stats().blank, 10);
+    assert_eq!(result.raw_stats().code, 100);
+}
+
+#[test]
+fn raw_stats_works_for_all_variants() {
+    let raw = LineStats {
+        total: 160,
+        code: 100,
+        comment: 50,
+        blank: 10,
+        ignored: 0,
+    };
+
+    // Test Warning variant
+    let warning = CheckResult::Warning {
+        path: PathBuf::from("test.rs"),
+        stats: stats_with_code(100),
+        raw_stats: Some(raw.clone()),
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+        violation_category: None,
+    };
+    assert_eq!(warning.raw_stats().comment, 50);
+
+    // Test Failed variant
+    let failed = CheckResult::Failed {
+        path: PathBuf::from("test.rs"),
+        stats: stats_with_code(100),
+        raw_stats: Some(raw.clone()),
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+        violation_category: None,
+    };
+    assert_eq!(failed.raw_stats().comment, 50);
+
+    // Test Grandfathered variant
+    let grandfathered = CheckResult::Grandfathered {
+        path: PathBuf::from("test.rs"),
+        stats: stats_with_code(100),
+        raw_stats: Some(raw),
+        limit: 500,
+        override_reason: None,
+        violation_category: None,
+    };
+    assert_eq!(grandfathered.raw_stats().comment, 50);
 }

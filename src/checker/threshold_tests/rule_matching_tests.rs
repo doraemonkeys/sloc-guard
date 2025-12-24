@@ -22,7 +22,7 @@ fn path_rule_matches_glob_pattern() {
     let stats = stats_with_code(800);
 
     // File matching the glob pattern should use content.rules max_lines
-    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats, None);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 1000);
 }
@@ -45,7 +45,7 @@ fn path_rule_does_not_match_unrelated_path() {
     let stats = stats_with_code(600);
 
     // File not matching the pattern should use default
-    let result = checker.check(Path::new("src/lib.rs"), &stats);
+    let result = checker.check(Path::new("src/lib.rs"), &stats, None);
     assert!(result.is_failed());
     assert_eq!(result.limit(), 500);
 }
@@ -73,7 +73,7 @@ fn path_rule_has_lower_priority_than_override() {
     let stats = stats_with_code(1500);
 
     // Override should take priority over content.rules
-    let result = checker.check(Path::new("src/generated/special.rs"), &stats);
+    let result = checker.check(Path::new("src/generated/special.rs"), &stats, None);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 2000);
 }
@@ -108,12 +108,12 @@ fn path_rule_has_higher_priority_than_extension_rule() {
     let stats = stats_with_code(400);
 
     // path_rule should override extension rule (last match wins)
-    let result = checker.check(Path::new("src/proto/messages.rs"), &stats);
+    let result = checker.check(Path::new("src/proto/messages.rs"), &stats, None);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 800);
 
     // Non-matching path should use extension rule
-    let result2 = checker.check(Path::new("src/lib.rs"), &stats);
+    let result2 = checker.check(Path::new("src/lib.rs"), &stats, None);
     assert!(result2.is_failed());
     assert_eq!(result2.limit(), 300);
 }
@@ -146,7 +146,7 @@ fn multiple_path_rules_last_match_wins() {
     let stats = stats_with_code(700);
 
     // Last matching rule should be used (1000 limit)
-    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats, None);
     assert!(result.is_passed()); // 700 < 1000
     assert_eq!(result.limit(), 1000);
 }

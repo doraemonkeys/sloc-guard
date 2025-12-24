@@ -19,7 +19,7 @@ pub fn process_file_for_check(
     let (stats, language) = process_file_with_cache(file_path, registry, cache, reader)?;
     let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
     let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
-    let check_result = checker.check(file_path, &effective_stats);
+    let check_result = checker.check(file_path, &effective_stats, Some(&stats));
     let file_stats = FileStatistics {
         path: file_path.to_path_buf(),
         stats,

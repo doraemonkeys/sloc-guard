@@ -119,6 +119,7 @@ pub fn structure_violation_to_check_result(violation: &StructureViolation) -> Ch
         CheckResult::Warning {
             path: violation.path.clone(),
             stats,
+            raw_stats: None, // Structure violations don't have raw vs effective stats
             limit: violation.limit,
             override_reason,
             suggestions: None,
@@ -128,6 +129,7 @@ pub fn structure_violation_to_check_result(violation: &StructureViolation) -> Ch
         CheckResult::Failed {
             path: violation.path.clone(),
             stats,
+            raw_stats: None, // Structure violations don't have raw vs effective stats
             limit: violation.limit,
             override_reason,
             suggestions: None,

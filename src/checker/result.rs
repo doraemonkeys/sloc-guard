@@ -13,11 +13,15 @@ use super::structure::violation::ViolationCategory;
 ///
 /// The `violation_category` field distinguishes between content (SLOC) and structure
 /// violations, preserving the structured `ViolationType` for structure violations.
+///
+/// `stats` contains the effective line counts (used for limit checking), while
+/// `raw_stats` contains the original counts before `skip_comments`/`skip_blank` adjustments.
 #[derive(Debug, Clone)]
 pub enum CheckResult {
     Passed {
         path: PathBuf,
         stats: LineStats,
+        raw_stats: Option<LineStats>,
         limit: usize,
         override_reason: Option<String>,
         violation_category: Option<ViolationCategory>,
@@ -25,6 +29,7 @@ pub enum CheckResult {
     Warning {
         path: PathBuf,
         stats: LineStats,
+        raw_stats: Option<LineStats>,
         limit: usize,
         override_reason: Option<String>,
         suggestions: Option<SplitSuggestion>,
@@ -33,6 +38,7 @@ pub enum CheckResult {
     Failed {
         path: PathBuf,
         stats: LineStats,
+        raw_stats: Option<LineStats>,
         limit: usize,
         override_reason: Option<String>,
         suggestions: Option<SplitSuggestion>,
@@ -41,6 +47,7 @@ pub enum CheckResult {
     Grandfathered {
         path: PathBuf,
         stats: LineStats,
+        raw_stats: Option<LineStats>,
         limit: usize,
         override_reason: Option<String>,
         violation_category: Option<ViolationCategory>,
@@ -67,6 +74,27 @@ impl CheckResult {
             | Self::Warning { stats, .. }
             | Self::Failed { stats, .. }
             | Self::Grandfathered { stats, .. } => stats,
+        }
+    }
+
+    /// Returns the raw (original) statistics before `skip_comments`/`skip_blank` adjustments.
+    ///
+    /// Falls back to effective stats if raw stats are not available (e.g., structure violations).
+    #[must_use]
+    pub fn raw_stats(&self) -> &LineStats {
+        match self {
+            Self::Passed {
+                raw_stats, stats, ..
+            }
+            | Self::Warning {
+                raw_stats, stats, ..
+            }
+            | Self::Failed {
+                raw_stats, stats, ..
+            }
+            | Self::Grandfathered {
+                raw_stats, stats, ..
+            } => raw_stats.as_ref().unwrap_or(stats),
         }
     }
 
@@ -160,6 +188,7 @@ impl CheckResult {
             Self::Failed {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 violation_category,
@@ -167,6 +196,7 @@ impl CheckResult {
             } => Self::Grandfathered {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 violation_category,
@@ -183,6 +213,7 @@ impl CheckResult {
             Self::Warning {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 violation_category,
@@ -190,6 +221,7 @@ impl CheckResult {
             } => Self::Warning {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 suggestions: Some(new_suggestions),
@@ -198,6 +230,7 @@ impl CheckResult {
             Self::Failed {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 violation_category,
@@ -205,6 +238,7 @@ impl CheckResult {
             } => Self::Failed {
                 path,
                 stats,
+                raw_stats,
                 limit,
                 override_reason,
                 suggestions: Some(new_suggestions),

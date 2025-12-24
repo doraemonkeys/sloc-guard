@@ -39,6 +39,7 @@ pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &Langua
                 CheckResult::Passed {
                     path: std::path::PathBuf::new(),
                     stats: LineStats::default(),
+                    raw_stats: None,
                     limit: 0,
                     override_reason: None,
                     violation_category: None,

@@ -207,12 +207,12 @@ impl TextFormatter {
         )
         .ok();
 
+        // Show raw stats in breakdown (before skip_comments/skip_blank adjustments)
+        let raw = result.raw_stats();
         writeln!(
             output,
             "   Breakdown: code={}, comment={}, blank={}",
-            result.stats().code,
-            result.stats().comment,
-            result.stats().blank
+            raw.code, raw.comment, raw.blank
         )
         .ok();
     }

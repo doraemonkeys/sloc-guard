@@ -22,7 +22,7 @@ fn path_rule_warn_threshold_overrides_default() {
     let stats = stats_with_code(999); // 99.9% of limit
 
     // With warn_threshold=1.0, should not warn
-    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats, None);
     assert!(result.is_passed());
 }
 
@@ -44,7 +44,7 @@ fn path_rule_without_warn_threshold_uses_default() {
     let stats = stats_with_code(950); // 95% of limit, above 90%
 
     // Without custom warn_threshold, should use default (0.9)
-    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats, None);
     assert!(result.is_warning());
 }
 
@@ -67,7 +67,7 @@ fn rule_warn_threshold_overrides_default() {
     let stats = stats_with_code(410); // 82% of 500 limit
 
     // With rule warn_threshold=0.8, should warn at 82%
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
     assert!(result.is_warning());
 }
 
@@ -90,7 +90,7 @@ fn rule_without_warn_threshold_uses_default() {
     let stats = stats_with_code(410); // 82% of 500 limit
 
     // Without rule warn_threshold, should use default 0.9 (no warning at 82%)
-    let result = checker.check(Path::new("test.rs"), &stats);
+    let result = checker.check(Path::new("test.rs"), &stats, None);
     assert!(result.is_passed());
 }
 
@@ -123,11 +123,11 @@ fn path_rule_warn_threshold_overrides_extension_rule() {
     let stats = stats_with_code(450); // 90% of limit
 
     // path_rule warn_threshold=1.0 should override extension rule's 0.8 (last match wins)
-    let result = checker.check(Path::new("src/generated/parser.rs"), &stats);
+    let result = checker.check(Path::new("src/generated/parser.rs"), &stats, None);
     assert!(result.is_passed());
 
     // Non-matching path should use extension rule's warn_threshold=0.8
-    let result2 = checker.check(Path::new("src/lib.rs"), &stats);
+    let result2 = checker.check(Path::new("src/lib.rs"), &stats, None);
     assert!(result2.is_warning());
 }
 
@@ -165,7 +165,7 @@ fn multiple_rules_winner_takes_all_warn_threshold() {
     // If inherit 0.5 -> Warn.
     // If winner takes all 0.9 -> Pass.
 
-    let result = checker.check(Path::new("src/main.rs"), &stats);
+    let result = checker.check(Path::new("src/main.rs"), &stats, None);
 
     // With fix, this should PASS (uses 0.9).
     assert!(result.is_passed());
@@ -193,14 +193,14 @@ fn rule_warn_at_takes_precedence_over_percentage_threshold() {
     let checker = ThresholdChecker::new(config);
 
     // 360 lines: above 350 (absolute), below 400 (percentage) → should warn
-    let result = checker.check(Path::new("test.rs"), &stats_with_code(360));
+    let result = checker.check(Path::new("test.rs"), &stats_with_code(360), None);
     assert!(
         result.is_warning(),
         "Should warn at 360 (above 350 absolute)"
     );
 
     // 340 lines: below 350 → should pass
-    let result = checker.check(Path::new("test.rs"), &stats_with_code(340));
+    let result = checker.check(Path::new("test.rs"), &stats_with_code(340), None);
     assert!(
         result.is_passed(),
         "Should pass at 340 (below 350 absolute)"
@@ -217,14 +217,14 @@ fn global_warn_at_takes_precedence_over_global_percentage() {
     let checker = ThresholdChecker::new(config);
 
     // 420 lines: above 400 (absolute), below 450 (percentage) → should warn
-    let result = checker.check(Path::new("test.rs"), &stats_with_code(420));
+    let result = checker.check(Path::new("test.rs"), &stats_with_code(420), None);
     assert!(
         result.is_warning(),
         "Should warn at 420 (above 400 absolute)"
     );
 
     // 380 lines: below 400 → should pass
-    let result = checker.check(Path::new("test.rs"), &stats_with_code(380));
+    let result = checker.check(Path::new("test.rs"), &stats_with_code(380), None);
     assert!(
         result.is_passed(),
         "Should pass at 380 (below 400 absolute)"
@@ -251,26 +251,26 @@ fn rule_warn_at_overrides_global_warn_at() {
     let checker = ThresholdChecker::new(config);
 
     // Matching file: should use rule's warn_at (350)
-    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(360));
+    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(360), None);
     assert!(
         result.is_warning(),
         "Rule file should warn at 360 (above 350)"
     );
 
-    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(340));
+    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(340), None);
     assert!(
         result.is_passed(),
         "Rule file should pass at 340 (below 350)"
     );
 
     // Non-matching file: should use global warn_at (450)
-    let result = checker.check(Path::new("other.rs"), &stats_with_code(460));
+    let result = checker.check(Path::new("other.rs"), &stats_with_code(460), None);
     assert!(
         result.is_warning(),
         "Non-rule file should warn at 460 (above 450)"
     );
 
-    let result = checker.check(Path::new("other.rs"), &stats_with_code(440));
+    let result = checker.check(Path::new("other.rs"), &stats_with_code(440), None);
     assert!(
         result.is_passed(),
         "Non-rule file should pass at 440 (below 450)"
@@ -297,10 +297,10 @@ fn rule_warn_threshold_used_when_no_warn_at() {
     let checker = ThresholdChecker::new(config);
 
     // Rule file: should use rule's warn_threshold (800)
-    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(810));
+    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(810), None);
     assert!(result.is_warning(), "Should warn at 810 (above 800)");
 
-    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(790));
+    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(790), None);
     assert!(result.is_passed(), "Should pass at 790 (below 800)");
 }
 

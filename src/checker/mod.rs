@@ -17,7 +17,11 @@ use std::path::Path;
 use crate::counter::LineStats;
 
 pub trait Checker {
-    fn check(&self, path: &Path, stats: &LineStats) -> CheckResult;
+    /// Check a file against configured thresholds.
+    ///
+    /// - `stats`: Effective line stats (after `skip_comments`/`skip_blank` adjustments)
+    /// - `raw_stats`: Original line stats before adjustments (for display in breakdown)
+    fn check(&self, path: &Path, stats: &LineStats, raw_stats: Option<&LineStats>) -> CheckResult;
 }
 
 #[cfg(test)]
