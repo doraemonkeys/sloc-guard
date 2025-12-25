@@ -79,8 +79,7 @@ reason = "No file limit for test directories"
 
 [[structure.rules]]
 scope = "src/features/**"
-file_pattern = "*.tsx"
-require_sibling = "{stem}.test.tsx"
+siblings = [{ match = "*.tsx", require = "{stem}.test.tsx" }]
 reason = "Every component must have a test file"
 
 # =============================================================================
