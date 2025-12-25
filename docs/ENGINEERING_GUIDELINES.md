@@ -9,9 +9,7 @@
 
 ### Best Practices
 * Break down complex problems into smaller, manageable parts
-* Don't ignore errors
 * Consider performance implications
-* Logical Completeness: Always strive for the most complete and correct logical model. Do not let legacy requirements compromise the integrity of the new design.
 
 
 ### Design for Testability
@@ -34,7 +32,8 @@ Follow standard Rust idioms (The "Rust way").
 * Use `#[allow()]` sparingly. Avoid bypassing CI lint checks unless there's a justified reason documented in a comment.
 
 
-### Other Rules
+### Design Principles
 * Principle of Least Surprise: Design logic to be intuitive. Code implementation must behave as a developer expects, and functional design must align with the user's intuition.
+* Logical Completeness: Prioritize first-principles domain modeling and logical orthogonality; favor refactoring core structures to capture native semantics over adding additive flags or 'patch' parameters.
 * No Backward Compatibility: Prioritize architectural correctness over legacy support. You are free to break old formats if it results in a cleaner design.
 * Refactoring Circuit Breaker: If achieving the ideal structure requires a massive, high-risk rewrite (e.g., changing core assumptions), STOP and explain the scope and complexity first. 
