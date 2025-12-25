@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use serde::Serialize;
 
 use crate::analyzer::SplitSuggestion;
@@ -5,9 +7,11 @@ use crate::checker::{CheckResult, ViolationCategory};
 use crate::error::Result;
 
 use super::OutputFormatter;
+use super::path::display_path;
 
 pub struct JsonFormatter {
     show_suggestions: bool,
+    project_root: Option<PathBuf>,
 }
 
 impl JsonFormatter {
@@ -15,6 +19,7 @@ impl JsonFormatter {
     pub const fn new() -> Self {
         Self {
             show_suggestions: false,
+            project_root: None,
         }
     }
 
@@ -22,6 +27,16 @@ impl JsonFormatter {
     pub const fn with_suggestions(mut self, show: bool) -> Self {
         self.show_suggestions = show;
         self
+    }
+
+    #[must_use]
+    pub fn with_project_root(mut self, root: Option<PathBuf>) -> Self {
+        self.project_root = root;
+        self
+    }
+
+    fn display_path(&self, path: &Path) -> String {
+        display_path(path, self.project_root.as_deref())
     }
 }
 
@@ -89,42 +104,43 @@ impl OutputFormatter for JsonFormatter {
                 failed,
                 grandfathered,
             },
-            results: results
-                .iter()
-                .map(|r| convert_result(r, self.show_suggestions))
-                .collect(),
+            results: results.iter().map(|r| self.convert_result(r)).collect(),
         };
 
         Ok(serde_json::to_string_pretty(&output)?)
     }
 }
 
-fn convert_result(result: &CheckResult, show_suggestions: bool) -> FileResult {
-    let suggestions = if show_suggestions {
-        result.suggestions().cloned()
-    } else {
-        None
-    };
+impl JsonFormatter {
+    fn convert_result(&self, result: &CheckResult) -> FileResult {
+        let suggestions = if self.show_suggestions {
+            result.suggestions().cloned()
+        } else {
+            None
+        };
 
-    FileResult {
-        path: result.path().display().to_string(),
-        status: match result {
-            CheckResult::Passed { .. } => "passed".to_string(),
-            CheckResult::Warning { .. } => "warning".to_string(),
-            CheckResult::Failed { .. } => "failed".to_string(),
-            CheckResult::Grandfathered { .. } => "grandfathered".to_string(),
-        },
-        sloc: result.stats().sloc(),
-        limit: result.limit(),
-        stats: FileStats {
-            total: result.stats().total,
-            code: result.stats().code,
-            comment: result.stats().comment,
-            blank: result.stats().blank,
-        },
-        override_reason: result.override_reason().map(String::from),
-        violation_category: result.violation_category().cloned(),
-        suggestions,
+        // Use raw_stats for display (before skip_comments/skip_blank adjustments)
+        let raw = result.raw_stats();
+        FileResult {
+            path: self.display_path(result.path()),
+            status: match result {
+                CheckResult::Passed { .. } => "passed".to_string(),
+                CheckResult::Warning { .. } => "warning".to_string(),
+                CheckResult::Failed { .. } => "failed".to_string(),
+                CheckResult::Grandfathered { .. } => "grandfathered".to_string(),
+            },
+            sloc: result.stats().sloc(),
+            limit: result.limit(),
+            stats: FileStats {
+                total: raw.total,
+                code: raw.code,
+                comment: raw.comment,
+                blank: raw.blank,
+            },
+            override_reason: result.override_reason().map(String::from),
+            violation_category: result.violation_category().cloned(),
+            suggestions,
+        }
     }
 }
 

@@ -75,7 +75,9 @@ pub fn ensure_parent_dir(path: &Path) -> io::Result<()> {
 /// If `start` cannot be canonicalized, returns it as-is.
 #[must_use]
 pub fn discover_project_root(start: &Path) -> PathBuf {
-    let abs_start = fs::canonicalize(start).unwrap_or_else(|_| start.to_path_buf());
+    // Use dunce::canonicalize to avoid \\?\ UNC prefix on Windows,
+    // ensuring consistent path comparison with scanner output
+    let abs_start = dunce::canonicalize(start).unwrap_or_else(|_| start.to_path_buf());
 
     for ancestor in abs_start.ancestors() {
         if ancestor.join(".git").is_dir() {

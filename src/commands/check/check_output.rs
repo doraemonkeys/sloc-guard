@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::checker::{CheckResult, StructureViolation, ViolationCategory, ViolationType};
 use crate::counter::LineStats;
 use crate::output::{
@@ -12,22 +14,29 @@ pub fn format_output(
     verbose: u8,
     show_suggestions: bool,
     project_stats: Option<ProjectStatistics>,
+    project_root: Option<PathBuf>,
 ) -> crate::Result<String> {
     match format {
         OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose)
             .with_suggestions(show_suggestions)
+            .with_project_root(project_root)
             .format(results),
         OutputFormat::Json => JsonFormatter::new()
             .with_suggestions(show_suggestions)
+            .with_project_root(project_root)
             .format(results),
         OutputFormat::Sarif => SarifFormatter::new()
             .with_suggestions(show_suggestions)
+            .with_project_root(project_root)
             .format(results),
         OutputFormat::Markdown => MarkdownFormatter::new()
             .with_suggestions(show_suggestions)
+            .with_project_root(project_root)
             .format(results),
         OutputFormat::Html => {
-            let mut formatter = HtmlFormatter::new().with_suggestions(show_suggestions);
+            let mut formatter = HtmlFormatter::new()
+                .with_suggestions(show_suggestions)
+                .with_project_root(project_root);
             if let Some(stats) = project_stats {
                 formatter = formatter.with_stats(stats);
             }

@@ -1,12 +1,15 @@
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 
 use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
+use super::path::display_path;
 
 pub struct MarkdownFormatter {
     show_suggestions: bool,
+    project_root: Option<PathBuf>,
 }
 
 impl MarkdownFormatter {
@@ -14,6 +17,7 @@ impl MarkdownFormatter {
     pub const fn new() -> Self {
         Self {
             show_suggestions: false,
+            project_root: None,
         }
     }
 
@@ -21,6 +25,16 @@ impl MarkdownFormatter {
     pub const fn with_suggestions(mut self, show: bool) -> Self {
         self.show_suggestions = show;
         self
+    }
+
+    #[must_use]
+    pub fn with_project_root(mut self, root: Option<PathBuf>) -> Self {
+        self.project_root = root;
+        self
+    }
+
+    fn display_path(&self, path: &Path) -> String {
+        display_path(path, self.project_root.as_deref())
     }
 
     const fn status_icon(result: &CheckResult) -> &'static str {
@@ -83,29 +97,32 @@ impl OutputFormatter for MarkdownFormatter {
             writeln!(output, "### Details\n").ok();
             writeln!(
                 output,
-                "| Status | File | Lines | Limit | Code | Comment | Blank | Reason |"
+                "| Status | File | Total | Lines | Limit | Code | Comment | Blank | Reason |"
             )
             .ok();
             writeln!(
                 output,
-                "|:------:|------|------:|------:|-----:|--------:|------:|--------|"
+                "|:------:|------|------:|------:|------:|-----:|--------:|------:|--------|"
             )
             .ok();
 
             for result in &non_passed {
                 let icon = Self::status_icon(result);
                 let status = Self::status_text(result);
-                let path = result.path().display();
+                let path = self.display_path(result.path());
+                // Use raw_stats for display (before skip_comments/skip_blank adjustments)
+                let raw = result.raw_stats();
+                let total = raw.total;
                 let sloc = result.stats().sloc();
                 let limit = result.limit();
-                let code = result.stats().code;
-                let comment = result.stats().comment;
-                let blank = result.stats().blank;
+                let code = raw.code;
+                let comment = raw.comment;
+                let blank = raw.blank;
                 let reason = result.override_reason().unwrap_or("-");
 
                 writeln!(
                     output,
-                    "| {icon} {status} | `{path}` | {sloc} | {limit} | {code} | {comment} | {blank} | {reason} |"
+                    "| {icon} {status} | `{path}` | {total} | {sloc} | {limit} | {code} | {comment} | {blank} | {reason} |"
                 )
                 .ok();
             }
@@ -126,7 +143,7 @@ impl OutputFormatter for MarkdownFormatter {
 
                     for result in with_suggestions {
                         if let Some(suggestion) = result.suggestions() {
-                            writeln!(output, "#### `{}`\n", result.path().display()).ok();
+                            writeln!(output, "#### `{}`\n", self.display_path(result.path())).ok();
                             writeln!(output, "| Suggested File | Lines | Functions |").ok();
                             writeln!(output, "|----------------|------:|-----------|").ok();
 

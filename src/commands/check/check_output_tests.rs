@@ -15,6 +15,7 @@ fn format_output_text() {
         0,
         false,
         None,
+        None,
     )
     .unwrap();
     assert!(output.contains("Summary"));
@@ -30,6 +31,7 @@ fn format_output_json() {
         0,
         false,
         None,
+        None,
     )
     .unwrap();
     assert!(output.contains("summary"));
@@ -44,6 +46,7 @@ fn format_output_sarif_works() {
         ColorMode::Never,
         0,
         false,
+        None,
         None,
     );
     assert!(result.is_ok());
@@ -61,6 +64,7 @@ fn format_output_markdown_works() {
         ColorMode::Never,
         0,
         false,
+        None,
         None,
     );
     assert!(result.is_ok());

@@ -198,6 +198,7 @@ fn verbose_one_shows_passed_files() {
     // Passed file details should appear
     assert!(output.contains("PASSED"));
     assert!(output.contains("passed.rs"));
+    assert!(output.contains("Total: 110")); // code(100) + comment(5) + blank(5)
     assert!(output.contains("Lines: 100"));
 }
 
@@ -550,6 +551,7 @@ fn format_content_violation_category() {
 
     let output = formatter.format(&results).unwrap();
 
+    assert!(output.contains("Total: 610"));
     assert!(output.contains("Lines: 600 (limit: 500)"));
     assert!(output.contains("Breakdown: code=600, comment=5, blank=5"));
 }

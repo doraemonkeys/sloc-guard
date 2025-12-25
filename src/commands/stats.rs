@@ -134,7 +134,7 @@ pub(crate) fn run_stats_with_context(
     let project_stats = ProjectStatistics::new(file_stats);
     let project_stats = match args.group_by {
         GroupBy::Lang => project_stats.with_language_breakdown(),
-        GroupBy::Dir => project_stats.with_directory_breakdown(),
+        GroupBy::Dir => project_stats.with_directory_breakdown_relative(Some(project_root)),
         GroupBy::None => project_stats,
     };
     let project_stats = if let Some(n) = args.top {
@@ -203,7 +203,7 @@ pub(crate) fn run_stats_with_context(
 
     // 6. Format output
     let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_output(args.format, &project_stats, color_mode)?;
+    let output = format_stats_output(args.format, &project_stats, color_mode, Some(project_root))?;
 
     // 7. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -229,14 +229,21 @@ pub(crate) fn format_stats_output(
     format: OutputFormat,
     stats: &ProjectStatistics,
     color_mode: ColorMode,
+    project_root: Option<&Path>,
 ) -> crate::Result<String> {
     match format {
-        OutputFormat::Text => StatsTextFormatter::new(color_mode).format(stats),
-        OutputFormat::Json => StatsJsonFormatter.format(stats),
+        OutputFormat::Text => StatsTextFormatter::new(color_mode)
+            .with_project_root(project_root.map(Path::to_path_buf))
+            .format(stats),
+        OutputFormat::Json => StatsJsonFormatter::new()
+            .with_project_root(project_root.map(Path::to_path_buf))
+            .format(stats),
         OutputFormat::Sarif => Err(crate::SlocGuardError::Config(
             "SARIF output format is not supported for stats command".to_string(),
         )),
-        OutputFormat::Markdown => StatsMarkdownFormatter.format(stats),
+        OutputFormat::Markdown => StatsMarkdownFormatter::new()
+            .with_project_root(project_root.map(Path::to_path_buf))
+            .format(stats),
         OutputFormat::Html => Err(crate::SlocGuardError::Config(
             "HTML output format is not yet supported for stats command".to_string(),
         )),

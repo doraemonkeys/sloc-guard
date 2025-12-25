@@ -4,6 +4,7 @@ mod html;
 mod html_template;
 mod json;
 mod markdown;
+mod path;
 mod progress;
 mod sarif;
 mod stats;
@@ -15,11 +16,12 @@ pub use error_output::{print_error, print_error_full, print_warning, print_warni
 pub use html::HtmlFormatter;
 pub use json::JsonFormatter;
 pub use markdown::MarkdownFormatter;
+pub use path::display_path;
 pub use progress::ScanProgress;
 pub use sarif::SarifFormatter;
 pub use stats::{
-    FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter, StatsJsonFormatter,
-    StatsMarkdownFormatter, StatsTextFormatter,
+    DirectoryStats, FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter,
+    StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 pub use text::{ColorMode, TextFormatter};
 

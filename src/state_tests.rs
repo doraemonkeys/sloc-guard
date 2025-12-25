@@ -107,7 +107,7 @@ fn discover_project_root_finds_git_directory() {
     fs::create_dir_all(&sub_dir).unwrap();
 
     let result = discover_project_root(&sub_dir);
-    assert_eq!(result, fs::canonicalize(temp_dir.path()).unwrap());
+    assert_eq!(result, dunce::canonicalize(temp_dir.path()).unwrap());
 }
 
 #[test]
@@ -121,7 +121,7 @@ fn discover_project_root_finds_config_file() {
     fs::create_dir(&sub_dir).unwrap();
 
     let result = discover_project_root(&sub_dir);
-    assert_eq!(result, fs::canonicalize(temp_dir.path()).unwrap());
+    assert_eq!(result, dunce::canonicalize(temp_dir.path()).unwrap());
 }
 
 #[test]
@@ -137,7 +137,7 @@ fn discover_project_root_prefers_git_over_config() {
 
     // Both markers exist, should find .git first
     let result = discover_project_root(&sub_dir);
-    assert_eq!(result, fs::canonicalize(temp_dir.path()).unwrap());
+    assert_eq!(result, dunce::canonicalize(temp_dir.path()).unwrap());
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn discover_project_root_stops_at_first_marker() {
 
     let result = discover_project_root(&sub_dir);
     // Should stop at inner project (config marker), not outer project (git marker)
-    assert_eq!(result, fs::canonicalize(&inner_project).unwrap());
+    assert_eq!(result, dunce::canonicalize(&inner_project).unwrap());
 }
 
 #[test]

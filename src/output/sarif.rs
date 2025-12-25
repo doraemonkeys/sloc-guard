@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use serde::Serialize;
 
 use crate::analyzer::SplitSuggestion;
@@ -5,10 +7,12 @@ use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::OutputFormatter;
+use super::path::display_path;
 
 /// SARIF 2.1.0 output formatter for GitHub Code Scanning and other CI/CD tools.
 pub struct SarifFormatter {
     show_suggestions: bool,
+    project_root: Option<PathBuf>,
 }
 
 impl SarifFormatter {
@@ -16,6 +20,7 @@ impl SarifFormatter {
     pub const fn new() -> Self {
         Self {
             show_suggestions: false,
+            project_root: None,
         }
     }
 
@@ -23,6 +28,16 @@ impl SarifFormatter {
     pub const fn with_suggestions(mut self, show: bool) -> Self {
         self.show_suggestions = show;
         self
+    }
+
+    #[must_use]
+    pub fn with_project_root(mut self, root: Option<PathBuf>) -> Self {
+        self.project_root = root;
+        self
+    }
+
+    fn display_path(&self, path: &Path) -> String {
+        display_path(path, self.project_root.as_deref())
     }
 }
 
@@ -184,7 +199,7 @@ impl SarifFormatter {
         ]
     }
 
-    fn convert_result(result: &CheckResult, show_suggestions: bool) -> Option<SarifResult> {
+    fn convert_result(&self, result: &CheckResult) -> Option<SarifResult> {
         if result.is_passed() {
             return None;
         }
@@ -226,10 +241,10 @@ impl SarifFormatter {
             CheckResult::Passed { .. } => unreachable!(),
         };
 
-        // Convert path to URI format (forward slashes)
-        let uri = result.path().display().to_string().replace('\\', "/");
+        // Convert path to URI format (already uses forward slashes from display_path)
+        let uri = self.display_path(result.path());
 
-        let suggestions = if show_suggestions {
+        let suggestions = if self.show_suggestions {
             result.suggestions().cloned()
         } else {
             None
@@ -253,11 +268,15 @@ impl SarifFormatter {
                 sloc: result.stats().sloc(),
                 limit: result.limit(),
                 usage_percent: result.usage_percent(),
-                stats: StatsProperties {
-                    total: result.stats().total,
-                    code: result.stats().code,
-                    comment: result.stats().comment,
-                    blank: result.stats().blank,
+                // Use raw_stats for display (before skip_comments/skip_blank adjustments)
+                stats: {
+                    let raw = result.raw_stats();
+                    StatsProperties {
+                        total: raw.total,
+                        code: raw.code,
+                        comment: raw.comment,
+                        blank: raw.blank,
+                    }
                 },
                 override_reason: result.override_reason().map(String::from),
                 suggestions,
@@ -270,7 +289,7 @@ impl OutputFormatter for SarifFormatter {
     fn format(&self, results: &[CheckResult]) -> Result<String> {
         let sarif_results: Vec<SarifResult> = results
             .iter()
-            .filter_map(|r| Self::convert_result(r, self.show_suggestions))
+            .filter_map(|r| self.convert_result(r))
             .collect();
 
         let log = SarifLog {

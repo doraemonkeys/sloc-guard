@@ -105,9 +105,15 @@ fn formats_details_table() {
     let output = formatter.format(&results).unwrap();
 
     assert!(output.contains("### Details"));
-    assert!(output.contains("| Status | File | Lines | Limit | Code | Comment | Blank | Reason |"));
-    assert!(output.contains("| ❌ Failed | `src/fail.rs` | 600 | 500 | 600 | 10 | 5 | - |"));
-    assert!(output.contains("| ⚠️ Warning | `src/warn.rs` | 450 | 500 | 450 | 10 | 5 | - |"));
+    assert!(
+        output.contains(
+            "| Status | File | Total | Lines | Limit | Code | Comment | Blank | Reason |"
+        )
+    );
+    // Total = code + comment + blank = 600 + 10 + 5 = 615
+    assert!(output.contains("| ❌ Failed | `src/fail.rs` | 615 | 600 | 500 | 600 | 10 | 5 | - |"));
+    // Total = 450 + 10 + 5 = 465
+    assert!(output.contains("| ⚠️ Warning | `src/warn.rs` | 465 | 450 | 500 | 450 | 10 | 5 | - |"));
 }
 
 #[test]
@@ -132,7 +138,8 @@ fn shows_grandfathered_count() {
     let output = formatter.format(&results).unwrap();
 
     assert!(output.contains("| 🔵 Grandfathered | 1 |"));
-    assert!(output.contains("| 🔵 Grandfathered | `src/legacy.rs`"));
+    // Total = 800 + 10 + 5 = 815
+    assert!(output.contains("| 🔵 Grandfathered | `src/legacy.rs` | 815 |"));
 }
 
 #[test]
@@ -182,8 +189,9 @@ fn override_reason_shown_in_table() {
     let output = formatter.format(&results).unwrap();
 
     assert!(output.contains("Legacy migration code"));
+    // Total = 765 (as specified in stats)
     assert!(output.contains(
-        "| ⚠️ Warning | `src/legacy.rs` | 750 | 800 | 750 | 10 | 5 | Legacy migration code |"
+        "| ⚠️ Warning | `src/legacy.rs` | 765 | 750 | 800 | 750 | 10 | 5 | Legacy migration code |"
     ));
 }
 

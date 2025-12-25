@@ -52,7 +52,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
 | ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
 | ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
-| **14. Path Output Fix**          | 19.1 Relative Path Output                                    |
+| ~~**14. Path Output Fix**~~      | ~~19.1 Relative Path Output~~ ✅                              |
 | **15. HTML Report Enhancement**  | 20.1 HTML Summary Stats, 20.2 File Total Column, 20.3 Stats HTML Format |
 
 ---
@@ -81,20 +81,9 @@ Implement HTML output format for `stats` command (`--format html`):
 
 ---
 
-## Phase 19: Path Handling (Pending)
+## Phase 19: Path Handling ✅
 
-### Task 19.1: Relative Path Output
-
-**Problem**: On Windows, `canonicalize()` returns extended-length paths (`\\?\C:\...`), and scanners produce absolute paths. Output formatters display these directly via `path.display()`.
-
-**Requirements**:
-1. All formatters output paths relative to project root (or current working directory)
-2. Eliminate `\\?\` prefix by avoiding `canonicalize()` or normalizing paths
-3. Path conversion happens at output stage (not in scanner/checker internals)
-
-**Affected Modules**:
-- `src/scanner/gitignore.rs`: Uses `canonicalize()` → use `dunce::canonicalize()` or normalize manually
-- `src/output/text.rs`, `json.rs`, `sarif.rs`, `markdown.rs`, `html.rs`: `path.display()` → convert to relative path
+### ~~Task 19.1: Relative Path Output~~ ✅
 
 
 

@@ -1,11 +1,13 @@
 use std::fmt::Write;
 use std::io::Write as IoWrite;
+use std::path::{Path, PathBuf};
 
 use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::error::Result;
 
 use super::OutputFormatter;
 use super::ansi;
+use super::path::display_path;
 
 /// Color output mode for terminal display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -59,6 +61,7 @@ pub struct TextFormatter {
     use_colors: bool,
     verbose: u8,
     show_suggestions: bool,
+    project_root: Option<PathBuf>,
 }
 
 impl TextFormatter {
@@ -74,6 +77,7 @@ impl TextFormatter {
             use_colors,
             verbose,
             show_suggestions: false,
+            project_root: None,
         }
     }
 
@@ -81,6 +85,16 @@ impl TextFormatter {
     pub const fn with_suggestions(mut self, show: bool) -> Self {
         self.show_suggestions = show;
         self
+    }
+
+    #[must_use]
+    pub fn with_project_root(mut self, root: Option<PathBuf>) -> Self {
+        self.project_root = root;
+        self
+    }
+
+    fn display_path(&self, path: &Path) -> String {
+        display_path(path, self.project_root.as_deref())
     }
 
     fn should_use_colors(mode: ColorMode) -> bool {
@@ -121,12 +135,8 @@ impl TextFormatter {
         };
         let colored_status = self.colorize(status_str, result);
 
-        writeln!(
-            output,
-            "{icon} {colored_status}: {}",
-            result.path().display()
-        )
-        .ok();
+        let path_display = self.display_path(result.path());
+        writeln!(output, "{icon} {colored_status}: {path_display}").ok();
 
         // Use structured ViolationCategory instead of parsing strings
         match result.violation_category() {
@@ -200,6 +210,9 @@ impl TextFormatter {
     }
 
     fn format_content_violation(result: &CheckResult, output: &mut Vec<u8>) {
+        // Show raw stats first (before skip_comments/skip_blank adjustments)
+        let raw = result.raw_stats();
+        writeln!(output, "   Total: {}", raw.total).ok();
         writeln!(
             output,
             "   Lines: {} (limit: {})",
@@ -208,8 +221,6 @@ impl TextFormatter {
         )
         .ok();
 
-        // Show raw stats in breakdown (before skip_comments/skip_blank adjustments)
-        let raw = result.raw_stats();
         writeln!(
             output,
             "   Breakdown: code={}, comment={}, blank={}",

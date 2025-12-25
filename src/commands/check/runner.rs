@@ -287,7 +287,9 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     if let Some(ref report_path) = args.report_json
         && let Some(ref stats) = project_stats
     {
-        let stats_json = StatsJsonFormatter.format(stats)?;
+        let stats_json = StatsJsonFormatter::new()
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats)?;
         write_output(Some(report_path), &stats_json, cli.quiet)?;
     }
 
@@ -300,6 +302,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         cli.verbose,
         args.suggest,
         project_stats,
+        Some(project_root.to_path_buf()),
     )?;
 
     // 9. Write output

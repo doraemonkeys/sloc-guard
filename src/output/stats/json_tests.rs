@@ -29,7 +29,7 @@ fn file_stats(
 #[test]
 fn json_formatter_empty() {
     let stats = ProjectStatistics::new(vec![]);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("\"total_files\": 0"));
     assert!(output.contains("\"files\": []"));
@@ -40,7 +40,7 @@ fn json_formatter_with_files() {
     let files = vec![file_stats("test.rs", 100, 80, 15, 5, "Rust")];
 
     let stats = ProjectStatistics::new(files);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("\"total_files\": 1"));
     assert!(output.contains("\"total_lines\": 100"));
@@ -54,7 +54,7 @@ fn json_formatter_valid_json() {
     let files = vec![file_stats("test.rs", 100, 80, 15, 5, "Rust")];
 
     let stats = ProjectStatistics::new(files);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("summary").is_some());
@@ -69,7 +69,7 @@ fn json_formatter_with_language_breakdown() {
     ];
 
     let stats = ProjectStatistics::new(files).with_language_breakdown();
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("by_language").is_some());
@@ -85,7 +85,7 @@ fn json_formatter_with_top_files() {
     ];
 
     let stats = ProjectStatistics::new(files).with_top_files(5);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("top_files").is_some());
@@ -104,7 +104,7 @@ fn json_formatter_with_directory_breakdown() {
     ];
 
     let stats = ProjectStatistics::new(files).with_directory_breakdown();
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("by_directory").is_some());
@@ -132,7 +132,7 @@ fn sample_trend_delta() -> TrendDelta {
 #[test]
 fn json_formatter_with_trend() {
     let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("trend").is_some());
@@ -144,7 +144,7 @@ fn json_formatter_with_trend() {
 #[test]
 fn json_formatter_without_trend() {
     let stats = ProjectStatistics::new(vec![]);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     assert!(parsed.get("trend").is_none());
@@ -164,7 +164,7 @@ fn json_formatter_trend_with_git_context() {
     };
 
     let stats = ProjectStatistics::new(vec![]).with_trend(trend_with_git);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     let trend = parsed.get("trend").expect("trend should be present");
@@ -197,7 +197,7 @@ fn json_formatter_trend_git_context_omitted_when_none() {
     };
 
     let stats = ProjectStatistics::new(vec![]).with_trend(trend_without_git);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     let trend = parsed.get("trend").expect("trend should be present");
@@ -228,7 +228,7 @@ fn json_formatter_trend_partial_git_context() {
     };
 
     let stats = ProjectStatistics::new(vec![]).with_trend(trend_commit_only);
-    let output = StatsJsonFormatter.format(&stats).unwrap();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
     let trend = parsed.get("trend").expect("trend should be present");

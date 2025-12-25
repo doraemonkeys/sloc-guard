@@ -181,6 +181,7 @@ fn formats_file_table() {
     assert!(output.contains("class=\"sortable\""));
     assert!(output.contains("<th>Status</th>") || output.contains("data-sort=\"status\">Status"));
     assert!(output.contains("<th") && output.contains(">File</th>"));
+    assert!(output.contains("<th") && output.contains(">Total</th>"));
     assert!(output.contains("<th") && output.contains(">Lines</th>"));
     assert!(output.contains("<th") && output.contains(">Limit</th>"));
     assert!(output.contains("src/fail.rs"));
@@ -470,6 +471,7 @@ fn numeric_cells_have_data_value_attribute() {
     let output = formatter.format(&results).unwrap();
 
     // Check that numeric cells have data-value for sorting
+    assert!(output.contains(r#"data-value="615""#)); // total lines (code + comment + blank)
     assert!(output.contains(r#"data-value="600""#)); // code lines (sloc)
     assert!(output.contains(r#"data-value="500""#)); // limit
 }

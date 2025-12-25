@@ -31,7 +31,7 @@ fn file_stats(
 #[test]
 fn markdown_formatter_empty() {
     let stats = ProjectStatistics::new(vec![]);
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("## SLOC Statistics"));
     assert!(output.contains("### Summary"));
@@ -43,7 +43,7 @@ fn markdown_formatter_with_files() {
     let files = vec![file_stats("test.rs", 100, 80, 15, 5, "Rust")];
 
     let stats = ProjectStatistics::new(files);
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("| Total Files | 1 |"));
     assert!(output.contains("| Total Lines | 100 |"));
@@ -60,7 +60,7 @@ fn markdown_formatter_with_top_files() {
     ];
 
     let stats = ProjectStatistics::new(files).with_top_files(5);
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("### Top 2 Largest Files"));
     assert!(output.contains("| # | File | Language | Code |"));
@@ -77,7 +77,7 @@ fn markdown_formatter_with_language_breakdown() {
     ];
 
     let stats = ProjectStatistics::new(files).with_language_breakdown();
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("### By Language"));
     assert!(output.contains("| Language | Files | Code | Comments | Blank |"));
@@ -93,7 +93,7 @@ fn markdown_formatter_with_directory_breakdown() {
     ];
 
     let stats = ProjectStatistics::new(files).with_directory_breakdown();
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("### By Directory"));
     assert!(output.contains("| Directory | Files | Code | Comments | Blank |"));
@@ -121,7 +121,7 @@ fn sample_trend_delta() -> TrendDelta {
 #[test]
 fn markdown_formatter_with_trend() {
     let stats = ProjectStatistics::new(vec![]).with_trend(sample_trend_delta());
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     // Header contains "Changes" and trend metrics
     assert!(output.contains("### Changes"));
@@ -133,7 +133,7 @@ fn markdown_formatter_with_trend() {
 #[test]
 fn markdown_formatter_without_trend() {
     let stats = ProjectStatistics::new(vec![]);
-    let output = StatsMarkdownFormatter.format(&stats).unwrap();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
 
     assert!(!output.contains("### Changes"));
 }

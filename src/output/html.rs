@@ -1,9 +1,11 @@
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 
 use crate::checker::CheckResult;
 use crate::error::Result;
 
 use super::html_template::{HTML_FOOTER, HTML_HEADER};
+use super::path::display_path;
 use super::svg::{FileSizeHistogram, LanguageBreakdownChart, SvgElement, TrendLineChart};
 use super::{OutputFormatter, ProjectStatistics};
 use crate::stats::TrendHistory;
@@ -13,6 +15,7 @@ pub struct HtmlFormatter {
     show_suggestions: bool,
     project_stats: Option<ProjectStatistics>,
     trend_history: Option<TrendHistory>,
+    project_root: Option<PathBuf>,
 }
 
 impl HtmlFormatter {
@@ -22,6 +25,7 @@ impl HtmlFormatter {
             show_suggestions: false,
             project_stats: None,
             trend_history: None,
+            project_root: None,
         }
     }
 
@@ -43,6 +47,16 @@ impl HtmlFormatter {
     pub fn with_trend_history(mut self, history: TrendHistory) -> Self {
         self.trend_history = Some(history);
         self
+    }
+
+    #[must_use]
+    pub fn with_project_root(mut self, root: Option<PathBuf>) -> Self {
+        self.project_root = root;
+        self
+    }
+
+    fn display_path(&self, path: &Path) -> String {
+        display_path(path, self.project_root.as_deref())
     }
 
     const fn status_class(result: &CheckResult) -> &'static str {
@@ -250,6 +264,9 @@ impl HtmlFormatter {
         output
             .push_str("                    <th class=\"sortable\" data-sort=\"text\">File</th>\n");
         output.push_str(
+            "                    <th class=\"sortable\" data-sort=\"number\">Total</th>\n",
+        );
+        output.push_str(
             "                    <th class=\"sortable\" data-sort=\"number\">Lines</th>\n",
         );
         output.push_str(
@@ -281,7 +298,7 @@ impl HtmlFormatter {
         let class = Self::status_class(result);
         let icon = Self::status_icon(result);
         let text = Self::status_text(result);
-        let path = html_escape(&result.path().display().to_string());
+        let path = html_escape(&self.display_path(result.path()));
 
         // Add data-status for filtering
         writeln!(output, "                <tr data-status=\"{class}\">").ok();
@@ -340,7 +357,18 @@ impl HtmlFormatter {
 
         output.push_str("                    </td>\n");
 
-        // Numeric cells with data-value for sorting
+        // Use raw_stats for display (before skip_comments/skip_blank adjustments)
+        let raw = result.raw_stats();
+
+        // Total: raw total lines (code + comment + blank)
+        let total = raw.total;
+        writeln!(
+            output,
+            r#"                    <td class="number" data-value="{total}">{total}</td>"#
+        )
+        .ok();
+
+        // Lines: effective SLOC after skip_comments/skip_blank rules
         let sloc = result.stats().sloc();
         writeln!(
             output,
@@ -353,19 +381,19 @@ impl HtmlFormatter {
             r#"                    <td class="number" data-value="{limit}">{limit}</td>"#
         )
         .ok();
-        let code = result.stats().code;
+        let code = raw.code;
         writeln!(
             output,
             r#"                    <td class="number" data-value="{code}">{code}</td>"#
         )
         .ok();
-        let comment = result.stats().comment;
+        let comment = raw.comment;
         writeln!(
             output,
             r#"                    <td class="number" data-value="{comment}">{comment}</td>"#
         )
         .ok();
-        let blank = result.stats().blank;
+        let blank = raw.blank;
         writeln!(
             output,
             r#"                    <td class="number" data-value="{blank}">{blank}</td>"#
