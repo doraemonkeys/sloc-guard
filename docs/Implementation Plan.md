@@ -53,13 +53,13 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 | ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
 | ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
 | ~~**14. Path Output Fix**~~      | ~~19.1 Relative Path Output~~ ✅                              |
-| **15. HTML Report Enhancement**  | 20.1 HTML Summary Stats, 20.2 File Total Column, 20.3 Stats HTML Format |
+| **15. HTML Report Enhancement**  | ~~20.1 HTML Summary Stats~~ ✅, 20.2 File Total Column, 20.3 Stats HTML Format |
 
 ---
 
 ## Phase 20: HTML Report Enhancement (Pending)
 
-### Task 20.1: HTML Summary Stats
+### ~~Task 20.1: HTML Summary Stats~~ ✅
 
 Add aggregate statistics to HTML report summary section:
 - Total lines, total code, total comments, total blanks

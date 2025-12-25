@@ -10,6 +10,25 @@ use super::svg::{FileSizeHistogram, LanguageBreakdownChart, SvgElement, TrendLin
 use super::{OutputFormatter, ProjectStatistics};
 use crate::stats::TrendHistory;
 
+/// Aggregate line statistics for summary display.
+#[derive(Default)]
+struct AggregateStats {
+    total: usize,
+    code: usize,
+    comment: usize,
+    blank: usize,
+}
+
+impl AggregateStats {
+    #[allow(clippy::missing_const_for_fn)] // Mutable self makes this impractical as const
+    fn accumulate(&mut self, stats: &crate::counter::LineStats) {
+        self.total += stats.total;
+        self.code += stats.code;
+        self.comment += stats.comment;
+        self.blank += stats.blank;
+    }
+}
+
 /// HTML formatter for generating standalone HTML reports.
 pub struct HtmlFormatter {
     show_suggestions: bool,
@@ -169,6 +188,7 @@ impl HtmlFormatter {
         warnings: usize,
         failed: usize,
         grandfathered: usize,
+        aggregate: &AggregateStats,
     ) {
         output.push_str("        <div class=\"summary-grid\">\n");
 
@@ -223,6 +243,55 @@ impl HtmlFormatter {
             )
             .ok();
         }
+
+        output.push_str("        </div>\n");
+
+        // Aggregate line statistics
+        Self::write_aggregate_stats(output, aggregate);
+    }
+
+    fn write_aggregate_stats(output: &mut String, stats: &AggregateStats) {
+        output.push_str("        <div class=\"summary-grid\">\n");
+
+        let total_lines = stats.total;
+        writeln!(
+            output,
+            r#"            <div class="summary-card">
+                <span class="value">{total_lines}</span>
+                <span class="label">Total Lines</span>
+            </div>"#
+        )
+        .ok();
+
+        let code = stats.code;
+        writeln!(
+            output,
+            r#"            <div class="summary-card">
+                <span class="value">{code}</span>
+                <span class="label">Code</span>
+            </div>"#
+        )
+        .ok();
+
+        let comment = stats.comment;
+        writeln!(
+            output,
+            r#"            <div class="summary-card">
+                <span class="value">{comment}</span>
+                <span class="label">Comments</span>
+            </div>"#
+        )
+        .ok();
+
+        let blank = stats.blank;
+        writeln!(
+            output,
+            r#"            <div class="summary-card">
+                <span class="value">{blank}</span>
+                <span class="label">Blanks</span>
+            </div>"#
+        )
+        .ok();
 
         output.push_str("        </div>\n");
     }
@@ -414,16 +483,18 @@ impl OutputFormatter for HtmlFormatter {
     fn format(&self, results: &[CheckResult]) -> Result<String> {
         let mut output = String::new();
 
-        // Count by status
+        // Count by status and aggregate line statistics
+        let mut aggregate = AggregateStats::default();
         let (passed, warnings, failed, grandfathered) =
-            results
-                .iter()
-                .fold((0, 0, 0, 0), |(p, w, f, g), r| match r {
+            results.iter().fold((0, 0, 0, 0), |(p, w, f, g), r| {
+                aggregate.accumulate(r.raw_stats());
+                match r {
                     CheckResult::Passed { .. } => (p + 1, w, f, g),
                     CheckResult::Warning { .. } => (p, w + 1, f, g),
                     CheckResult::Failed { .. } => (p, w, f + 1, g),
                     CheckResult::Grandfathered { .. } => (p, w, f, g + 1),
-                });
+                }
+            });
 
         Self::write_html_header(&mut output);
         Self::write_summary(
@@ -433,6 +504,7 @@ impl OutputFormatter for HtmlFormatter {
             warnings,
             failed,
             grandfathered,
+            &aggregate,
         );
 
         // Render charts if project stats or trend history are available
@@ -450,7 +522,7 @@ impl OutputFormatter for HtmlFormatter {
 }
 
 /// Escape HTML special characters.
-fn html_escape(s: &str) -> String {
+pub fn html_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
@@ -459,5 +531,5 @@ fn html_escape(s: &str) -> String {
 }
 
 #[cfg(test)]
-#[path = "html_tests.rs"]
+#[path = "html_tests/mod.rs"]
 mod tests;
