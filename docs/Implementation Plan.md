@@ -26,61 +26,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
 - **Phase 15**: 15.1 Colored Error Output, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment.
 
----
 
-## Phase 7: HTML Report Visualization (Pending)
-
-### ~~Task 7.1: SVG Chart Generation Core~~ ✅
-Location: `src/output/svg/`
-```
-- svg module with chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart)
-- viewBox-based responsive scaling via SvgBuilder
-- CSS variable integration (ChartColor::CssVar) for dark mode support
-- Accessibility: <title> elements, role="img", aria-labelledby
-```
-
-### ~~Task 7.2: File Size Distribution Histogram~~ ✅
-Location: `src/output/svg/histogram.rs`, `src/output/html.rs`
-```
-- FileSizeHistogram: vertical bar chart by SLOC ranges (0-50, 51-100, 101-200, 201-500, 500+)
-- Data source: ProjectStatistics via HtmlFormatter.with_stats()
-- Hover: <title> tooltips with file count per bucket
-- Empty state: "Not enough files for histogram" (<3 files)
-- CSS variable --color-chart-primary for theming
-```
-
-### ~~Task 7.3: Language Breakdown Chart~~ ✅
-Location: `src/output/svg/language_chart.rs`, `src/output/html.rs`
-```
-- LanguageBreakdownChart: horizontal bar chart sorted by SLOC (descending)
-- Data source: ProjectStatistics.by_language (pre-sorted)
-- Hover: <title> tooltips with language name + exact line count
-- Empty state: "No language data" message (when by_language is None or empty)
-- CSS variable --color-chart-primary for theming
-```
-
-### ~~Task 7.4: Trend Line Chart~~ ✅
-Location: `src/output/svg/trend_chart.rs`, `src/output/html.rs`
-```
-- TrendLineChart: line chart X=timestamp (MM/DD format), Y=code lines (auto-scaled)
-- Data source: TrendHistory via HtmlFormatter.with_trend_history()
-- Downsample to max 30 points (evenly sampled, preserves first/last)
-- Git context: git_ref/branch in X-axis labels and tooltips
-- Empty state: "No trend data" message when history empty
-- CSS variable --color-chart-primary for theming
-```
-
-### ~~Task 7.5: Chart Interactivity & Polish~~ ✅
-Location: `src/output/svg/trend_chart.rs`, `src/output/html_template.rs`
-```
-- Delta indicators: ↓green (decrease=good), ↑red (increase) with significance threshold
-- Hover tooltips via CSS :hover + <title> fallback with delta info
-- @media print styles: status prefixes, border fallbacks for color-only encoding
-- Smart X-axis labels: MM/DD for short range, W## (week) for >1 month range
-- CSS variables: --color-delta-good, --color-delta-bad, --color-delta-neutral
-```
-
----
 
 ## Phase 16: Trend Enhancement (Pending)
 
@@ -104,6 +50,41 @@ Location: `src/output/svg/trend_chart.rs`, `src/output/html_template.rs`
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
 | ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
+| **13. Sibling Rules Redesign**   | 18.1 Unified Siblings Config                                 |
+
+---
+
+## Phase 18: Sibling Rules Redesign (Pending)
+
+### Task 18.1: Unified Siblings Config
+
+Replace `file_pattern` + `require_sibling` with new `siblings` array supporting two rule types:
+
+**Config Change (Breaking):**
+```toml
+[[structure.rules]]
+scope = "src/components/**"
+reason = "Component file requirements"
+siblings = [
+    # Directed: if match found, require sibling(s)
+    { match = "*.tsx", require = "{stem}.test.tsx" },
+    { match = "*.tsx", require = ["{stem}.css", "{stem}.stories.tsx"], severity = "warn" },
+    
+    # Atomic group: if ANY exists, ALL must exist
+    { group = ["{stem}.c", "{stem}.h"] },
+    { group = ["{stem}.tsx", "{stem}.test.tsx", "{stem}.module.css"] },
+]
+```
+
+**Implementation:**
+1. Add `SiblingRule` enum in `config/model.rs`:
+   - `Group { group: Vec<String>, severity: Option<Severity> }`
+   - `Directed { match: String, require: Vec<String>, severity: Option<Severity> }`
+2. Replace `file_pattern`/`require_sibling` with `siblings: Vec<SiblingRule>` in `StructureRule`
+3. Update `StructureChecker::check_siblings()` to handle both rule types
+4. Add `GroupMissing` violation type for atomic group violations
+5. Update explain output for new sibling rule format
+6. Remove deprecated fields, update all tests
 
 ---
 
