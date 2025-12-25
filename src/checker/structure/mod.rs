@@ -291,11 +291,12 @@ impl StructureChecker {
 
     /// Check files for missing siblings.
     ///
-    /// For each file matching a sibling rule (directory pattern + file pattern),
-    /// verifies that a sibling file matching the template exists in the same directory.
+    /// Supports two rule types:
+    /// - **Directed**: If a file matches the pattern, require specific sibling(s).
+    /// - **Group**: If ANY file in the group exists, ALL must exist.
     ///
     /// # Returns
-    /// A vector of `MissingSibling` violations for files without required siblings.
+    /// A vector of sibling violations (`MissingSibling` or `GroupIncomplete`).
     #[must_use]
     pub fn check_siblings(&self, files: &[PathBuf]) -> Vec<StructureViolation> {
         if self.sibling_rules.is_empty() {
@@ -316,26 +317,121 @@ impl StructureChecker {
             };
 
             for rule in &self.sibling_rules {
-                // Check if parent directory matches the rule's directory pattern
-                if !rule.dir_matcher.is_match(parent) {
-                    continue;
-                }
+                match rule {
+                    CompiledSiblingRule::Directed {
+                        dir_scope,
+                        dir_matcher,
+                        file_matcher,
+                        sibling_templates,
+                        is_warning,
+                    } => {
+                        // Check if parent directory matches the rule's directory pattern
+                        if !dir_matcher.is_match(parent) {
+                            continue;
+                        }
 
-                // Check if filename matches the rule's file pattern
-                if !rule.file_matcher.is_match(file_name) {
-                    continue;
-                }
+                        // Check if filename matches the rule's file pattern
+                        if !file_matcher.is_match(file_name) {
+                            continue;
+                        }
 
-                // Derive expected sibling path
-                if let Some(expected_sibling) =
-                    Self::derive_sibling_path(file_path, &rule.sibling_template)
-                    && !file_set.contains(&expected_sibling)
-                {
-                    violations.push(StructureViolation::missing_sibling(
-                        file_path.clone(),
-                        rule.dir_scope.clone(),
-                        rule.sibling_template.clone(),
-                    ));
+                        // Check each required sibling
+                        for template in sibling_templates {
+                            if let Some(expected_sibling) =
+                                Self::derive_sibling_path(file_path, template)
+                                && !file_set.contains(&expected_sibling)
+                            {
+                                let violation = if *is_warning {
+                                    StructureViolation::missing_sibling_warning(
+                                        file_path.clone(),
+                                        dir_scope.clone(),
+                                        template.clone(),
+                                    )
+                                } else {
+                                    StructureViolation::missing_sibling(
+                                        file_path.clone(),
+                                        dir_scope.clone(),
+                                        template.clone(),
+                                    )
+                                };
+                                violations.push(violation);
+                            }
+                        }
+                    }
+                    #[allow(clippy::literal_string_with_formatting_args)]
+                    // {stem} is template syntax, not a format arg
+                    CompiledSiblingRule::Group {
+                        dir_scope,
+                        dir_matcher,
+                        group_patterns,
+                        is_warning,
+                    } => {
+                        // Check if parent directory matches the rule's directory pattern
+                        if !dir_matcher.is_match(parent) {
+                            continue;
+                        }
+
+                        // Try ALL patterns to extract possible stems, then find the best one
+                        // (the one that results in the most complete group)
+                        let stems: Vec<String> = group_patterns
+                            .iter()
+                            .filter_map(|pattern| {
+                                Self::extract_stem_from_pattern(file_name, pattern)
+                            })
+                            .collect();
+
+                        if stems.is_empty() {
+                            // File doesn't match any pattern in the group
+                            continue;
+                        }
+
+                        // Find the stem that results in the most complete group
+                        // (fewest missing files, prefer complete groups)
+                        let best_stem = stems.iter().min_by_key(|stem| {
+                            group_patterns
+                                .iter()
+                                .filter(|pattern| {
+                                    let expected_name = pattern.replace("{stem}", stem);
+                                    let expected_path = parent.join(&expected_name);
+                                    !file_set.contains(&expected_path)
+                                })
+                                .count()
+                        });
+
+                        let Some(stem) = best_stem else {
+                            continue;
+                        };
+
+                        // This file triggers the group check - find missing members using the best stem
+                        let missing: Vec<String> = group_patterns
+                            .iter()
+                            .filter(|pattern| {
+                                let expected_name = pattern.replace("{stem}", stem);
+                                let expected_path = parent.join(&expected_name);
+                                !file_set.contains(&expected_path)
+                            })
+                            .cloned()
+                            .collect();
+
+                        if !missing.is_empty() {
+                            let violation = if *is_warning {
+                                StructureViolation::group_incomplete_warning(
+                                    file_path.clone(),
+                                    dir_scope.clone(),
+                                    group_patterns.clone(),
+                                    missing,
+                                )
+                            } else {
+                                StructureViolation::group_incomplete(
+                                    file_path.clone(),
+                                    dir_scope.clone(),
+                                    group_patterns.clone(),
+                                    missing,
+                                )
+                            };
+                            violations.push(violation);
+                        }
+                    }
                 }
             }
         }
@@ -348,13 +444,51 @@ impl StructureChecker {
     /// Derive sibling path from source file and template.
     ///
     /// Template syntax: `{stem}` is replaced with the source file's stem.
-    #[allow(clippy::literal_string_with_formatting_args)] // {stem} is a template placeholder, not a format arg
+    #[allow(clippy::literal_string_with_formatting_args)] // {stem} is template syntax, not a format arg
     fn derive_sibling_path(source: &Path, template: &str) -> Option<PathBuf> {
         let parent = source.parent()?;
         let stem = source.file_stem()?.to_str()?;
 
         let sibling_name = template.replace("{stem}", stem);
         Some(parent.join(sibling_name))
+    }
+
+    /// Extract the stem value from a file name matching a pattern.
+    ///
+    /// Template syntax: `{stem}` is a placeholder. The function checks if the file name
+    /// matches the pattern and extracts what `{stem}` represents.
+    ///
+    /// Examples:
+    /// - `Button.tsx` matching `{stem}.tsx` → `Some("Button")`
+    /// - `Button.test.tsx` matching `{stem}.test.tsx` → `Some("Button")`
+    /// - `Button.tsx` matching `{stem}.test.tsx` → `None` (no match)
+    #[allow(clippy::literal_string_with_formatting_args)] // {stem} is template syntax, not a format arg
+    fn extract_stem_from_pattern(file_name: &str, pattern: &str) -> Option<String> {
+        // Split the pattern by {stem} to get prefix and suffix
+        let parts: Vec<&str> = pattern.split("{stem}").collect();
+        if parts.len() != 2 {
+            // Pattern must contain exactly one {stem}
+            return None;
+        }
+        let (prefix, suffix) = (parts[0], parts[1]);
+
+        // Check if file_name starts with prefix and ends with suffix
+        if !file_name.starts_with(prefix) {
+            return None;
+        }
+        if !file_name.ends_with(suffix) {
+            return None;
+        }
+
+        // Extract the stem (the part between prefix and suffix)
+        let stem_start = prefix.len();
+        let stem_end = file_name.len() - suffix.len();
+
+        if stem_start > stem_end {
+            return None;
+        }
+
+        Some(file_name[stem_start..stem_end].to_string())
     }
 
     /// Explain which rule matches a given directory path.

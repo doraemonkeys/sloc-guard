@@ -119,28 +119,8 @@ fn rule_overrides_global_depth_limit() {
         max_depth: Some(2),
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(5), // Override to allow deeper
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -203,28 +183,8 @@ fn invalid_rule_max_depth_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(-3), // Invalid
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -247,28 +207,9 @@ fn calculate_base_depth_simple_pattern() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/features/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(2),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -297,28 +238,9 @@ fn relative_depth_allows_deep_nesting_within_base() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/features/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(2),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -346,28 +268,9 @@ fn relative_depth_violates_when_too_deep() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/features/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(2),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -396,28 +299,9 @@ fn relative_depth_false_uses_absolute_depth() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/features/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(2),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false, // Default behavior
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            // relative_depth: false is default
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -447,28 +331,9 @@ fn relative_depth_with_wildcard_in_middle() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/*/utils/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(1),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -497,28 +362,9 @@ fn relative_depth_with_double_star_at_start() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(3),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -545,28 +391,10 @@ fn relative_depth_warn_threshold() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/features/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(5),
             warn_threshold: Some(0.6), // Warn at depth 3
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -598,28 +426,9 @@ fn relative_depth_moving_base_works() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "packages/core/src/features/**".to_string(),
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(2),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -649,28 +458,9 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/features/**".to_string(), // base_depth = 2
-            max_files: None,
-            max_dirs: None,
             max_depth: Some(1),
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
             relative_depth: true,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };

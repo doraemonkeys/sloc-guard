@@ -37,10 +37,18 @@ pub enum ViolationType {
         /// The regex pattern that the filename should have matched.
         expected_pattern: String,
     },
-    /// Required sibling file is missing (`require_sibling`).
+    /// Required sibling file is missing (directed `siblings` rule).
     MissingSibling {
         /// The sibling pattern template that was expected (e.g., "{stem}.test.tsx").
         expected_sibling_pattern: String,
+    },
+    /// Atomic group is incomplete (group `siblings` rule).
+    /// If ANY file in the group exists, ALL must exist.
+    GroupIncomplete {
+        /// The group patterns that form the atomic set.
+        group_patterns: Vec<String>,
+        /// Which patterns from the group are missing.
+        missing_patterns: Vec<String>,
     },
 }
 
@@ -184,7 +192,7 @@ impl StructureViolation {
         }
     }
 
-    /// Create a missing sibling violation.
+    /// Create a missing sibling violation (directed rule).
     #[must_use]
     pub const fn missing_sibling(
         path: PathBuf,
@@ -199,6 +207,70 @@ impl StructureViolation {
             actual: 1,
             limit: 1,
             is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a missing sibling violation as a warning.
+    #[must_use]
+    pub const fn missing_sibling_warning(
+        path: PathBuf,
+        rule_pattern: String,
+        expected_sibling_pattern: String,
+    ) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::MissingSibling {
+                expected_sibling_pattern,
+            },
+            actual: 1,
+            limit: 1,
+            is_warning: true,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a group incomplete violation (atomic group rule).
+    #[must_use]
+    pub const fn group_incomplete(
+        path: PathBuf,
+        rule_pattern: String,
+        group_patterns: Vec<String>,
+        missing_patterns: Vec<String>,
+    ) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::GroupIncomplete {
+                group_patterns,
+                missing_patterns,
+            },
+            actual: 1,
+            limit: 1,
+            is_warning: false,
+            override_reason: None,
+            triggering_rule_pattern: Some(rule_pattern),
+        }
+    }
+
+    /// Create a group incomplete violation as a warning.
+    #[must_use]
+    pub const fn group_incomplete_warning(
+        path: PathBuf,
+        rule_pattern: String,
+        group_patterns: Vec<String>,
+        missing_patterns: Vec<String>,
+    ) -> Self {
+        Self {
+            path,
+            violation_type: ViolationType::GroupIncomplete {
+                group_patterns,
+                missing_patterns,
+            },
+            actual: 1,
+            limit: 1,
+            is_warning: true,
             override_reason: None,
             triggering_rule_pattern: Some(rule_pattern),
         }

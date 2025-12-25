@@ -44,26 +44,6 @@ fn make_rule(scope: &str, max_files: Option<i64>) -> StructureRule {
     StructureRule {
         scope: scope.to_string(),
         max_files,
-        max_dirs: None,
-        max_depth: None,
-        warn_threshold: None,
-        warn_files_at: None,
-        warn_dirs_at: None,
-        warn_files_threshold: None,
-        warn_dirs_threshold: None,
-        allow_extensions: vec![],
-        allow_patterns: vec![],
-        allow_files: vec![],
-        allow_dirs: vec![],
-        file_naming_pattern: None,
-        relative_depth: false,
-        file_pattern: None,
-        require_sibling: None,
-        deny_extensions: vec![],
-        deny_patterns: vec![],
-        deny_files: vec![],
-        deny_dirs: vec![],
-        reason: None,
-        expires: None,
+        ..Default::default()
     }
 }

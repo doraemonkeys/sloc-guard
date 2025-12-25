@@ -104,6 +104,18 @@ pub fn structure_violation_to_check_result(violation: &StructureViolation) -> Ch
                 "structure: missing sibling (expected: {expected_sibling_pattern}, rule: {rule})"
             ))
         }
+        ViolationType::GroupIncomplete {
+            missing_patterns, ..
+        } => {
+            let rule = violation
+                .triggering_rule_pattern
+                .as_deref()
+                .unwrap_or("unknown");
+            let missing = missing_patterns.join(", ");
+            Some(format!(
+                "structure: group incomplete (missing: {missing}, rule: {rule})"
+            ))
+        }
         ViolationType::DeniedDirectory { pattern } => {
             let rule = violation
                 .triggering_rule_pattern

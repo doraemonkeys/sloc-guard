@@ -9,7 +9,8 @@ pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
 pub use model::{
     BaselineConfig, CONFIG_VERSION, CONFIG_VERSION_V1, Config, ContentConfig, ContentRule,
     CustomLanguageConfig, DefaultConfig, ExcludeConfig, FileOverride, RatchetMode, RuleConfig,
-    ScannerConfig, StructureConfig, StructureRule, TrendConfig, UNLIMITED,
+    ScannerConfig, SiblingRequire, SiblingRule, SiblingSeverity, StructureConfig, StructureRule,
+    TrendConfig, UNLIMITED,
 };
 pub use remote::{
     clear_cache as clear_remote_cache, fetch_remote_config, fetch_remote_config_offline,

@@ -39,32 +39,57 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
         .collect()
 }
 
-/// Build sibling rules from config rules that have `require_sibling` set.
+/// Build sibling rules from the new `siblings` array in structure rules.
 pub(super) fn build_sibling_rules(rules: &[StructureRule]) -> Result<Vec<CompiledSiblingRule>> {
-    rules
-        .iter()
-        .filter(|rule| rule.require_sibling.is_some() && rule.file_pattern.is_some())
-        .map(|rule| {
-            let dir_glob = Glob::new(&rule.scope).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: rule.scope.clone(),
-                source: e,
-            })?;
+    use crate::config::{SiblingRule, SiblingSeverity};
 
-            let file_pattern = rule.file_pattern.as_ref().unwrap();
-            let file_glob =
-                Glob::new(file_pattern).map_err(|e| SlocGuardError::InvalidPattern {
-                    pattern: file_pattern.clone(),
-                    source: e,
-                })?;
+    let mut compiled_rules = Vec::new();
 
-            Ok(CompiledSiblingRule {
-                dir_scope: rule.scope.clone(),
-                dir_matcher: dir_glob.compile_matcher(),
-                file_matcher: file_glob.compile_matcher(),
-                sibling_template: rule.require_sibling.clone().unwrap(),
-            })
-        })
-        .collect()
+    for rule in rules {
+        let dir_glob = Glob::new(&rule.scope).map_err(|e| SlocGuardError::InvalidPattern {
+            pattern: rule.scope.clone(),
+            source: e,
+        })?;
+        let dir_matcher = dir_glob.compile_matcher();
+
+        for sibling in &rule.siblings {
+            match sibling {
+                SiblingRule::Directed {
+                    match_pattern,
+                    require,
+                    severity,
+                } => {
+                    let file_glob =
+                        Glob::new(match_pattern).map_err(|e| SlocGuardError::InvalidPattern {
+                            pattern: match_pattern.clone(),
+                            source: e,
+                        })?;
+
+                    compiled_rules.push(CompiledSiblingRule::Directed {
+                        dir_scope: rule.scope.clone(),
+                        dir_matcher: dir_matcher.clone(),
+                        file_matcher: file_glob.compile_matcher(),
+                        sibling_templates: require
+                            .as_patterns()
+                            .iter()
+                            .map(|s| (*s).to_string())
+                            .collect(),
+                        is_warning: *severity == SiblingSeverity::Warn,
+                    });
+                }
+                SiblingRule::Group { group, severity } => {
+                    compiled_rules.push(CompiledSiblingRule::Group {
+                        dir_scope: rule.scope.clone(),
+                        dir_matcher: dir_matcher.clone(),
+                        group_patterns: group.clone(),
+                        is_warning: *severity == SiblingSeverity::Warn,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(compiled_rules)
 }
 
 /// Calculate the depth of the pattern's base directory.

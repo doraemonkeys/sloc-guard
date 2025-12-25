@@ -606,3 +606,127 @@ fn trend_config_roundtrip_serialization() {
 
     assert_eq!(original, parsed);
 }
+
+// =============================================================================
+// SiblingRule Deserialization Tests
+// =============================================================================
+
+#[test]
+fn sibling_rule_directed_deserialize() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = "{stem}.test.tsx"
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules.len(), 1);
+    assert_eq!(config.structure.rules[0].siblings.len(), 1);
+
+    match &config.structure.rules[0].siblings[0] {
+        SiblingRule::Directed {
+            match_pattern,
+            require,
+            ..
+        } => {
+            assert_eq!(match_pattern, "*.tsx");
+            assert_eq!(require.as_patterns(), vec!["{stem}.test.tsx"]);
+        }
+        SiblingRule::Group { .. } => panic!("Expected Directed rule"),
+    }
+}
+
+#[test]
+fn sibling_rule_group_deserialize() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        group = ["{stem}.tsx", "{stem}.test.tsx"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.structure.rules.len(), 1);
+    assert_eq!(config.structure.rules[0].siblings.len(), 1);
+
+    match &config.structure.rules[0].siblings[0] {
+        SiblingRule::Group { group, .. } => {
+            assert_eq!(group.len(), 2);
+            assert_eq!(group[0], "{stem}.tsx");
+            assert_eq!(group[1], "{stem}.test.tsx");
+        }
+        SiblingRule::Directed { .. } => panic!("Expected Group rule"),
+    }
+}
+
+#[test]
+fn sibling_rule_ambiguous_match_and_group_rejected() {
+    // Ambiguous: has both match/require AND group
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = "{stem}.test.tsx"
+        group = ["{stem}.tsx", "{stem}.spec.tsx"]
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("Ambiguous") || err_msg.contains("ambiguous"));
+}
+
+#[test]
+fn sibling_rule_empty_rejected() {
+    // Neither match/require nor group
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        severity = "warn"
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+}
+
+#[test]
+fn sibling_rule_directed_missing_require_rejected() {
+    // Has match but no require
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("require"));
+}
+
+#[test]
+fn sibling_rule_directed_missing_match_rejected() {
+    // Has require but no match
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        require = "{stem}.test.tsx"
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("match"));
+}

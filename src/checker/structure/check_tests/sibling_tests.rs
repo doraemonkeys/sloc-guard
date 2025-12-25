@@ -2,6 +2,8 @@
 
 use std::path::PathBuf;
 
+use crate::config::{SiblingRequire, SiblingRule, SiblingSeverity};
+
 use super::*;
 
 // ============================================================================
@@ -9,32 +11,16 @@ use super::*;
 // ============================================================================
 
 #[test]
-fn require_sibling_without_file_pattern_returns_error() {
+fn empty_match_pattern_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,                               // Missing!
-            require_sibling: Some("{stem}.spec".to_string()), // Set
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: String::new(), // Empty!
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -43,39 +29,59 @@ fn require_sibling_without_file_pattern_returns_error() {
     assert!(result.is_err());
     if let Err(err) = result {
         let msg = err.to_string();
-        assert!(msg.contains("require_sibling"));
-        assert!(msg.contains("file_pattern"));
+        assert!(msg.contains("empty 'match' pattern"));
     }
 }
 
 #[test]
-fn file_pattern_without_require_sibling_is_allowed() {
-    // file_pattern alone doesn't trigger sibling checking (no-op)
+fn empty_require_pattern_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single(String::new()), // Empty!
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+}
+
+#[test]
+fn group_with_one_pattern_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.ts".to_string()], // Only one pattern!
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("at least 2 patterns"));
+    }
+}
+
+#[test]
+fn empty_siblings_array_is_valid_no_op() {
+    // No sibling rules - valid, just no sibling checking
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -85,32 +91,16 @@ fn file_pattern_without_require_sibling_is_allowed() {
 }
 
 #[test]
-fn invalid_file_pattern_returns_error() {
+fn invalid_match_glob_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("[invalid".to_string()), // Invalid glob
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "[invalid".to_string(), // Invalid glob
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -119,8 +109,59 @@ fn invalid_file_pattern_returns_error() {
     assert!(result.is_err());
 }
 
+#[test]
+fn require_pattern_without_stem_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("test.spec".to_string()), // Missing {stem}!
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("{stem}"));
+        assert!(msg.contains("require"));
+    }
+}
+
+#[test]
+fn require_multiple_patterns_one_without_stem_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.tsx".to_string(),
+                require: SiblingRequire::Multiple(vec![
+                    "{stem}.test.tsx".to_string(), // Valid
+                    "styles.css".to_string(),      // Missing {stem}!
+                ]),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    if let Err(err) = result {
+        let msg = err.to_string();
+        assert!(msg.contains("styles.css"));
+        assert!(msg.contains("{stem}"));
+    }
+}
+
 // ============================================================================
-// Basic Sibling Check Tests
+// Basic Directed Sibling Check Tests
 // ============================================================================
 
 #[test]
@@ -141,32 +182,16 @@ fn check_siblings_no_rules_returns_empty() {
 }
 
 #[test]
-fn check_siblings_file_has_sibling_no_violation() {
+fn directed_file_has_sibling_no_violation() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -182,39 +207,23 @@ fn check_siblings_file_has_sibling_no_violation() {
 }
 
 #[test]
-fn check_siblings_file_missing_sibling_returns_violation() {
+fn directed_file_missing_sibling_returns_violation() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
     let checker = StructureChecker::new(&config).unwrap();
 
     let files = vec![
-        PathBuf::from("src/lib/foo.ts"), // No foo.test.ts exists
+        PathBuf::from("src/lib/foo.ts"), // No foo.spec exists
     ];
 
     let violations = checker.check_siblings(&files);
@@ -226,6 +235,67 @@ fn check_siblings_file_missing_sibling_returns_violation() {
             expected_sibling_pattern: "{stem}.spec".to_string()
         }
     );
+    assert!(!violations[0].is_warning);
+}
+
+#[test]
+fn directed_with_warn_severity_creates_warning() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Warn, // Warning instead of error
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![PathBuf::from("src/lib/foo.ts")];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning); // Should be warning
+}
+
+#[test]
+fn directed_multiple_requires() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.tsx".to_string(),
+                require: SiblingRequire::Multiple(vec![
+                    "{stem}.test.tsx".to_string(),
+                    "{stem}.module.css".to_string(),
+                ]),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Button.tsx exists but missing both siblings
+    let files = vec![PathBuf::from("src/components/Button.tsx")];
+
+    let violations = checker.check_siblings(&files);
+    // One violation per missing sibling
+    assert_eq!(violations.len(), 2);
+    assert!(violations.iter().any(|v| matches!(
+        &v.violation_type,
+        ViolationType::MissingSibling { expected_sibling_pattern }
+        if expected_sibling_pattern == "{stem}.test.tsx"
+    )));
+    assert!(violations.iter().any(|v| matches!(
+        &v.violation_type,
+        ViolationType::MissingSibling { expected_sibling_pattern }
+        if expected_sibling_pattern == "{stem}.module.css"
+    )));
 }
 
 // ============================================================================
@@ -233,32 +303,16 @@ fn check_siblings_file_missing_sibling_returns_violation() {
 // ============================================================================
 
 #[test]
-fn check_siblings_dir_pattern_not_matching_skips_check() {
+fn directed_dir_pattern_not_matching_skips_check() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/components/**".to_string(), // Only components
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -273,32 +327,16 @@ fn check_siblings_dir_pattern_not_matching_skips_check() {
 }
 
 #[test]
-fn check_siblings_file_pattern_not_matching_skips_check() {
+fn directed_file_pattern_not_matching_skips_check() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.tsx".to_string()), // Only .tsx files
-            require_sibling: Some("{stem}.test.tsx".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.tsx".to_string(), // Only .tsx files
+                require: SiblingRequire::Single("{stem}.test.tsx".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -313,36 +351,160 @@ fn check_siblings_file_pattern_not_matching_skips_check() {
 }
 
 // ============================================================================
+// Group (Atomic) Sibling Tests
+// ============================================================================
+
+#[test]
+fn group_all_files_exist_no_violation() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.tsx".to_string(), "{stem}.test.tsx".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![
+        PathBuf::from("src/components/Button.tsx"),
+        PathBuf::from("src/components/Button.test.tsx"),
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn group_missing_member_returns_violation() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.tsx".to_string(), "{stem}.test.tsx".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Button.tsx exists but Button.test.tsx is missing
+    let files = vec![PathBuf::from("src/components/Button.tsx")];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert_eq!(
+        violations[0].path,
+        PathBuf::from("src/components/Button.tsx")
+    );
+    assert!(matches!(
+        &violations[0].violation_type,
+        ViolationType::GroupIncomplete { group_patterns, missing_patterns }
+        if group_patterns.len() == 2 && missing_patterns.contains(&"{stem}.test.tsx".to_string())
+    ));
+}
+
+#[test]
+fn group_with_warn_severity_creates_warning() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.tsx".to_string(), "{stem}.test.tsx".to_string()],
+                severity: SiblingSeverity::Warn,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![PathBuf::from("src/components/Button.tsx")];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert!(violations[0].is_warning);
+}
+
+#[test]
+fn group_three_files_one_missing() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec![
+                    "{stem}.tsx".to_string(),
+                    "{stem}.test.tsx".to_string(),
+                    "{stem}.module.css".to_string(),
+                ],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Button.tsx and Button.test.tsx exist, Button.module.css is missing
+    let files = vec![
+        PathBuf::from("src/components/Button.tsx"),
+        PathBuf::from("src/components/Button.test.tsx"),
+    ];
+
+    let violations = checker.check_siblings(&files);
+    // Each existing file in the group triggers a violation because group is incomplete
+    assert_eq!(violations.len(), 2);
+    for v in &violations {
+        assert!(matches!(
+            &v.violation_type,
+            ViolationType::GroupIncomplete { missing_patterns, .. }
+            if missing_patterns.contains(&"{stem}.module.css".to_string())
+        ));
+    }
+}
+
+#[test]
+fn group_file_not_in_group_no_check() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.tsx".to_string(), "{stem}.test.tsx".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // A .ts file doesn't match any pattern in the group
+    let files = vec![PathBuf::from("src/components/utils.ts")];
+
+    let violations = checker.check_siblings(&files);
+    assert!(violations.is_empty());
+}
+
+// ============================================================================
 // Multiple Files Tests
 // ============================================================================
 
 #[test]
-fn check_siblings_multiple_files_mixed_results() {
+fn directed_multiple_files_mixed_results() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -362,76 +524,16 @@ fn check_siblings_multiple_files_mixed_results() {
 }
 
 #[test]
-fn check_siblings_test_file_not_checked_for_siblings() {
-    // Test that .test.ts files also get checked (they match *.ts)
-    // This is expected behavior - if you want to exclude test files,
-    // use a more specific file_pattern
+fn directed_nested_directories() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()), // Matches ALL *.ts including *.test.ts
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
-        }],
-        ..Default::default()
-    };
-    let checker = StructureChecker::new(&config).unwrap();
-
-    let files = vec![
-        PathBuf::from("src/lib/foo.test.ts"), // This matches *.ts
-    ];
-
-    let violations = checker.check_siblings(&files);
-    // foo.test.ts matches *.ts, so it requires foo.test.spec which doesn't exist
-    assert_eq!(violations.len(), 1);
-}
-
-#[test]
-fn check_siblings_nested_directories() {
-    let config = StructureConfig {
-        rules: vec![StructureRule {
-            scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -449,32 +551,16 @@ fn check_siblings_nested_directories() {
 }
 
 #[test]
-fn check_siblings_sorted_by_path() {
+fn directed_violations_are_sorted_by_path() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.ts".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -504,28 +590,12 @@ fn derive_sibling_path_basic() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*.tsx".to_string()),
-            require_sibling: Some("{stem}.spec".to_string()),
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.tsx".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -547,28 +617,12 @@ fn derive_sibling_path_different_template() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "**".to_string(),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: Some("*Service.java".to_string()), // Only matches *Service.java
-            require_sibling: Some("{stem}Test.java".to_string()), // Java style
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*Service.java".to_string(),
+                require: SiblingRequire::Single("{stem}Test.java".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
         }],
         ..Default::default()
     };

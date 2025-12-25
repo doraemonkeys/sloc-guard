@@ -31,15 +31,43 @@ pub(super) struct CompiledStructureRule {
 }
 
 /// Compiled sibling rule for file co-location checking.
-pub(super) struct CompiledSiblingRule {
-    /// Original directory scope string (for violation messages).
-    pub dir_scope: String,
-    /// Matcher for directory (parent of files).
-    pub dir_matcher: GlobMatcher,
-    /// Matcher for files that require a sibling.
-    pub file_matcher: GlobMatcher,
-    /// Template for deriving sibling filename (e.g., "{stem}.test.tsx").
-    pub sibling_template: String,
+///
+/// Contains pre-compiled glob matchers for efficient runtime matching.
+/// Created from [`crate::config::SiblingRule`] during checker initialization.
+pub(super) enum CompiledSiblingRule {
+    /// Directed rule: if file matches, require sibling(s).
+    ///
+    /// When a file matches `file_matcher` in a directory matching `dir_matcher`,
+    /// each template in `sibling_templates` is expanded using `{stem}` substitution
+    /// to derive required sibling file paths.
+    Directed {
+        /// Original directory scope string from config (for violation messages).
+        dir_scope: String,
+        /// Pre-compiled matcher for directory (parent of files).
+        dir_matcher: GlobMatcher,
+        /// Pre-compiled matcher for files that trigger the rule.
+        file_matcher: GlobMatcher,
+        /// Templates for deriving sibling filename(s), e.g., `"{stem}.test.tsx"`.
+        /// The `{stem}` placeholder is replaced with the source file's stem.
+        sibling_templates: Vec<String>,
+        /// When `true`, violations are warnings instead of errors.
+        is_warning: bool,
+    },
+    /// Atomic group: if ANY file in the group exists, ALL must exist.
+    ///
+    /// Enforces file co-location by treating a set of patterns as an atomic unit.
+    /// If any file matching a group pattern exists, all other group members must also exist.
+    Group {
+        /// Original directory scope string from config (for violation messages).
+        dir_scope: String,
+        /// Pre-compiled matcher for directory (parent of files).
+        dir_matcher: GlobMatcher,
+        /// Patterns that form an atomic set, e.g., `["{stem}.tsx", "{stem}.test.tsx"]`.
+        /// Each pattern must contain `{stem}` for stem extraction and expansion.
+        group_patterns: Vec<String>,
+        /// When `true`, violations are warnings instead of errors.
+        is_warning: bool,
+    },
 }
 
 /// Resolved limits for a directory path.

@@ -66,15 +66,82 @@ fn validate_rule_limits(rules: &[StructureRule]) -> Result<()> {
 }
 
 /// Validate sibling rule configuration.
-/// `require_sibling` requires `file_pattern` to be set.
+/// Ensures sibling rules have valid structure.
+#[allow(clippy::literal_string_with_formatting_args)] // {stem} is template syntax, not a format arg
 pub(super) fn validate_sibling_rules(rules: &[StructureRule]) -> Result<()> {
+    use crate::config::SiblingRule;
+
     for (i, rule) in rules.iter().enumerate() {
-        if rule.require_sibling.is_some() && rule.file_pattern.is_none() {
-            return Err(SlocGuardError::Config(format!(
-                "Rule {} has 'require_sibling' but no 'file_pattern'. \
-                 Both must be set together to specify which files need siblings.",
-                i + 1
-            )));
+        for (j, sibling) in rule.siblings.iter().enumerate() {
+            match sibling {
+                SiblingRule::Directed {
+                    match_pattern,
+                    require,
+                    ..
+                } => {
+                    if match_pattern.is_empty() {
+                        return Err(SlocGuardError::Config(format!(
+                            "Rule {} sibling {} has empty 'match' pattern.",
+                            i + 1,
+                            j + 1
+                        )));
+                    }
+                    let patterns = require.as_patterns();
+                    if patterns.is_empty() {
+                        return Err(SlocGuardError::Config(format!(
+                            "Rule {} sibling {} has empty 'require' pattern.",
+                            i + 1,
+                            j + 1
+                        )));
+                    }
+                    for pattern in patterns {
+                        if pattern.is_empty() {
+                            return Err(SlocGuardError::Config(format!(
+                                "Rule {} sibling {} has empty pattern in 'require' array.",
+                                i + 1,
+                                j + 1
+                            )));
+                        }
+                        // Require patterns must contain {stem} placeholder for sibling derivation
+                        if !pattern.contains("{stem}") {
+                            return Err(SlocGuardError::Config(format!(
+                                "Rule {} sibling {} 'require' pattern '{}' must contain {{stem}} placeholder.",
+                                i + 1,
+                                j + 1,
+                                pattern
+                            )));
+                        }
+                    }
+                }
+                SiblingRule::Group { group, .. } => {
+                    if group.len() < 2 {
+                        return Err(SlocGuardError::Config(format!(
+                            "Rule {} sibling {} group must have at least 2 patterns.",
+                            i + 1,
+                            j + 1
+                        )));
+                    }
+                    for (k, pattern) in group.iter().enumerate() {
+                        if pattern.is_empty() {
+                            return Err(SlocGuardError::Config(format!(
+                                "Rule {} sibling {} has empty pattern at index {}.",
+                                i + 1,
+                                j + 1,
+                                k
+                            )));
+                        }
+                        // Group patterns must contain {stem} placeholder for stem extraction
+                        if !pattern.contains("{stem}") {
+                            return Err(SlocGuardError::Config(format!(
+                                "Rule {} sibling {} pattern '{}' must contain {{stem}} placeholder.",
+                                i + 1,
+                                j + 1,
+                                pattern
+                            )));
+                        }
+                    }
+                }
+            }
         }
     }
     Ok(())

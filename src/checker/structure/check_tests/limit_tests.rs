@@ -83,27 +83,7 @@ fn rule_overrides_global_limit() {
         rules: vec![StructureRule {
             scope: "src/generated/**".to_string(),
             max_files: Some(100),
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -131,27 +111,8 @@ fn rule_inherits_unset_limit_from_global() {
         rules: vec![StructureRule {
             scope: "src/generated/**".to_string(),
             max_files: Some(100),
-            max_dirs: None, // Should inherit global max_dirs=3
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            // max_dirs: None → inherits global max_dirs=3
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -286,28 +247,8 @@ fn warn_threshold_rule_overrides_global() {
         warn_threshold: Some(0.9), // Global: warn at 45
         rules: vec![StructureRule {
             scope: "src/special/**".to_string(),
-            max_files: None, // Inherit 50
-            max_dirs: None,
-            max_depth: None,
             warn_threshold: Some(0.5), // Rule: warn at 25
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -413,27 +354,8 @@ fn rule_can_set_unlimited_to_override_global() {
         rules: vec![StructureRule {
             scope: "src/generated/**".to_string(),
             max_files: Some(UNLIMITED), // Override to unlimited
-            max_dirs: None,             // Inherit global (2)
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            // max_dirs: None → inherits global (2)
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -531,27 +453,7 @@ fn invalid_rule_max_files_returns_error() {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
             max_files: Some(-10), // Invalid
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -569,28 +471,8 @@ fn invalid_rule_max_dirs_returns_error() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None,
             max_dirs: Some(-3), // Invalid
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -750,28 +632,8 @@ fn granular_warn_in_rule_overrides_global() {
         warn_threshold: Some(0.9), // Global: 45 files
         rules: vec![StructureRule {
             scope: "src/special/**".to_string(),
-            max_files: None, // Inherit limit
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
             warn_files_at: Some(25), // Rule: warn at 25 files
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -825,28 +687,8 @@ fn rule_inherits_granular_threshold_from_global() {
         warn_files_at: Some(40), // Global absolute
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
-            max_files: None, // Inherit limit
-            max_dirs: None,
-            max_depth: None,
-            warn_threshold: None,
-            warn_files_at: None, // Should inherit 40 from global
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            file_naming_pattern: None,
-            relative_depth: false,
-            file_pattern: None,
-            require_sibling: None,
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            reason: None,
-            expires: None,
+            // No warn_files_at → inherits 40 from global
+            ..Default::default()
         }],
         ..Default::default()
     };

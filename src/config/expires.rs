@@ -282,27 +282,7 @@ mod tests {
         config.structure.rules = vec![StructureRule {
             scope: "tests/".to_string(),
             expires: Some("2024-06-01".to_string()),
-            max_files: None,
-            max_dirs: None,
-            max_depth: None,
-            relative_depth: false,
-            warn_threshold: None,
-            warn_files_at: None,
-            warn_dirs_at: None,
-            warn_files_threshold: None,
-            warn_dirs_threshold: None,
-            allow_extensions: vec![],
-            allow_patterns: vec![],
-            allow_files: vec![],
-            allow_dirs: vec![],
-            deny_extensions: vec![],
-            deny_patterns: vec![],
-            deny_files: vec![],
-            deny_dirs: vec![],
-            file_naming_pattern: None,
-            file_pattern: None,
-            require_sibling: None,
-            reason: None,
+            ..Default::default()
         }];
 
         let today = ParsedDate::parse("2025-06-15").unwrap();

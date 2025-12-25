@@ -1,6 +1,7 @@
 //! Tests for structure validation logic.
 
 use super::*;
+use crate::config::{SiblingRule, SiblingSeverity};
 
 // =============================================================================
 // Allow/Deny Mutual Exclusion Tests
@@ -90,4 +91,51 @@ fn rule_allow_dirs_with_deny_patterns_fails() {
     };
     let result = StructureChecker::new(&config);
     assert!(result.is_err());
+}
+
+// =============================================================================
+// Sibling Group Pattern Validation Tests
+// =============================================================================
+
+#[test]
+fn group_pattern_without_stem_placeholder_fails() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                // "index.ts" is missing {stem} placeholder
+                group: vec![
+                    "{stem}.tsx".to_string(),
+                    "index.ts".to_string(), // Invalid: no {stem}
+                ],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let result = StructureChecker::new(&config);
+    assert!(result.is_err());
+    let err = result.err().expect("expected error");
+    assert!(
+        err.to_string().contains("{stem}"),
+        "Error should mention {{stem}} placeholder: {err}"
+    );
+}
+
+#[test]
+fn group_pattern_with_stem_placeholder_passes() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.tsx".to_string(), "{stem}.test.tsx".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let result = StructureChecker::new(&config);
+    assert!(result.is_ok());
 }

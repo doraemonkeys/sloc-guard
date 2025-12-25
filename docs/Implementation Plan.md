@@ -25,6 +25,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
 - **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
 - **Phase 15**: 15.1 Colored Error Output, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment.
+- **Phase 18**: 18.1 Unified Siblings Config (replaced `file_pattern`/`require_sibling` with `siblings` array, added `SiblingRule::Directed`/`Group`, `GroupIncomplete` violation).
 
 
 
@@ -50,41 +51,13 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 | ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
 | ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
 | ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
-| **13. Sibling Rules Redesign**   | 18.1 Unified Siblings Config                                 |
+| ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
 
 ---
 
-## Phase 18: Sibling Rules Redesign (Pending)
+## Phase 18: Sibling Rules Redesign ✅
 
-### Task 18.1: Unified Siblings Config
-
-Replace `file_pattern` + `require_sibling` with new `siblings` array supporting two rule types:
-
-**Config Change (Breaking):**
-```toml
-[[structure.rules]]
-scope = "src/components/**"
-reason = "Component file requirements"
-siblings = [
-    # Directed: if match found, require sibling(s)
-    { match = "*.tsx", require = "{stem}.test.tsx" },
-    { match = "*.tsx", require = ["{stem}.css", "{stem}.stories.tsx"], severity = "warn" },
-    
-    # Atomic group: if ANY exists, ALL must exist
-    { group = ["{stem}.c", "{stem}.h"] },
-    { group = ["{stem}.tsx", "{stem}.test.tsx", "{stem}.module.css"] },
-]
-```
-
-**Implementation:**
-1. Add `SiblingRule` enum in `config/model.rs`:
-   - `Group { group: Vec<String>, severity: Option<Severity> }`
-   - `Directed { match: String, require: Vec<String>, severity: Option<Severity> }`
-2. Replace `file_pattern`/`require_sibling` with `siblings: Vec<SiblingRule>` in `StructureRule`
-3. Update `StructureChecker::check_siblings()` to handle both rule types
-4. Add `GroupMissing` violation type for atomic group violations
-5. Update explain output for new sibling rule format
-6. Remove deprecated fields, update all tests
+### ~~Task 18.1: Unified Siblings Config~~ ✅
 
 ---
 

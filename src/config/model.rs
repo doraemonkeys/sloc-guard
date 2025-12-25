@@ -396,6 +396,124 @@ const fn default_warn_threshold() -> f64 {
 /// Use `-1` in TOML to indicate no limit should be applied.
 pub const UNLIMITED: i64 = -1;
 
+/// Severity level for sibling violations (defaults to error if not specified).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SiblingSeverity {
+    /// Treat as warning, not a hard failure.
+    Warn,
+    /// Treat as error (default).
+    #[default]
+    Error,
+}
+
+/// Sibling rule for file co-location checking.
+///
+/// Supports two rule types:
+/// - **Directed**: If a file matches `match_pattern`, require specific sibling(s).
+/// - **Group**: If ANY file in the group exists, ALL must exist (atomic group).
+///
+/// **Note**: Ambiguous configs containing both `match`/`require` AND `group` fields
+/// are rejected during deserialization with a clear error message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum SiblingRule {
+    /// Directed rule: if file matches, require sibling(s).
+    /// Example: `{ match = "*.tsx", require = "{stem}.test.tsx" }`
+    Directed {
+        /// Glob pattern for files that trigger the rule.
+        match_pattern: String,
+        /// Required sibling pattern(s). Use `{stem}` for the source file's stem.
+        require: SiblingRequire,
+        /// Severity level (default: error).
+        severity: SiblingSeverity,
+    },
+    /// Atomic group: if ANY file in the group exists, ALL must exist.
+    /// Example: `{ group = ["{stem}.tsx", "{stem}.test.tsx", "{stem}.module.css"] }`
+    Group {
+        /// Patterns that form an atomic group. Use `{stem}` for the base name.
+        group: Vec<String>,
+        /// Severity level (default: error).
+        severity: SiblingSeverity,
+    },
+}
+
+/// Intermediate struct for deserializing `SiblingRule` with ambiguity detection.
+#[derive(Deserialize)]
+struct SiblingRuleHelper {
+    #[serde(rename = "match")]
+    match_pattern: Option<String>,
+    require: Option<SiblingRequire>,
+    group: Option<Vec<String>>,
+    #[serde(default)]
+    severity: SiblingSeverity,
+}
+
+impl<'de> serde::Deserialize<'de> for SiblingRule {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let helper = SiblingRuleHelper::deserialize(deserializer)?;
+
+        let has_directed = helper.match_pattern.is_some() || helper.require.is_some();
+        let has_group = helper.group.is_some();
+
+        match (has_directed, has_group) {
+            (true, true) => Err(serde::de::Error::custom(
+                "Ambiguous sibling rule: cannot mix 'match'/'require' with 'group'. \
+                 Use either Directed ({ match = \"...\", require = \"...\" }) \
+                 OR Group ({ group = [...] }), not both.",
+            )),
+            (true, false) => {
+                let match_pattern = helper.match_pattern.ok_or_else(|| {
+                    serde::de::Error::custom("Directed sibling rule requires 'match' field.")
+                })?;
+                let require = helper.require.ok_or_else(|| {
+                    serde::de::Error::custom("Directed sibling rule requires 'require' field.")
+                })?;
+                Ok(Self::Directed {
+                    match_pattern,
+                    require,
+                    severity: helper.severity,
+                })
+            }
+            (false, true) => {
+                // Safe to unwrap: has_group is true
+                let group = helper.group.unwrap();
+                Ok(Self::Group {
+                    group,
+                    severity: helper.severity,
+                })
+            }
+            (false, false) => Err(serde::de::Error::custom(
+                "Invalid sibling rule: must specify either 'match'/'require' (Directed) \
+                 or 'group' (Group).",
+            )),
+        }
+    }
+}
+
+/// Sibling require field: single pattern or array of patterns.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum SiblingRequire {
+    /// Single required sibling pattern.
+    Single(String),
+    /// Multiple required sibling patterns.
+    Multiple(Vec<String>),
+}
+
+impl SiblingRequire {
+    /// Convert to a vector of patterns.
+    #[must_use]
+    pub fn as_patterns(&self) -> Vec<&str> {
+        match self {
+            Self::Single(s) => vec![s.as_str()],
+            Self::Multiple(v) => v.iter().map(String::as_str).collect(),
+        }
+    }
+}
+
 /// Configuration for directory structure limits.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct StructureConfig {
@@ -596,19 +714,12 @@ pub struct StructureRule {
     #[serde(default)]
     pub file_naming_pattern: Option<String>,
 
-    /// Glob pattern for files that require a sibling file.
-    /// Only files matching this pattern are checked for siblings.
-    /// Must be used together with `require_sibling`.
-    /// Example: `*.tsx` for React components.
+    /// Sibling rules for file co-location checking.
+    /// Supports two rule types:
+    /// - Directed: `{ match = "*.tsx", require = "{stem}.test.tsx" }`
+    /// - Group: `{ group = ["{stem}.tsx", "{stem}.test.tsx"] }`
     #[serde(default)]
-    pub file_pattern: Option<String>,
-
-    /// Template for the required sibling file.
-    /// Use `{stem}` as placeholder for the source file's stem (filename without extension).
-    /// Must be used together with `file_pattern`.
-    /// Example: `{stem}.test.tsx` requires `Button.test.tsx` for `Button.tsx`.
-    #[serde(default)]
-    pub require_sibling: Option<String>,
+    pub siblings: Vec<SiblingRule>,
 
     /// Optional reason for this rule (audit trail, displayed in explain output).
     #[serde(default)]

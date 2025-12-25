@@ -192,7 +192,8 @@ impl TextFormatter {
             | ViolationType::DeniedFile { .. }
             | ViolationType::DeniedDirectory { .. }
             | ViolationType::NamingConvention { .. }
-            | ViolationType::MissingSibling { .. } => {
+            | ViolationType::MissingSibling { .. }
+            | ViolationType::GroupIncomplete { .. } => {
                 // No additional metrics needed for file-level violations
             }
         }
