@@ -9,7 +9,7 @@ use crate::git::GitContext;
 use crate::language::LanguageRegistry;
 use crate::output::{
     ColorMode, FileStatistics, OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter,
-    StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
+    StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 use crate::scanner::scan_files;
 use crate::state;
@@ -145,7 +145,7 @@ pub(crate) fn run_stats_with_context(
 
     // 5.2 Trend tracking if enabled (--trend or --since implies trend)
     let trend_enabled = args.trend || args.since.is_some();
-    let project_stats = if trend_enabled {
+    let (project_stats, trend_history) = if trend_enabled {
         let default_path = state::history_path(project_root);
         let history_path = args.history_file.as_ref().unwrap_or(&default_path);
         let mut history = TrendHistory::load_or_default(history_path);
@@ -190,20 +190,28 @@ pub(crate) fn run_stats_with_context(
         let _ = history.save_with_retention(history_path, &config.trend);
 
         // Only show trend if delta is significant (reduces noise from trivial changes)
-        if let Some(delta) = trend
+        let project_stats = if let Some(delta) = trend
             && delta.is_significant(&config.trend)
         {
             project_stats.with_trend(delta)
         } else {
             project_stats
-        }
+        };
+
+        (project_stats, Some(history))
     } else {
-        project_stats
+        (project_stats, None)
     };
 
     // 6. Format output
     let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_output(args.format, &project_stats, color_mode, Some(project_root))?;
+    let output = format_stats_output(
+        args.format,
+        &project_stats,
+        color_mode,
+        Some(project_root),
+        trend_history.as_ref(),
+    )?;
 
     // 7. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
@@ -230,6 +238,7 @@ pub(crate) fn format_stats_output(
     stats: &ProjectStatistics,
     color_mode: ColorMode,
     project_root: Option<&Path>,
+    trend_history: Option<&TrendHistory>,
 ) -> crate::Result<String> {
     match format {
         OutputFormat::Text => StatsTextFormatter::new(color_mode)
@@ -244,9 +253,14 @@ pub(crate) fn format_stats_output(
         OutputFormat::Markdown => StatsMarkdownFormatter::new()
             .with_project_root(project_root.map(Path::to_path_buf))
             .format(stats),
-        OutputFormat::Html => Err(crate::SlocGuardError::Config(
-            "HTML output format is not yet supported for stats command".to_string(),
-        )),
+        OutputFormat::Html => {
+            let mut formatter =
+                StatsHtmlFormatter::new().with_project_root(project_root.map(Path::to_path_buf));
+            if let Some(history) = trend_history {
+                formatter = formatter.with_trend_history(history.clone());
+            }
+            formatter.format(stats)
+        }
     }
 }
 

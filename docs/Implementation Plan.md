@@ -53,7 +53,7 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 | ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
 | ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
 | ~~**14. Path Output Fix**~~      | ~~19.1 Relative Path Output~~ ✅                              |
-| **15. HTML Report Enhancement**  | ~~20.1 HTML Summary Stats~~ ✅, ~~20.2 File Total Column~~ ✅, 20.3 Stats HTML Format |
+| **15. HTML Report Enhancement**  | ~~20.1 HTML Summary Stats~~ ✅, ~~20.2 File Total Column~~ ✅, ~~20.3 Stats HTML Format~~ ✅ |
 
 ---
 
@@ -69,15 +69,16 @@ Add aggregate statistics to HTML report summary section:
 
 Add "Total" column to HTML file table showing actual file line count (`stats.total`). Already implemented in `HtmlFormatter::write_file_row`.
 
-### Task 20.3: Stats HTML Format
+### ~~Task 20.3: Stats HTML Format~~ ✅
 
-Implement HTML output format for `stats` command (`--format html`):
-- Display project statistics in styled HTML table (total files, lines, code/comment/blank counts)
-- Language breakdown table with percentages
-- Directory breakdown if `--group-by dir`
-- Top files list if `--top N`
-- Embed SVG charts inline (language pie chart, optional trend line if `--trend`)
-- Follow existing `HtmlFormatter` styling patterns
+Implemented HTML output format for `stats` command (`--format html`):
+- Summary cards showing total files, lines, code, comments, blanks, and avg code/file
+- Trend delta section with colored cards when `--trend` is used
+- Language breakdown table when `--group-by lang`
+- Directory breakdown table when `--group-by dir`
+- Top files table when `--top N`
+- Inline SVG charts: language breakdown chart and trend line chart
+- Follows existing `HtmlFormatter` CSS styling and HTML template
 
 ---
 

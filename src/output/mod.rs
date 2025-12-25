@@ -21,7 +21,7 @@ pub use progress::ScanProgress;
 pub use sarif::SarifFormatter;
 pub use stats::{
     DirectoryStats, FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter,
-    StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
+    StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 pub use text::{ColorMode, TextFormatter};
 

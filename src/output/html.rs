@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use crate::checker::CheckResult;
 use crate::error::Result;
 
-use super::html_template::{HTML_FOOTER, HTML_HEADER};
+// Re-export for use by stats HTML formatter
+pub use super::html_template::{HTML_FOOTER, HTML_HEADER};
 use super::path::display_path;
 use super::svg::{FileSizeHistogram, LanguageBreakdownChart, SvgElement, TrendLineChart};
 use super::{OutputFormatter, ProjectStatistics};

@@ -1,8 +1,10 @@
+mod html;
 mod json;
 mod markdown;
 mod statistics;
 mod text;
 
+pub use html::StatsHtmlFormatter;
 pub use json::StatsJsonFormatter;
 pub use markdown::StatsMarkdownFormatter;
 pub use statistics::{DirectoryStats, FileStatistics, LanguageStats, ProjectStatistics};

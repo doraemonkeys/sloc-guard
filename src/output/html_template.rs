@@ -44,6 +44,8 @@ pub const HTML_HEADER: &str = r#"<!DOCTYPE html>
         .summary-card.warning .value { color: var(--color-warning); }
         .summary-card.failed .value { color: var(--color-failed); }
         .summary-card.grandfathered .value { color: var(--color-grandfathered); }
+        .summary-card.delta-increase .value { color: var(--color-delta-good); }
+        .summary-card.delta-decrease .value { color: var(--color-delta-bad); }
         .filter-controls { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
         .filter-btn { padding: 0.5rem 1rem; border: 1px solid var(--color-border); background: var(--color-card); border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem; transition: all 0.15s; }
         .filter-btn:hover { background: var(--color-bg); }
@@ -97,6 +99,8 @@ pub const HTML_HEADER: &str = r#"<!DOCTYPE html>
             .summary-card.warning .label::before { content: '⚠ '; }
             .summary-card.failed .label::before { content: '✗ '; }
             .summary-card.grandfathered .label::before { content: '◉ '; }
+            .summary-card.delta-increase .label::before { content: '↑ '; }
+            .summary-card.delta-decrease .label::before { content: '↓ '; }
             .filter-controls { display: none; }
             .status { background: transparent !important; border: 1px solid currentColor; }
             /* Print-friendly delta indicators with text labels */
