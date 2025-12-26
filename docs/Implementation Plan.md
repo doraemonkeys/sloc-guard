@@ -13,72 +13,22 @@ make ci
 All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 
 - **Phase 1-3**: Core MVP, Color Support, Git Diff Mode, Git-Aware Exclude
-- **Phase 4**: Path-Based Rules, Inline Ignore, Strict Mode, SARIF Output, Progress Bar, File Hash Cache, Per-rule warn_threshold, Custom Language Definition, Config Inheritance, Split Suggestions, Remote Config.
-- **Phase 5 (Partial)**: Language Breakdown, Top-N & Metrics, Markdown Output, Directory Statistics, Trend Tracking, HTML Report, Structure Guard.
-- **Phase 5.5 (Refactoring & V2 Config)**: Scanner/Structure separation, `Config` V2 (auto-migration), `CheckResult` refactor, DI Context, Extension-based rule sugar, Explicit Rule Priority, Structure `warn_threshold`.
-- **Phase 6 (Partial)**: CLI updates (`--max-files/dirs`, `--diff/--staged`, `--history-file`, `--update-baseline`, `--report-json`), parameter renames (`--suggest`, `--count-*`), documentation updates.
-- **Phase 8 (CI/CD)**: GitHub Action (cache, summary, matcher), Pre-commit Hook, Universal Docker Image, SARIF Guidance.
-- **Phase 9**: `explain` command, `max_depth` limit, `init --detect`, Structure Allowlist Mode, Unified Directory Traversal.
-- **Phase 10**: IO Abstraction, error handling cleanup.
-- **Phase 11**: 11.1 Naming Convention Enforcement, 11.2 File Co-location Check, 11.4 Baseline Ratchet, 11.6 Config Presets, 11.7 Deny Patterns, 11.8 Terminology Modernization, 11.9 Rename pattern→scope, 11.10 Content Exclude Patterns, 11.11 Granular Warn Thresholds, 11.12 deny_files + deny_dirs, 11.13 Structure Allowlist Mode, 11.14 Unify Rule and Override, 11.15 Remove Language Shorthand.
-- **Phase 12**: Structure Rule Priority, State File Consolidation, .gitignore Support, Remote Config (Fetch Warning, Offline Mode, Hash Lock), Rule Matching Override, Relative max_depth, --diff A..B Range.
-- **Phase 13**: 13.1 Project Root Discovery, 13.2 Cache Hash Optimization, 13.3 File Locking, 13.4 Test Isolation.
-- **Phase 14**: 14.1 Extract Path Matching Utility, 14.2 CheckOptions Struct, 14.3 Scanner Module Split.
-- **Phase 15**: 15.1 Colored Error Output, 15.2 Structured Error Suggestions, 15.3 Error Context Enrichment.
-- **Phase 18**: 18.1 Unified Siblings Config (replaced `file_pattern`/`require_sibling` with `siblings` array, added `SiblingRule::Directed`/`Group`, `GroupIncomplete` violation).
+- **Phase 4**: Path-Based Rules, Inline Ignore, Strict Mode, SARIF Output, Progress Bar, Cache, Custom Language, Config Inheritance, Split Suggestions, Remote Config
+- **Phase 5**: Language Breakdown, Top-N & Metrics, Markdown Output, Directory Statistics, Trend Tracking, HTML Report, Structure Guard
+- **Phase 5.5**: Config V2, CheckResult refactor, DI Context, Scanner/Structure separation
+- **Phase 6**: CLI updates (diff/staged/ratchet/baseline flags), parameter renames
+- **Phase 8**: GitHub Action, Pre-commit Hook, Docker Image, SARIF Guidance
+- **Phase 9**: `explain` command, `max_depth`, `init --detect`, Allowlist Mode, Unified Traversal
+- **Phase 10-11**: IO Abstraction, Naming Convention, Co-location Check, Baseline Ratchet, Config Presets, Deny Patterns, Content Exclude, Granular Warn Thresholds
+- **Phase 12**: Rule Priority, State Consolidation, .gitignore, Remote Config (Offline/Hash Lock), --diff A..B Range
+- **Phase 13-15**: Project Root Discovery, Cache Optimization, File Locking, Path Matching, CheckOptions, Scanner Split, Colored Error Output
+- **Phase 18**: Unified Siblings Config (`siblings` array with Directed/Group rules)
 
 
 
 ## Phase 16: Trend Enhancement (Pending)
 
 ### ~~Task 16.6: History Command~~ ✅
-
----
-
-## Priority Order
-
-| Priority                         | Tasks                                                        |
-| -------------------------------- | ------------------------------------------------------------ |
-| ~~**1. State File Cleanup**~~    | ~~12.7 Remove V1 path_rules~~ ✅                              |
-| ~~**2. Git Diff Enhancement**~~  | ~~12.13 --diff A..B Explicit Range Syntax~~ ✅                |
-| ~~**3. Code Quality**~~          | ~~14.1 Extract Path Matching~~ ✅, ~~14.2 CheckOptions Struct~~ ✅, ~~14.3 Scanner Module Split~~ ✅ |
-| ~~**4. Structure Naming**~~      | ~~11.9 pattern→scope~~ ✅, ~~11.12 deny_file_patterns→deny_files + deny_dirs~~ ✅ |
-| ~~**5. Governance Refinement**~~ | ~~11.10 Content Exclude~~ ✅, ~~11.11 Granular Warn~~ ✅, ~~11.13 Allowlist Mode~~ ✅ |
-| ~~**6. Config Simplification**~~ | ~~11.14 Unify Rule and Override~~ ✅, ~~11.15 Remove Language Shorthand~~ ✅ |
-| ~~**7. Debt Lifecycle**~~        | ~~11.4 Baseline Ratchet~~ ✅                                  |
-| ~~**8. Error UX**~~              | ~~15.1 Colored Error Output~~ ✅, ~~15.2 Structured Error Suggestions~~ ✅, ~~15.3 Error Context Enrichment~~ ✅ |
-| ~~**9. Trend Core**~~            | ~~16.1 Retention Policy~~ ✅, ~~16.2 Output Semantics~~ ✅, ~~16.3 Significance Threshold~~ ✅ |
-| ~~**10. Content Warn Granularity**~~ | ~~17.1 Content warn_at Field~~ ✅                           |
-| ~~**11. Trend Extended**~~       | ~~16.4 Flexible Comparison~~ ✅, ~~16.5 Git Context~~ ✅, ~~16.6 History Command~~ ✅ |
-| ~~**12. Visualization**~~        | ~~7.1 SVG Core~~ ✅ → ~~7.2 Histogram~~ ✅ → ~~7.3 Language Chart~~ ✅ → ~~7.4 Trend Line~~ ✅ → ~~7.5 Polish~~ ✅ |
-| ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
-| ~~**14. Path Output Fix**~~      | ~~19.1 Relative Path Output~~ ✅                              |
-| **15. HTML Report Enhancement**  | ~~20.1 HTML Summary Stats~~ ✅, ~~20.2 File Total Column~~ ✅, ~~20.3 Stats HTML Format~~ ✅ |
-
----
-
-## Phase 20: HTML Report Enhancement (Pending)
-
-### ~~Task 20.1: HTML Summary Stats~~ ✅
-
-Add aggregate statistics to HTML report summary section:
-- Total lines, total code, total comments, total blanks
-- Currently only shows file counts (Passed/Warning/Failed/Grandfathered)
-
-### ~~Task 20.2: File Total Column~~ ✅
-
-Add "Total" column to HTML file table showing actual file line count (`stats.total`). Already implemented in `HtmlFormatter::write_file_row`.
-
-### ~~Task 20.3: Stats HTML Format~~ ✅
-
-Implemented HTML output format for `stats` command (`--format html`):
-- Summary cards showing total files, lines, code, comments, blanks, and avg code/file
-- Trend delta section with colored cards when `--trend` is used
-- Language breakdown table when `--group-by lang`
-- Directory breakdown table when `--group-by dir`
-- Top files table when `--top N`
-- Inline SVG charts: language breakdown chart and trend line chart
-- Follows existing `HtmlFormatter` CSS styling and HTML template
 
 ---
 
@@ -95,4 +45,36 @@ Implemented HTML output format for `stats` command (`--format html`):
 ### ~~Task 18.1: Unified Siblings Config~~ ✅
 
 ---
+
+
+
+## Phase 20: HTML Report Enhancement (Pending)
+
+### ~~Task 20.1: HTML Summary Stats~~ ✅
+
+### ~~Task 20.2: File Total Column~~ ✅
+
+### ~~Task 20.3: Stats HTML Format~~ ✅
+
+Implemented HTML output format for `stats` command (`--format html`):
+
+- Summary cards showing total files, lines, code, comments, blanks, and avg code/file
+- Trend delta section with colored cards when `--trend` is used
+- Language breakdown table when `--group-by lang`
+- Directory breakdown table when `--group-by dir`
+- Top files table when `--top N`
+- Inline SVG charts: language breakdown chart and trend line chart
+- Follows existing `HtmlFormatter` CSS styling and HTML template
+
+## Priority Order
+
+| Priority                         | Tasks                                                        |
+| -------------------------------- | ------------------------------------------------------------ |
+| ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
+| ~~**14. Path Output Fix**~~      | ~~19.1 Relative Path Output~~ ✅                              |
+| **15. HTML Report Enhancement**  | ~~20.1 HTML Summary Stats~~ ✅, ~~20.2 File Total Column~~ ✅, ~~20.3 Stats HTML Format~~ ✅ |
+
+---
+
+
 
