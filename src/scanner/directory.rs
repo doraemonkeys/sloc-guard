@@ -83,7 +83,16 @@ impl<F: FileFilter> DirectoryScanner<F> {
         structure_config: Option<&StructureScanConfig>,
     ) -> ScanResult {
         let mut state = StructureScanState::new(structure_config);
-        let walker = WalkDir::new(root).into_iter();
+        // Use filter_entry to skip excluded directories entirely (prunes subtree)
+        let walker = WalkDir::new(root).into_iter().filter_entry(|e| {
+            if e.file_type().is_dir()
+                && let Some(cfg) = structure_config
+            {
+                // Return false to skip this directory and all its children
+                return !cfg.is_scanner_excluded(e.path(), true);
+            }
+            true
+        });
 
         for entry in walker {
             let Ok(entry) = entry else {
@@ -112,6 +121,8 @@ impl<F: FileFilter> DirectoryScanner<F> {
         use ignore::WalkBuilder;
 
         let mut state = StructureScanState::new(structure_config);
+        // Clone config: filter_entry closure must be 'static, but structure_config is a borrowed reference
+        let config_for_filter = structure_config.cloned();
         let walker = WalkBuilder::new(root)
             .git_ignore(true)
             .git_global(true)
@@ -119,6 +130,15 @@ impl<F: FileFilter> DirectoryScanner<F> {
             .require_git(false)
             .hidden(false)
             .parents(true)
+            .filter_entry(move |e| {
+                // Skip excluded directories entirely (prunes subtree)
+                if e.file_type().is_some_and(|ft| ft.is_dir())
+                    && let Some(ref cfg) = config_for_filter
+                {
+                    return !cfg.is_scanner_excluded(e.path(), true);
+                }
+                true
+            })
             .build();
 
         for entry in walker.filter_map(std::result::Result::ok) {

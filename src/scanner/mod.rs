@@ -2,14 +2,12 @@ mod allowlist;
 mod composite;
 mod directory;
 mod filter;
-mod gitignore;
 mod structure_config;
 
 pub use allowlist::{AllowlistRule, AllowlistRuleBuilder};
 pub use composite::{CompositeScanner, scan_files};
 pub use directory::DirectoryScanner;
 pub use filter::{FileFilter, GlobFilter};
-pub use gitignore::GitAwareScanner;
 pub use structure_config::StructureScanConfig;
 
 #[cfg(test)]

@@ -19,7 +19,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
-| `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `types.rs`: `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `gitignore.rs`: `GitAwareScanner` (gix with .gitignore); `composite.rs`: `CompositeScanner` (git/non-git fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
+| `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `composite.rs`: `CompositeScanner` (gitignore-aware/regular fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
 | `checker/*` | `Checker` trait; `result.rs`: `CheckResult` enum; `threshold.rs`: `ThresholdChecker` with pre-indexed extension lookup; `explain.rs`: `ContentExplanation`, `StructureExplanation` for rule chain debugging; `structure/`: `StructureChecker` (split into `builder.rs`, `compiled_rules.rs`, `validation.rs`, `violation.rs`) |
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode); `GitContext` - current commit hash and branch for trend entries |
 | `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation, file locking for concurrent access) |
@@ -149,7 +149,7 @@ CLI args → load_config() → [if --offline] use cache only, error on miss
          → [if v1 config] migrate_v1_to_v2() auto-conversion (path_rules rejected with error)
          → [if !--no-cache] load_cache(config_hash)
          → LanguageRegistry
-         → [if gitignore] GitAwareScanner else DirectoryScanner
+         → DirectoryScanner (with or without gitignore support)
             Scanner returns ALL files (exclude patterns only, no extension filter)
          → ThresholdChecker::should_process() filters by content.exclude, then content.extensions OR rule match
          → parallel file processing (rayon):
