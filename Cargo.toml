@@ -28,7 +28,7 @@ rayon = "1.10"
 # Progress bar
 indicatif = "0.18.3"
 
-gix = { version = "0.75", default-features = false, features = [
+gix = { version = "0.76", default-features = false, features = [
     "revision",
     "index",
     "dirwalk",
