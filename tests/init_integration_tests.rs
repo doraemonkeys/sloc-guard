@@ -72,7 +72,8 @@ fn init_force_overwrites_existing_config() {
     let config_path = fixture.path().join(".sloc-guard.toml");
     let content = std::fs::read_to_string(&config_path).unwrap();
     // Should be the default template, not the old content
-    assert!(content.contains("[default]"));
+    assert!(content.contains("[content]"));
+    assert!(content.contains("version = \"2\""));
     assert!(!content.contains("max_lines = 999"));
 }
 

@@ -5,9 +5,10 @@ use super::{generate_config_template, run_init, run_init_impl, run_init_with_cwd
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 #[test]
-fn generate_config_template_contains_default_section() {
+fn generate_config_template_contains_content_section() {
     let template = generate_config_template();
-    assert!(template.contains("[default]"));
+    assert!(template.contains("version = \"2\""));
+    assert!(template.contains("[content]"));
     assert!(template.contains("max_lines = 500"));
     assert!(template.contains("skip_comments = true"));
     assert!(template.contains("skip_blank = true"));
@@ -21,9 +22,10 @@ fn generate_config_template_contains_extensions() {
 }
 
 #[test]
-fn generate_config_template_contains_exclude_section() {
+fn generate_config_template_contains_scanner_section() {
     let template = generate_config_template();
-    assert!(template.contains("[exclude]"));
+    assert!(template.contains("[scanner]"));
+    assert!(template.contains("gitignore = true"));
     assert!(template.contains("**/target/**"));
     assert!(template.contains("**/node_modules/**"));
 }
@@ -51,7 +53,8 @@ fn run_init_creates_config_file() {
     assert!(config_path.exists());
 
     let content = std::fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("[default]"));
+    assert!(content.contains("[content]"));
+    assert!(content.contains("version = \"2\""));
 }
 
 #[test]
@@ -90,7 +93,7 @@ fn run_init_overwrites_with_force() {
     assert!(result.is_ok());
 
     let content = std::fs::read_to_string(&config_path).unwrap();
-    assert!(content.contains("[default]"));
+    assert!(content.contains("[content]"));
     assert!(!content.contains("old content"));
 }
 
@@ -113,10 +116,12 @@ fn run_init_creates_parent_directories() {
 }
 
 #[test]
-fn generate_config_template_contains_strict() {
+fn generate_config_template_contains_structure_section() {
     let template = generate_config_template();
-    assert!(template.contains("strict"));
-    assert!(template.contains("Strict mode"));
+    assert!(template.contains("[structure]"));
+    assert!(template.contains("max_files = 30"));
+    assert!(template.contains("max_dirs = 10"));
+    assert!(template.contains("max_depth = 8"));
 }
 
 #[test]
