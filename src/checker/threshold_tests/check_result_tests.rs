@@ -60,12 +60,17 @@ fn check_uses_rule_specific_limit() {
 }
 
 #[test]
-fn check_uses_override_for_specific_file() {
+fn check_uses_rule_with_reason() {
     let mut config = default_config();
-    config.overrides.push(crate::config::FileOverride {
-        path: "legacy.rs".to_string(),
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/legacy.rs".to_string(),
         max_lines: 800,
+        warn_threshold: None,
+        warn_at: None,
+        skip_comments: None,
+        skip_blank: None,
         reason: Some("Legacy code".to_string()),
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
@@ -79,12 +84,17 @@ fn check_uses_override_for_specific_file() {
 }
 
 #[test]
-fn check_override_without_reason() {
+fn check_rule_without_reason() {
     let mut config = default_config();
-    config.overrides.push(crate::config::FileOverride {
-        path: "special.rs".to_string(),
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/special.rs".to_string(),
         max_lines: 800,
+        warn_threshold: None,
+        warn_at: None,
+        skip_comments: None,
+        skip_blank: None,
         reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);

@@ -16,16 +16,15 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | Purpose |
 |--------|---------|
 | `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (with `--trend`, `--since`, `history` subcommand), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
-| `config/*` | `Config` (v2: scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
+| `config/*` | `Config` (scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `composite.rs`: `CompositeScanner` (gitignore-aware/regular fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
 | `checker/*` | `Checker` trait; `result.rs`: `CheckResult` enum; `threshold.rs`: `ThresholdChecker` with pre-indexed extension lookup; `explain.rs`: `ContentExplanation`, `StructureExplanation` for rule chain debugging; `structure/`: `StructureChecker` (split into `builder.rs`, `compiled_rules.rs`, `validation.rs`, `violation.rs`) |
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode); `GitContext` - current commit hash and branch for trend entries |
-| `baseline`/`cache` | `Baseline` V2 (Content/Structure entries, V1 auto-migration), `Cache` (mtime+size validation, file locking for concurrent access) |
+| `baseline`/`cache` | `Baseline` (Content/Structure entries), `Cache` (mtime+size validation, file locking for concurrent access) |
 | `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter` (with `with_stats()` for project stats, `with_trend_history()` for trend chart, `with_project_root()` for relative paths); `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `StatsHtmlFormatter` (with `with_project_root()`, `with_trend_history()` for trend chart); `ScanProgress` (progress bar); `ErrorOutput` (colored error/warning output); `path.rs`: `display_path()` for relative path output with forward-slash normalization; `trend_formatting.rs`: relative time, trend arrows/colors/percentages; `svg/`: chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart, FileSizeHistogram, LanguageBreakdownChart, TrendLineChart with delta indicators and smart X-axis labels, SvgBuilder) with viewBox scaling, CSS variables, hover effects, print styles, accessibility |
-| `path_matching` | `path_matches_override()` - shared path suffix matching for override path resolution (handles Windows/Unix separators) |
 | `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `message()` includes error kind for `FileRead`/`Io` and glob details for `InvalidPattern` |
 | `commands/*` | `run_check`, `run_stats`, `run_config`, `run_init`, `run_explain`; check split into: `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_validation.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
@@ -36,7 +35,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ```rust
 // Config (priority: CLI > file > defaults; extends: local/remote/preset with 1h TTL cache for remote)
-// V2 schema separates scanner/content/structure concerns
+// Schema separates scanner/content/structure concerns
 // Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
 Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend }
@@ -102,7 +101,7 @@ GitContext::from_path(path) → Option<GitContext>  // Get current git context f
 GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff ref (compares to HEAD)
 GitDiff::get_changed_files_range(base, target) → HashSet<PathBuf>  // --diff base..target
 GitDiff::get_staged_files() → HashSet<PathBuf>  // --staged mode
-// Baseline V2 (.sloc-guard-baseline.json in project root)
+// Baseline (.sloc-guard-baseline.json in project root)
 Baseline { version: 2, files: HashMap<path, BaselineEntry> }
 BaselineEntry::Content { lines, hash } | Structure { violation_type, count }
 StructureViolationType::Files | Dirs
@@ -146,7 +145,6 @@ ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testabi
 CLI args → load_config() → [if --offline] use cache only, error on miss
          → [if extends] resolve chain (local/remote/preset:*, cycle detection)
          → [if extends_sha256] verify remote config hash, error on mismatch
-         → [if v1 config] migrate_v1_to_v2() auto-conversion (path_rules rejected with error)
          → [if !--no-cache] load_cache(config_hash)
          → LanguageRegistry
          → DirectoryScanner (with or without gitignore support)

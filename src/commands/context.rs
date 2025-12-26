@@ -71,33 +71,13 @@ pub fn save_cache(cache_path: &Path, cache: &Cache) {
     let _ = cache.save(cache_path);
 }
 
-pub(crate) fn resolve_scan_paths(
-    paths: &[PathBuf],
-    include: &[String],
-    config: &Config,
-) -> Vec<PathBuf> {
-    // CLI --include overrides config include_paths
+pub(crate) fn resolve_scan_paths(paths: &[PathBuf], include: &[String]) -> Vec<PathBuf> {
+    // CLI --include overrides paths
     if !include.is_empty() {
         return include.iter().map(PathBuf::from).collect();
     }
 
-    // If CLI paths provided (other than default "."), use them
-    let default_path = PathBuf::from(".");
-    if paths.len() != 1 || paths[0] != default_path {
-        return paths.to_vec();
-    }
-
-    // Use config include_paths if available
-    if !config.default.include_paths.is_empty() {
-        return config
-            .default
-            .include_paths
-            .iter()
-            .map(PathBuf::from)
-            .collect();
-    }
-
-    // Default to current directory
+    // Use provided paths (or default ".")
     paths.to_vec()
 }
 

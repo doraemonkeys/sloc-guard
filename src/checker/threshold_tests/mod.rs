@@ -3,7 +3,6 @@
 mod check_result_tests;
 mod content_exclude_tests;
 mod file_filter_tests;
-mod override_matching_tests;
 mod rule_matching_tests;
 mod skip_settings_tests;
 mod warn_threshold_tests;

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::error::{Result, SlocGuardError};
 
 use super::Config;
-use super::model::{CONFIG_VERSION, CONFIG_VERSION_V1, ContentRule};
+use super::model::CONFIG_VERSION;
 use super::presets;
 use super::remote::{fetch_remote_config, fetch_remote_config_offline, is_remote_url};
 
@@ -40,87 +40,15 @@ const USER_CONFIG_DIR: &str = "sloc-guard";
 const USER_CONFIG_NAME: &str = "config.toml";
 
 /// Validate config version. Returns an error if version is unsupported.
-/// Returns `true` if version is missing or V1 (requires migration).
-fn validate_config_version(config: &Config) -> Result<bool> {
-    // Reject deprecated path_rules - must use content.rules instead
-    if !config.path_rules.is_empty() {
-        return Err(SlocGuardError::Config(
-            "Deprecated: [[path_rules]] is no longer supported. \
-             Please migrate to [[content.rules]] format. Example:\n\n\
-             # Old format (no longer supported):\n\
-             # [[path_rules]]\n\
-             # pattern = \"src/generated/**\"\n\
-             # max_lines = 1000\n\n\
-             # New format:\n\
-             [[content.rules]]\n\
-             pattern = \"src/generated/**\"\n\
-             max_lines = 1000"
-                .to_string(),
-        ));
-    }
-
+fn validate_config_version(config: &Config) -> Result<()> {
     match &config.version {
-        None => Ok(true),                              // Missing version - needs migration
-        Some(v) if v == CONFIG_VERSION => Ok(false),   // V2 - no migration
-        Some(v) if v == CONFIG_VERSION_V1 => Ok(true), // V1 - needs migration
+        None => Ok(()),                           // No version specified - use defaults
+        Some(v) if v == CONFIG_VERSION => Ok(()), // V2 - valid
         Some(v) => Err(SlocGuardError::Config(format!(
-            "Unsupported config version '{v}'. Supported versions: '{CONFIG_VERSION_V1}', '{CONFIG_VERSION}'. \
-             Please check for updates or adjust your config."
+            "Unsupported config version '{v}'. Only version '{CONFIG_VERSION}' is supported. \
+             Please update your configuration to the V2 format."
         ))),
     }
-}
-
-/// Migrate V1 config fields to V2 structure.
-/// This function populates `scanner`/`content` fields from legacy fields.
-fn migrate_v1_to_v2(config: &mut Config) {
-    // Migrate default.gitignore -> scanner.gitignore
-    config.scanner.gitignore = config.default.gitignore;
-
-    // Migrate exclude.patterns -> scanner.exclude
-    if !config.exclude.patterns.is_empty() {
-        config.scanner.exclude = config.exclude.patterns.clone();
-    }
-
-    // Migrate default.* -> content.*
-    config.content.extensions = config.default.extensions.clone();
-    config.content.max_lines = config.default.max_lines;
-    config.content.warn_threshold = config.default.warn_threshold;
-    config.content.skip_comments = config.default.skip_comments;
-    config.content.skip_blank = config.default.skip_blank;
-    config.content.strict = config.default.strict;
-
-    // Note: path_rules migration removed - V1 path_rules are now rejected with an error.
-    // Users must manually migrate to [[content.rules]] format.
-    // Note: overrides migration removed - V1 overrides are no longer supported.
-    // Users must manually migrate to [[content.rules]] with reason field.
-
-    // Migrate V1 [rules.X] (extension-based) -> [[content.rules]]
-    // V1 format: [rules.python] with extensions = ["py"]
-    // V2 format: [[content.rules]] with pattern = "**/*.py"
-    // Collect and sort extensions for deterministic order
-    let mut all_extensions: Vec<(String, &super::model::RuleConfig)> = Vec::new();
-    for rule in config.rules.values() {
-        for ext in &rule.extensions {
-            all_extensions.push((ext.clone(), rule));
-        }
-    }
-    all_extensions.sort_by(|a, b| a.0.cmp(&b.0));
-
-    // Insert at HEAD of content.rules (so explicit rules override migrated ones)
-    let migrated_rules: Vec<ContentRule> = all_extensions
-        .into_iter()
-        .map(|(ext, rule)| ContentRule {
-            pattern: format!("**/*.{ext}"),
-            max_lines: rule.max_lines.unwrap_or(config.content.max_lines),
-            warn_threshold: rule.warn_threshold,
-            warn_at: None,
-            skip_comments: rule.skip_comments,
-            skip_blank: rule.skip_blank,
-            reason: None,
-            expires: None,
-        })
-        .collect();
-    config.content.rules.splice(0..0, migrated_rules);
 }
 
 /// Trait for filesystem operations (for testability).
@@ -243,14 +171,8 @@ impl<F: FileSystem> FileConfigLoader<F> {
     }
 
     fn parse_config(content: &str) -> Result<Config> {
-        let mut config: Config = toml::from_str(content).map_err(SlocGuardError::from)?;
-        let needs_migration = validate_config_version(&config)?;
-
-        // Migrate V1 config to V2 structure if needed
-        if needs_migration {
-            migrate_v1_to_v2(&mut config);
-        }
-
+        let config: Config = toml::from_str(content).map_err(SlocGuardError::from)?;
+        validate_config_version(&config)?;
         Ok(config)
     }
 

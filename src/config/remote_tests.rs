@@ -188,7 +188,7 @@ fn clear_cache_removes_cached_files() {
 
     // Write a test file to cache
     let test_url = "https://clear-cache-test.example.com/config.toml";
-    let test_content = "[default]\nmax_lines = 100\n";
+    let test_content = "version = \"2\"\n\n[content]\nmax_lines = 100\n";
 
     if write_to_cache(test_url, test_content, Some(temp_dir.path())).is_none() {
         return;
@@ -252,7 +252,7 @@ fn write_to_cache_and_read_back() {
     let temp_dir = create_temp_project();
 
     let test_url = "https://test.example.com/config.toml";
-    let test_content = "[default]\nmax_lines = 100\n";
+    let test_content = "version = \"2\"\n\n[content]\nmax_lines = 100\n";
 
     // Write to cache
     let write_result = write_to_cache(test_url, test_content, Some(temp_dir.path()));
@@ -280,7 +280,7 @@ fn cache_file_path_different_urls_produce_different_paths() {
 #[test]
 fn fetch_with_mock_client_success() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 200\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 200\n";
     let client = MockHttpClient::success(content);
 
     let url = "https://mock-test-success.example.com/config.toml";
@@ -312,7 +312,7 @@ fn fetch_with_mock_client_error() {
 #[test]
 fn fetch_with_mock_client_uses_cache_on_second_call() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 300\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 300\n";
     let client = MockHttpClient::success(content);
 
     let url = "https://mock-test-cache.example.com/config.toml";
@@ -370,7 +370,7 @@ fn fetch_with_mock_client_ftp_url_never_calls_client() {
 #[test]
 fn fetch_with_mock_client_http_url_accepted() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 400\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 400\n";
     let client = MockHttpClient::success(content);
 
     let url = "http://mock-test-http.example.com/config.toml";
@@ -460,7 +460,7 @@ fn warning_shown_on_first_remote_fetch() {
     let temp_dir = create_temp_project();
     reset_warning_flag();
 
-    let content = "[default]\nmax_lines = 500\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 500\n";
     let client = MockHttpClient::success(content);
 
     let url = "https://mock-test-warning.example.com/config.toml";
@@ -477,7 +477,7 @@ fn warning_shown_only_once_per_session() {
     let temp_dir = create_temp_project();
     reset_warning_flag();
 
-    let content = "[default]\nmax_lines = 600\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 600\n";
     let client = MockHttpClient::success(content);
 
     let url1 = "https://mock-test-warning-once-1.example.com/config.toml";
@@ -499,7 +499,7 @@ fn warning_not_shown_when_cache_hit() {
     let temp_dir = create_temp_project();
     reset_warning_flag();
 
-    let content = "[default]\nmax_lines = 700\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 700\n";
     let client = MockHttpClient::success(content);
 
     let url = "https://mock-test-warning-cache.example.com/config.toml";
@@ -527,7 +527,7 @@ fn warning_not_shown_when_cache_hit() {
 #[test]
 fn offline_mode_returns_cached_content() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 800\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 800\n";
 
     let url = "https://mock-test-offline-cached.example.com/config.toml";
 
@@ -581,7 +581,7 @@ fn offline_mode_returns_none_without_project_root() {
 
 #[test]
 fn compute_content_hash_produces_consistent_hash() {
-    let content = "[default]\nmax_lines = 100\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 100\n";
     let hash1 = compute_content_hash(content);
     let hash2 = compute_content_hash(content);
     assert_eq!(hash1, hash2);
@@ -589,7 +589,7 @@ fn compute_content_hash_produces_consistent_hash() {
 
 #[test]
 fn compute_content_hash_produces_64_char_hex() {
-    let content = "[default]\nmax_lines = 100\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 100\n";
     let hash = compute_content_hash(content);
     assert_eq!(hash.len(), 64);
     assert!(hash.chars().all(|c| c.is_ascii_hexdigit()));
@@ -597,15 +597,15 @@ fn compute_content_hash_produces_64_char_hex() {
 
 #[test]
 fn compute_content_hash_different_for_different_content() {
-    let hash1 = compute_content_hash("[default]\nmax_lines = 100\n");
-    let hash2 = compute_content_hash("[default]\nmax_lines = 200\n");
+    let hash1 = compute_content_hash("version = \"2\"\n\n[content]\nmax_lines = 100\n");
+    let hash2 = compute_content_hash("version = \"2\"\n\n[content]\nmax_lines = 200\n");
     assert_ne!(hash1, hash2);
 }
 
 #[test]
 fn hash_verification_success_on_match() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 900\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 900\n";
     let expected_hash = compute_content_hash(content);
     let client = MockHttpClient::success(content);
 
@@ -620,7 +620,7 @@ fn hash_verification_success_on_match() {
 #[test]
 fn hash_verification_fails_on_mismatch() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 1000\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 1000\n";
     let wrong_hash = "0".repeat(64); // Intentionally wrong hash
     let client = MockHttpClient::success(content);
 
@@ -650,7 +650,7 @@ fn hash_verification_fails_on_mismatch() {
 #[test]
 fn hash_verification_with_cached_content_success() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 1100\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 1100\n";
     let expected_hash = compute_content_hash(content);
 
     let url = "https://mock-test-hash-cache-success.example.com/config.toml";
@@ -672,8 +672,8 @@ fn hash_verification_with_cached_content_success() {
 #[test]
 fn hash_verification_with_cached_content_fails_on_mismatch() {
     let temp_dir = create_temp_project();
-    let cached_content = "[default]\nmax_lines = 1200\n";
-    let fresh_content = "[default]\nmax_lines = 1201\n";
+    let cached_content = "version = \"2\"\n\n[content]\nmax_lines = 1200\n";
+    let fresh_content = "version = \"2\"\n\n[content]\nmax_lines = 1201\n";
     let expected_hash = compute_content_hash(fresh_content);
 
     let url = "https://mock-test-hash-cache-fail.example.com/config.toml";
@@ -696,8 +696,8 @@ fn hash_verification_with_cached_content_fails_on_mismatch() {
 #[test]
 fn hash_mismatch_on_both_cache_and_remote_fails() {
     let temp_dir = create_temp_project();
-    let cached_content = "[default]\nmax_lines = 1200\n";
-    let remote_content = "[default]\nmax_lines = 1201\n";
+    let cached_content = "version = \"2\"\n\n[content]\nmax_lines = 1200\n";
+    let remote_content = "version = \"2\"\n\n[content]\nmax_lines = 1201\n";
     let wrong_hash = "f".repeat(64); // Doesn't match either
 
     let url = "https://mock-test-hash-both-fail.example.com/config.toml";
@@ -720,7 +720,7 @@ fn hash_mismatch_on_both_cache_and_remote_fails() {
 #[test]
 fn hash_verification_offline_mode_success() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 1300\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 1300\n";
     let expected_hash = compute_content_hash(content);
 
     let url = "https://mock-test-hash-offline-success.example.com/config.toml";
@@ -737,7 +737,7 @@ fn hash_verification_offline_mode_success() {
 #[test]
 fn hash_verification_offline_mode_fails_on_mismatch() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 1400\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 1400\n";
     let wrong_hash = "a".repeat(64);
 
     let url = "https://mock-test-hash-offline-fail.example.com/config.toml";
@@ -754,7 +754,7 @@ fn hash_verification_offline_mode_fails_on_mismatch() {
 #[test]
 fn hash_not_required_when_none() {
     let temp_dir = create_temp_project();
-    let content = "[default]\nmax_lines = 1500\n";
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 1500\n";
     let client = MockHttpClient::success(content);
 
     let url = "https://mock-test-no-hash.example.com/config.toml";

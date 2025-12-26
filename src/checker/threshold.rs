@@ -5,7 +5,6 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::config::Config;
 use crate::counter::LineStats;
-use crate::path_matching::path_matches_override;
 
 use super::Checker;
 use super::explain::{
@@ -78,7 +77,7 @@ impl ThresholdChecker {
     /// - NOT in `content.exclude` patterns, AND
     /// - (`content.extensions` is empty (no filter), OR
     ///   File extension is in `content.extensions`, OR
-    ///   File matches any legacy override or rule pattern)
+    ///   File matches any rule pattern)
     ///
     /// This ensures extension-less files (Dockerfile, Jenkinsfile, etc.) can be
     /// checked if there's an explicit rule targeting them.
@@ -100,13 +99,6 @@ impl ThresholdChecker {
             .is_some_and(|ext| self.allowed_extensions.contains(ext))
         {
             return true;
-        }
-
-        // Check if file matches any legacy override
-        for override_cfg in &self.config.overrides {
-            if path_matches_override(path, &override_cfg.path) {
-                return true;
-            }
         }
 
         // Check if file matches any rule pattern (O(1) via GlobSet)
@@ -146,13 +138,6 @@ impl ThresholdChecker {
 
     /// Returns (`max_lines`, `override_reason`) for a path.
     fn get_limit_for_path(&self, path: &Path) -> (usize, Option<String>) {
-        // Check legacy overrides first (highest priority)
-        for override_cfg in &self.config.overrides {
-            if path_matches_override(path, &override_cfg.path) {
-                return (override_cfg.max_lines, override_cfg.reason.clone());
-            }
-        }
-
         // Check path_rules (glob patterns) - last match wins
         // Use GlobSet::matches() for O(n) matching where n = path length
         let matches = self.path_rules_set.matches(path);

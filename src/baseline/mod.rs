@@ -58,20 +58,6 @@ impl BaselineEntry {
     }
 }
 
-/// Legacy entry format (V1) for backward compatibility.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct LegacyBaselineEntry {
-    lines: usize,
-    hash: String,
-}
-
-/// Legacy baseline format (V1) for backward compatibility.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct LegacyBaseline {
-    version: u32,
-    files: HashMap<String, LegacyBaselineEntry>,
-}
-
 /// Baseline file structure for tracking grandfathered violations.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Baseline {
@@ -95,7 +81,6 @@ impl Baseline {
     }
 
     /// Load baseline from a JSON file.
-    /// Supports both V1 (legacy) and V2 formats with automatic migration.
     ///
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
@@ -105,28 +90,8 @@ impl Baseline {
             source: e,
         })?;
 
-        // Try V2 format first
-        if let Ok(baseline) = serde_json::from_str::<Self>(&content) {
-            return Ok(baseline);
-        }
-
-        // Fall back to V1 migration
-        let legacy: LegacyBaseline = serde_json::from_str(&content)?;
-        Ok(Self::migrate_from_v1(legacy))
-    }
-
-    /// Migrate from V1 baseline format to V2.
-    fn migrate_from_v1(legacy: LegacyBaseline) -> Self {
-        let files = legacy
-            .files
-            .into_iter()
-            .map(|(path, entry)| (path, BaselineEntry::content(entry.lines, entry.hash)))
-            .collect();
-
-        Self {
-            version: BASELINE_VERSION,
-            files,
-        }
+        let baseline: Self = serde_json::from_str(&content)?;
+        Ok(baseline)
     }
 
     /// Save baseline to a JSON file.

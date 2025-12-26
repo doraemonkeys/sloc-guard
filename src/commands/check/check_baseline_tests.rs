@@ -269,7 +269,7 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
     baseline.save(&baseline_path).unwrap();
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");
-    let config_content = "[default]\nmax_lines = 10\n";
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 10\n";
     std::fs::write(&config_path, config_content).unwrap();
 
     let args = make_check_args_with_baseline(
@@ -295,7 +295,7 @@ fn run_check_impl_without_baseline_fails_on_violations() {
     std::fs::write(&test_file_path, &large_content).unwrap();
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");
-    let config_content = "[default]\nmax_lines = 10\n";
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 10\n";
     std::fs::write(&config_path, config_content).unwrap();
 
     let args = make_check_args_with_baseline(
@@ -325,7 +325,7 @@ fn run_check_impl_with_baseline_fails_on_new_violations() {
     baseline.save(&baseline_path).unwrap();
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");
-    let config_content = "[default]\nmax_lines = 10\n";
+    let config_content = "version = \"2\"\n\n[content]\nmax_lines = 10\n";
     std::fs::write(&config_path, config_content).unwrap();
 
     let args = make_check_args_with_baseline(

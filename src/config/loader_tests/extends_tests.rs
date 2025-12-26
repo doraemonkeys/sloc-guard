@@ -11,14 +11,17 @@ use super::mock_fs::MockFileSystem;
 #[test]
 fn extends_loads_base_config() {
     let base_content = r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 300
 extensions = ["rs", "go"]
 "#;
     let child_content = r#"
+version = "2"
 extends = "/base/config.toml"
 
-[default]
+[content]
 max_lines = 500
 "#;
 
@@ -31,21 +34,24 @@ max_lines = 500
         .load_from_path(Path::new("/project/config.toml"))
         .unwrap();
 
-    assert_eq!(config.default.max_lines, 500);
-    assert_eq!(config.default.extensions, vec!["rs", "go"]);
+    assert_eq!(config.content.max_lines, 500);
+    assert_eq!(config.content.extensions, vec!["rs", "go"]);
     assert!(config.extends.is_none());
 }
 
 #[test]
 fn extends_with_relative_path() {
-    let base_content = r"
-[default]
+    let base_content = r#"
+version = "2"
+
+[content]
 max_lines = 200
-";
+"#;
     let child_content = r#"
+version = "2"
 extends = "../base/config.toml"
 
-[default]
+[content]
 skip_comments = false
 "#;
 
@@ -58,29 +64,33 @@ skip_comments = false
         .load_from_path(Path::new("/configs/project/config.toml"))
         .unwrap();
 
-    assert_eq!(config.default.max_lines, 200);
-    assert!(!config.default.skip_comments);
+    assert_eq!(config.content.max_lines, 200);
+    assert!(!config.content.skip_comments);
 }
 
 #[test]
 fn extends_chain_works() {
     let grandparent_content = r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 100
 
-[exclude]
-patterns = ["**/vendor/**"]
+[scanner]
+exclude = ["**/vendor/**"]
 "#;
     let parent_content = r#"
+version = "2"
 extends = "/configs/grandparent.toml"
 
-[default]
+[content]
 max_lines = 200
 "#;
     let child_content = r#"
+version = "2"
 extends = "/configs/parent.toml"
 
-[default]
+[content]
 max_lines = 300
 "#;
 
@@ -94,8 +104,8 @@ max_lines = 300
         .load_from_path(Path::new("/configs/child.toml"))
         .unwrap();
 
-    assert_eq!(config.default.max_lines, 300);
-    assert_eq!(config.exclude.patterns, vec!["**/vendor/**"]);
+    assert_eq!(config.content.max_lines, 300);
+    assert_eq!(config.scanner.exclude, vec!["**/vendor/**"]);
 }
 
 #[test]
@@ -124,7 +134,7 @@ fn extends_detects_self_reference() {
     let config = r#"
 extends = "/configs/self.toml"
 
-[default]
+[content]
 max_lines = 100
 "#;
 
@@ -139,24 +149,24 @@ max_lines = 100
 }
 
 #[test]
-fn extends_merges_rules() {
+fn extends_merges_content_rules() {
     let base_content = r#"
-[rules.rust]
-extensions = ["rs"]
+version = "2"
+
+[[content.rules]]
+pattern = "**/*.rs"
 max_lines = 300
 
-[rules.python]
-extensions = ["py"]
+[[content.rules]]
+pattern = "**/*.py"
 max_lines = 400
 "#;
     let child_content = r#"
+version = "2"
 extends = "/base.toml"
 
-[rules.rust]
-max_lines = 500
-
-[rules.go]
-extensions = ["go"]
+[[content.rules]]
+pattern = "**/*.go"
 max_lines = 600
 "#;
 
@@ -167,20 +177,10 @@ max_lines = 600
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load_from_path(Path::new("/child.toml")).unwrap();
 
-    // Child overrides max_lines but inherits extensions from base
-    let rust_rule = config.rules.get("rust").unwrap();
-    assert_eq!(rust_rule.max_lines, Some(500));
-    assert_eq!(rust_rule.extensions, vec!["rs"]);
-
-    // Python rule inherited entirely from base
-    let python_rule = config.rules.get("python").unwrap();
-    assert_eq!(python_rule.max_lines, Some(400));
-    assert_eq!(python_rule.extensions, vec!["py"]);
-
-    // Go rule defined only in child
-    let go_rule = config.rules.get("go").unwrap();
-    assert_eq!(go_rule.max_lines, Some(600));
-    assert_eq!(go_rule.extensions, vec!["go"]);
+    // Child's rules override base's rules (arrays are replaced, not merged)
+    assert_eq!(config.content.rules.len(), 1);
+    assert_eq!(config.content.rules[0].pattern, "**/*.go");
+    assert_eq!(config.content.rules[0].max_lines, 600);
 }
 
 #[test]
@@ -188,7 +188,7 @@ fn extends_error_on_missing_base() {
     let child_content = r#"
 extends = "/nonexistent/base.toml"
 
-[default]
+[content]
 max_lines = 100
 "#;
 
@@ -206,14 +206,17 @@ max_lines = 100
 
 #[test]
 fn load_without_extends_ignores_extends_field() {
-    let base_content = r"
-[default]
+    let base_content = r#"
+version = "2"
+
+[content]
 max_lines = 100
-";
+"#;
     let child_content = r#"
+version = "2"
 extends = "/base.toml"
 
-[default]
+[content]
 max_lines = 200
 "#;
 
@@ -226,7 +229,7 @@ max_lines = 200
     let config = loader.load_without_extends().unwrap();
 
     // Should have max_lines from child only, not merged with base
-    assert_eq!(config.default.max_lines, 200);
+    assert_eq!(config.content.max_lines, 200);
     // Extends field should be preserved in the config
     assert_eq!(config.extends, Some("/base.toml".to_string()));
 }
@@ -234,14 +237,17 @@ max_lines = 200
 #[test]
 fn load_from_path_without_extends_ignores_extends() {
     let base_content = r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 100
 extensions = ["rs", "go"]
 "#;
     let child_content = r#"
+version = "2"
 extends = "/base.toml"
 
-[default]
+[content]
 max_lines = 300
 "#;
 
@@ -255,11 +261,11 @@ max_lines = 300
         .unwrap();
 
     // Should have only child's max_lines, not merged
-    assert_eq!(config.default.max_lines, 300);
+    assert_eq!(config.content.max_lines, 300);
     // Extensions should be default (not from base)
     assert_eq!(
-        config.default.extensions,
-        Config::default().default.extensions
+        config.content.extensions,
+        Config::default().content.extensions
     );
     // Extends field should be preserved
     assert_eq!(config.extends, Some("/base.toml".to_string()));
@@ -268,9 +274,10 @@ max_lines = 300
 #[test]
 fn load_without_extends_falls_back_to_user_config() {
     let user_content = r#"
+version = "2"
 extends = "https://example.com/base.toml"
 
-[default]
+[content]
 max_lines = 400
 "#;
 
@@ -281,7 +288,7 @@ max_lines = 400
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load_without_extends().unwrap();
 
-    assert_eq!(config.default.max_lines, 400);
+    assert_eq!(config.content.max_lines, 400);
     assert_eq!(
         config.extends,
         Some("https://example.com/base.toml".to_string())

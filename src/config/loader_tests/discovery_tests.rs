@@ -14,17 +14,19 @@ fn returns_default_when_no_config_found() {
 
     let config = loader.load().unwrap();
 
-    assert_eq!(config.default.max_lines, 500);
-    assert!(config.default.skip_comments);
-    assert!(config.default.skip_blank);
+    assert_eq!(config.content.max_lines, 500);
+    assert!(config.content.skip_comments);
+    assert!(config.content.skip_blank);
 }
 
 #[test]
 fn loads_local_config_from_current_directory() {
-    let config_content = r"
-[default]
+    let config_content = r#"
+version = "2"
+
+[content]
 max_lines = 300
-";
+"#;
 
     let fs = MockFileSystem::new()
         .with_current_dir("/my/project")
@@ -33,15 +35,17 @@ max_lines = 300
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load().unwrap();
 
-    assert_eq!(config.default.max_lines, 300);
+    assert_eq!(config.content.max_lines, 300);
 }
 
 #[test]
 fn loads_user_config_as_fallback() {
-    let config_content = r"
-[default]
+    let config_content = r#"
+version = "2"
+
+[content]
 max_lines = 400
-";
+"#;
 
     let fs = MockFileSystem::new()
         .with_home_dir(Some(PathBuf::from("/home/testuser")))
@@ -53,19 +57,23 @@ max_lines = 400
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load().unwrap();
 
-    assert_eq!(config.default.max_lines, 400);
+    assert_eq!(config.content.max_lines, 400);
 }
 
 #[test]
 fn local_config_takes_priority_over_user_config() {
-    let local_content = r"
-[default]
+    let local_content = r#"
+version = "2"
+
+[content]
 max_lines = 200
-";
-    let user_content = r"
-[default]
+"#;
+    let user_content = r#"
+version = "2"
+
+[content]
 max_lines = 600
-";
+"#;
 
     let fs = MockFileSystem::new()
         .with_current_dir("/project")
@@ -76,7 +84,7 @@ max_lines = 600
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load().unwrap();
 
-    assert_eq!(config.default.max_lines, 200);
+    assert_eq!(config.content.max_lines, 200);
 }
 
 #[test]

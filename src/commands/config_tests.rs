@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::cli::{Cli, ColorChoice, Commands, ConfigOutputFormat, InitArgs};
-use crate::config::{Config, ContentConfig, ContentRule, FileOverride, RuleConfig};
+use crate::config::{Config, ContentConfig, ContentRule};
 use tempfile::TempDir;
 
 use super::*;
@@ -55,22 +55,21 @@ fn validate_config_valid_full_config() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("full.toml");
     let content = r#"
-[default]
+version = "2"
+
+[scanner]
+gitignore = true
+exclude = ["**/target/**"]
+
+[content]
 max_lines = 500
 extensions = ["rs", "go"]
 skip_comments = true
 skip_blank = true
 warn_threshold = 0.9
 
-[rules.rust]
-extensions = ["rs"]
-max_lines = 300
-
-[exclude]
-patterns = ["**/target/**"]
-
-[[override]]
-path = "src/legacy.rs"
+[[content.rules]]
+pattern = "src/legacy.rs"
 max_lines = 800
 reason = "Legacy code"
 "#;
@@ -83,7 +82,7 @@ reason = "Legacy code"
 #[test]
 fn validate_config_semantics_invalid_warn_threshold_too_high() {
     let mut config = Config::default();
-    config.default.warn_threshold = 1.5;
+    config.content.warn_threshold = 1.5;
 
     let result = validate_config_semantics(&config);
     assert!(result.is_err());
@@ -93,7 +92,7 @@ fn validate_config_semantics_invalid_warn_threshold_too_high() {
 #[test]
 fn validate_config_semantics_invalid_warn_threshold_negative() {
     let mut config = Config::default();
-    config.default.warn_threshold = -0.1;
+    config.content.warn_threshold = -0.1;
 
     let result = validate_config_semantics(&config);
     assert!(result.is_err());
@@ -104,17 +103,17 @@ fn validate_config_semantics_invalid_warn_threshold_negative() {
 fn validate_config_semantics_valid_warn_threshold_boundaries() {
     let mut config = Config::default();
 
-    config.default.warn_threshold = 0.0;
+    config.content.warn_threshold = 0.0;
     assert!(validate_config_semantics(&config).is_ok());
 
-    config.default.warn_threshold = 1.0;
+    config.content.warn_threshold = 1.0;
     assert!(validate_config_semantics(&config).is_ok());
 }
 
 #[test]
-fn validate_config_semantics_invalid_glob_pattern() {
+fn validate_config_semantics_invalid_scanner_exclude_pattern() {
     let mut config = Config::default();
-    config.exclude.patterns = vec!["[invalid".to_string()];
+    config.scanner.exclude = vec!["[invalid".to_string()];
 
     let result = validate_config_semantics(&config);
     assert!(result.is_err());
@@ -122,48 +121,13 @@ fn validate_config_semantics_invalid_glob_pattern() {
 }
 
 #[test]
-fn validate_config_semantics_empty_override_path() {
-    let config = Config {
-        overrides: vec![FileOverride {
-            path: String::new(),
-            max_lines: 500,
-            reason: None,
-        }],
-        ..Default::default()
-    };
-
-    let result = validate_config_semantics(&config);
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("path cannot be empty")
-    );
-}
-
-#[test]
-fn validate_config_semantics_rule_without_extensions_or_max_lines() {
+fn validate_config_semantics_invalid_content_exclude_pattern() {
     let mut config = Config::default();
-    config.rules.insert(
-        "empty_rule".to_string(),
-        RuleConfig {
-            extensions: vec![],
-            max_lines: None,
-            skip_comments: None,
-            skip_blank: None,
-            warn_threshold: None,
-        },
-    );
+    config.content.exclude = vec!["[invalid".to_string()];
 
     let result = validate_config_semantics(&config);
     assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("must specify at least")
-    );
+    assert!(result.unwrap_err().to_string().contains("Invalid glob"));
 }
 
 #[test]
@@ -177,7 +141,8 @@ fn config_show_default_returns_text() {
     assert!(result.is_ok());
     let output = result.unwrap();
     assert!(output.contains("Effective Configuration"));
-    assert!(output.contains("[default]"));
+    assert!(output.contains("[scanner]"));
+    assert!(output.contains("[content]"));
     assert!(output.contains("max_lines = 500"));
 }
 
@@ -202,11 +167,13 @@ fn config_show_from_file() {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("test.toml");
     let content = r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 300
 
-[exclude]
-patterns = ["**/vendor/**"]
+[scanner]
+exclude = ["**/vendor/**"]
 "#;
     std::fs::write(&config_path, content).unwrap();
 
@@ -229,67 +196,31 @@ fn config_show_nonexistent_file_returns_error() {
 #[test]
 fn format_config_text_includes_all_sections() {
     let mut config = Config::default();
-    config.rules.insert(
-        "rust".to_string(),
-        RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(300),
-            skip_comments: Some(true),
-            skip_blank: None,
-            warn_threshold: None,
-        },
-    );
-    config.exclude.patterns = vec!["**/target/**".to_string()];
-    config.overrides = vec![FileOverride {
-        path: "src/legacy.rs".to_string(),
-        max_lines: 800,
-        reason: Some("Legacy code".to_string()),
-    }];
+    config.content.rules.push(ContentRule {
+        pattern: "**/*.rs".to_string(),
+        max_lines: 300,
+        warn_threshold: Some(0.85),
+        warn_at: None,
+        skip_comments: Some(true),
+        skip_blank: None,
+        reason: Some("Rust files".to_string()),
+        expires: None,
+    });
+    config.scanner.exclude = vec!["**/target/**".to_string()];
 
     let output = format_config_text(&config);
 
-    assert!(output.contains("[default]"));
-    assert!(output.contains("[rules.rust]"));
-    assert!(output.contains("[exclude]"));
-    assert!(output.contains("[[override]]  # DEPRECATED"));
-    assert!(output.contains("src/legacy.rs"));
-    assert!(output.contains("Legacy code"));
-}
-
-#[test]
-fn format_config_text_with_include_paths() {
-    let mut config = Config::default();
-    config.default.include_paths = vec!["src".to_string(), "lib".to_string()];
-
-    let output = format_config_text(&config);
-    assert!(output.contains("include_paths"));
-    assert!(output.contains("src"));
-    assert!(output.contains("lib"));
-}
-
-#[test]
-fn format_config_text_with_rule_skip_blank() {
-    let mut config = Config::default();
-    config.rules.insert(
-        "test".to_string(),
-        RuleConfig {
-            extensions: vec!["rs".to_string()],
-            max_lines: Some(300),
-            skip_comments: None,
-            skip_blank: Some(false),
-            warn_threshold: None,
-        },
-    );
-
-    let output = format_config_text(&config);
-    assert!(output.contains("[rules.test]"));
-    assert!(output.contains("skip_blank = false"));
+    assert!(output.contains("[scanner]"));
+    assert!(output.contains("[content]"));
+    assert!(output.contains("[[content.rules]]"));
+    assert!(output.contains("**/*.rs"));
+    assert!(output.contains("Rust files"));
 }
 
 #[test]
 fn format_config_text_shows_strict() {
     let mut config = Config::default();
-    config.default.strict = true;
+    config.content.strict = true;
 
     let output = format_config_text(&config);
     assert!(output.contains("strict = true"));

@@ -90,18 +90,23 @@ fn should_process_extension_less_file_with_rule_exact_path() {
 }
 
 #[test]
-fn should_process_extension_less_file_with_legacy_override() {
+fn should_process_extension_less_file_with_content_rule_exact_match() {
     let mut config = default_config();
     config.content.extensions = vec!["rs".to_string()];
-    config.overrides.push(crate::config::FileOverride {
-        path: "Makefile".to_string(),
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/Makefile".to_string(),
         max_lines: 300,
+        warn_threshold: None,
+        warn_at: None,
+        skip_comments: None,
+        skip_blank: None,
         reason: Some("Build config".to_string()),
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
 
-    // Makefile should be processed because it matches a legacy override
+    // Makefile should be processed because it matches a content rule
     assert!(checker.should_process(Path::new("Makefile")));
     // Dockerfile still skipped
     assert!(!checker.should_process(Path::new("Dockerfile")));

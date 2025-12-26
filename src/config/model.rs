@@ -3,9 +3,6 @@ use serde::{Deserialize, Serialize};
 /// Supported config version. Current version is "2".
 pub const CONFIG_VERSION: &str = "2";
 
-/// Legacy config version for migration support.
-pub const CONFIG_VERSION_V1: &str = "1";
-
 // ============================================================================
 // V2 Config Types (Scanner/Content/Structure separation)
 // ============================================================================
@@ -200,13 +197,9 @@ pub struct ContentRule {
     pub expires: Option<String>,
 }
 
-// ============================================================================
-// V1 Legacy Types (kept for backward compatibility during migration)
-// ============================================================================
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
-    /// Config schema version. "2" for new schema, "1" or missing for legacy.
+    /// Config schema version. Must be "2".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 
@@ -218,7 +211,6 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extends_sha256: Option<String>,
 
-    // ========== V2 Fields ==========
     /// Scanner configuration (file discovery).
     #[serde(default)]
     pub scanner: ScannerConfig,
@@ -239,33 +231,7 @@ pub struct Config {
     #[serde(default)]
     pub trend: TrendConfig,
 
-    // ========== V1 Legacy Fields (for migration) ==========
-    // These fields are deserialized but not serialized (skip_serializing).
-    // The loader migrates them to V2 fields.
-    /// Legacy: default config (migrated to scanner + content).
-    #[serde(default, skip_serializing)]
-    pub default: DefaultConfig,
-
-    /// Legacy: extension-based rules (migrated to content.rules).
-    #[serde(default, skip_serializing)]
-    pub rules: std::collections::HashMap<String, RuleConfig>,
-
-    /// Legacy: path-based rules (DEPRECATED - use content.rules instead).
-    /// This field is only used for detection to emit a clear error message.
-    #[serde(default, skip_serializing)]
-    pub path_rules: Vec<PathRuleDeprecated>,
-
-    /// Legacy: exclude config (migrated to scanner.exclude).
-    #[serde(default, skip_serializing)]
-    pub exclude: ExcludeConfig,
-
-    /// Legacy V1: file overrides. DEPRECATED - use [[content.rules]] instead.
-    /// Kept only for V1 config deserialization and migration.
-    #[serde(default, skip_serializing, rename = "override")]
-    pub overrides: Vec<FileOverride>,
-
     /// Custom language definitions (comment syntax).
-    /// Kept at top level for both V1 and V2.
     #[serde(default)]
     pub languages: std::collections::HashMap<String, CustomLanguageConfig>,
 }
@@ -280,92 +246,6 @@ pub struct CustomLanguageConfig {
 
     #[serde(default)]
     pub multi_line_comments: Vec<(String, String)>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct DefaultConfig {
-    #[serde(default = "default_max_lines")]
-    pub max_lines: usize,
-
-    #[serde(default = "default_extensions")]
-    pub extensions: Vec<String>,
-
-    #[serde(default)]
-    pub include_paths: Vec<String>,
-
-    #[serde(default = "default_true")]
-    pub skip_comments: bool,
-
-    #[serde(default = "default_true")]
-    pub skip_blank: bool,
-
-    #[serde(default = "default_warn_threshold")]
-    pub warn_threshold: f64,
-
-    #[serde(default)]
-    pub strict: bool,
-
-    #[serde(default = "default_true")]
-    pub gitignore: bool,
-}
-
-impl Default for DefaultConfig {
-    fn default() -> Self {
-        Self {
-            max_lines: default_max_lines(),
-            extensions: default_extensions(),
-            include_paths: Vec::new(),
-            skip_comments: true,
-            skip_blank: true,
-            warn_threshold: default_warn_threshold(),
-            strict: false,
-            gitignore: true,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct RuleConfig {
-    #[serde(default)]
-    pub extensions: Vec<String>,
-
-    pub max_lines: Option<usize>,
-
-    #[serde(default)]
-    pub skip_comments: Option<bool>,
-
-    #[serde(default)]
-    pub skip_blank: Option<bool>,
-
-    #[serde(default)]
-    pub warn_threshold: Option<f64>,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ExcludeConfig {
-    #[serde(default)]
-    pub patterns: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct FileOverride {
-    pub path: String,
-    pub max_lines: usize,
-    #[serde(default)]
-    pub reason: Option<String>,
-}
-
-/// Deprecated: use `ContentRule` in `[[content.rules]]` instead.
-/// This type exists only for deserializing V1 configs to emit clear error messages.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-pub struct PathRuleDeprecated {
-    #[serde(default)]
-    pub pattern: String,
-    #[serde(default)]
-    pub max_lines: usize,
-    #[serde(default)]
-    pub warn_threshold: Option<f64>,
 }
 
 const fn default_max_lines() -> usize {

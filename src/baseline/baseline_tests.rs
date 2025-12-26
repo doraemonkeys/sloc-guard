@@ -239,35 +239,6 @@ fn saved_json_is_readable() {
 }
 
 #[test]
-fn v1_baseline_migration() {
-    let temp = TempDir::new().unwrap();
-    let path = temp.path().join("baseline-v1.json");
-
-    // Write a V1 format baseline directly
-    let v1_json = r#"{
-        "version": 1,
-        "files": {
-            "src/main.rs": { "lines": 100, "hash": "abc123" },
-            "src/lib.rs": { "lines": 200, "hash": "def456" }
-        }
-    }"#;
-    fs::write(&path, v1_json).unwrap();
-
-    // Load should migrate to V2
-    let loaded = Baseline::load(&path).unwrap();
-    assert_eq!(loaded.len(), 2);
-
-    // All entries should be Content type after migration
-    match loaded.get("src/main.rs").unwrap() {
-        BaselineEntry::Content { lines, hash } => {
-            assert_eq!(*lines, 100);
-            assert_eq!(hash, "abc123");
-        }
-        BaselineEntry::Structure { .. } => panic!("Expected Content entry after migration"),
-    }
-}
-
-#[test]
 fn mixed_content_and_structure_entries() {
     let temp = TempDir::new().unwrap();
     let path = temp.path().join("baseline.json");

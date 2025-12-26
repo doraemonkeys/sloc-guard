@@ -51,7 +51,7 @@ fn path_rule_does_not_match_unrelated_path() {
 }
 
 #[test]
-fn path_rule_has_lower_priority_than_override() {
+fn later_rule_overrides_earlier_rule() {
     let mut config = default_config();
     config.content.rules.push(crate::config::ContentRule {
         pattern: "src/generated/**".to_string(),
@@ -63,16 +63,22 @@ fn path_rule_has_lower_priority_than_override() {
         reason: None,
         expires: None,
     });
-    config.overrides.push(crate::config::FileOverride {
-        path: "special.rs".to_string(),
+    // More specific rule added later - last match wins
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "**/special.rs".to_string(),
         max_lines: 2000,
+        warn_threshold: None,
+        warn_at: None,
+        skip_comments: None,
+        skip_blank: None,
         reason: None,
+        expires: None,
     });
 
     let checker = ThresholdChecker::new(config);
     let stats = stats_with_code(1500);
 
-    // Override should take priority over content.rules
+    // Later rule should take priority (last match wins)
     let result = checker.check(Path::new("src/generated/special.rs"), &stats, None);
     assert!(result.is_passed());
     assert_eq!(result.limit(), 2000);

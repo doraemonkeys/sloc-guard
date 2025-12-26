@@ -155,7 +155,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     let (all_files, scan_result, skip_structure_checks) = if args.files.is_empty() {
         // Normal mode: scan directories
         // 1. Determine paths to scan
-        let paths_to_scan = resolve_scan_paths(paths, &args.include, config);
+        let paths_to_scan = resolve_scan_paths(paths, &args.include);
 
         // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
         let scan_result = ctx

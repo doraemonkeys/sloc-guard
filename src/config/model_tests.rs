@@ -1,8 +1,8 @@
 use super::*;
 
 #[test]
-fn default_config_has_expected_values() {
-    let config = DefaultConfig::default();
+fn content_config_has_expected_defaults() {
+    let config = ContentConfig::default();
     assert_eq!(config.max_lines, 500);
     assert!(config.skip_comments);
     assert!(config.skip_blank);
@@ -10,32 +10,37 @@ fn default_config_has_expected_values() {
 }
 
 #[test]
-fn config_deserialize_from_toml() {
+fn config_deserialize_v2_format() {
     let toml_str = r#"
-        [default]
+        version = "2"
+
+        [content]
         max_lines = 300
         extensions = ["rs"]
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert_eq!(config.default.max_lines, 300);
-    assert_eq!(config.default.extensions, vec!["rs"]);
+    assert_eq!(config.content.max_lines, 300);
+    assert_eq!(config.content.extensions, vec!["rs"]);
 }
 
 #[test]
-fn config_deserialize_with_rules() {
+fn config_deserialize_with_content_rules() {
     let toml_str = r#"
-        [default]
+        version = "2"
+
+        [content]
         max_lines = 500
 
-        [rules.rust]
-        extensions = ["rs"]
+        [[content.rules]]
+        pattern = "**/*.rs"
         max_lines = 300
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(config.rules.contains_key("rust"));
-    assert_eq!(config.rules["rust"].max_lines, Some(300));
+    assert_eq!(config.content.rules.len(), 1);
+    assert_eq!(config.content.rules[0].pattern, "**/*.rs");
+    assert_eq!(config.content.rules[0].max_lines, 300);
 }
 
 #[test]
@@ -48,66 +53,71 @@ fn config_serialize_roundtrip() {
 
 #[test]
 fn config_deserialize_strict_mode() {
-    let toml_str = r"
-        [default]
+    let toml_str = r#"
+        version = "2"
+
+        [content]
         max_lines = 500
         strict = true
-    ";
+    "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(config.default.strict);
+    assert!(config.content.strict);
 }
 
 #[test]
 fn config_deserialize_strict_mode_default_false() {
     let toml_str = r"
-        [default]
+        [content]
         max_lines = 500
     ";
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(!config.default.strict);
+    assert!(!config.content.strict);
 }
 
 #[test]
 fn config_deserialize_rule_with_warn_threshold() {
     let toml_str = r#"
-        [default]
+        version = "2"
+
+        [content]
         max_lines = 500
 
-        [rules.rust]
-        extensions = ["rs"]
+        [[content.rules]]
+        pattern = "**/*.rs"
         max_lines = 300
         warn_threshold = 0.85
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(config.rules.contains_key("rust"));
-    assert_eq!(config.rules["rust"].max_lines, Some(300));
-    assert_eq!(config.rules["rust"].warn_threshold, Some(0.85));
+    assert_eq!(config.content.rules.len(), 1);
+    assert_eq!(config.content.rules[0].max_lines, 300);
+    assert_eq!(config.content.rules[0].warn_threshold, Some(0.85));
 }
 
 #[test]
 fn config_deserialize_rule_without_warn_threshold() {
     let toml_str = r#"
-        [default]
+        version = "2"
+
+        [content]
         max_lines = 500
 
-        [rules.rust]
-        extensions = ["rs"]
+        [[content.rules]]
+        pattern = "**/*.rs"
         max_lines = 300
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(config.rules.contains_key("rust"));
-    assert_eq!(config.rules["rust"].warn_threshold, None);
+    assert_eq!(config.content.rules.len(), 1);
+    assert_eq!(config.content.rules[0].warn_threshold, None);
 }
 
 #[test]
 fn config_deserialize_custom_language() {
     let toml_str = r#"
-        [default]
-        max_lines = 500
+        version = "2"
 
         [languages.haskell]
         extensions = ["hs", "lhs"]
@@ -129,8 +139,7 @@ fn config_deserialize_custom_language() {
 #[test]
 fn config_deserialize_multiple_custom_languages() {
     let toml_str = r#"
-        [default]
-        max_lines = 500
+        version = "2"
 
         [languages.haskell]
         extensions = ["hs"]
@@ -184,8 +193,7 @@ fn config_structure_default_empty() {
 #[test]
 fn config_deserialize_structure_global_limits() {
     let toml_str = r#"
-        [default]
-        max_lines = 500
+        version = "2"
 
         [structure]
         max_files = 10
@@ -202,8 +210,7 @@ fn config_deserialize_structure_global_limits() {
 #[test]
 fn config_deserialize_structure_with_rules() {
     let toml_str = r#"
-        [default]
-        max_lines = 500
+        version = "2"
 
         [structure]
         max_files = 10
@@ -236,8 +243,7 @@ fn config_deserialize_structure_with_rules() {
 #[test]
 fn config_deserialize_structure_only_rules() {
     let toml_str = r#"
-        [default]
-        max_lines = 500
+        version = "2"
 
         [[structure.rules]]
         scope = "vendor/**"
@@ -253,15 +259,14 @@ fn config_deserialize_structure_only_rules() {
 
 #[test]
 fn config_deserialize_structure_warn_threshold() {
-    let toml_str = r"
-        [default]
-        max_lines = 500
+    let toml_str = r#"
+        version = "2"
 
         [structure]
         max_files = 50
         max_dirs = 10
         warn_threshold = 0.9
-    ";
+    "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
     assert_eq!(config.structure.max_files, Some(50));
@@ -271,19 +276,18 @@ fn config_deserialize_structure_warn_threshold() {
 
 #[test]
 fn config_deserialize_structure_rule_warn_threshold() {
-    let toml_str = r"
-        [default]
-        max_lines = 500
+    let toml_str = r#"
+        version = "2"
 
         [structure]
         max_files = 50
         warn_threshold = 0.9
 
         [[structure.rules]]
-        scope = 'src/generated/**'
+        scope = "src/generated/**"
         max_files = 100
         warn_threshold = 0.8
-    ";
+    "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
     assert_eq!(config.structure.warn_threshold, Some(0.9));
@@ -306,20 +310,20 @@ fn config_version_defaults_to_none() {
 #[test]
 fn config_deserialize_with_version() {
     let toml_str = r#"
-        version = "1"
+        version = "2"
 
-        [default]
+        [content]
         max_lines = 500
     "#;
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert_eq!(config.version, Some("1".to_string()));
+    assert_eq!(config.version, Some("2".to_string()));
 }
 
 #[test]
 fn config_deserialize_without_version() {
     let toml_str = r"
-        [default]
+        [content]
         max_lines = 500
     ";
 

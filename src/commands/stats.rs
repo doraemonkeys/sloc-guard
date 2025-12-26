@@ -93,7 +93,7 @@ pub(crate) fn run_stats_with_context(
     exclude_patterns.extend(args.exclude.clone());
 
     // 2. Determine paths to scan
-    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include, config);
+    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include);
 
     // 3. Scan directories (respecting .gitignore if enabled)
     // Scanner returns ALL files, extension filtering is done below

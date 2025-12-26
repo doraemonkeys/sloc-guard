@@ -55,12 +55,13 @@ pub(crate) fn run_config_validate_impl(config_path: &Path) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if `warn_threshold` is out of range, glob patterns are invalid,
-/// override paths are empty, `warn_at >= max_lines`, or rules are misconfigured.
+/// `warn_at >= max_lines`, or rules are misconfigured.
 pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
-    if !(0.0..=1.0).contains(&config.default.warn_threshold) {
+    // Validate content.warn_threshold
+    if !(0.0..=1.0).contains(&config.content.warn_threshold) {
         return Err(SlocGuardError::Config(format!(
-            "warn_threshold must be between 0.0 and 1.0, got {}",
-            config.default.warn_threshold
+            "content.warn_threshold must be between 0.0 and 1.0, got {}",
+            config.content.warn_threshold
         )));
     }
 
@@ -86,27 +87,20 @@ pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
         }
     }
 
-    for pattern in &config.exclude.patterns {
+    // Validate scanner.exclude patterns
+    for pattern in &config.scanner.exclude {
         globset::Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
             pattern: pattern.clone(),
             source: e,
         })?;
     }
 
-    for (i, override_cfg) in config.overrides.iter().enumerate() {
-        if override_cfg.path.is_empty() {
-            return Err(SlocGuardError::Config(format!(
-                "override[{i}].path cannot be empty"
-            )));
-        }
-    }
-
-    for (name, rule) in &config.rules {
-        if rule.extensions.is_empty() && rule.max_lines.is_none() {
-            return Err(SlocGuardError::Config(format!(
-                "rules.{name}: must specify at least extensions or max_lines"
-            )));
-        }
+    // Validate content.exclude patterns
+    for pattern in &config.content.exclude {
+        globset::Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
+            pattern: pattern.clone(),
+            source: e,
+        })?;
     }
 
     Ok(())
@@ -169,37 +163,44 @@ pub(crate) fn format_config_text(config: &Config) -> String {
 
     output.push_str("=== Effective Configuration ===\n\n");
 
-    output.push_str("[default]\n");
-    let _ = writeln!(output, "  max_lines = {}", config.default.max_lines);
-    let _ = writeln!(output, "  extensions = {:?}", config.default.extensions);
-    if !config.default.include_paths.is_empty() {
-        let _ = writeln!(
-            output,
-            "  include_paths = {:?}",
-            config.default.include_paths
-        );
+    // Scanner section
+    output.push_str("[scanner]\n");
+    let _ = writeln!(output, "  gitignore = {}", config.scanner.gitignore);
+    if !config.scanner.exclude.is_empty() {
+        let _ = writeln!(output, "  exclude = {:?}", config.scanner.exclude);
     }
-    let _ = writeln!(output, "  skip_comments = {}", config.default.skip_comments);
-    let _ = writeln!(output, "  skip_blank = {}", config.default.skip_blank);
+
+    // Content section
+    output.push_str("\n[content]\n");
+    let _ = writeln!(output, "  max_lines = {}", config.content.max_lines);
+    let _ = writeln!(output, "  extensions = {:?}", config.content.extensions);
+    let _ = writeln!(output, "  skip_comments = {}", config.content.skip_comments);
+    let _ = writeln!(output, "  skip_blank = {}", config.content.skip_blank);
     let _ = writeln!(
         output,
         "  warn_threshold = {}",
-        config.default.warn_threshold
+        config.content.warn_threshold
     );
-    let _ = writeln!(output, "  strict = {}", config.default.strict);
+    if let Some(warn_at) = config.content.warn_at {
+        let _ = writeln!(output, "  warn_at = {warn_at}");
+    }
+    let _ = writeln!(output, "  strict = {}", config.content.strict);
+    if !config.content.exclude.is_empty() {
+        let _ = writeln!(output, "  exclude = {:?}", config.content.exclude);
+    }
 
-    if !config.rules.is_empty() {
+    // Content rules
+    if !config.content.rules.is_empty() {
         output.push('\n');
-        let mut rule_names: Vec<_> = config.rules.keys().collect();
-        rule_names.sort();
-        for name in rule_names {
-            let rule = &config.rules[name];
-            let _ = writeln!(output, "[rules.{name}]");
-            if !rule.extensions.is_empty() {
-                let _ = writeln!(output, "  extensions = {:?}", rule.extensions);
+        for (i, rule) in config.content.rules.iter().enumerate() {
+            let _ = writeln!(output, "[[content.rules]]  # rule {i}");
+            let _ = writeln!(output, "  pattern = \"{}\"", rule.pattern);
+            let _ = writeln!(output, "  max_lines = {}", rule.max_lines);
+            if let Some(warn_threshold) = rule.warn_threshold {
+                let _ = writeln!(output, "  warn_threshold = {warn_threshold}");
             }
-            if let Some(max_lines) = rule.max_lines {
-                let _ = writeln!(output, "  max_lines = {max_lines}");
+            if let Some(warn_at) = rule.warn_at {
+                let _ = writeln!(output, "  warn_at = {warn_at}");
             }
             if let Some(skip_comments) = rule.skip_comments {
                 let _ = writeln!(output, "  skip_comments = {skip_comments}");
@@ -207,28 +208,33 @@ pub(crate) fn format_config_text(config: &Config) -> String {
             if let Some(skip_blank) = rule.skip_blank {
                 let _ = writeln!(output, "  skip_blank = {skip_blank}");
             }
-        }
-    }
-
-    if !config.exclude.patterns.is_empty() {
-        output.push_str("\n[exclude]\n");
-        output.push_str("  patterns = [\n");
-        for pattern in &config.exclude.patterns {
-            let _ = writeln!(output, "    \"{pattern}\",");
-        }
-        output.push_str("  ]\n");
-    }
-
-    if !config.overrides.is_empty() {
-        output.push('\n');
-        output.push_str("# Legacy V1 overrides (migrate to [[content.rules]]):\n");
-        for override_cfg in &config.overrides {
-            output.push_str("[[override]]  # DEPRECATED\n");
-            let _ = writeln!(output, "  path = \"{}\"", override_cfg.path);
-            let _ = writeln!(output, "  max_lines = {}", override_cfg.max_lines);
-            if let Some(reason) = &override_cfg.reason {
+            if let Some(reason) = &rule.reason {
                 let _ = writeln!(output, "  reason = \"{reason}\"");
             }
+            if let Some(expires) = &rule.expires {
+                let _ = writeln!(output, "  expires = \"{expires}\"");
+            }
+        }
+    }
+
+    // Structure section (if configured)
+    if config.structure.max_files.is_some()
+        || config.structure.max_dirs.is_some()
+        || config.structure.max_depth.is_some()
+        || !config.structure.rules.is_empty()
+    {
+        output.push_str("\n[structure]\n");
+        if let Some(max_files) = config.structure.max_files {
+            let _ = writeln!(output, "  max_files = {max_files}");
+        }
+        if let Some(max_dirs) = config.structure.max_dirs {
+            let _ = writeln!(output, "  max_dirs = {max_dirs}");
+        }
+        if let Some(max_depth) = config.structure.max_depth {
+            let _ = writeln!(output, "  max_depth = {max_depth}");
+        }
+        if let Some(warn_threshold) = config.structure.warn_threshold {
+            let _ = writeln!(output, "  warn_threshold = {warn_threshold}");
         }
     }
 

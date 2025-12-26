@@ -17,7 +17,7 @@ fn exit_codes_documented() {
 #[test]
 fn load_config_no_config_returns_default() {
     let config = load_config(None, true, false, false).unwrap();
-    assert_eq!(config.default.max_lines, 500);
+    assert_eq!(config.content.max_lines, 500);
 }
 
 #[test]
@@ -34,7 +34,7 @@ fn load_config_with_nonexistent_path_returns_error() {
 #[test]
 fn load_config_without_no_config_searches_defaults() {
     let config = load_config(None, false, false, false).unwrap();
-    assert!(config.default.max_lines > 0);
+    assert!(config.content.max_lines > 0);
 }
 
 #[test]
@@ -64,23 +64,22 @@ fn write_output_normal_mode() {
 
 #[test]
 fn config_strict_mode_from_file() {
-    let temp_dir = TempDir::new().unwrap();
-    let config_path = temp_dir.path().join("strict.toml");
-    let content = r"
-[default]
+    let content = r#"
+version = "2"
+
+[content]
 max_lines = 500
 strict = true
-";
-    std::fs::write(&config_path, content).unwrap();
+"#;
 
     let config: Config = toml::from_str(content).unwrap();
-    assert!(config.default.strict);
+    assert!(config.content.strict);
 }
 
 #[test]
 fn config_strict_mode_default_false() {
     let config = Config::default();
-    assert!(!config.default.strict);
+    assert!(!config.content.strict);
 }
 
 #[test]
@@ -90,13 +89,13 @@ fn load_config_with_no_extends_returns_config_without_merging() {
     let content = r#"
 extends = "https://example.com/base.toml"
 
-[default]
+[content]
 max_lines = 200
 "#;
     std::fs::write(&config_path, content).unwrap();
 
     let config = load_config(Some(&config_path), false, true, false).unwrap();
-    assert_eq!(config.default.max_lines, 200);
+    assert_eq!(config.content.max_lines, 200);
     assert_eq!(
         config.extends,
         Some("https://example.com/base.toml".to_string())
@@ -105,43 +104,28 @@ max_lines = 200
 
 #[test]
 fn resolve_scan_paths_uses_include_override() {
-    let config = Config::default();
     let paths = vec![PathBuf::from(".")];
     let include = vec!["src".to_string(), "lib".to_string()];
 
-    let result = resolve_scan_paths(&paths, &include, &config);
+    let result = resolve_scan_paths(&paths, &include);
     assert_eq!(result, vec![PathBuf::from("src"), PathBuf::from("lib")]);
 }
 
 #[test]
 fn resolve_scan_paths_uses_cli_paths() {
-    let config = Config::default();
     let paths = vec![PathBuf::from("src"), PathBuf::from("tests")];
     let include: Vec<String> = vec![];
 
-    let result = resolve_scan_paths(&paths, &include, &config);
+    let result = resolve_scan_paths(&paths, &include);
     assert_eq!(result, vec![PathBuf::from("src"), PathBuf::from("tests")]);
 }
 
 #[test]
-fn resolve_scan_paths_uses_config_include_paths() {
-    let mut config = Config::default();
-    config.default.include_paths = vec!["src".to_string()];
-
-    let paths = vec![PathBuf::from(".")];
-    let include: Vec<String> = vec![];
-
-    let result = resolve_scan_paths(&paths, &include, &config);
-    assert_eq!(result, vec![PathBuf::from("src")]);
-}
-
-#[test]
 fn resolve_scan_paths_defaults_to_current_dir() {
-    let config = Config::default();
     let paths = vec![PathBuf::from(".")];
     let include: Vec<String> = vec![];
 
-    let result = resolve_scan_paths(&paths, &include, &config);
+    let result = resolve_scan_paths(&paths, &include);
     assert_eq!(result, vec![PathBuf::from(".")]);
 }
 

@@ -11,7 +11,9 @@ use super::mock_fs::MockFileSystem;
 #[test]
 fn load_from_explicit_path() {
     let config_content = r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 700
 extensions = ["rs", "py"]
 "#;
@@ -23,8 +25,8 @@ extensions = ["rs", "py"]
         .load_from_path(Path::new("/custom/path/config.toml"))
         .unwrap();
 
-    assert_eq!(config.default.max_lines, 700);
-    assert_eq!(config.default.extensions, vec!["rs", "py"]);
+    assert_eq!(config.content.max_lines, 700);
+    assert_eq!(config.content.extensions, vec!["rs", "py"]);
 }
 
 #[test]
@@ -54,25 +56,28 @@ fn returns_error_for_nonexistent_explicit_path() {
 }
 
 #[test]
-fn parses_full_config_with_rules_and_overrides() {
+fn parses_full_v2_config() {
     let config_content = r#"
-[default]
+version = "2"
+
+[scanner]
+gitignore = true
+exclude = ["**/target/**", "**/vendor/**"]
+
+[content]
 max_lines = 500
 extensions = ["rs", "go"]
-include_paths = ["src", "lib"]
 skip_comments = true
 skip_blank = true
 warn_threshold = 0.85
 
-[rules.rust]
-extensions = ["rs"]
+[[content.rules]]
+pattern = "**/*.rs"
 max_lines = 300
+reason = "Rust files"
 
-[exclude]
-patterns = ["**/target/**", "**/vendor/**"]
-
-[[override]]
-path = "src/legacy.rs"
+[[content.rules]]
+pattern = "src/legacy.rs"
 max_lines = 800
 reason = "Legacy code"
 "#;
@@ -82,24 +87,21 @@ reason = "Legacy code"
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
-    assert_eq!(config.default.max_lines, 500);
-    assert_eq!(config.default.extensions, vec!["rs", "go"]);
-    assert_eq!(config.default.include_paths, vec!["src", "lib"]);
-    assert!(config.default.skip_comments);
-    assert!(config.default.skip_blank);
-    assert!((config.default.warn_threshold - 0.85).abs() < f64::EPSILON);
+    assert_eq!(config.content.max_lines, 500);
+    assert_eq!(config.content.extensions, vec!["rs", "go"]);
+    assert!(config.content.skip_comments);
+    assert!(config.content.skip_blank);
+    assert!((config.content.warn_threshold - 0.85).abs() < f64::EPSILON);
 
-    let rust_rule = config.rules.get("rust").unwrap();
-    assert_eq!(rust_rule.extensions, vec!["rs"]);
-    assert_eq!(rust_rule.max_lines, Some(300));
+    assert_eq!(config.scanner.exclude, vec!["**/target/**", "**/vendor/**"]);
 
+    assert_eq!(config.content.rules.len(), 2);
+    assert_eq!(config.content.rules[0].pattern, "**/*.rs");
+    assert_eq!(config.content.rules[0].max_lines, 300);
+    assert_eq!(config.content.rules[1].pattern, "src/legacy.rs");
+    assert_eq!(config.content.rules[1].max_lines, 800);
     assert_eq!(
-        config.exclude.patterns,
-        vec!["**/target/**", "**/vendor/**"]
+        config.content.rules[1].reason,
+        Some("Legacy code".to_string())
     );
-
-    assert_eq!(config.overrides.len(), 1);
-    assert_eq!(config.overrides[0].path, "src/legacy.rs");
-    assert_eq!(config.overrides[0].max_lines, 800);
-    assert_eq!(config.overrides[0].reason, Some("Legacy code".to_string()));
 }

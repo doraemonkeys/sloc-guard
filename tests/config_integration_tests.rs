@@ -66,7 +66,9 @@ fn config_validate_invalid_warn_threshold() {
     fixture.create_file(
         ".sloc-guard.toml",
         r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 500
 extensions = ["rs"]
 warn_threshold = 1.5
@@ -87,12 +89,10 @@ fn config_validate_invalid_glob_pattern() {
     fixture.create_file(
         ".sloc-guard.toml",
         r#"
-[default]
-max_lines = 500
-extensions = ["rs"]
+version = "2"
 
-[exclude]
-patterns = ["[invalid"]
+[scanner]
+exclude = ["[invalid"]
 "#,
     );
 
@@ -102,30 +102,6 @@ patterns = ["[invalid"]
         .assert()
         .code(2)
         .stderr(predicate::str::contains("InvalidPattern"));
-}
-
-#[test]
-fn config_validate_empty_override_path() {
-    let fixture = TestFixture::new();
-    fixture.create_file(
-        ".sloc-guard.toml",
-        r#"
-[default]
-max_lines = 500
-extensions = ["rs"]
-
-[[override]]
-path = ""
-max_lines = 1000
-"#,
-    );
-
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["config", "validate"])
-        .assert()
-        .code(2)
-        .stderr(predicate::str::contains("path"));
 }
 
 // =============================================================================
@@ -174,21 +150,23 @@ fn config_show_custom_path() {
 }
 
 #[test]
-fn config_show_with_rules() {
+fn config_show_with_content_rules() {
     let fixture = TestFixture::new();
     fixture.create_file(
         ".sloc-guard.toml",
         r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 500
 extensions = ["rs", "go"]
 
-[rules.rust]
-extensions = ["rs"]
+[[content.rules]]
+pattern = "**/*.rs"
 max_lines = 300
 
-[rules.golang]
-extensions = ["go"]
+[[content.rules]]
+pattern = "**/*.go"
 max_lines = 400
 "#,
     );
@@ -198,24 +176,25 @@ max_lines = 400
         .args(["config", "show"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("[rules.rust]"))
-        .stdout(predicate::str::contains("[rules.golang]"));
+        .stdout(predicate::str::contains("[[content.rules]]"))
+        .stdout(predicate::str::contains("**/*.rs"))
+        .stdout(predicate::str::contains("**/*.go"));
 }
 
 #[test]
-fn config_show_with_overrides() {
+fn config_show_with_scanner_exclude_patterns() {
     let fixture = TestFixture::new();
     fixture.create_file(
         ".sloc-guard.toml",
         r#"
-[default]
+version = "2"
+
+[content]
 max_lines = 500
 extensions = ["rs"]
 
-[[override]]
-path = "src/legacy.rs"
-max_lines = 1000
-reason = "Legacy code"
+[scanner]
+exclude = ["**/target/**", "**/vendor/**"]
 "#,
     );
 
@@ -224,32 +203,7 @@ reason = "Legacy code"
         .args(["config", "show"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("[[override]]  # DEPRECATED"))
-        .stdout(predicate::str::contains("src/legacy.rs"))
-        .stdout(predicate::str::contains("Legacy code"));
-}
-
-#[test]
-fn config_show_with_exclude_patterns() {
-    let fixture = TestFixture::new();
-    fixture.create_file(
-        ".sloc-guard.toml",
-        r#"
-[default]
-max_lines = 500
-extensions = ["rs"]
-
-[exclude]
-patterns = ["**/target/**", "**/vendor/**"]
-"#,
-    );
-
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["config", "show"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("[exclude]"))
+        .stdout(predicate::str::contains("[scanner]"))
         .stdout(predicate::str::contains("target"))
         .stdout(predicate::str::contains("vendor"));
 }

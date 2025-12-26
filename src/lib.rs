@@ -10,7 +10,6 @@ pub mod error;
 pub mod git;
 pub mod language;
 pub mod output;
-pub mod path_matching;
 pub mod scanner;
 pub mod state;
 pub mod stats;

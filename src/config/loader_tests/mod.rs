@@ -1,6 +1,5 @@
 mod mock_fs;
 
-mod deprecation_tests;
 mod discovery_tests;
 mod extends_tests;
 mod parsing_tests;
