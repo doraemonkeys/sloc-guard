@@ -76,15 +76,15 @@ impl<F: FileFilter> GitAwareScanner<F> {
 
         let mut delegate = Collector::new(&prefix, &self.filter);
 
-        // Convert prefix to BStr for pattern matching
-        // Normalize path separators to forward slashes for git pathspecs
-        let prefix_string = prefix.to_string_lossy().replace('\\', "/");
-        let prefix_str = gix::bstr::BString::from(prefix_string.as_bytes());
-        let patterns: &[&BStr] = if prefix_str.is_empty() {
-            &[]
-        } else {
-            &[prefix_str.as_bstr()]
-        };
+        // Walk the entire repository with empty patterns.
+        // Filtering to the scan prefix is handled by the delegate's `emit()` function.
+        //
+        // We intentionally avoid using pathspec patterns to limit the dirwalk because:
+        // - gix pathspec semantics differ from glob patterns
+        // - A pattern like "src/" matches only the directory, not its contents
+        // - A pattern like "src" may not match files within the directory correctly
+        // - Empty patterns walk everything, and the delegate filters by prefix
+        let patterns: &[&BStr] = &[];
 
         repo.dirwalk(&index, patterns, &should_interrupt, options, &mut delegate)
             .map_err(|e| SlocGuardError::Git(format!("Dirwalk failed: {e}")))?;
@@ -145,15 +145,15 @@ impl<F: FileFilter> GitAwareScanner<F> {
 
         let mut delegate = StructureAwareCollector::new(&prefix, &self.filter, structure_config);
 
-        // Convert prefix to BStr for pattern matching
-        // Normalize path separators to forward slashes for git pathspecs
-        let prefix_string = prefix.to_string_lossy().replace('\\', "/");
-        let prefix_str = gix::bstr::BString::from(prefix_string.as_bytes());
-        let patterns: &[&BStr] = if prefix_str.is_empty() {
-            &[]
-        } else {
-            &[prefix_str.as_bstr()]
-        };
+        // Walk the entire repository with empty patterns.
+        // Filtering to the scan prefix is handled by the delegate's `emit()` function.
+        //
+        // We intentionally avoid using pathspec patterns to limit the dirwalk because:
+        // - gix pathspec semantics differ from glob patterns
+        // - A pattern like "src/" matches only the directory, not its contents
+        // - A pattern like "src" may not match files within the directory correctly
+        // - Empty patterns walk everything, and the delegate filters by prefix
+        let patterns: &[&BStr] = &[];
 
         repo.dirwalk(&index, patterns, &should_interrupt, options, &mut delegate)
             .map_err(|e| SlocGuardError::Git(format!("Dirwalk failed: {e}")))?;

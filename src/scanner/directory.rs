@@ -56,7 +56,7 @@ impl<F: FileFilter> DirectoryScanner<F> {
             .git_exclude(true)
             .require_git(false)
             .hidden(false)
-            .parents(false)
+            .parents(true)
             .build()
             .filter_map(std::result::Result::ok)
             .filter(|e| e.file_type().is_some_and(|ft| ft.is_file()))
@@ -118,7 +118,7 @@ impl<F: FileFilter> DirectoryScanner<F> {
             .git_exclude(true)
             .require_git(false)
             .hidden(false)
-            .parents(false)
+            .parents(true)
             .build();
 
         for entry in walker.filter_map(std::result::Result::ok) {

@@ -218,3 +218,101 @@ fn respects_wildcards_and_spaces() {
     assert!(!files.iter().any(|f| f.ends_with("file with spaces.txt")));
     assert!(files.iter().any(|f| f.ends_with("normal.txt")));
 }
+
+/// Bug regression test: scanning from a subdirectory should find files.
+///
+/// When `sloc-guard stats` is run from a subdirectory (e.g., `src/`), the scanner
+/// receives the subdirectory path. The gix dirwalk pathspec pattern must correctly
+/// match files within that subdirectory. Without a trailing `/`, gix may interpret
+/// the pattern as matching a file named "src" rather than the directory contents.
+#[test]
+fn finds_files_when_scanning_subdirectory_directly() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    // Create files in root
+    std::fs::write(temp_dir.path().join("root.rs"), "fn root() {}").unwrap();
+
+    // Create subdirectory with files
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(src_dir.join("lib.rs"), "pub mod lib;").unwrap();
+
+    // Create nested subdirectory
+    let nested_dir = src_dir.join("utils");
+    std::fs::create_dir(&nested_dir).unwrap();
+    std::fs::write(nested_dir.join("helper.rs"), "fn helper() {}").unwrap();
+
+    // Scan only the src subdirectory (simulates running from src/)
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let files = scanner.scan(&src_dir).unwrap();
+
+    // Should find all files in src/ and its subdirectories
+    assert!(
+        files.len() >= 3,
+        "Expected at least 3 files in src/, got {}: {:?}",
+        files.len(),
+        files
+    );
+    assert!(files.iter().any(|f| f.ends_with("main.rs")));
+    assert!(files.iter().any(|f| f.ends_with("lib.rs")));
+    assert!(files.iter().any(|f| f.ends_with("helper.rs")));
+
+    // Should NOT find files outside src/
+    assert!(!files.iter().any(|f| f.ends_with("root.rs")));
+}
+
+/// Bug regression test: scanning with relative path "." from a subdirectory.
+///
+/// This test simulates the exact scenario when running `sloc-guard stats` from
+/// a subdirectory: the scanner receives `Path::new(".")` which resolves to the
+/// subdirectory. The pathspec pattern must correctly match files.
+#[test]
+fn finds_files_when_scanning_with_relative_dot_path() {
+    let temp_dir = TempDir::new().unwrap();
+    init_git_repo(temp_dir.path());
+
+    // Create files in root
+    std::fs::write(temp_dir.path().join("root.rs"), "fn root() {}").unwrap();
+
+    // Create subdirectory with files
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("main.rs"), "fn main() {}").unwrap();
+    std::fs::write(src_dir.join("lib.rs"), "pub mod lib;").unwrap();
+
+    // Change to src directory and scan with "."
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(&src_dir).unwrap();
+
+    let scanner = GitAwareScanner::new(AcceptAllFilter);
+    let result = scanner.scan(std::path::Path::new("."));
+
+    // Restore original directory before assertions (to avoid affecting other tests)
+    std::env::set_current_dir(&original_dir).unwrap();
+
+    let files = result.expect("scan should succeed");
+
+    // Should find files in the current directory (src/)
+    assert!(
+        files.len() >= 2,
+        "Expected at least 2 files when scanning '.', got {}: {:?}",
+        files.len(),
+        files
+    );
+    assert!(
+        files.iter().any(|f| f.ends_with("main.rs")),
+        "Should find main.rs, got: {files:?}"
+    );
+    assert!(
+        files.iter().any(|f| f.ends_with("lib.rs")),
+        "Should find lib.rs, got: {files:?}"
+    );
+
+    // Should NOT find files outside src/
+    assert!(
+        !files.iter().any(|f| f.ends_with("root.rs")),
+        "Should not find root.rs from parent directory"
+    );
+}
