@@ -257,13 +257,32 @@ const fn default_max_lines() -> usize {
 
 fn default_extensions() -> Vec<String> {
     vec![
+        // Systems programming
         "rs".to_string(),
         "go".to_string(),
-        "py".to_string(),
-        "js".to_string(),
-        "ts".to_string(),
         "c".to_string(),
         "cpp".to_string(),
+        // JVM languages
+        "java".to_string(),
+        "kt".to_string(),
+        "scala".to_string(),
+        // .NET
+        "cs".to_string(),
+        // Web/Frontend
+        "js".to_string(),
+        "ts".to_string(),
+        "tsx".to_string(),
+        "jsx".to_string(),
+        "vue".to_string(),
+        // Mobile
+        "swift".to_string(),
+        "dart".to_string(),
+        // Scripting
+        "py".to_string(),
+        "rb".to_string(),
+        "php".to_string(),
+        "lua".to_string(),
+        "sh".to_string(),
     ]
 }
 

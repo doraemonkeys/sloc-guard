@@ -139,6 +139,84 @@ impl Default for LanguageRegistry {
             CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
         ));
 
+        registry.register(Language::new(
+            "Java",
+            vec!["java"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "Kotlin",
+            vec!["kt", "kts"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "Swift",
+            vec!["swift"],
+            CommentSyntax::new(vec!["//", "///"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "Dart",
+            vec!["dart"],
+            CommentSyntax::new(vec!["//", "///"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "C#",
+            vec!["cs"],
+            CommentSyntax::new(vec!["//", "///"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "PHP",
+            vec!["php"],
+            CommentSyntax::new(vec!["//", "#"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "Ruby",
+            vec!["rb", "rake"],
+            CommentSyntax::new(vec!["#"], vec![("=begin", "=end")]),
+        ));
+
+        registry.register(Language::new(
+            "Shell",
+            vec!["sh", "bash", "zsh"],
+            CommentSyntax::new(vec!["#"], vec![]),
+        ));
+
+        registry.register(Language::new(
+            "Scala",
+            vec!["scala", "sc"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "Lua",
+            vec!["lua"],
+            CommentSyntax::new(vec!["--"], vec![("--[[", "]]")]),
+        ));
+
+        registry.register(Language::new(
+            "SQL",
+            vec!["sql"],
+            CommentSyntax::new(vec!["--"], vec![("/*", "*/")]),
+        ));
+
+        registry.register(Language::new(
+            "Vue",
+            vec!["vue"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/"), ("<!--", "-->")]),
+        ));
+
+        registry.register(Language::new(
+            "JSX",
+            vec!["jsx"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
+        ));
+
         registry
     }
 }

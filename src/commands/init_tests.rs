@@ -18,7 +18,16 @@ fn generate_config_template_contains_content_section() {
 #[test]
 fn generate_config_template_contains_extensions() {
     let template = generate_config_template();
-    assert!(template.contains(r#"extensions = ["rs", "go", "py", "js", "ts", "c", "cpp"]"#));
+    // Check for key extensions across all language categories
+    assert!(template.contains("extensions = ["));
+    assert!(template.contains(r#""rs""#)); // Rust
+    assert!(template.contains(r#""java""#)); // Java
+    assert!(template.contains(r#""dart""#)); // Dart
+    assert!(template.contains(r#""swift""#)); // Swift
+    assert!(template.contains(r#""kt""#)); // Kotlin
+    assert!(template.contains(r#""cs""#)); // C#
+    assert!(template.contains(r#""py""#)); // Python
+    assert!(template.contains(r#""ts""#)); // TypeScript
 }
 
 #[test]

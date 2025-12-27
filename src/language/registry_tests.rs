@@ -55,7 +55,77 @@ fn registry_all_returns_all_languages() {
     let registry = LanguageRegistry::default();
     let all = registry.all();
 
-    assert!(all.len() >= 7);
+    // 20 built-in languages as of this writing
+    assert!(all.len() >= 20);
+}
+
+#[test]
+fn default_registry_has_java() {
+    let registry = LanguageRegistry::default();
+    let java = registry.get_by_extension("java").unwrap();
+
+    assert_eq!(java.name, "Java");
+    assert!(java.comment_syntax.single_line.contains(&"//".to_string()));
+}
+
+#[test]
+fn default_registry_has_kotlin() {
+    let registry = LanguageRegistry::default();
+    let kotlin = registry.get_by_extension("kt").unwrap();
+
+    assert_eq!(kotlin.name, "Kotlin");
+    assert!(
+        kotlin
+            .comment_syntax
+            .single_line
+            .contains(&"//".to_string())
+    );
+    // Also supports .kts extension
+    assert!(registry.get_by_extension("kts").is_some());
+}
+
+#[test]
+fn default_registry_has_swift() {
+    let registry = LanguageRegistry::default();
+    let swift = registry.get_by_extension("swift").unwrap();
+
+    assert_eq!(swift.name, "Swift");
+    // Swift has doc comments with ///
+    assert!(
+        swift
+            .comment_syntax
+            .single_line
+            .contains(&"///".to_string())
+    );
+}
+
+#[test]
+fn default_registry_has_ruby() {
+    let registry = LanguageRegistry::default();
+    let ruby = registry.get_by_extension("rb").unwrap();
+
+    assert_eq!(ruby.name, "Ruby");
+    assert!(ruby.comment_syntax.single_line.contains(&"#".to_string()));
+    // Ruby uses =begin/=end for multi-line comments
+    assert_eq!(
+        ruby.comment_syntax.multi_line[0],
+        ("=begin".to_string(), "=end".to_string())
+    );
+}
+
+#[test]
+fn default_registry_has_lua() {
+    let registry = LanguageRegistry::default();
+    let lua = registry.get_by_extension("lua").unwrap();
+
+    assert_eq!(lua.name, "Lua");
+    // Lua uses -- for single-line comments
+    assert!(lua.comment_syntax.single_line.contains(&"--".to_string()));
+    // Lua uses --[[ / ]] for multi-line comments
+    assert_eq!(
+        lua.comment_syntax.multi_line[0],
+        ("--[[".to_string(), "]]".to_string())
+    );
 }
 
 #[test]

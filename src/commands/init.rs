@@ -72,7 +72,15 @@ exclude = ["**/target/**", "**/node_modules/**", "**/vendor/**", "**/dist/**"]
 # Content: SLOC (Source Lines of Code) limits
 # =============================================================================
 [content]
-extensions = ["rs", "go", "py", "js", "ts", "c", "cpp"]  # File types to analyze
+# File types to analyze (major programming languages)
+extensions = [
+    "rs", "go", "c", "cpp",           # Systems
+    "java", "kt", "scala",            # JVM
+    "cs",                             # .NET
+    "js", "ts", "tsx", "jsx", "vue",  # Web/Frontend
+    "swift", "dart",                  # Mobile
+    "py", "rb", "php", "lua", "sh",   # Scripting
+]
 max_lines = 600                           # Default max lines per file
 warn_threshold = 0.9                      # Warn at 90% of limit (450 lines)
 skip_comments = true                      # Don't count comment lines
