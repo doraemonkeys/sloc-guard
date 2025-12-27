@@ -5,6 +5,8 @@ use crate::cli::{Cli, ConfigAction, ConfigOutputFormat};
 use crate::config::{Config, ConfigLoader, FileConfigLoader};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
+use super::context::print_preset_info;
+
 #[must_use]
 pub fn run_config(args: &crate::cli::ConfigArgs, cli: &Cli) -> i32 {
     match &args.action {
@@ -152,7 +154,14 @@ fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
         .or_else(|| std::env::current_dir().ok());
 
     let loader = FileConfigLoader::with_options(cli.offline, project_root);
-    config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
+    let load_result = config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))?;
+    
+    // Print preset info if a preset was used
+    if let Some(ref preset_name) = load_result.preset_used {
+        print_preset_info(preset_name);
+    }
+    
+    Ok(load_result.config)
 }
 
 #[must_use]

@@ -5,7 +5,7 @@ pub mod presets;
 mod remote;
 
 pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
-pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
+pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, LoadResult, RealFileSystem};
 pub use model::{
     BaselineConfig, CONFIG_VERSION, Config, ContentConfig, ContentRule, CustomLanguageConfig,
     DEFAULT_MAX_LINES, RatchetMode, ScannerConfig, SiblingRequire, SiblingRule, SiblingSeverity,

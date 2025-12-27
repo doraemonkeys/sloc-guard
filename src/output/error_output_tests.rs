@@ -178,3 +178,89 @@ fn new_with_never_mode() {
 // The is_no_color_set() function is a trivial wrapper around std::env::var(),
 // and testing standard library behavior is unnecessary.
 // The actual color output behavior is tested via new_with_always_mode/new_with_never_mode.
+
+#[test]
+fn info_without_colors_basic() {
+    let out = make_output(false);
+    let mut buf = Vec::new();
+    out.write_info(&mut buf, "Using preset: rust-strict", None, None);
+    let result = String::from_utf8(buf).unwrap();
+    assert_eq!(result, "ℹ Using preset: rust-strict\n");
+}
+
+#[test]
+fn info_without_colors_with_detail() {
+    let out = make_output(false);
+    let mut buf = Vec::new();
+    out.write_info(
+        &mut buf,
+        "Using preset: rust-strict",
+        Some("max_lines = 500"),
+        None,
+    );
+    let result = String::from_utf8(buf).unwrap();
+    assert!(result.contains("ℹ Using preset: rust-strict\n"));
+    assert!(result.contains("  × max_lines = 500\n"));
+}
+
+#[test]
+fn info_without_colors_with_suggestion() {
+    let out = make_output(false);
+    let mut buf = Vec::new();
+    out.write_info(
+        &mut buf,
+        "Using preset: rust-strict",
+        None,
+        Some("Run `sloc-guard config show` to see effective settings"),
+    );
+    let result = String::from_utf8(buf).unwrap();
+    assert!(result.contains("ℹ Using preset: rust-strict\n"));
+    assert!(result.contains("  help: Run `sloc-guard config show` to see effective settings\n"));
+}
+
+#[test]
+fn info_without_colors_full() {
+    let out = make_output(false);
+    let mut buf = Vec::new();
+    out.write_info(
+        &mut buf,
+        "Using preset: rust-strict",
+        Some("max_lines = 500"),
+        Some("Run `sloc-guard config show` to see effective settings"),
+    );
+    let result = String::from_utf8(buf).unwrap();
+    assert!(result.contains("ℹ Using preset: rust-strict\n"));
+    assert!(result.contains("  × max_lines = 500\n"));
+    assert!(result.contains("  help: Run `sloc-guard config show` to see effective settings\n"));
+}
+
+#[test]
+fn info_with_colors_contains_ansi() {
+    let out = make_output(true);
+    let mut buf = Vec::new();
+    out.write_info(&mut buf, "Using preset: rust-strict", None, None);
+    let result = String::from_utf8(buf).unwrap();
+    // Verify ANSI codes are present (cyan color)
+    assert!(result.contains("\x1b["));
+    assert!(result.contains("ℹ"));
+    assert!(result.contains("Using preset: rust-strict"));
+}
+
+#[test]
+fn info_with_colors_full_message() {
+    let out = make_output(true);
+    let mut buf = Vec::new();
+    out.write_info(
+        &mut buf,
+        "Using preset: rust-strict",
+        Some("max_lines = 500"),
+        Some("Run `sloc-guard config show` to see effective settings"),
+    );
+    let result = String::from_utf8(buf).unwrap();
+    // Verify structure
+    assert!(result.contains("ℹ"));
+    assert!(result.contains("Using preset: rust-strict"));
+    assert!(result.contains("× max_lines = 500"));
+    assert!(result.contains("help:"));
+    assert!(result.contains("Run `sloc-guard config show` to see effective settings"));
+}

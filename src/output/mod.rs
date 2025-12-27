@@ -12,7 +12,9 @@ pub mod svg;
 mod text;
 mod trend_formatting;
 
-pub use error_output::{print_error, print_error_full, print_warning, print_warning_full};
+pub use error_output::{
+    print_error, print_error_full, print_info, print_info_full, print_warning, print_warning_full,
+};
 pub use html::HtmlFormatter;
 pub use json::JsonFormatter;
 pub use markdown::MarkdownFormatter;

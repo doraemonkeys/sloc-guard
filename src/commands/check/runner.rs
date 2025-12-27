@@ -23,8 +23,8 @@ use super::check_git_diff::filter_by_git_diff;
 use super::check_output::{format_output, structure_violation_to_check_result};
 use super::check_processing::process_file_for_check;
 use crate::commands::context::{
-    CheckContext, color_choice_to_mode, load_cache, load_config, resolve_scan_paths, save_cache,
-    write_output,
+    CheckContext, color_choice_to_mode, load_cache, load_config, print_preset_info,
+    resolve_scan_paths, save_cache, write_output,
 };
 
 /// Options for running a check with injected context.
@@ -66,12 +66,18 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
     let project_root = state::discover_project_root(Path::new("."));
 
     // 1. Load configuration
-    let mut config = load_config(
+    let load_result = load_config(
         args.config.as_deref(),
         cli.no_config,
         cli.no_extends,
         cli.offline,
     )?;
+    let mut config = load_result.config;
+
+    // 1.1 Print preset info if a preset was used
+    if let Some(ref preset_name) = load_result.preset_used {
+        print_preset_info(preset_name);
+    }
 
     // 2. Apply CLI argument overrides
     apply_cli_overrides(&mut config, args);

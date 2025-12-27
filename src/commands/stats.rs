@@ -17,8 +17,8 @@ use crate::stats::{TrendEntry, TrendHistory, parse_duration};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::context::{
-    FileReader, RealFileReader, StatsContext, load_cache, load_config, process_file_with_cache,
-    resolve_scan_paths, save_cache, write_output,
+    FileReader, RealFileReader, StatsContext, load_cache, load_config, print_preset_info,
+    process_file_with_cache, resolve_scan_paths, save_cache, write_output,
 };
 
 #[must_use]
@@ -44,14 +44,20 @@ pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
 
 pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> {
     // 1. Load configuration (for exclude patterns)
-    let mut config = load_config(
+    let load_result = load_config(
         args.config.as_deref(),
         cli.no_config,
         cli.no_extends,
         cli.offline,
     )?;
+    let mut config = load_result.config;
 
-    // 1.0.1 Discover project root for consistent state file resolution
+    // 1a. Print preset info if a preset was used
+    if let Some(ref preset_name) = load_result.preset_used {
+        print_preset_info(preset_name);
+    }
+
+    // 1b. Discover project root for consistent state file resolution
     let project_root = state::discover_project_root(Path::new("."));
 
     // 1.1 Load cache if not disabled

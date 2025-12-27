@@ -21,12 +21,12 @@ extensions = ["rs", "py"]
     let fs = MockFileSystem::new().with_file("/custom/path/config.toml", config_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader
+    let result = loader
         .load_from_path(Path::new("/custom/path/config.toml"))
         .unwrap();
 
-    assert_eq!(config.content.max_lines, 700);
-    assert_eq!(config.content.extensions, vec!["rs", "py"]);
+    assert_eq!(result.config.content.max_lines, 700);
+    assert_eq!(result.config.content.extensions, vec!["rs", "py"]);
 }
 
 #[test]
@@ -85,7 +85,8 @@ reason = "Legacy code"
     let fs = MockFileSystem::new().with_file("/config.toml", config_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let config = result.config;
 
     assert_eq!(config.content.max_lines, 500);
     assert_eq!(config.content.extensions, vec!["rs", "go"]);

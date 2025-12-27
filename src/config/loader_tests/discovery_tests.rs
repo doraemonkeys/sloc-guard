@@ -12,11 +12,12 @@ fn returns_default_when_no_config_found() {
     let fs = MockFileSystem::new();
     let loader = FileConfigLoader::with_fs(fs);
 
-    let config = loader.load().unwrap();
+    let result = loader.load().unwrap();
 
-    assert_eq!(config.content.max_lines, 600);
-    assert!(config.content.skip_comments);
-    assert!(config.content.skip_blank);
+    assert_eq!(result.config.content.max_lines, 600);
+    assert!(result.config.content.skip_comments);
+    assert!(result.config.content.skip_blank);
+    assert!(result.preset_used.is_none());
 }
 
 #[test]
@@ -33,9 +34,9 @@ max_lines = 300
         .with_file("/my/project/.sloc-guard.toml", config_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load().unwrap();
+    let result = loader.load().unwrap();
 
-    assert_eq!(config.content.max_lines, 300);
+    assert_eq!(result.config.content.max_lines, 300);
 }
 
 #[test]
@@ -55,9 +56,9 @@ max_lines = 400
         );
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load().unwrap();
+    let result = loader.load().unwrap();
 
-    assert_eq!(config.content.max_lines, 400);
+    assert_eq!(result.config.content.max_lines, 400);
 }
 
 #[test]
@@ -82,9 +83,9 @@ max_lines = 600
         .with_file("/home/user/.config/sloc-guard/config.toml", user_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load().unwrap();
+    let result = loader.load().unwrap();
 
-    assert_eq!(config.content.max_lines, 200);
+    assert_eq!(result.config.content.max_lines, 200);
 }
 
 #[test]
@@ -92,9 +93,9 @@ fn handles_missing_home_dir() {
     let fs = MockFileSystem::new().with_home_dir(None);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load().unwrap();
+    let result = loader.load().unwrap();
 
-    assert_eq!(config, Config::default());
+    assert_eq!(result.config, Config::default());
 }
 
 #[test]

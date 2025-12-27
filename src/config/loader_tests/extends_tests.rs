@@ -30,13 +30,13 @@ max_lines = 500
         .with_file("/project/config.toml", child_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader
+    let result = loader
         .load_from_path(Path::new("/project/config.toml"))
         .unwrap();
 
-    assert_eq!(config.content.max_lines, 500);
-    assert_eq!(config.content.extensions, vec!["rs", "go"]);
-    assert!(config.extends.is_none());
+    assert_eq!(result.config.content.max_lines, 500);
+    assert_eq!(result.config.content.extensions, vec!["rs", "go"]);
+    assert!(result.config.extends.is_none());
 }
 
 #[test]
@@ -60,12 +60,12 @@ skip_comments = false
         .with_file("/configs/project/config.toml", child_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader
+    let result = loader
         .load_from_path(Path::new("/configs/project/config.toml"))
         .unwrap();
 
-    assert_eq!(config.content.max_lines, 200);
-    assert!(!config.content.skip_comments);
+    assert_eq!(result.config.content.max_lines, 200);
+    assert!(!result.config.content.skip_comments);
 }
 
 #[test]
@@ -100,12 +100,12 @@ max_lines = 300
         .with_file("/configs/child.toml", child_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader
+    let result = loader
         .load_from_path(Path::new("/configs/child.toml"))
         .unwrap();
 
-    assert_eq!(config.content.max_lines, 300);
-    assert_eq!(config.scanner.exclude, vec!["**/vendor/**"]);
+    assert_eq!(result.config.content.max_lines, 300);
+    assert_eq!(result.config.scanner.exclude, vec!["**/vendor/**"]);
 }
 
 #[test]
@@ -175,12 +175,12 @@ max_lines = 600
         .with_file("/child.toml", child_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/child.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/child.toml")).unwrap();
 
     // Child's rules override base's rules (arrays are replaced, not merged)
-    assert_eq!(config.content.rules.len(), 1);
-    assert_eq!(config.content.rules[0].pattern, "**/*.go");
-    assert_eq!(config.content.rules[0].max_lines, 600);
+    assert_eq!(result.config.content.rules.len(), 1);
+    assert_eq!(result.config.content.rules[0].pattern, "**/*.go");
+    assert_eq!(result.config.content.rules[0].max_lines, 600);
 }
 
 #[test]
@@ -226,12 +226,14 @@ max_lines = 200
         .with_current_dir("/project");
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_without_extends().unwrap();
+    let result = loader.load_without_extends().unwrap();
 
     // Should have max_lines from child only, not merged with base
-    assert_eq!(config.content.max_lines, 200);
+    assert_eq!(result.config.content.max_lines, 200);
     // Extends field should be preserved in the config
-    assert_eq!(config.extends, Some("/base.toml".to_string()));
+    assert_eq!(result.config.extends, Some("/base.toml".to_string()));
+    // preset_used should be None when not resolving extends
+    assert!(result.preset_used.is_none());
 }
 
 #[test]
@@ -256,19 +258,19 @@ max_lines = 300
         .with_file("/child.toml", child_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader
+    let result = loader
         .load_from_path_without_extends(Path::new("/child.toml"))
         .unwrap();
 
     // Should have only child's max_lines, not merged
-    assert_eq!(config.content.max_lines, 300);
+    assert_eq!(result.config.content.max_lines, 300);
     // Extensions should be default (not from base)
     assert_eq!(
-        config.content.extensions,
+        result.config.content.extensions,
         Config::default().content.extensions
     );
     // Extends field should be preserved
-    assert_eq!(config.extends, Some("/base.toml".to_string()));
+    assert_eq!(result.config.extends, Some("/base.toml".to_string()));
 }
 
 #[test]
@@ -286,11 +288,11 @@ max_lines = 400
         .with_file("/home/user/.config/sloc-guard/config.toml", user_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_without_extends().unwrap();
+    let result = loader.load_without_extends().unwrap();
 
-    assert_eq!(config.content.max_lines, 400);
+    assert_eq!(result.config.content.max_lines, 400);
     assert_eq!(
-        config.extends,
+        result.config.extends,
         Some("https://example.com/base.toml".to_string())
     );
 }

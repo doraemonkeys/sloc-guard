@@ -16,8 +16,9 @@ fn exit_codes_documented() {
 
 #[test]
 fn load_config_no_config_returns_default() {
-    let config = load_config(None, true, false, false).unwrap();
-    assert_eq!(config.content.max_lines, 600);
+    let result = load_config(None, true, false, false).unwrap();
+    assert_eq!(result.config.content.max_lines, 600);
+    assert!(result.preset_used.is_none());
 }
 
 #[test]
@@ -33,8 +34,8 @@ fn load_config_with_nonexistent_path_returns_error() {
 
 #[test]
 fn load_config_without_no_config_searches_defaults() {
-    let config = load_config(None, false, false, false).unwrap();
-    assert!(config.content.max_lines > 0);
+    let result = load_config(None, false, false, false).unwrap();
+    assert!(result.config.content.max_lines > 0);
 }
 
 #[test]
@@ -94,12 +95,14 @@ max_lines = 200
 "#;
     std::fs::write(&config_path, content).unwrap();
 
-    let config = load_config(Some(&config_path), false, true, false).unwrap();
-    assert_eq!(config.content.max_lines, 200);
+    let result = load_config(Some(&config_path), false, true, false).unwrap();
+    assert_eq!(result.config.content.max_lines, 200);
     assert_eq!(
-        config.extends,
+        result.config.extends,
         Some("https://example.com/base.toml".to_string())
     );
+    // preset_used is None when extends is not resolved
+    assert!(result.preset_used.is_none());
 }
 
 #[test]

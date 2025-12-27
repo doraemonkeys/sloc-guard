@@ -8,31 +8,43 @@ use super::model::CONFIG_VERSION;
 use super::presets;
 use super::remote::{fetch_remote_config, fetch_remote_config_offline, is_remote_url};
 
+/// Result of loading a configuration, containing both the config and metadata.
+///
+/// This allows the caller to decide how to handle loading side-effects (like printing
+/// preset info) rather than coupling the loader to the output module.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadResult {
+    /// The loaded configuration.
+    pub config: Config,
+    /// The preset name if a preset was used (e.g., "rust-strict").
+    pub preset_used: Option<String>,
+}
+
 /// Trait for loading configuration from various sources.
 pub trait ConfigLoader {
     /// Load configuration from the default location.
     ///
     /// # Errors
     /// Returns an error if the config file cannot be read or parsed.
-    fn load(&self) -> Result<Config>;
+    fn load(&self) -> Result<LoadResult>;
 
     /// Load configuration from a specific path.
     ///
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
-    fn load_from_path(&self, path: &Path) -> Result<Config>;
+    fn load_from_path(&self, path: &Path) -> Result<LoadResult>;
 
     /// Load configuration without resolving extends.
     ///
     /// # Errors
     /// Returns an error if the config file cannot be read or parsed.
-    fn load_without_extends(&self) -> Result<Config>;
+    fn load_without_extends(&self) -> Result<LoadResult>;
 
     /// Load configuration from a specific path without resolving extends.
     ///
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
-    fn load_from_path_without_extends(&self, path: &Path) -> Result<Config>;
+    fn load_from_path_without_extends(&self, path: &Path) -> Result<LoadResult>;
 }
 
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
@@ -176,7 +188,12 @@ impl<F: FileSystem> FileConfigLoader<F> {
         Ok(config)
     }
 
-    fn load_with_extends(&self, path: &Path, visited: &mut HashSet<String>) -> Result<toml::Value> {
+    /// Load config with extends chain, returning (value, `preset_used`).
+    fn load_with_extends(
+        &self,
+        path: &Path,
+        visited: &mut HashSet<String>,
+    ) -> Result<(toml::Value, Option<String>)> {
         let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         let key = canonical.to_string_lossy().to_string();
 
@@ -198,12 +215,13 @@ impl<F: FileSystem> FileConfigLoader<F> {
         self.process_config_content(&content, Some(path), visited)
     }
 
+    /// Load remote config with extends chain, returning (value, `preset_used`).
     fn load_remote_with_extends(
         &self,
         url: &str,
         expected_hash: Option<&str>,
         visited: &mut HashSet<String>,
-    ) -> Result<toml::Value> {
+    ) -> Result<(toml::Value, Option<String>)> {
         if !visited.insert(url.to_string()) {
             return Err(SlocGuardError::Config(format!(
                 "Circular extends detected: {url}"
@@ -218,12 +236,13 @@ impl<F: FileSystem> FileConfigLoader<F> {
         self.process_config_content(&content, None, visited)
     }
 
+    /// Process config content and return (value, `preset_used`).
     fn process_config_content(
         &self,
         content: &str,
         base_path: Option<&Path>,
         visited: &mut HashSet<String>,
-    ) -> Result<toml::Value> {
+    ) -> Result<(toml::Value, Option<String>)> {
         let mut config_value: toml::Value =
             toml::from_str(content).map_err(SlocGuardError::from)?;
 
@@ -237,26 +256,35 @@ impl<F: FileSystem> FileConfigLoader<F> {
             .and_then(toml::Value::as_str)
             .map(String::from);
 
+        let mut preset_used = None;
+
         if let Some(extends) = extends_value {
-            let base_value = if let Some(preset_name) = extends.strip_prefix("preset:") {
-                presets::load_preset(preset_name)?
-            } else if is_remote_url(&extends) {
-                self.load_remote_with_extends(&extends, extends_sha256.as_deref(), visited)?
-            } else {
-                let extends_path = Path::new(&extends);
-                let resolved_path = if extends_path.is_absolute() {
-                    extends_path.to_path_buf()
-                } else if let Some(base) = base_path {
-                    base.parent()
-                        .unwrap_or_else(|| Path::new("."))
-                        .join(extends_path)
+            let (base_value, child_preset) =
+                if let Some(preset_name) = extends.strip_prefix("preset:") {
+                    // Track which preset was used (caller decides whether/how to notify user)
+                    preset_used = Some(preset_name.to_string());
+                    (presets::load_preset(preset_name)?, None)
+                } else if is_remote_url(&extends) {
+                    self.load_remote_with_extends(&extends, extends_sha256.as_deref(), visited)?
                 } else {
-                    return Err(SlocGuardError::Config(format!(
-                        "Cannot resolve relative path '{extends}' from remote config"
-                    )));
+                    let extends_path = Path::new(&extends);
+                    let resolved_path = if extends_path.is_absolute() {
+                        extends_path.to_path_buf()
+                    } else if let Some(base) = base_path {
+                        base.parent()
+                            .unwrap_or_else(|| Path::new("."))
+                            .join(extends_path)
+                    } else {
+                        return Err(SlocGuardError::Config(format!(
+                            "Cannot resolve relative path '{extends}' from remote config"
+                        )));
+                    };
+                    self.load_with_extends(&resolved_path, visited)?
                 };
-                self.load_with_extends(&resolved_path, visited)?
-            };
+            // Propagate preset from child if we didn't find one at this level
+            if preset_used.is_none() {
+                preset_used = child_preset;
+            }
             config_value = merge_toml_values(base_value, config_value);
         }
 
@@ -265,7 +293,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
             table.remove("extends_sha256");
         }
 
-        Ok(config_value)
+        Ok((config_value, preset_used))
     }
 }
 
@@ -291,7 +319,7 @@ fn merge_toml_values(base: toml::Value, child: toml::Value) -> toml::Value {
 }
 
 impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
-    fn load(&self) -> Result<Config> {
+    fn load(&self) -> Result<LoadResult> {
         if let Some(local_path) = self.local_config_path()
             && self.fs.exists(&local_path)
         {
@@ -304,18 +332,25 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
             return self.load_from_path(&user_path);
         }
 
-        Ok(Config::default())
+        Ok(LoadResult {
+            config: Config::default(),
+            preset_used: None,
+        })
     }
 
-    fn load_from_path(&self, path: &Path) -> Result<Config> {
+    fn load_from_path(&self, path: &Path) -> Result<LoadResult> {
         let mut visited = HashSet::new();
-        let merged_value = self.load_with_extends(path, &mut visited)?;
+        let (merged_value, preset_used) = self.load_with_extends(path, &mut visited)?;
         let config_str =
             toml::to_string(&merged_value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
-        Self::parse_config(&config_str)
+        let config = Self::parse_config(&config_str)?;
+        Ok(LoadResult {
+            config,
+            preset_used,
+        })
     }
 
-    fn load_without_extends(&self) -> Result<Config> {
+    fn load_without_extends(&self) -> Result<LoadResult> {
         if let Some(local_path) = self.local_config_path()
             && self.fs.exists(&local_path)
         {
@@ -328,10 +363,13 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
             return self.load_from_path_without_extends(&user_path);
         }
 
-        Ok(Config::default())
+        Ok(LoadResult {
+            config: Config::default(),
+            preset_used: None,
+        })
     }
 
-    fn load_from_path_without_extends(&self, path: &Path) -> Result<Config> {
+    fn load_from_path_without_extends(&self, path: &Path) -> Result<LoadResult> {
         let content = self
             .fs
             .read_to_string(path)
@@ -339,7 +377,11 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                 path: path.to_path_buf(),
                 source,
             })?;
-        Self::parse_config(&content)
+        let config = Self::parse_config(&content)?;
+        Ok(LoadResult {
+            config,
+            preset_used: None,
+        })
     }
 }
 

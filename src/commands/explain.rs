@@ -6,7 +6,7 @@ use crate::cli::{Cli, ExplainArgs, ExplainFormat};
 use crate::error::SlocGuardError;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
-use super::context::load_config;
+use super::context::{load_config, print_preset_info};
 
 #[must_use]
 pub fn run_explain(args: &ExplainArgs, cli: &Cli) -> i32 {
@@ -25,12 +25,18 @@ pub fn run_explain(args: &ExplainArgs, cli: &Cli) -> i32 {
 }
 
 pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<()> {
-    let config = load_config(
+    let load_result = load_config(
         args.config.as_deref(),
         cli.no_config,
         cli.no_extends,
         cli.offline,
     )?;
+    let config = load_result.config;
+
+    // Print preset info if a preset was used
+    if let Some(ref preset_name) = load_result.preset_used {
+        print_preset_info(preset_name);
+    }
 
     let path = &args.path;
 

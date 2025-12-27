@@ -85,6 +85,28 @@ impl ErrorOutput {
         self.write_warning(&mut stderr, message, detail, suggestion);
     }
 
+    /// Prints an info message with consistent formatting.
+    ///
+    /// Format: `ℹ {message}`
+    ///         `  × {detail}` (optional)
+    ///         `  help: {suggestion}` (optional)
+    ///
+    /// Uses cyan color - softer than warning, appropriate for informational messages.
+    pub fn print_info(&self, message: &str) {
+        self.print_info_with_detail(message, None, None);
+    }
+
+    /// Prints an info message with detail.
+    pub fn print_info_with_detail(
+        &self,
+        message: &str,
+        detail: Option<&str>,
+        suggestion: Option<&str>,
+    ) {
+        let mut stderr = std::io::stderr().lock();
+        self.write_info(&mut stderr, message, detail, suggestion);
+    }
+
     /// Writes error to a writer (for testing).
     pub fn write_error<W: Write>(
         &self,
@@ -165,6 +187,39 @@ impl ErrorOutput {
         }
     }
 
+    /// Writes info to a writer (for testing).
+    pub fn write_info<W: Write>(
+        &self,
+        w: &mut W,
+        message: &str,
+        detail: Option<&str>,
+        suggestion: Option<&str>,
+    ) {
+        // Discard write errors: same rationale as write_error - we can't meaningfully
+        // recover from stderr write failures during info output.
+        if self.use_colors {
+            let _ = writeln!(w, "{}ℹ{} {message}", ansi::CYAN, ansi::RESET);
+        } else {
+            let _ = writeln!(w, "ℹ {message}");
+        }
+
+        if let Some(d) = detail {
+            if self.use_colors {
+                let _ = writeln!(w, "  {}× {d}{}", ansi::DIM, ansi::RESET);
+            } else {
+                let _ = writeln!(w, "  × {d}");
+            }
+        }
+
+        if let Some(s) = suggestion {
+            if self.use_colors {
+                let _ = writeln!(w, "  {}help:{} {s}", ansi::CYAN, ansi::RESET);
+            } else {
+                let _ = writeln!(w, "  help: {s}");
+            }
+        }
+    }
+
     /// Creates an error output formatter with explicit color control (for testing).
     #[cfg(test)]
     pub const fn with_colors(use_colors: bool) -> Self {
@@ -207,6 +262,16 @@ pub fn print_warning(message: &str) {
 /// Convenience function: prints a warning with detail and suggestion.
 pub fn print_warning_full(message: &str, detail: Option<&str>, suggestion: Option<&str>) {
     ErrorOutput::stderr().print_warning_with_detail(message, detail, suggestion);
+}
+
+/// Convenience function: prints an info message using auto-detected color mode.
+pub fn print_info(message: &str) {
+    ErrorOutput::stderr().print_info(message);
+}
+
+/// Convenience function: prints an info message with detail and suggestion.
+pub fn print_info_full(message: &str, detail: Option<&str>, suggestion: Option<&str>) {
+    ErrorOutput::stderr().print_info_with_detail(message, detail, suggestion);
 }
 
 #[cfg(test)]

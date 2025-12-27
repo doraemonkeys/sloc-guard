@@ -16,11 +16,20 @@ extends = "preset:rust-strict"
 
     let fs = MockFileSystem::new().with_file("/config.toml", config_content);
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
-    assert_eq!(config.content.max_lines, 600);
-    assert!(config.content.extensions.contains(&"rs".to_string()));
-    assert!(config.scanner.exclude.iter().any(|p| p == "target/**"));
+    assert_eq!(result.config.content.max_lines, 600);
+    assert!(result.config.content.extensions.contains(&"rs".to_string()));
+    assert!(
+        result
+            .config
+            .scanner
+            .exclude
+            .iter()
+            .any(|p| p == "target/**")
+    );
+    // Verify preset_used is populated
+    assert_eq!(result.preset_used, Some("rust-strict".to_string()));
 }
 
 #[test]
@@ -34,13 +43,22 @@ max_lines = 800
 
     let fs = MockFileSystem::new().with_file("/config.toml", config_content);
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
     // Child config overrides preset's max_lines
-    assert_eq!(config.content.max_lines, 800);
+    assert_eq!(result.config.content.max_lines, 800);
     // Preset's other values are preserved
-    assert!(config.content.extensions.contains(&"rs".to_string()));
-    assert!(config.scanner.exclude.iter().any(|p| p == "target/**"));
+    assert!(result.config.content.extensions.contains(&"rs".to_string()));
+    assert!(
+        result
+            .config
+            .scanner
+            .exclude
+            .iter()
+            .any(|p| p == "target/**")
+    );
+    // Preset used should still be tracked
+    assert_eq!(result.preset_used, Some("rust-strict".to_string()));
 }
 
 #[test]
@@ -55,17 +73,19 @@ max_lines = 1000
 
     let fs = MockFileSystem::new().with_file("/config.toml", config_content);
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
     // Child adds rules on top of preset
     assert!(
-        config
+        result
+            .config
             .content
             .rules
             .iter()
             .any(|r| r.pattern == "src/legacy/**")
     );
-    assert_eq!(config.content.max_lines, 600); // From node-strict
+    assert_eq!(result.config.content.max_lines, 600); // From node-strict
+    assert_eq!(result.preset_used, Some("node-strict".to_string()));
 }
 
 #[test]

@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 use crate::cache::Cache;
 use crate::checker::{StructureChecker, ThresholdChecker};
 use crate::cli::ColorChoice;
-use crate::config::{Config, ConfigLoader, FileConfigLoader};
+use crate::config::{Config, ConfigLoader, FileConfigLoader, LoadResult};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
@@ -24,14 +24,20 @@ pub(crate) const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
     }
 }
 
+/// Load configuration from the filesystem, returning both config and metadata.
+///
+/// The caller is responsible for handling side-effects like printing preset info.
 pub(crate) fn load_config(
     config_path: Option<&Path>,
     no_config: bool,
     no_extends: bool,
     offline: bool,
-) -> crate::Result<Config> {
+) -> crate::Result<LoadResult> {
     if no_config {
-        return Ok(Config::default());
+        return Ok(LoadResult {
+            config: Config::default(),
+            preset_used: None,
+        });
     }
 
     // Determine project root from config path or current directory
@@ -49,6 +55,15 @@ pub(crate) fn load_config(
     } else {
         config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
     }
+}
+
+/// Print preset usage info to stderr (once per session managed by caller).
+pub(crate) fn print_preset_info(preset_name: &str) {
+    crate::output::print_info_full(
+        &format!("Using preset: {preset_name}"),
+        None,
+        Some("Run `sloc-guard config show` to see effective settings"),
+    );
 }
 
 #[must_use]

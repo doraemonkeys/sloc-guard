@@ -20,10 +20,10 @@ max_lines = 300
     let fs = MockFileSystem::new().with_file("/config.toml", config_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
-    assert_eq!(config.version, Some("2".to_string()));
-    assert_eq!(config.content.max_lines, 300);
+    assert_eq!(result.config.version, Some("2".to_string()));
+    assert_eq!(result.config.content.max_lines, 300);
 }
 
 #[test]
@@ -36,10 +36,10 @@ max_lines = 400
     let fs = MockFileSystem::new().with_file("/config.toml", config_content);
 
     let loader = FileConfigLoader::with_fs(fs);
-    let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
+    let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
-    assert!(config.version.is_none());
-    assert_eq!(config.content.max_lines, 400);
+    assert!(result.config.version.is_none());
+    assert_eq!(result.config.content.max_lines, 400);
 }
 
 #[test]
