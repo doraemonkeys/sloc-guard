@@ -3,6 +3,65 @@ use std::path::Path;
 use super::*;
 use crate::scanner::TestConfigParams;
 
+// =============================================================================
+// matches_directory with dot-prefixed paths Tests (regression tests for scope matching bug)
+// =============================================================================
+
+#[test]
+fn allowlist_rule_matches_directory_with_dot_prefix() {
+    // Scope pattern like {src,src/**} should match both ./src and src
+    let rule = AllowlistRuleBuilder::new("{src,src/**}".to_string())
+        .build()
+        .unwrap();
+
+    // Should match without dot prefix
+    assert!(rule.matches_directory(Path::new("src")));
+    assert!(rule.matches_directory(Path::new("src/lib")));
+    assert!(rule.matches_directory(Path::new("src/output")));
+
+    // Should also match WITH dot prefix (the bug fix)
+    assert!(rule.matches_directory(Path::new("./src")));
+    assert!(rule.matches_directory(Path::new("./src/lib")));
+    assert!(rule.matches_directory(Path::new("./src/output")));
+}
+
+#[test]
+fn allowlist_rule_matches_directory_with_backslash_dot_prefix() {
+    // Windows-style paths
+    let rule = AllowlistRuleBuilder::new("{src,src/**}".to_string())
+        .build()
+        .unwrap();
+
+    // Should match with backslash paths
+    assert!(rule.matches_directory(Path::new(".\\src")));
+    assert!(rule.matches_directory(Path::new(".\\src\\lib")));
+}
+
+#[test]
+fn allowlist_rule_matches_directory_glob_star_with_dot_prefix() {
+    let rule = AllowlistRuleBuilder::new("src/**".to_string())
+        .with_extensions(vec![".rs".to_string()])
+        .build()
+        .unwrap();
+
+    // Without dot prefix
+    assert!(rule.matches_directory(Path::new("src/lib")));
+
+    // With dot prefix
+    assert!(rule.matches_directory(Path::new("./src/lib")));
+}
+
+#[test]
+fn allowlist_rule_matches_directory_double_star_prefix_with_dot() {
+    let rule = AllowlistRuleBuilder::new("**/src".to_string())
+        .build()
+        .unwrap();
+
+    // Should match paths with and without dot prefix
+    assert!(rule.matches_directory(Path::new("project/src")));
+    assert!(rule.matches_directory(Path::new("./project/src")));
+}
+
 #[test]
 fn allowlist_rule_builder_creates_rule() {
     let rule = AllowlistRuleBuilder::new("src/**".to_string())

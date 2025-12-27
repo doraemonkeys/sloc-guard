@@ -1,10 +1,25 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use regex::Regex;
 
 use crate::SlocGuardError;
 use crate::error::Result;
+
+/// Strip leading `.` component from a path for consistent scope matching.
+///
+/// Converts paths like `./src/foo` or `.\src\foo` (Windows) to `src/foo`,
+/// ensuring scope patterns like `{src,src/**}` match regardless of scan root.
+fn strip_dot_prefix(path: &Path) -> PathBuf {
+    let mut components = path.components().peekable();
+
+    // Skip leading CurDir (`.`) component if present
+    if matches!(components.peek(), Some(std::path::Component::CurDir)) {
+        components.next();
+    }
+
+    components.collect()
+}
 
 /// A compiled allowlist rule for checking allowed file types in a directory.
 #[derive(Debug, Clone)]
@@ -133,9 +148,13 @@ impl AllowlistRule {
     }
 
     /// Check if a directory path matches this rule's pattern.
+    ///
+    /// Normalizes paths by stripping leading `.` component (e.g., `./src` → `src`)
+    /// to ensure consistent scope matching regardless of scan root.
     #[must_use]
     pub fn matches_directory(&self, dir: &Path) -> bool {
-        self.matcher.is_match(dir)
+        let normalized = strip_dot_prefix(dir);
+        self.matcher.is_match(normalized)
     }
 
     /// Check if a filename matches the naming convention pattern.
@@ -379,5 +398,56 @@ impl AllowlistRuleBuilder {
             naming_pattern,
             naming_pattern_str,
         })
+    }
+}
+
+#[cfg(test)]
+mod strip_dot_prefix_tests {
+    use super::*;
+
+    #[test]
+    fn removes_leading_dot() {
+        assert_eq!(strip_dot_prefix(Path::new("./src")), PathBuf::from("src"));
+        assert_eq!(
+            strip_dot_prefix(Path::new("./src/lib")),
+            PathBuf::from("src/lib")
+        );
+    }
+
+    #[test]
+    fn handles_backslash_paths() {
+        // On Windows, paths may use backslashes
+        assert_eq!(strip_dot_prefix(Path::new(".\\src")), PathBuf::from("src"));
+        assert_eq!(
+            strip_dot_prefix(Path::new(".\\src\\lib")),
+            PathBuf::from("src\\lib")
+        );
+    }
+
+    #[test]
+    fn no_op_for_paths_without_dot() {
+        assert_eq!(strip_dot_prefix(Path::new("src")), PathBuf::from("src"));
+        assert_eq!(
+            strip_dot_prefix(Path::new("src/lib")),
+            PathBuf::from("src/lib")
+        );
+    }
+
+    #[test]
+    fn preserves_dot_in_filename() {
+        // Dot in filename should not be stripped
+        assert_eq!(
+            strip_dot_prefix(Path::new("src/.gitignore")),
+            PathBuf::from("src/.gitignore")
+        );
+        assert_eq!(
+            strip_dot_prefix(Path::new("./.gitignore")),
+            PathBuf::from(".gitignore")
+        );
+    }
+
+    #[test]
+    fn handles_just_dot() {
+        assert_eq!(strip_dot_prefix(Path::new(".")), PathBuf::from(""));
     }
 }
