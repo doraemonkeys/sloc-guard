@@ -66,7 +66,7 @@ version = "2"
 # =============================================================================
 [scanner]
 gitignore = true                          # Respect .gitignore (default: true)
-exclude = ["**/target/**", "**/node_modules/**", "**/vendor/**", "**/dist/**"]
+exclude = [".git/**", "**/target/**", "**/node_modules/**", "**/vendor/**", "**/dist/**"]
 
 # =============================================================================
 # Content: SLOC (Source Lines of Code) limits

@@ -40,6 +40,25 @@ fn generate_config_template_contains_scanner_section() {
 }
 
 #[test]
+fn generate_config_template_excludes_git_directory() {
+    // .git/** must be in scanner.exclude to prevent structure checks on git internals.
+    // Without this, directories like .git/objects (with 253 subdirectories) would trigger
+    // structure violations even when gitignore = true.
+    let template = generate_config_template();
+    assert!(
+        template.contains(".git/**"),
+        "Template must exclude .git/** to prevent structure violations on git internals"
+    );
+
+    // Also verify that the parsed config actually has .git/** in the exclude list
+    let config: crate::config::Config = toml::from_str(&template).unwrap();
+    assert!(
+        config.scanner.exclude.iter().any(|p| p.contains(".git")),
+        "Parsed config must have .git exclusion pattern"
+    );
+}
+
+#[test]
 fn generate_config_template_is_valid_toml() {
     let template = generate_config_template();
     let result: Result<crate::config::Config, _> = toml::from_str(&template);

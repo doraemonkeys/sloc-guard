@@ -36,7 +36,7 @@ const PRESET_RUST_STRICT: &str = r#"
 version = "2"
 
 [scanner]
-exclude = ["target/**", "vendor/**", "*.generated.rs"]
+exclude = [".git/**", "target/**", "vendor/**", "*.generated.rs"]
 
 [content]
 extensions = ["rs"]
@@ -55,7 +55,7 @@ const PRESET_NODE_STRICT: &str = r#"
 version = "2"
 
 [scanner]
-exclude = ["node_modules/**", "dist/**", "build/**", ".next/**", "coverage/**"]
+exclude = [".git/**", "node_modules/**", "dist/**", "build/**", ".next/**", "coverage/**"]
 
 [content]
 extensions = ["js", "jsx", "ts", "tsx", "mjs", "cjs"]
@@ -74,7 +74,7 @@ const PRESET_PYTHON_STRICT: &str = r#"
 version = "2"
 
 [scanner]
-exclude = ["__pycache__/**", ".venv/**", "venv/**", ".tox/**", "*.egg-info/**", ".pytest_cache/**"]
+exclude = [".git/**", "__pycache__/**", ".venv/**", "venv/**", ".tox/**", "*.egg-info/**", ".pytest_cache/**"]
 
 [content]
 extensions = ["py", "pyi"]

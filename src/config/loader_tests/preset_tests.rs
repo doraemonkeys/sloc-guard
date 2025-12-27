@@ -120,3 +120,30 @@ fn extends_preset_all_available_presets_work() {
         );
     }
 }
+
+#[test]
+fn all_presets_exclude_git_directory() {
+    // All presets must exclude .git/** to prevent structure violations on git internals.
+    // Without this, directories like .git/objects (with many subdirectories) would trigger
+    // structure violations even when gitignore = true.
+    for preset_name in presets::AVAILABLE_PRESETS {
+        let config_content = format!(r#"extends = "preset:{preset_name}""#);
+
+        let fs = MockFileSystem::new().with_file("/config.toml", &config_content);
+        let loader = FileConfigLoader::with_fs(fs);
+        let result = loader.load_from_path(Path::new("/config.toml")).unwrap();
+
+        let has_git_exclude = result
+            .config
+            .scanner
+            .exclude
+            .iter()
+            .any(|p| p.contains(".git"));
+
+        assert!(
+            has_git_exclude,
+            "Preset '{preset_name}' must have .git exclusion in scanner.exclude, got: {:?}",
+            result.config.scanner.exclude
+        );
+    }
+}
