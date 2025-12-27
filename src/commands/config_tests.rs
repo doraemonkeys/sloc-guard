@@ -143,7 +143,7 @@ fn config_show_default_returns_text() {
     assert!(output.contains("Effective Configuration"));
     assert!(output.contains("[scanner]"));
     assert!(output.contains("[content]"));
-    assert!(output.contains("max_lines = 500"));
+    assert!(output.contains("max_lines = 600"));
 }
 
 #[test]

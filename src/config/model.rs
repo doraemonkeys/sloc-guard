@@ -248,8 +248,11 @@ pub struct CustomLanguageConfig {
     pub multi_line_comments: Vec<(String, String)>,
 }
 
+/// Default maximum lines per file for SLOC checks.
+pub const DEFAULT_MAX_LINES: usize = 600;
+
 const fn default_max_lines() -> usize {
-    500
+    DEFAULT_MAX_LINES
 }
 
 fn default_extensions() -> Vec<String> {

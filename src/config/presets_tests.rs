@@ -13,7 +13,7 @@ fn load_rust_strict_preset() {
     assert!(extensions.iter().any(|v| v.as_str() == Some("rs")));
     assert_eq!(
         content.get("max_lines").and_then(Value::as_integer),
-        Some(500)
+        Some(600)
     );
 
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
@@ -45,7 +45,7 @@ fn load_node_strict_preset() {
     assert!(ext_strs.contains(&"tsx"));
     assert_eq!(
         content.get("max_lines").and_then(Value::as_integer),
-        Some(400)
+        Some(600)
     );
 
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
@@ -70,7 +70,7 @@ fn load_python_strict_preset() {
     assert!(ext_strs.contains(&"pyi"));
     assert_eq!(
         content.get("max_lines").and_then(Value::as_integer),
-        Some(400)
+        Some(600)
     );
 
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();

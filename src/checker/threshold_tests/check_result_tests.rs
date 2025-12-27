@@ -12,13 +12,13 @@ fn check_passes_under_threshold() {
     let result = checker.check(Path::new("test.rs"), &stats, None);
 
     assert!(result.is_passed());
-    assert_eq!(result.limit(), 500);
+    assert_eq!(result.limit(), 600);
 }
 
 #[test]
 fn check_fails_over_threshold() {
     let checker = ThresholdChecker::new(default_config());
-    let stats = stats_with_code(600);
+    let stats = stats_with_code(700);
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
 
@@ -28,7 +28,7 @@ fn check_fails_over_threshold() {
 #[test]
 fn check_warns_near_threshold() {
     let checker = ThresholdChecker::new(default_config());
-    let stats = stats_with_code(460);
+    let stats = stats_with_code(550); // 90% of 600 = 540
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
 
@@ -141,7 +141,7 @@ fn check_result_usage_percent() {
 #[test]
 fn custom_warning_threshold() {
     let checker = ThresholdChecker::new(default_config()).with_warning_threshold(0.8);
-    let stats = stats_with_code(410);
+    let stats = stats_with_code(490); // 80% of 600 = 480
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
 

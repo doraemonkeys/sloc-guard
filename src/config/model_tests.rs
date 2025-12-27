@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn content_config_has_expected_defaults() {
     let config = ContentConfig::default();
-    assert_eq!(config.max_lines, 500);
+    assert_eq!(config.max_lines, 600);
     assert!(config.skip_comments);
     assert!(config.skip_blank);
     assert!(!config.strict);

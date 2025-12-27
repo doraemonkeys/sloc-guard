@@ -14,7 +14,7 @@ fn returns_default_when_no_config_found() {
 
     let config = loader.load().unwrap();
 
-    assert_eq!(config.content.max_lines, 500);
+    assert_eq!(config.content.max_lines, 600);
     assert!(config.content.skip_comments);
     assert!(config.content.skip_blank);
 }

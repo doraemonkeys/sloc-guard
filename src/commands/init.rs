@@ -73,7 +73,7 @@ exclude = ["**/target/**", "**/node_modules/**", "**/vendor/**", "**/dist/**"]
 # =============================================================================
 [content]
 extensions = ["rs", "go", "py", "js", "ts", "c", "cpp"]  # File types to analyze
-max_lines = 500                           # Default max lines per file
+max_lines = 600                           # Default max lines per file
 warn_threshold = 0.9                      # Warn at 90% of limit (450 lines)
 skip_comments = true                      # Don't count comment lines
 skip_blank = true                         # Don't count blank lines

@@ -42,12 +42,12 @@ fn path_rule_does_not_match_unrelated_path() {
     });
 
     let checker = ThresholdChecker::new(config);
-    let stats = stats_with_code(600);
+    let stats = stats_with_code(700);
 
     // File not matching the pattern should use default
     let result = checker.check(Path::new("src/lib.rs"), &stats, None);
     assert!(result.is_failed());
-    assert_eq!(result.limit(), 500);
+    assert_eq!(result.limit(), 600);
 }
 
 #[test]

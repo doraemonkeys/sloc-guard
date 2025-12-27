@@ -40,7 +40,7 @@ exclude = ["target/**", "vendor/**", "*.generated.rs"]
 
 [content]
 extensions = ["rs"]
-max_lines = 500
+max_lines = 600
 warn_threshold = 0.85
 skip_comments = true
 skip_blank = true
@@ -59,7 +59,7 @@ exclude = ["node_modules/**", "dist/**", "build/**", ".next/**", "coverage/**"]
 
 [content]
 extensions = ["js", "jsx", "ts", "tsx", "mjs", "cjs"]
-max_lines = 400
+max_lines = 600
 warn_threshold = 0.85
 skip_comments = true
 skip_blank = true
@@ -78,7 +78,7 @@ exclude = ["__pycache__/**", ".venv/**", "venv/**", ".tox/**", "*.egg-info/**", 
 
 [content]
 extensions = ["py", "pyi"]
-max_lines = 400
+max_lines = 600
 warn_threshold = 0.85
 skip_comments = true
 skip_blank = true

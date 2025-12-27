@@ -210,12 +210,12 @@ fn project_type_extensions() {
 #[test]
 fn project_type_max_lines() {
     assert_eq!(ProjectType::Rust.default_max_lines(), 800);
-    assert_eq!(ProjectType::Node.default_max_lines(), 400);
+    assert_eq!(ProjectType::Node.default_max_lines(), 600);
     assert_eq!(ProjectType::Go.default_max_lines(), 600);
-    assert_eq!(ProjectType::Python.default_max_lines(), 500);
-    assert_eq!(ProjectType::Java.default_max_lines(), 500);
+    assert_eq!(ProjectType::Python.default_max_lines(), 600);
+    assert_eq!(ProjectType::Java.default_max_lines(), 600);
     assert_eq!(ProjectType::CSharp.default_max_lines(), 600);
-    assert_eq!(ProjectType::Unknown.default_max_lines(), 500);
+    assert_eq!(ProjectType::Unknown.default_max_lines(), 600);
 }
 
 #[test]
@@ -300,7 +300,7 @@ fn generate_config_for_node_project() {
     assert!(config.contains("\"ts\""));
     assert!(config.contains("\"js\""));
     assert!(config.contains("**/node_modules/**"));
-    assert!(config.contains("max_lines = 400"));
+    assert!(config.contains("max_lines = 600"));
 }
 
 #[test]
@@ -318,7 +318,7 @@ fn generate_config_for_java_project() {
     assert!(config.contains("\"kt\""));
     assert!(config.contains("**/target/**"));
     assert!(config.contains("**/build/**"));
-    assert!(config.contains("max_lines = 500"));
+    assert!(config.contains("max_lines = 600"));
 }
 
 #[test]
@@ -351,7 +351,7 @@ fn generate_config_for_python_project() {
     assert!(config.contains("version = \"2\""));
     assert!(config.contains("\"py\""));
     assert!(config.contains("**/__pycache__/**"));
-    assert!(config.contains("max_lines = 500"));
+    assert!(config.contains("max_lines = 600"));
 }
 
 #[test]
@@ -393,7 +393,7 @@ fn generate_config_for_monorepo() {
     assert!(config.contains("pattern = \"packages/api/**\""));
     assert!(config.contains("pattern = \"packages/web/**\""));
     assert!(config.contains("max_lines = 800")); // Rust
-    assert!(config.contains("max_lines = 400")); // Node
+    assert!(config.contains("max_lines = 600")); // Node
 }
 
 #[test]
@@ -408,7 +408,7 @@ fn generate_config_for_unknown_project() {
 
     assert!(config.contains("version = \"2\""));
     assert!(config.contains("Unknown project type"));
-    assert!(config.contains("max_lines = 500"));
+    assert!(config.contains("max_lines = 600"));
 }
 
 #[test]

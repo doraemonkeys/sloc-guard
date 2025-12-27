@@ -17,7 +17,7 @@ fn exit_codes_documented() {
 #[test]
 fn load_config_no_config_returns_default() {
     let config = load_config(None, true, false, false).unwrap();
-    assert_eq!(config.content.max_lines, 500);
+    assert_eq!(config.content.max_lines, 600);
 }
 
 #[test]

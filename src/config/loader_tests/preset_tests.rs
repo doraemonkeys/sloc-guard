@@ -18,7 +18,7 @@ extends = "preset:rust-strict"
     let loader = FileConfigLoader::with_fs(fs);
     let config = loader.load_from_path(Path::new("/config.toml")).unwrap();
 
-    assert_eq!(config.content.max_lines, 500);
+    assert_eq!(config.content.max_lines, 600);
     assert!(config.content.extensions.contains(&"rs".to_string()));
     assert!(config.scanner.exclude.iter().any(|p| p == "target/**"));
 }
@@ -65,7 +65,7 @@ max_lines = 1000
             .iter()
             .any(|r| r.pattern == "src/legacy/**")
     );
-    assert_eq!(config.content.max_lines, 400); // From node-strict
+    assert_eq!(config.content.max_lines, 600); // From node-strict
 }
 
 #[test]

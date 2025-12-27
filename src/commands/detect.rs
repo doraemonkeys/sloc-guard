@@ -33,11 +33,12 @@ impl ProjectType {
     /// Returns recommended `max_lines` for this project type.
     #[must_use]
     pub const fn default_max_lines(&self) -> usize {
+        use crate::config::DEFAULT_MAX_LINES;
         match self {
             Self::Rust => 800,
-            Self::Node => 400,
-            Self::Go | Self::CSharp => 600,
-            Self::Python | Self::Java | Self::Unknown => 500,
+            Self::Node | Self::Python | Self::Java | Self::Go | Self::CSharp | Self::Unknown => {
+                DEFAULT_MAX_LINES
+            }
         }
     }
 

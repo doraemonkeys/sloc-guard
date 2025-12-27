@@ -9,7 +9,7 @@ fn generate_config_template_contains_content_section() {
     let template = generate_config_template();
     assert!(template.contains("version = \"2\""));
     assert!(template.contains("[content]"));
-    assert!(template.contains("max_lines = 500"));
+    assert!(template.contains("max_lines = 600"));
     assert!(template.contains("skip_comments = true"));
     assert!(template.contains("skip_blank = true"));
     assert!(template.contains("warn_threshold = 0.9"));

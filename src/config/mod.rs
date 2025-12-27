@@ -8,8 +8,8 @@ pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
 pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, RealFileSystem};
 pub use model::{
     BaselineConfig, CONFIG_VERSION, Config, ContentConfig, ContentRule, CustomLanguageConfig,
-    RatchetMode, ScannerConfig, SiblingRequire, SiblingRule, SiblingSeverity, StructureConfig,
-    StructureRule, TrendConfig, UNLIMITED,
+    DEFAULT_MAX_LINES, RatchetMode, ScannerConfig, SiblingRequire, SiblingRule, SiblingSeverity,
+    StructureConfig, StructureRule, TrendConfig, UNLIMITED,
 };
 pub use remote::{
     clear_cache as clear_remote_cache, fetch_remote_config, fetch_remote_config_offline,
@@ -23,7 +23,7 @@ mod tests {
     #[test]
     fn config_default_values() {
         let config = Config::default();
-        assert_eq!(config.content.max_lines, 500);
+        assert_eq!(config.content.max_lines, DEFAULT_MAX_LINES);
         assert!(!config.content.extensions.is_empty());
     }
 
