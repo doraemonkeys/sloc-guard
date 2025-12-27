@@ -363,4 +363,3 @@ fn scan_with_structure_dir_excluded_by_name_match() {
     assert_eq!(result.files.len(), 1);
     assert!(result.files[0].ends_with("main.rs"));
 }
-

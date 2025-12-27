@@ -10,8 +10,10 @@ version = "2"
 # Scanner: How to discover files
 # =============================================================================
 [scanner]
-gitignore = true                   # Respect .gitignore (default: true)
-exclude = ["vendor/**", "dist/**"] # Additional patterns to completely ignore
+gitignore = true # Respect .gitignore (default: true)
+# IMPORTANT: Explicit exclude REPLACES the default [".git/**"], it does NOT merge.
+# If you override this, include ".git/**" to keep .git directory excluded.
+exclude = [".git/**", "vendor/**", "dist/**"]
 
 # =============================================================================
 # Content: SLOC (Source Lines of Code) limits

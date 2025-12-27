@@ -24,4 +24,3 @@ impl FileFilter for RustOnlyFilter {
         path.extension().is_some_and(|ext| ext == "rs")
     }
 }
-

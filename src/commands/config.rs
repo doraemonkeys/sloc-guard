@@ -154,13 +154,14 @@ fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
         .or_else(|| std::env::current_dir().ok());
 
     let loader = FileConfigLoader::with_options(cli.offline, project_root);
-    let load_result = config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))?;
-    
+    let load_result =
+        config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))?;
+
     // Print preset info if a preset was used
     if let Some(ref preset_name) = load_result.preset_used {
         print_preset_info(preset_name);
     }
-    
+
     Ok(load_result.config)
 }
 

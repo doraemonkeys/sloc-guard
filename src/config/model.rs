@@ -88,15 +88,22 @@ pub struct ScannerConfig {
 
     /// Global exclude patterns (files/dirs to completely ignore by ALL checkers).
     /// These are ADDITIVE to .gitignore (union, not override).
-    #[serde(default)]
+    /// Default: `[".git/**"]` - always exclude .git directory.
+    #[serde(default = "default_scanner_exclude")]
     pub exclude: Vec<String>,
+}
+
+/// Default scanner exclude patterns.
+/// Always excludes `.git/**` to prevent structure checks on git internals.
+fn default_scanner_exclude() -> Vec<String> {
+    vec![".git/**".to_string()]
 }
 
 impl Default for ScannerConfig {
     fn default() -> Self {
         Self {
             gitignore: true,
-            exclude: Vec::new(),
+            exclude: default_scanner_exclude(),
         }
     }
 }

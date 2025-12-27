@@ -197,4 +197,3 @@ fn scan_from_subdirectory_still_detects_violations() {
         denied_dirs.iter().map(|v| &v.path).collect::<Vec<_>>()
     );
 }
-

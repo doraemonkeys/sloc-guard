@@ -245,4 +245,3 @@ fn scan_with_structure_per_rule_allow_files_works() {
             .any(|v| v.path.ends_with("config.json"))
     );
 }
-
