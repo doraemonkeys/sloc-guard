@@ -36,6 +36,12 @@ Large files and messy directory structures are silent killers of codebase mainta
 
 > Other tools *count* lines. sloc-guard *enforces* them.
 
+### 🤖 Perfect for AI-Assisted Development
+
+In the age of AI coding assistants, telling AI "don't write spaghetti code" is futile — it has no memory of your preferences. But **hard constraints work**: when sloc-guard fails the build, AI automatically responds by refactoring and splitting code.
+
+Instead of endlessly reminding AI to keep files small, just let it hit the wall and fix itself.
+
 ---
 
 ## Quick Start
