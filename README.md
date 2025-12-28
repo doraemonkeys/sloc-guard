@@ -1,300 +1,447 @@
 # sloc-guard
 
-Source Lines of Code enforcement tool - enforces file size limits by counting code lines (excluding comments and blanks) and enforces directory structure limits (file/folder counts).
+**Guard your codebase against complexity.**
 
-## Installation
+`sloc-guard` is a high-performance command-line tool that enforces limits on **Source Lines of Code (SLOC)** and **Directory Structure**. Unlike passive counters that just tell you how big your project is, `sloc-guard` actively prevents code bloat and architectural decay by failing your build when thresholds are exceeded.
 
-```bash
-cargo install sloc-guard
-```
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Test Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen.svg)]()
+[![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)]()
+
+---
+
+## ❓ Why sloc-guard?
+
+Large files and messy directory structures are silent killers of codebase maintainability. By the time you notice, the damage is done.
+
+**sloc-guard** enforces limits *before* code is merged:
+- 🎯 **SLOC Limits** — Prevent files from exceeding line count thresholds (comments and blanks excluded by default)
+- 📁 **Structure Guards** — Enforce directory organization (max files/dirs, naming conventions, sibling rules)
+- 🔄 **Git-Aware** — Check only changed files (`--diff`, `--staged`) for fast CI integration
+- 📊 **Trend Tracking** — Monitor codebase growth over time with historical snapshots
+
+### How is it different from other tools?
+
+| Feature | sloc-guard | cloc | tokei | SCC |
+|---------|------------|------|-------|-----|
+| **Enforce limits** | ✅ | ❌ | ❌ | ❌ |
+| **Directory structure rules** | ✅ | ❌ | ❌ | ❌ |
+| **Path-based rule overrides** | ✅ | ❌ | ❌ | ❌ |
+| **Git diff mode** | ✅ | ❌ | ❌ | ❌ |
+| **Baseline grandfathering** | ✅ | ❌ | ❌ | ❌ |
+| **Trend tracking** | ✅ | ❌ | ❌ | ❌ |
+| **Split suggestions** | ✅ | ❌ | ❌ | ❌ |
+| **SARIF output** | ✅ | ❌ | ❌ | ❌ |
+| **Remote config inheritance** | ✅ | ❌ | ❌ | ❌ |
+
+> Other tools *count* lines. sloc-guard *enforces* them.
+
+---
 
 ## Quick Start
 
-```bash
-# Initialize config
-sloc-guard init
+### Installation
 
-# Check files
+```bash
+# From source (requires Rust 1.85+)
+cargo install --git https://github.com/doraemonkeys/sloc-guard
+
+cargo install sloc-guard
+
+# Or download pre-built binary from GitHub Releases
+```
+
+### 30-Second Setup
+
+```bash
+# 1. Initialize config with project type detection
+sloc-guard init --detect
+
+# 2. Check your codebase
 sloc-guard check
 
-# View statistics
+# 3. See project statistics
 sloc-guard stats
 ```
 
-## Commands
+That's it! sloc-guard will enforce a 600-line limit per file by default.
 
-| Command | Description |
-|---------|-------------|
-| `check` | Check files against line count thresholds |
-| `stats` | Display statistics without checking thresholds |
-| `init` | Generate a default configuration file |
-| `config validate` | Validate configuration file syntax |
-| `config show` | Display the effective configuration |
-| `explain <PATH>` | Show which rules apply to a path |
+### Configuration
 
-## CLI Parameters
-
-### Scan Roots vs Include Filter
-
-**Scan roots** (`<PATH>` arguments) are starting points for file discovery:
-```bash
-sloc-guard check src tests    # Scan src/ and tests/ directories
-```
-
-**Include filter** (`--include`, `-I`) restricts scanning to specific subdirectories, overriding both `<PATH>` arguments and config `include_paths`:
-```bash
-sloc-guard check --include src/core --include src/utils
-```
-
-Priority: `--include` > CLI `<PATH>` > config `include_paths` > default "."
-
-### CLI Override Scope
-
-CLI parameters like `--max-lines`, `--max-files`, `--max-dirs` override **config defaults only**, not rules:
-
-```bash
-# Overrides [content] max_lines default, but [[content.rules]] still take precedence
-sloc-guard check --max-lines 200
-```
-
-### Diff Mode
-
-`--diff` filters content checks to files changed between a git reference and HEAD. Compares **committed** trees only (not the working directory). Defaults to HEAD when no value provided:
-
-```bash
-sloc-guard check --diff          # Same as --diff HEAD (no changed files)
-sloc-guard check --diff main     # Files changed between main and HEAD
-sloc-guard check --staged        # Uncommitted staged files only
-```
-
-**Structure checks** are NOT filtered by `--diff` - they always count full directory state. The `--diff` flag only limits which files are checked for SLOC violations.
-
-## Configuration
-
-Create `.sloc-guard.toml` with `sloc-guard init` or manually:
+Create `.sloc-guard.toml` in your project root:
 
 ```toml
-version = 2
+version = "2"
+
+# Optional: inherit from presets or remote configs
+# extends = "preset:rust-strict"
 
 [scanner]
-gitignore = true
-exclude = ["target/**", "node_modules/**"]
+gitignore = true                             # Respect .gitignore (default: true)
+exclude = [".git/**", "vendor/**", "dist/**"] # Exclude from scanning entirely
 
 [content]
-extensions = ["rs", "go", "py", "js", "ts"]
-max_lines = 300
-warn_threshold = 0.8
-skip_comments = true
-skip_blank = true
+extensions = ["rs", "go", "py", "js", "ts"]  # Files to check
+max_lines = 500                              # Max lines per file
+warn_threshold = 0.8                         # Warn at 80% (400 lines)
+warn_at = 450                                # Absolute threshold (takes precedence over warn_threshold)
+skip_comments = true                         # Don't count comments (default: true)
+skip_blank = true                            # Don't count blank lines (default: true)
+exclude = ["**/*_test.go"]                   # Skip SLOC check (still visible to structure rules)
+
+[structure]
+max_files = 30                               # Max files per directory
+max_dirs = 10                                # Max subdirectories
+max_depth = 8                                # Max nesting depth
+warn_threshold = 0.8                         # Warn at 80% of limits
+warn_files_at = 25                           # Absolute threshold (takes precedence)
+warn_dirs_at = 8                             # Absolute threshold (takes precedence)
+count_exclude = ["*.md", ".gitkeep"]         # Don't count these toward limits
+deny_extensions = [".exe", ".dll", ".bak"]   # Forbidden file types
+deny_files = [".DS_Store", "Thumbs.db"]      # Forbidden files
+
+[baseline]
+ratchet = "warn"                             # warn|auto|strict - violations can only decrease
+
+[trend]
+max_entries = 100                            # Keep last N snapshots
+max_age_days = 90                            # Delete older entries
+min_interval_secs = 3600                     # At most one entry per hour
+min_code_delta = 10                          # Ignore changes < N lines
+```
+
+---
+
+## Features
+
+### Content Rules (SLOC Limits)
+
+Override line limits for specific paths (last match wins):
+
+```toml
+[[content.rules]]
+pattern = "src/generated/**"
+max_lines = 2000
+reason = "Auto-generated code"
 
 [[content.rules]]
 pattern = "**/*_test.rs"
-max_lines = 500
+max_lines = 800
+skip_comments = false                        # Override: count comments for tests
+reason = "Test files need more space"
 
+# Temporary exemption with expiration
 [[content.rules]]
-pattern = "src/legacy/huge_file.rs"
-max_lines = 1000
-reason = "Legacy code pending refactor"
+pattern = "src/legacy/parser.rs"
+max_lines = 1500
+reason = "Refactoring in progress - JIRA-1234"
+expires = "2025-06-01"
+```
 
-[structure]
-max_files = 20
-max_dirs = 10
+### Structure Rules (Directory Organization)
 
+Override structure limits and enforce naming conventions:
+
+```toml
 [[structure.rules]]
 scope = "src/components/**"
-max_files = 30
+max_files = 50
+file_naming_pattern = "^[A-Z][a-zA-Z0-9]*\\.(tsx|css)$"
+allow_extensions = [".tsx", ".css"]          # Only these extensions allowed
+reason = "React components: PascalCase required"
+
+[[structure.rules]]
+scope = "src/features/**"
+max_files = -1                               # -1 = unlimited
+max_depth = 3
+relative_depth = true                        # Depth relative to scope, not project root
+siblings = [
+    { match = "*.tsx", require = "{stem}.test.tsx" }
+]
+reason = "Feature modules: max 3 levels deep, every component needs a test"
+
+[[structure.rules]]
+scope = "tests/**"
+max_files = -1
+max_dirs = -1
+reason = "No limits for test directories"
 ```
 
-### Rule Priority
+### Git Integration
 
-**Content (SLOC limits):**
-1. `[[content.rules]]` - glob pattern (last declared match wins)
-2. `[content.languages.X]` - extension shorthand
-3. `[content]` defaults
-
-**Structure (directory limits):**
-1. `[[structure.rules]]` - glob pattern (last declared match wins)
-2. `[structure]` defaults
-
-## GitHub Actions
-
-Use sloc-guard in GitHub Actions workflows with built-in caching, problem matchers, and SARIF output.
-
-### Basic Usage
-
-```yaml
-name: SLOC Check
-on: [push, pull_request]
-
-jobs:
-  sloc-guard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: doraemonkeys/sloc-guard@v0.1.0
-        with:
-          paths: src
-```
-
-### SARIF Output and Security Tab Integration
-
-Generate SARIF reports and upload to GitHub's Security tab for inline annotations:
-
-```yaml
-name: SLOC Check with Security Integration
-on: [push, pull_request]
-
-permissions:
-  security-events: write  # Required for SARIF upload
-
-jobs:
-  sloc-guard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run sloc-guard
-        id: sloc
-        uses: doraemonkeys/sloc-guard@v0.1.0
-        with:
-          sarif-output: sloc-guard.sarif
-          baseline: .sloc-guard-baseline.json
-        continue-on-error: true  # Allow SARIF upload even on failure
-
-      - name: Upload SARIF to Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ steps.sloc.outputs.sarif-file }}
-          category: sloc-guard
-```
-
-### Action Inputs
-
-| Input | Description | Default |
-|-------|-------------|---------|
-| `paths` | Paths to check (space-separated) | `.` |
-| `config-path` | Path to config file | `sloc-guard.toml` |
-| `fail-on-warning` | Treat warnings as failures | `false` |
-| `version` | sloc-guard version to install | `latest` |
-| `cache` | Enable result caching | `true` |
-| `sarif-output` | Path for SARIF output file | _(disabled)_ |
-| `baseline` | Path to baseline file | _(disabled)_ |
-| `diff` | Only check files changed since ref | _(disabled)_ |
-
-### Action Outputs
-
-| Output | Description |
-|--------|-------------|
-| `total-files` | Total number of files checked |
-| `passed` | Number of files that passed |
-| `failed` | Number of files that failed |
-| `warnings` | Number of files with warnings |
-| `grandfathered` | Number of grandfathered violations |
-| `sarif-file` | Path to generated SARIF file |
-
-### PR-Only Checks with Diff Mode
-
-Check only changed files in pull requests:
-
-```yaml
-jobs:
-  sloc-guard:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for diff
-
-      - uses: doraemonkeys/sloc-guard@v0.1.0
-        with:
-          diff: origin/${{ github.base_ref }}
-```
-
-## Docker
-
-sloc-guard is available as a lightweight (~10MB) Docker image:
+Check only what changed for fast CI:
 
 ```bash
-# Pull from GitHub Container Registry
-docker pull ghcr.io/doraemonkeys/sloc-guard:latest
+# Check files changed since main branch
+sloc-guard check --diff main
 
-# Run check
-docker run --rm -v $(pwd):/workspace ghcr.io/doraemonkeys/sloc-guard check /workspace
+# Check only staged files (pre-commit hooks)
+sloc-guard check --staged
+
+# Check specific commit range
+sloc-guard check --diff v1.0..v2.0
 ```
 
-### CI Platform Examples
+### Baseline & Grandfathering
 
-**GitLab CI:**
-```yaml
-sloc-guard:
-  image: ghcr.io/doraemonkeys/sloc-guard:latest
-  script:
-    - sloc-guard check .
+Adopt sloc-guard in existing projects without fixing everything at once:
+
+```bash
+# Create baseline from current violations
+sloc-guard check --update-baseline
+
+# Violations in baseline are "grandfathered" (pass with note)
+sloc-guard check --baseline
+
+# Ratchet mode: violations can only decrease over time
+sloc-guard check --baseline --ratchet strict
 ```
 
-**Azure Pipelines:**
-```yaml
-- script: |
-    docker run --rm -v $(Build.SourcesDirectory):/workspace \
-      ghcr.io/doraemonkeys/sloc-guard check /workspace
-  displayName: 'SLOC Check'
+### Trend Tracking
+
+Monitor codebase growth over time:
+
+```bash
+# Show stats with trend delta
+sloc-guard stats --trend
+
+# Compare against 7 days ago
+sloc-guard stats --since 7d
+
+# View history
+sloc-guard stats history --limit 20
 ```
+
+Output:
+```
+📊 Project Statistics
+  Files: 142 (+3)
+  Code:  28,451 (+127)
+  Comments: 4,231 (-12)
+  
+  Trend: ↗ +0.4% code since last run
+```
+
+### Split Suggestions
+
+When a file exceeds limits, get actionable suggestions:
+
+```bash
+sloc-guard check --suggest
+```
+
+Output:
+```
+✗ src/parser.rs: 723 lines (limit: 500)
+  
+  Split suggestion:
+  ├── parse_expression() (lines 45-180, 135 lines)
+  ├── parse_statement() (lines 182-340, 158 lines)
+  └── parse_block() (lines 342-520, 178 lines)
+```
+
+### Multiple Output Formats
+
+```bash
+sloc-guard check --format text      # Human-readable (default)
+sloc-guard check --format json      # Machine-readable
+sloc-guard check --format sarif     # IDE integration (VS Code, GitHub)
+sloc-guard check --format markdown  # Documentation
+sloc-guard check --format html      # Rich reports with charts
+```
+
+### Explain Command
+
+Debug which rules apply to a path:
+
+```bash
+sloc-guard explain src/components/Button.tsx
+```
+
+Output:
+```
+Path: src/components/Button.tsx
+Matched Rule: [[content.rules]] #2
+  Pattern: src/components/**
+  Reason: "React components"
+Effective Limit: 400 lines
+Warn At: 320 lines (80%)
+```
+
+### Config Inheritance
+
+Share configuration across projects:
+
+```toml
+# Built-in presets: rust-strict, node-strict, python-strict, monorepo-base
+extends = "preset:rust-strict"
+
+# Or remote URL with optional integrity check
+extends = "https://example.com/team-config.toml"
+extends_sha256 = "abc123..."
+
+# Local values override inherited ones
+[content]
+max_lines = 600
+```
+
+### Custom Languages
+
+Define comment syntax for unsupported languages:
+
+```toml
+[languages.hcl]
+extensions = ["tf", "hcl"]
+single_line_comments = ["#", "//"]
+multi_line_comments = [["/*", "*/"]]
+```
+
+---
+
+## CLI Reference
+
+```bash
+Usage: sloc-guard.exe [OPTIONS] <COMMAND>
+
+Commands:
+  check    Check files against line count thresholds
+  stats    Display statistics without checking thresholds
+  init     Generate a default configuration file
+  config   Configuration file utilities
+  explain  Explain which rules apply to a path
+  help     Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --verbose...     Increase output verbosity (-v, -vv for more)
+  -q, --quiet          Suppress non-essential output
+      --color <COLOR>  Control color output [default: auto] [possible values: auto, always, never]
+      --no-config      Skip loading configuration file
+      --no-extends     Skip resolving extends in configuration (ignore remote/local inheritance)
+      --offline        Use cached remote configs only, error if cache miss
+  -h, --help           Print help (see more with '--help')
+  -V, --version        Print version
+```
+
+
 
 ## Pre-commit Hook
 
-sloc-guard integrates with the [pre-commit](https://pre-commit.com/) framework for automatic SLOC checking on every commit.
-
-### Setup
-
-Add to your `.pre-commit-config.yaml`:
+Add to `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
   - repo: https://github.com/doraemonkeys/sloc-guard
-    rev: v0.1.0  # Pin to specific version
+    rev: v0.1.0
     hooks:
       - id: sloc-guard
-        # Optional: restrict to specific file types
-        # types_or: [rust, python, javascript, typescript]
 ```
 
-Then run:
+The hook uses `--staged` mode for fast incremental checks.
 
-```bash
-pre-commit install
-```
+---
 
-### How it Works
+## Advanced Usage
 
-1. **Binary Download**: On first run, downloads the matching pre-built binary to `~/.cache/sloc-guard/`
-2. **Checksum Verification**: Verifies SHA256 checksum before installation
-3. **Incremental Mode**: Uses `--files` parameter to check only staged files (no full scan)
-4. **Version Pinning**: The `rev` in your config pins the sloc-guard version
-
-### Manual Installation Alternative
-
-If you prefer to install sloc-guard globally and use the system binary:
+### GitHub Actions
 
 ```yaml
-repos:
-  - repo: local
-    hooks:
-      - id: sloc-guard
-        name: sloc-guard
-        entry: sloc-guard check --files
-        language: system
-        types: [file]
-        pass_filenames: true
+name: Code Quality
+on: [push, pull_request]
+
+jobs:
+  sloc-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # For --diff mode
+      
+      - name: Install sloc-guard
+        run: |
+          curl -sSL https://github.com/doraemonkeys/sloc-guard/releases/latest/download/sloc-guard-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv sloc-guard /usr/local/bin/
+      
+      - name: Check SLOC limits
+        run: sloc-guard check --diff origin/main --format sarif --output results.sarif
+      
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif
 ```
+
+### Docker
+
+```bash
+# Run directly
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/doraemonkeys/sloc-guard check
+
+# With custom config
+docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/doraemonkeys/sloc-guard check --config .sloc-guard.toml
+```
+
+Build locally:
+```bash
+docker build -t sloc-guard .
+```
+
+The Docker image is Alpine-based (~10MB) and runs as a non-root user.
+
+### Monorepo Setup
+
+```toml
+version = "2"
+extends = "preset:monorepo-base"
+
+[scanner]
+exclude = [".git/**", "node_modules/**", "target/**", "dist/**"]
+
+[[structure.rules]]
+scope = "packages/*"
+max_files = 50
+max_dirs = 15
+
+[[structure.rules]]
+scope = "packages/*/src/**"
+siblings = [
+    { group = ["index.ts", "types.ts"] }  # If one exists, both must exist
+]
+```
+
+---
+
+## Performance
+
+sloc-guard is designed for speed:
+
+- **Parallel processing** via Rayon — utilizes all CPU cores
+- **Intelligent caching** — skips unchanged files (mtime + size + hash)
+- **Git-aware scanning** — respects `.gitignore` by default
+- **Incremental mode** — `--diff` and `--staged` check only changed files
+
+
+
+## 🛡️ Project Quality
+
+- **90%+ test coverage** enforced by CI
+- **Strict Clippy lints** (pedantic + nursery)
+- **Comprehensive integration tests**
+- **Dependency injection** for testability
+- **Well-documented** internal architecture
+
+See [ENGINEERING_GUIDELINES.md](docs/ENGINEERING_GUIDELINES.md) for coding standards.
 
 ## Exit Codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | All checks passed |
-| 1 | Threshold violations found |
-| 2 | Configuration or runtime error |
+| 1 | Threshold exceeded (or warnings in `--strict` mode) |
+| 2 | Configuration error |
+
+---
 
 ## License
 
-Apache-2.0
+Apache-2.0 — see [LICENSE](LICENSE) for details.
+
