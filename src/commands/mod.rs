@@ -4,10 +4,12 @@ pub mod context;
 pub mod detect;
 pub mod explain;
 pub mod init;
+pub mod snapshot;
 pub mod stats;
 
 pub use check::run_check;
 pub use config::run_config;
 pub use explain::run_explain;
 pub use init::run_init;
+pub use snapshot::run_snapshot;
 pub use stats::run_stats;

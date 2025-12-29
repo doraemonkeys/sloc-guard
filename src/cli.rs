@@ -121,6 +121,9 @@ pub enum Commands {
     /// Display statistics without checking thresholds
     Stats(StatsArgs),
 
+    /// Record a statistics snapshot to trend history
+    Snapshot(SnapshotArgs),
+
     /// Generate a default configuration file
     Init(InitArgs),
 
@@ -253,8 +256,36 @@ pub struct CheckArgs {
     pub files: Vec<PathBuf>,
 }
 
+/// Output format for stats subcommands (subset without SARIF)
+#[derive(Debug, Clone, Copy, Default, ValueEnum, PartialEq, Eq)]
+pub enum StatsOutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output
+    Json,
+    /// Markdown output
+    #[value(name = "md")]
+    Markdown,
+}
+
+/// Output format for stats report command (includes HTML)
+#[derive(Debug, Clone, Copy, Default, ValueEnum, PartialEq, Eq)]
+pub enum ReportOutputFormat {
+    /// Human-readable text output
+    #[default]
+    Text,
+    /// JSON output
+    Json,
+    /// Markdown output
+    #[value(name = "md")]
+    Markdown,
+    /// HTML output
+    Html,
+}
+
 /// Output format for stats history command
-#[derive(Debug, Clone, Copy, Default, ValueEnum)]
+#[derive(Debug, Clone, Copy, Default, ValueEnum, PartialEq, Eq)]
 pub enum HistoryOutputFormat {
     /// Human-readable text output
     #[default]
@@ -263,12 +294,35 @@ pub enum HistoryOutputFormat {
     Json,
 }
 
-#[derive(Parser, Debug)]
-pub struct StatsArgs {
-    /// Subcommand for stats (omit for default stats behavior)
-    #[command(subcommand)]
-    pub action: Option<StatsAction>,
+/// Sort order for files subcommand
+#[derive(Debug, Clone, Copy, Default, ValueEnum, PartialEq, Eq)]
+pub enum FileSortOrder {
+    /// Sort by code lines (default)
+    #[default]
+    Code,
+    /// Sort by total lines
+    Total,
+    /// Sort by comment lines
+    Comment,
+    /// Sort by blank lines
+    Blank,
+    /// Sort alphabetically by name
+    Name,
+}
 
+/// Grouping mode for breakdown subcommand
+#[derive(Debug, Clone, Copy, Default, ValueEnum, PartialEq, Eq)]
+pub enum BreakdownBy {
+    /// Group by language (default)
+    #[default]
+    Lang,
+    /// Group by directory
+    Dir,
+}
+
+/// Common scanning arguments shared across stats subcommands
+#[derive(clap::Args, Debug, Clone)]
+pub struct CommonStatsArgs {
     /// Paths to analyze
     #[arg(default_value = ".")]
     pub paths: Vec<PathBuf>,
@@ -289,54 +343,131 @@ pub struct StatsArgs {
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 
-    /// Output format [possible values: text, json, sarif, markdown, html]
-    #[arg(short, long, default_value = "text")]
-    pub format: OutputFormat,
-
-    /// Write output to file instead of stdout
-    #[arg(short, long)]
-    pub output: Option<PathBuf>,
-
     /// Disable file hash caching
     #[arg(long)]
     pub no_cache: bool,
 
-    /// Group results by category
-    #[arg(long, value_enum, default_value = "none")]
-    pub group_by: GroupBy,
-
-    /// Show top N largest files by code lines
-    #[arg(long)]
-    pub top: Option<usize>,
-
     /// Disable .gitignore filtering (scan all files)
     #[arg(long)]
     pub no_gitignore: bool,
+}
 
-    /// Track and display trend (delta from previous run)
+/// Arguments for the `snapshot` command
+#[derive(Parser, Debug)]
+pub struct SnapshotArgs {
+    #[command(flatten)]
+    pub common: CommonStatsArgs,
+
+    /// Path to history file (defaults to .git/sloc-guard/history.json or .sloc-guard/history.json)
     #[arg(long)]
-    pub trend: bool,
-
-    /// Path to history file for trend tracking (default: .sloc-guard-history.json)
-    #[arg(long, value_name = "PATH")]
     pub history_file: Option<PathBuf>,
 
-    /// Compare against a specific time ago (e.g., 7d, 30d, 1w, 12h).
-    /// Finds the nearest entry before the specified time point.
-    /// Implies --trend. Supported units: s, m, h, d, w.
-    #[arg(long, value_name = "DURATION")]
-    pub since: Option<String>,
+    /// Force snapshot even if min_interval_secs hasn't elapsed
+    #[arg(long)]
+    pub force: bool,
+
+    /// Dry-run: show what would be recorded without saving
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Parser, Debug)]
+pub struct StatsArgs {
+    /// Stats subcommand (required)
+    #[command(subcommand)]
+    pub action: StatsAction,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum StatsAction {
+    /// Project-level summary totals (files, code, comments, blanks, averages)
+    Summary(SummaryArgs),
+
+    /// File list with sorting and filtering options
+    Files(FilesArgs),
+
+    /// Grouped statistics by language or directory
+    Breakdown(BreakdownArgs),
+
+    /// Delta comparison with historical snapshots
+    Trend(TrendArgs),
+
     /// List recent history entries
     History(HistoryArgs),
+
+    /// Comprehensive report combining summary, files, breakdown, and trend
+    Report(ReportArgs),
+}
+
+#[derive(Parser, Debug)]
+pub struct SummaryArgs {
+    #[command(flatten)]
+    pub common: CommonStatsArgs,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: StatsOutputFormat,
+}
+
+#[derive(Parser, Debug)]
+pub struct FilesArgs {
+    #[command(flatten)]
+    pub common: CommonStatsArgs,
+
+    /// Show top N largest files (default: all files)
+    #[arg(long)]
+    pub top: Option<usize>,
+
+    /// Sort order for files
+    #[arg(long, value_enum, default_value = "code")]
+    pub sort: FileSortOrder,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: StatsOutputFormat,
+}
+
+#[derive(Parser, Debug)]
+pub struct BreakdownArgs {
+    #[command(flatten)]
+    pub common: CommonStatsArgs,
+
+    /// Group by language or directory
+    #[arg(long, value_enum, default_value = "lang")]
+    pub by: BreakdownBy,
+
+    /// Maximum depth for directory grouping (only with --by dir)
+    #[arg(long)]
+    pub depth: Option<usize>,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: StatsOutputFormat,
+}
+
+#[derive(Parser, Debug)]
+pub struct TrendArgs {
+    #[command(flatten)]
+    pub common: CommonStatsArgs,
+
+    /// Compare against a specific time ago (e.g., 7d, 30d, 1w, 12h).
+    /// Finds the nearest entry before the specified time point.
+    /// Supported units: s, m, h, d, w.
+    #[arg(long, value_name = "DURATION")]
+    pub since: Option<String>,
+
+    /// Path to history file (default: auto-discovered in project state dir)
+    #[arg(long, value_name = "PATH")]
+    pub history_file: Option<PathBuf>,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: StatsOutputFormat,
 }
 
 #[derive(Parser, Debug)]
 pub struct HistoryArgs {
-    /// Maximum number of entries to display (default: 10)
+    /// Maximum number of entries to display
     #[arg(short, long, default_value = "10")]
     pub limit: usize,
 
@@ -344,7 +475,25 @@ pub struct HistoryArgs {
     #[arg(short, long, value_enum, default_value = "text")]
     pub format: HistoryOutputFormat,
 
-    /// Path to history file (default: .sloc-guard-history.json in project state dir)
+    /// Path to history file (default: auto-discovered in project state dir)
+    #[arg(long, value_name = "PATH")]
+    pub history_file: Option<PathBuf>,
+}
+
+#[derive(Parser, Debug)]
+pub struct ReportArgs {
+    #[command(flatten)]
+    pub common: CommonStatsArgs,
+
+    /// Output format
+    #[arg(short, long, value_enum, default_value = "text")]
+    pub format: ReportOutputFormat,
+
+    /// Write output to file instead of stdout
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
+
+    /// Path to history file for trend data (default: auto-discovered in project state dir)
     #[arg(long, value_name = "PATH")]
     pub history_file: Option<PathBuf>,
 }

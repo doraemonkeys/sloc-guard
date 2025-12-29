@@ -121,16 +121,154 @@ fn cli_check_with_staged() {
     }
 }
 
+// ============================================================================
+// Stats Subcommand Tests
+// ============================================================================
+
 #[test]
-fn cli_stats_command() {
-    let cli = Cli::parse_from(["sloc-guard", "stats", "src"]);
+fn cli_stats_summary_command() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "summary", "src"]);
     match cli.command {
-        Commands::Stats(args) => {
-            assert_eq!(args.paths, vec![PathBuf::from("src")]);
-        }
+        Commands::Stats(args) => match args.action {
+            StatsAction::Summary(summary_args) => {
+                assert_eq!(summary_args.common.paths, vec![PathBuf::from("src")]);
+            }
+            _ => panic!("Expected Summary action"),
+        },
         _ => panic!("Expected Stats command"),
     }
 }
+
+#[test]
+fn cli_stats_files_command() {
+    let cli = Cli::parse_from([
+        "sloc-guard",
+        "stats",
+        "files",
+        "--top",
+        "10",
+        "--sort",
+        "code",
+    ]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.top, Some(10));
+                assert_eq!(files_args.sort, FileSortOrder::Code);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_breakdown_command() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "breakdown", "--by", "dir"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Breakdown(breakdown_args) => {
+                assert_eq!(breakdown_args.by, BreakdownBy::Dir);
+            }
+            _ => panic!("Expected Breakdown action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_trend_command() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "trend", "--since", "7d"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Trend(trend_args) => {
+                assert_eq!(trend_args.since, Some("7d".to_string()));
+            }
+            _ => panic!("Expected Trend action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_history_command() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "history", "--limit", "5"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::History(history_args) => {
+                assert_eq!(history_args.limit, 5);
+            }
+            _ => panic!("Expected History action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_report_command() {
+    let cli = Cli::parse_from([
+        "sloc-guard",
+        "stats",
+        "report",
+        "--format",
+        "html",
+        "-o",
+        "report.html",
+    ]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Report(report_args) => {
+                assert_eq!(report_args.format, ReportOutputFormat::Html);
+                assert_eq!(report_args.output, Some(PathBuf::from("report.html")));
+            }
+            _ => panic!("Expected Report action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_common_args() {
+    let cli = Cli::parse_from([
+        "sloc-guard",
+        "stats",
+        "summary",
+        "--config",
+        "custom.toml",
+        "--ext",
+        "rs,go",
+        "-x",
+        "**/target/**",
+        "-I",
+        "src",
+        "--no-cache",
+        "--no-gitignore",
+    ]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Summary(summary_args) => {
+                assert_eq!(
+                    summary_args.common.config,
+                    Some(PathBuf::from("custom.toml"))
+                );
+                assert_eq!(
+                    summary_args.common.ext,
+                    Some(vec!["rs".to_string(), "go".to_string()])
+                );
+                assert_eq!(summary_args.common.exclude, vec!["**/target/**"]);
+                assert_eq!(summary_args.common.include, vec!["src"]);
+                assert!(summary_args.common.no_cache);
+                assert!(summary_args.common.no_gitignore);
+            }
+            _ => panic!("Expected Summary action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+// ============================================================================
+// Init Command Tests
+// ============================================================================
 
 #[test]
 fn cli_init_command() {
@@ -166,7 +304,9 @@ fn cli_init_with_force() {
     }
 }
 
-// Tests for new CLI options
+// ============================================================================
+// Global Flags Tests
+// ============================================================================
 
 #[test]
 fn cli_global_verbose() {
@@ -268,28 +408,6 @@ fn cli_check_output_file() {
             assert_eq!(args.output, Some(PathBuf::from("report.json")));
         }
         _ => panic!("Expected Check command"),
-    }
-}
-
-#[test]
-fn cli_stats_with_config() {
-    let cli = Cli::parse_from(["sloc-guard", "stats", "--config", "custom.toml"]);
-    match cli.command {
-        Commands::Stats(args) => {
-            assert_eq!(args.config, Some(PathBuf::from("custom.toml")));
-        }
-        _ => panic!("Expected Stats command"),
-    }
-}
-
-#[test]
-fn cli_stats_with_exclude() {
-    let cli = Cli::parse_from(["sloc-guard", "stats", "-x", "**/vendor/**"]);
-    match cli.command {
-        Commands::Stats(args) => {
-            assert_eq!(args.exclude, vec!["**/vendor/**"]);
-        }
-        _ => panic!("Expected Stats command"),
     }
 }
 

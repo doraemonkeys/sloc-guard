@@ -6,11 +6,11 @@ use common::{BASIC_CONFIG_V2, TestFixture};
 use predicates::prelude::*;
 
 // =============================================================================
-// Basic Stats Command Tests
+// Summary Subcommand Tests
 // =============================================================================
 
 #[test]
-fn stats_basic_output() {
+fn stats_summary_basic_output() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -18,7 +18,7 @@ fn stats_basic_output() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache"])
+        .args(["stats", "summary", "--no-cache"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Files:"))
@@ -26,20 +26,20 @@ fn stats_basic_output() {
 }
 
 #[test]
-fn stats_empty_directory() {
+fn stats_summary_empty_directory() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_dir("src");
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache"])
+        .args(["stats", "summary", "--no-cache"])
         .assert()
         .success();
 }
 
 #[test]
-fn stats_with_specific_path() {
+fn stats_summary_with_specific_path() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -47,78 +47,98 @@ fn stats_with_specific_path() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "src"])
+        .args(["stats", "summary", "--no-cache", "src"])
         .assert()
         .success()
         .stdout(predicate::str::contains("1")); // Only 1 file in src
 }
 
-// =============================================================================
-// Output Format Tests
-// =============================================================================
-
 #[test]
-fn stats_json_output_format() {
+fn stats_summary_json_format() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--format", "json"])
+        .args(["stats", "summary", "--no-cache", "--format", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"summary\""))
-        .stdout(predicate::str::contains("\"total_files\""))
-        .stdout(predicate::str::contains("\"files\""));
+        .stdout(predicate::str::contains("\"total_files\""));
 }
 
 #[test]
-fn stats_markdown_output_format() {
+fn stats_summary_markdown_format() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--format", "markdown"])
+        .args(["stats", "summary", "--no-cache", "--format", "md"])
         .assert()
         .success()
         .stdout(predicate::str::contains("# SLOC Statistics"));
 }
 
+// =============================================================================
+// Files Subcommand Tests
+// =============================================================================
+
 #[test]
-fn stats_output_to_file() {
+fn stats_files_shows_all_files() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
-
-    let output_path = fixture.path().join("stats.json");
+    fixture.create_rust_file("src/lib.rs", 30);
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args([
-            "stats",
-            "--no-cache",
-            "--format",
-            "json",
-            "--output",
-            output_path.to_str().unwrap(),
-        ])
+        .args(["stats", "files", "--no-cache"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("main.rs"))
+        .stdout(predicate::str::contains("lib.rs"));
+}
+
+#[test]
+fn stats_files_top_largest_files() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/small.rs", 10);
+    fixture.create_rust_file("src/medium.rs", 50);
+    fixture.create_rust_file("src/large.rs", 100);
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["stats", "files", "--no-cache", "--top", "2"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("large.rs"))
+        .stdout(predicate::str::contains("Top 2"));
+}
+
+#[test]
+fn stats_files_sort_by_code() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/small.rs", 10);
+    fixture.create_rust_file("src/large.rs", 100);
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["stats", "files", "--no-cache", "--sort", "code"])
         .assert()
         .success();
-
-    assert!(output_path.exists());
-    let content = std::fs::read_to_string(&output_path).unwrap();
-    assert!(content.contains("\"summary\""));
 }
 
 // =============================================================================
-// Grouping Tests
+// Breakdown Subcommand Tests
 // =============================================================================
 
 #[test]
-fn stats_group_by_language() {
+fn stats_breakdown_by_language() {
     let fixture = TestFixture::new();
     fixture.create_config(
         r#"
@@ -141,14 +161,14 @@ max_dirs = 10
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--group-by", "lang"])
+        .args(["stats", "breakdown", "--no-cache", "--by", "lang"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Language"));
 }
 
 #[test]
-fn stats_group_by_directory() {
+fn stats_breakdown_by_directory() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -156,45 +176,231 @@ fn stats_group_by_directory() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--group-by", "dir"])
+        .args(["stats", "breakdown", "--no-cache", "--by", "dir"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Directory"));
 }
 
 // =============================================================================
-// Top Files Tests
+// Trend Subcommand Tests
 // =============================================================================
 
 #[test]
-fn stats_top_largest_files() {
-    let fixture = TestFixture::new();
-    fixture.create_config(BASIC_CONFIG_V2);
-    fixture.create_rust_file("src/small.rs", 10);
-    fixture.create_rust_file("src/medium.rs", 50);
-    fixture.create_rust_file("src/large.rs", 100);
-
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--top", "2"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("large.rs"))
-        .stdout(predicate::str::contains("Top 2"));
-}
-
-#[test]
-fn stats_top_zero_shows_none() {
+fn stats_trend_basic() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
 
-    // Top 0 should not show any top files section
+    // Create some history first
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 50, "code": 45, "comment": 3, "blank": 2}]}"#,
+    ).unwrap();
+
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache"])
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
         .assert()
         .success();
+}
+
+#[test]
+fn stats_trend_with_since() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 50, "code": 45, "comment": 3, "blank": 2}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--since",
+            "7d",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+}
+
+// =============================================================================
+// History Subcommand Tests
+// =============================================================================
+
+#[test]
+fn stats_history_empty() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    let history_path = fixture.path().join("history.json");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "history",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No history entries found"));
+}
+
+#[test]
+fn stats_history_with_entries() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735048800, "total_files": 100, "total_lines": 5500, "code": 5000, "comment": 300, "blank": 200}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "history",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("History"))
+        .stdout(predicate::str::contains("Files: 100"));
+}
+
+#[test]
+fn stats_history_json_format() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735048800, "total_files": 100, "total_lines": 5500, "code": 5000, "comment": 300, "blank": 200}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "history",
+            "--format",
+            "json",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"count\""))
+        .stdout(predicate::str::contains("\"entries\""));
+}
+
+#[test]
+fn stats_history_limit() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [
+            {"timestamp": 1735000000, "total_files": 96, "total_lines": 5100, "code": 4600, "comment": 260, "blank": 180},
+            {"timestamp": 1735010000, "total_files": 97, "total_lines": 5200, "code": 4700, "comment": 270, "blank": 190},
+            {"timestamp": 1735020000, "total_files": 98, "total_lines": 5300, "code": 4800, "comment": 280, "blank": 195}
+        ]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "history",
+            "--limit",
+            "2",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("2 of 3 entries"));
+}
+
+// =============================================================================
+// Report Subcommand Tests
+// =============================================================================
+
+#[test]
+fn stats_report_to_file() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let output_path = fixture.path().join("report.json");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "report",
+            "--no-cache",
+            "--format",
+            "json",
+            "--output",
+            output_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(output_path.exists());
+    let content = std::fs::read_to_string(&output_path).unwrap();
+    assert!(content.contains("\"summary\""));
+}
+
+#[test]
+fn stats_report_html_output() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let output_path = fixture.path().join("report.html");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "report",
+            "--no-cache",
+            "--format",
+            "html",
+            "--output",
+            output_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(output_path.exists());
+    let content = std::fs::read_to_string(&output_path).unwrap();
+    assert!(content.contains("<!DOCTYPE html>"));
 }
 
 // =============================================================================
@@ -202,7 +408,7 @@ fn stats_top_zero_shows_none() {
 // =============================================================================
 
 #[test]
-fn stats_cli_ext_filter() {
+fn stats_summary_cli_ext_filter() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -211,14 +417,22 @@ fn stats_cli_ext_filter() {
     // Only count Python files
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--ext", "py", "--format", "json"])
+        .args([
+            "stats",
+            "summary",
+            "--no-cache",
+            "--ext",
+            "py",
+            "--format",
+            "json",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"total_files\": 1"));
 }
 
 #[test]
-fn stats_cli_exclude_pattern() {
+fn stats_summary_cli_exclude_pattern() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -228,6 +442,7 @@ fn stats_cli_exclude_pattern() {
         .current_dir(fixture.path())
         .args([
             "stats",
+            "summary",
             "--no-cache",
             "--exclude",
             "**/vendor/**",
@@ -240,7 +455,7 @@ fn stats_cli_exclude_pattern() {
 }
 
 #[test]
-fn stats_cli_include_filter() {
+fn stats_summary_cli_include_filter() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -250,6 +465,7 @@ fn stats_cli_include_filter() {
         .current_dir(fixture.path())
         .args([
             "stats",
+            "summary",
             "--no-cache",
             "--include",
             "src",
@@ -262,87 +478,24 @@ fn stats_cli_include_filter() {
 }
 
 // =============================================================================
-// Trend Tracking Tests
+// No Config Mode Tests
 // =============================================================================
 
 #[test]
-fn stats_trend_creates_history_file() {
+fn stats_summary_no_config_mode() {
     let fixture = TestFixture::new();
-    fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
-
-    // History file is now created in .sloc-guard/ directory (or .git/sloc-guard/ if in git repo)
-    let history_path = fixture.path().join(".sloc-guard").join("history.json");
-
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--trend"])
-        .assert()
-        .success();
-
-    assert!(history_path.exists());
-}
-
-#[test]
-fn stats_trend_custom_history_file() {
-    let fixture = TestFixture::new();
-    fixture.create_config(BASIC_CONFIG_V2);
-    fixture.create_rust_file("src/main.rs", 50);
-
-    let custom_history = fixture.path().join("custom-history.json");
 
     sloc_guard!()
         .current_dir(fixture.path())
         .args([
             "stats",
+            "summary",
+            "--no-config",
             "--no-cache",
-            "--trend",
-            "--history-file",
-            custom_history.to_str().unwrap(),
+            "--ext",
+            "rs",
         ])
-        .assert()
-        .success();
-
-    assert!(custom_history.exists());
-}
-
-#[test]
-fn stats_trend_shows_delta_on_second_run() {
-    let fixture = TestFixture::new();
-    fixture.create_config(BASIC_CONFIG_V2);
-    fixture.create_rust_file("src/main.rs", 50);
-
-    // First run to create history
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--trend"])
-        .assert()
-        .success();
-
-    // Add more code
-    fixture.create_rust_file("src/lib.rs", 30);
-
-    // Second run should show delta (may include git context or fallback to "previous run")
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--trend"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Changes since"));
-}
-
-// =============================================================================
-// No Config Mode Tests
-// =============================================================================
-
-#[test]
-fn stats_no_config_mode() {
-    let fixture = TestFixture::new();
-    fixture.create_rust_file("src/main.rs", 50);
-
-    sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["stats", "--no-config", "--no-cache", "--ext", "rs"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Total"));
@@ -353,7 +506,7 @@ fn stats_no_config_mode() {
 // =============================================================================
 
 #[test]
-fn stats_handles_binary_files_gracefully() {
+fn stats_summary_handles_binary_files_gracefully() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_rust_file("src/main.rs", 50);
@@ -368,13 +521,13 @@ fn stats_handles_binary_files_gracefully() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache"])
+        .args(["stats", "summary", "--no-cache"])
         .assert()
         .success();
 }
 
 #[test]
-fn stats_handles_empty_files() {
+fn stats_summary_handles_empty_files() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_file("src/empty.rs", "");
@@ -382,14 +535,14 @@ fn stats_handles_empty_files() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache", "--format", "json"])
+        .args(["stats", "summary", "--no-cache", "--format", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"total_files\": 2"));
 }
 
 #[test]
-fn stats_handles_files_with_only_comments() {
+fn stats_summary_handles_files_with_only_comments() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
     fixture.create_file(
@@ -399,7 +552,24 @@ fn stats_handles_files_with_only_comments() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "--no-cache"])
+        .args(["stats", "summary", "--no-cache"])
         .assert()
         .success();
+}
+
+// =============================================================================
+// Error Cases
+// =============================================================================
+
+#[test]
+fn stats_bare_command_requires_subcommand() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["stats"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("subcommand"));
 }

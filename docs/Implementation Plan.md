@@ -34,7 +34,7 @@ Refactor `stats` into explicit subcommands following design principles:
 - Read/write separation
 - Bare `stats` requires subcommand
 
-### Task 21.1: CLI Subcommand Structure
+### Task 21.1: CLI Subcommand Structure ✅
 
 Restructure CLI to enforce subcommand requirement:
 - `stats summary` - project-level totals only
@@ -80,11 +80,12 @@ Implement `stats report` for comprehensive output:
 - Flags: `--format text|json|md|html`, `-o <path>`
 - Content controlled by `[stats.report]` config (exclude list)
 
-### Task 21.7: Snapshot Command
+### Task 21.7: Snapshot Command ✅
 
 Create standalone `snapshot` command (read/write separation):
 - Records current stats to trend history
-- Respects `min_interval_secs` from config
+- Respects `min_interval_secs` from config (--force to override)
+- Flags: `--history-file`, `--force`, `--dry-run`
 - Separate from stats viewing commands
 
 ### Task 21.8: Trend Config Enhancement
@@ -108,5 +109,5 @@ Add `[stats.report]` config section:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | 21.1 CLI, 21.2 Summary, 21.3 Files, 21.4 Breakdown, 21.5 Trend, 21.6 Report, 21.7 Snapshot, 21.8-9 Config |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, 21.2 Summary, 21.3 Files, 21.4 Breakdown, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-9 Config |
 

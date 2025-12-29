@@ -4,12 +4,15 @@ use std::sync::Mutex;
 use rayon::prelude::*;
 
 use crate::cache::{Cache, compute_config_hash};
-use crate::cli::{Cli, GroupBy, HistoryArgs, HistoryOutputFormat, StatsAction, StatsArgs};
-use crate::git::GitContext;
+use crate::cli::{
+    BreakdownArgs, BreakdownBy, Cli, CommonStatsArgs, FileSortOrder, FilesArgs, HistoryArgs,
+    HistoryOutputFormat, ReportArgs, ReportOutputFormat, StatsAction, StatsArgs, StatsOutputFormat,
+    SummaryArgs, TrendArgs,
+};
 use crate::language::LanguageRegistry;
 use crate::output::{
-    ColorMode, FileStatistics, OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter,
-    StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
+    ColorMode, FileStatistics, ProjectStatistics, ScanProgress, StatsFormatter, StatsHtmlFormatter,
+    StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 use crate::scanner::scan_files;
 use crate::state;
@@ -23,12 +26,16 @@ use super::context::{
 
 #[must_use]
 pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
-    // Handle subcommand if present
-    if let Some(StatsAction::History(history_args)) = &args.action {
-        return run_history(history_args, cli);
-    }
+    let result = match &args.action {
+        StatsAction::Summary(summary_args) => run_summary(summary_args, cli),
+        StatsAction::Files(files_args) => run_files(files_args, cli),
+        StatsAction::Breakdown(breakdown_args) => run_breakdown(breakdown_args, cli),
+        StatsAction::Trend(trend_args) => run_trend(trend_args, cli),
+        StatsAction::History(history_args) => run_history(history_args, cli),
+        StatsAction::Report(report_args) => run_report(report_args, cli),
+    };
 
-    match run_stats_impl(args, cli) {
+    match result {
         Ok(exit_code) => exit_code,
         Err(e) => {
             crate::output::print_error_full(
@@ -42,10 +49,234 @@ pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
     }
 }
 
-pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> {
-    // 1. Load configuration (for exclude patterns)
+// ============================================================================
+// Summary Subcommand
+// ============================================================================
+
+fn run_summary(args: &SummaryArgs, cli: &Cli) -> crate::Result<i32> {
+    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    save_cache_if_enabled(&args.common, &cache, &project_root);
+
+    let color_mode = super::context::color_choice_to_mode(cli.color);
+    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    println!("{output}");
+    Ok(EXIT_SUCCESS)
+}
+
+/// Unified stats output formatter for Text/Json/Markdown formats.
+/// Used by summary, files, breakdown, and trend subcommands.
+fn format_stats_subcommand_output(
+    format: StatsOutputFormat,
+    stats: &ProjectStatistics,
+    color_mode: ColorMode,
+    project_root: &Path,
+) -> crate::Result<String> {
+    match format {
+        StatsOutputFormat::Text => StatsTextFormatter::new(color_mode)
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats),
+        StatsOutputFormat::Json => StatsJsonFormatter::new()
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats),
+        StatsOutputFormat::Markdown => StatsMarkdownFormatter::new()
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats),
+    }
+}
+
+// ============================================================================
+// Files Subcommand
+// ============================================================================
+
+fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
+    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    save_cache_if_enabled(&args.common, &cache, &project_root);
+
+    // Warn about unimplemented --sort option (Task 21.3)
+    if args.sort != FileSortOrder::Code {
+        crate::output::print_warning_full(
+            "--sort option is not yet implemented",
+            Some(&format!("Using default sort order (code lines). Requested: {:?}", args.sort)),
+            None,
+        );
+    }
+
+    // Apply sorting and top-N filtering
+    let project_stats = apply_file_sorting(project_stats, args.sort);
+    let project_stats = if let Some(n) = args.top {
+        project_stats.with_top_files(n)
+    } else {
+        // Show all files in sorted order
+        project_stats.with_top_files(usize::MAX)
+    };
+
+    let color_mode = super::context::color_choice_to_mode(cli.color);
+    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    println!("{output}");
+    Ok(EXIT_SUCCESS)
+}
+
+#[allow(unused_variables)] // _sort will be used in Task 21.3
+fn apply_file_sorting(stats: ProjectStatistics, _sort: FileSortOrder) -> ProjectStatistics {
+    // ProjectStatistics::with_top_files sorts by code by default
+    // TODO: Task 21.3 will implement custom sorting in ProjectStatistics
+    // For now, always use default code sorting
+    stats
+}
+
+// ============================================================================
+// Breakdown Subcommand
+// ============================================================================
+
+fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
+    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    save_cache_if_enabled(&args.common, &cache, &project_root);
+
+    // Warn about unimplemented --depth option (Task 21.4)
+    if args.depth.is_some() {
+        crate::output::print_warning_full(
+            "--depth option is not yet implemented",
+            Some(&format!("Showing all directory levels. Requested depth: {}", args.depth.unwrap())),
+            None,
+        );
+    }
+
+    // Apply grouping
+    let project_stats = match args.by {
+        BreakdownBy::Lang => project_stats.with_language_breakdown(),
+        BreakdownBy::Dir => project_stats.with_directory_breakdown_relative(Some(&project_root)),
+    };
+
+    let color_mode = super::context::color_choice_to_mode(cli.color);
+    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    println!("{output}");
+    Ok(EXIT_SUCCESS)
+}
+
+// ============================================================================
+// Trend Subcommand
+// ============================================================================
+
+fn run_trend(args: &TrendArgs, cli: &Cli) -> crate::Result<i32> {
+    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    save_cache_if_enabled(&args.common, &cache, &project_root);
+
+    // Load history and compute trend delta
+    let default_path = state::history_path(&project_root);
+    let history_path = args.history_file.as_ref().unwrap_or(&default_path);
+    let history = TrendHistory::load_or_default(history_path);
+
+    // Get current time for delta computation
+    let current_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before UNIX_EPOCH")
+        .as_secs();
+
+    // Compute trend: either from --since duration or from latest entry
+    let trend = args.since.as_ref().map_or_else(
+        || history.compute_delta(&project_stats),
+        |since_str| match parse_duration(since_str) {
+            Ok(duration_secs) => {
+                history.compute_delta_since(duration_secs, &project_stats, current_time)
+            }
+            Err(e) => {
+                crate::output::print_warning_full(
+                    "Invalid --since duration",
+                    Some(&e.message()),
+                    Some("Falling back to latest entry comparison"),
+                );
+                history.compute_delta(&project_stats)
+            }
+        },
+    );
+
+    // Apply trend to stats for display
+    let project_stats = if let Some(delta) = trend {
+        project_stats.with_trend(delta)
+    } else {
+        project_stats
+    };
+
+    let color_mode = super::context::color_choice_to_mode(cli.color);
+    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    println!("{output}");
+    Ok(EXIT_SUCCESS)
+}
+
+// ============================================================================
+// Report Subcommand
+// ============================================================================
+
+fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
+    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    save_cache_if_enabled(&args.common, &cache, &project_root);
+
+    // Load history for trend
+    let default_path = state::history_path(&project_root);
+    let history_path = args.history_file.as_ref().unwrap_or(&default_path);
+    let history = TrendHistory::load_or_default(history_path);
+
+    // Build comprehensive stats with all sections
+    let project_stats = project_stats.with_language_breakdown().with_top_files(10);
+
+    // Add trend if history exists
+    let project_stats = if let Some(delta) = history.compute_delta(&project_stats) {
+        project_stats.with_trend(delta)
+    } else {
+        project_stats
+    };
+
+    let color_mode = super::context::color_choice_to_mode(cli.color);
+    let output = format_report_output(
+        args.format,
+        &project_stats,
+        color_mode,
+        &project_root,
+        &history,
+    )?;
+
+    // Write to file or stdout
+    write_output(args.output.as_deref(), &output, cli.quiet)?;
+
+    Ok(EXIT_SUCCESS)
+}
+
+fn format_report_output(
+    format: ReportOutputFormat,
+    stats: &ProjectStatistics,
+    color_mode: ColorMode,
+    project_root: &Path,
+    trend_history: &TrendHistory,
+) -> crate::Result<String> {
+    match format {
+        ReportOutputFormat::Text => StatsTextFormatter::new(color_mode)
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats),
+        ReportOutputFormat::Json => StatsJsonFormatter::new()
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats),
+        ReportOutputFormat::Markdown => StatsMarkdownFormatter::new()
+            .with_project_root(Some(project_root.to_path_buf()))
+            .format(stats),
+        ReportOutputFormat::Html => StatsHtmlFormatter::new()
+            .with_project_root(Some(project_root.to_path_buf()))
+            .with_trend_history(trend_history.clone())
+            .format(stats),
+    }
+}
+
+// ============================================================================
+// Shared Helpers
+// ============================================================================
+
+/// Collect file statistics using common scanning arguments.
+fn collect_stats(
+    common: &CommonStatsArgs,
+    cli: &Cli,
+) -> crate::Result<(ProjectStatistics, std::path::PathBuf, Mutex<Cache>)> {
+    // 1. Load configuration
     let load_result = load_config(
-        args.config.as_deref(),
+        common.config.as_deref(),
         cli.no_config,
         cli.no_extends,
         cli.offline,
@@ -57,62 +288,44 @@ pub(crate) fn run_stats_impl(args: &StatsArgs, cli: &Cli) -> crate::Result<i32> 
         print_preset_info(preset_name);
     }
 
-    // 1b. Discover project root for consistent state file resolution
+    // 1b. Discover project root
     let project_root = state::discover_project_root(Path::new("."));
 
-    // 1.1 Load cache if not disabled
+    // 1c. Load cache if not disabled
     let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
-    let cache = if args.no_cache {
+    let cache = if common.no_cache {
         None
     } else {
         load_cache(&cache_path, &config_hash)
     };
     let cache = Mutex::new(cache.unwrap_or_else(|| Cache::new(config_hash)));
 
-    // Apply CLI extensions override if provided
-    if let Some(ref cli_extensions) = args.ext {
+    // Apply CLI extensions override
+    if let Some(ref cli_extensions) = common.ext {
         config.content.extensions.clone_from(cli_extensions);
     }
 
-    // 2. Build stats context with dependencies
+    // 2. Build stats context
     let ctx = StatsContext::from_config(&config);
 
-    // 3. Run stats with context
-    run_stats_with_context(args, cli, &config, &ctx, &cache, &project_root)
-}
-
-/// Internal implementation accepting injectable context (for testing).
-///
-/// This function contains the core stats logic and accepts pre-built dependencies,
-/// enabling unit testing with custom/mock components.
-pub(crate) fn run_stats_with_context(
-    args: &StatsArgs,
-    cli: &Cli,
-    config: &crate::config::Config,
-    ctx: &StatsContext,
-    cache: &Mutex<Cache>,
-    project_root: &Path,
-) -> crate::Result<i32> {
-    // 1. Prepare exclude patterns from scanner config
+    // 3. Prepare exclude patterns
     let mut exclude_patterns = config.scanner.exclude.clone();
-    exclude_patterns.extend(args.exclude.clone());
+    exclude_patterns.extend(common.exclude.clone());
 
-    // 2. Determine paths to scan
-    let paths_to_scan = resolve_scan_paths(&args.paths, &args.include);
+    // 4. Determine paths to scan
+    let paths_to_scan = resolve_scan_paths(&common.paths, &common.include);
 
-    // 3. Scan directories (respecting .gitignore if enabled)
-    // Scanner returns ALL files, extension filtering is done below
-    let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
+    // 5. Scan directories
+    let use_gitignore = config.scanner.gitignore && !common.no_gitignore;
     let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
-    // 4. Process each file and collect statistics (parallel with rayon) using injected context
+    // 6. Process files in parallel
     let reader = RealFileReader;
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| {
-            // Filter by extension using context's allowed_extensions
             if ctx.allowed_extensions.is_empty() {
                 return true;
             }
@@ -122,107 +335,24 @@ pub(crate) fn run_stats_with_context(
                 .is_some_and(|ext| ctx.allowed_extensions.contains(ext))
         })
         .filter_map(|file_path| {
-            let result = collect_file_stats(file_path, &ctx.registry, cache, &reader);
+            let result = collect_file_stats(file_path, &ctx.registry, &cache, &reader);
             progress.inc();
             result
         })
         .collect();
     progress.finish();
 
-    // 5. Save cache if not disabled
-    if !args.no_cache
+    Ok((ProjectStatistics::new(file_stats), project_root, cache))
+}
+
+/// Save cache if caching is enabled.
+fn save_cache_if_enabled(common: &CommonStatsArgs, cache: &Mutex<Cache>, project_root: &Path) {
+    if !common.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
         let cache_path = state::cache_path(project_root);
         save_cache(&cache_path, &cache_guard);
     }
-
-    let project_stats = ProjectStatistics::new(file_stats);
-    let project_stats = match args.group_by {
-        GroupBy::Lang => project_stats.with_language_breakdown(),
-        GroupBy::Dir => project_stats.with_directory_breakdown_relative(Some(project_root)),
-        GroupBy::None => project_stats,
-    };
-    let project_stats = if let Some(n) = args.top {
-        project_stats.with_top_files(n)
-    } else {
-        project_stats
-    };
-
-    // 5.2 Trend tracking if enabled (--trend or --since implies trend)
-    let trend_enabled = args.trend || args.since.is_some();
-    let (project_stats, trend_history) = if trend_enabled {
-        let default_path = state::history_path(project_root);
-        let history_path = args.history_file.as_ref().unwrap_or(&default_path);
-        let mut history = TrendHistory::load_or_default(history_path);
-
-        // Capture git context for trend entry (commit hash and branch name)
-        let git_context = GitContext::from_path(project_root);
-
-        // Get current time for delta computation
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX_EPOCH")
-            .as_secs();
-
-        // Compute trend: either from --since duration or from latest entry
-        let trend = args.since.as_ref().map_or_else(
-            || history.compute_delta(&project_stats),
-            |since_str| match parse_duration(since_str) {
-                Ok(duration_secs) => {
-                    history.compute_delta_since(duration_secs, &project_stats, current_time)
-                }
-                Err(e) => {
-                    crate::output::print_warning_full(
-                        "Invalid --since duration",
-                        Some(&e.message()),
-                        Some("Falling back to latest entry comparison"),
-                    );
-                    history.compute_delta(&project_stats)
-                }
-            },
-        );
-
-        // Add entry only if retention policy allows (respects min_interval_secs)
-        // Git context is captured to record commit hash and branch for later delta display
-        history.add_if_allowed_with_context(&project_stats, &config.trend, git_context.as_ref());
-
-        // Ensure parent directory exists before saving
-        if let Some(parent) = history_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-
-        // Save with retention policy applied (cleanup old entries)
-        let _ = history.save_with_retention(history_path, &config.trend);
-
-        // Only show trend if delta is significant (reduces noise from trivial changes)
-        let project_stats = if let Some(delta) = trend
-            && delta.is_significant(&config.trend)
-        {
-            project_stats.with_trend(delta)
-        } else {
-            project_stats
-        };
-
-        (project_stats, Some(history))
-    } else {
-        (project_stats, None)
-    };
-
-    // 6. Format output
-    let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_output(
-        args.format,
-        &project_stats,
-        color_mode,
-        Some(project_root),
-        trend_history.as_ref(),
-    )?;
-
-    // 7. Write output
-    write_output(args.output.as_deref(), &output, cli.quiet)?;
-
-    Ok(EXIT_SUCCESS)
 }
 
 fn collect_file_stats(
@@ -239,13 +369,16 @@ fn collect_file_stats(
     })
 }
 
+/// Kept for backward compatibility with existing tests.
+#[cfg(test)]
 pub(crate) fn format_stats_output(
-    format: OutputFormat,
+    format: crate::output::OutputFormat,
     stats: &ProjectStatistics,
     color_mode: ColorMode,
     project_root: Option<&Path>,
     trend_history: Option<&TrendHistory>,
 ) -> crate::Result<String> {
+    use crate::output::OutputFormat;
     match format {
         OutputFormat::Text => StatsTextFormatter::new(color_mode)
             .with_project_root(project_root.map(Path::to_path_buf))
@@ -274,25 +407,8 @@ pub(crate) fn format_stats_output(
 // History Subcommand
 // ============================================================================
 
-/// Run the `stats history` subcommand.
-#[must_use]
-pub fn run_history(args: &HistoryArgs, cli: &Cli) -> i32 {
-    match run_history_impl(args, cli) {
-        Ok(exit_code) => exit_code,
-        Err(e) => {
-            crate::output::print_error_full(
-                e.error_type(),
-                &e.message(),
-                e.detail().as_deref(),
-                None,
-            );
-            EXIT_CONFIG_ERROR
-        }
-    }
-}
-
 // Note: `_cli` is reserved for future options like `--verbose`, `--quiet`, or `--color` support
-fn run_history_impl(args: &HistoryArgs, _cli: &Cli) -> crate::Result<i32> {
+fn run_history(args: &HistoryArgs, _cli: &Cli) -> crate::Result<i32> {
     // Discover project root for history file resolution
     let project_root = state::discover_project_root(Path::new("."));
 
@@ -324,7 +440,7 @@ fn format_history_text(entries: &[&TrendEntry], total_entries: usize) -> String 
     use std::fmt::Write;
 
     if entries.is_empty() {
-        return "No history entries found.\n\nRun `sloc-guard stats --trend` to start tracking."
+        return "No history entries found.\n\nRecord a snapshot with: sloc-guard snapshot"
             .to_string();
     }
 
