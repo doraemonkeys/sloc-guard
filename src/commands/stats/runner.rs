@@ -1,8 +1,6 @@
 use crate::cli::{
-    BreakdownArgs, BreakdownBy, Cli, FileSortOrder as CliFileSortOrder, FilesArgs, StatsAction,
-    StatsArgs, SummaryArgs, TrendArgs,
+    BreakdownArgs, BreakdownBy, Cli, FilesArgs, StatsAction, StatsArgs, SummaryArgs, TrendArgs,
 };
-use crate::output::FileSortOrder;
 use crate::state;
 use crate::stats::{TrendHistory, parse_duration};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
@@ -67,26 +65,14 @@ fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
     let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
-    // Convert CLI sort order to output sort order and apply sorting
-    let sort_order = cli_sort_to_output_sort(args.sort);
-    let project_stats = project_stats.with_sorted_files(sort_order, args.top);
+    // Apply sorting with unified FileSortOrder type
+    let project_stats = project_stats.with_sorted_files(args.sort, args.top);
 
     let color_mode = color_choice_to_mode(cli.color);
     let output =
         format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
     println!("{output}");
     Ok(EXIT_SUCCESS)
-}
-
-/// Convert CLI's `FileSortOrder` to output module's `FileSortOrder`.
-const fn cli_sort_to_output_sort(cli_sort: CliFileSortOrder) -> FileSortOrder {
-    match cli_sort {
-        CliFileSortOrder::Code => FileSortOrder::Code,
-        CliFileSortOrder::Total => FileSortOrder::Total,
-        CliFileSortOrder::Comment => FileSortOrder::Comment,
-        CliFileSortOrder::Blank => FileSortOrder::Blank,
-        CliFileSortOrder::Name => FileSortOrder::Name,
-    }
 }
 
 // ============================================================================

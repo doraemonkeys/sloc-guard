@@ -6,7 +6,7 @@ use crate::error::Result;
 use crate::stats::TrendDelta;
 
 use super::super::path::display_path;
-use super::{DirectoryStats, LanguageStats, ProjectStatistics, StatsFormatter};
+use super::{DirectoryStats, LanguageStats, ProjectStatistics, StatsFormatter, StatsOutputMode};
 
 pub struct StatsJsonFormatter {
     project_root: Option<PathBuf>,
@@ -101,8 +101,8 @@ struct JsonFileStats {
 
 impl StatsFormatter for StatsJsonFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
-        // Detect files-only mode: files cleared and top_files populated (from with_sorted_files)
-        let is_files_only = stats.files.is_empty() && stats.top_files.is_some();
+        let is_files_only = stats.output_mode == StatsOutputMode::FilesOnly;
+        let is_summary_only = stats.output_mode == StatsOutputMode::SummaryOnly;
 
         // Include summary unless in files-only mode
         let summary = if is_files_only {
@@ -118,13 +118,28 @@ impl StatsFormatter for StatsJsonFormatter {
             })
         };
 
-        let output = JsonStatsOutput {
-            summary,
-            trend: stats.trend.as_ref().map(JsonTrendDelta::from),
-            by_language: stats.by_language.clone(),
-            by_directory: stats.by_directory.clone(),
-            top_files: stats.top_files.as_ref().map(|files| {
-                files
+        // Skip breakdown and file sections in summary-only mode
+        let (by_language, by_directory, top_files, files) = if is_summary_only {
+            (None, None, None, Vec::new())
+        } else {
+            (
+                stats.by_language.clone(),
+                stats.by_directory.clone(),
+                stats.top_files.as_ref().map(|files| {
+                    files
+                        .iter()
+                        .map(|f| JsonFileStats {
+                            path: self.display_path(&f.path),
+                            language: f.language.clone(),
+                            total: f.stats.total,
+                            code: f.stats.code,
+                            comment: f.stats.comment,
+                            blank: f.stats.blank,
+                        })
+                        .collect()
+                }),
+                stats
+                    .files
                     .iter()
                     .map(|f| JsonFileStats {
                         path: self.display_path(&f.path),
@@ -134,20 +149,17 @@ impl StatsFormatter for StatsJsonFormatter {
                         comment: f.stats.comment,
                         blank: f.stats.blank,
                     })
-                    .collect()
-            }),
-            files: stats
-                .files
-                .iter()
-                .map(|f| JsonFileStats {
-                    path: self.display_path(&f.path),
-                    language: f.language.clone(),
-                    total: f.stats.total,
-                    code: f.stats.code,
-                    comment: f.stats.comment,
-                    blank: f.stats.blank,
-                })
-                .collect(),
+                    .collect(),
+            )
+        };
+
+        let output = JsonStatsOutput {
+            summary,
+            trend: stats.trend.as_ref().map(JsonTrendDelta::from),
+            by_language,
+            by_directory,
+            top_files,
+            files,
         };
 
         Ok(serde_json::to_string_pretty(&output)?)

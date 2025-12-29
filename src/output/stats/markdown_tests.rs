@@ -137,3 +137,115 @@ fn markdown_formatter_without_trend() {
 
     assert!(!output.contains("### Changes"));
 }
+
+// ============================================================================
+// SummaryOnly mode tests
+// ============================================================================
+
+#[test]
+fn markdown_formatter_summary_only_shows_summary_section() {
+    let files = vec![
+        file_stats("main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("lib.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_summary_only();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
+
+    // Summary section should be present
+    assert!(output.contains("## SLOC Statistics"));
+    assert!(output.contains("### Summary"));
+    assert!(output.contains("| Total Files | 2 |"));
+    assert!(output.contains("| Total Lines | 150 |"));
+    assert!(output.contains("| Code | 120 |"));
+    assert!(output.contains("| Average Code Lines | 60.0 |"));
+}
+
+#[test]
+fn markdown_formatter_summary_only_skips_top_files() {
+    let files = vec![
+        file_stats("large.rs", 200, 150, 30, 20, "Rust"),
+        file_stats("small.rs", 50, 30, 10, 10, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_top_files(5)
+        .with_summary_only();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
+
+    // Top files section should NOT be present
+    assert!(
+        !output.contains("### Top"),
+        "Top files section should not appear in summary-only mode"
+    );
+    assert!(
+        !output.contains("large.rs"),
+        "File names should not appear in summary-only mode"
+    );
+}
+
+#[test]
+fn markdown_formatter_summary_only_skips_language_breakdown() {
+    let files = vec![
+        file_stats("main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("main.go", 50, 40, 5, 5, "Go"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_language_breakdown()
+        .with_summary_only();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
+
+    // Language breakdown should NOT be present
+    assert!(
+        !output.contains("### By Language"),
+        "Language breakdown should not appear in summary-only mode"
+    );
+}
+
+#[test]
+fn markdown_formatter_summary_only_skips_directory_breakdown() {
+    let files = vec![
+        file_stats("src/main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("tests/test.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_directory_breakdown()
+        .with_summary_only();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
+
+    // Directory breakdown should NOT be present
+    assert!(
+        !output.contains("### By Directory"),
+        "Directory breakdown should not appear in summary-only mode"
+    );
+}
+
+#[test]
+fn markdown_formatter_summary_only_preserves_trend() {
+    let files = vec![file_stats("test.rs", 100, 80, 15, 5, "Rust")];
+    let trend = TrendDelta {
+        files_delta: 5,
+        lines_delta: 100,
+        code_delta: 50,
+        comment_delta: 30,
+        blank_delta: 20,
+        previous_timestamp: None,
+        previous_git_ref: None,
+        previous_git_branch: None,
+    };
+
+    let stats = ProjectStatistics::new(files)
+        .with_trend(trend)
+        .with_summary_only();
+    let output = StatsMarkdownFormatter::new().format(&stats).unwrap();
+
+    // Trend section should still be present
+    assert!(
+        output.contains("### Changes"),
+        "Trend should be preserved in summary-only mode"
+    );
+    assert!(output.contains("| Files | +5 |"));
+    assert!(output.contains("| Code | +50 |"));
+}

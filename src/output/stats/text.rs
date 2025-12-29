@@ -6,7 +6,7 @@ use crate::error::Result;
 use super::super::path::display_path;
 use super::super::text::ColorMode;
 use super::super::trend_formatting::{TrendLineFormatter, format_trend_header};
-use super::{ProjectStatistics, StatsFormatter};
+use super::{ProjectStatistics, StatsFormatter, StatsOutputMode};
 
 /// Characters for rendering progress bars (using Unicode block elements).
 const PROGRESS_FILLED: char = '█';
@@ -138,43 +138,46 @@ impl StatsFormatter for StatsTextFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
         let mut output = Vec::new();
 
-        // Detect files-only mode: files cleared and top_files populated (from with_sorted_files)
-        let is_files_only = stats.files.is_empty() && stats.top_files.is_some();
+        let is_files_only = stats.output_mode == StatsOutputMode::FilesOnly;
+        let is_summary_only = stats.output_mode == StatsOutputMode::SummaryOnly;
 
-        // Show top files if available
-        if let Some(ref top_files) = stats.top_files {
-            // In files-only mode, show as file list without "Top N" header
-            if is_files_only {
-                writeln!(output, "Files ({} total):", top_files.len()).ok();
-                writeln!(output).ok();
+        // Skip file-related sections in summary-only mode
+        if !is_summary_only {
+            // Show top files if available
+            if let Some(ref top_files) = stats.top_files {
+                // In files-only mode, show as file list without "Top N" header
+                if is_files_only {
+                    writeln!(output, "Files ({} total):", top_files.len()).ok();
+                    writeln!(output).ok();
 
-                for file in top_files {
-                    writeln!(
-                        output,
-                        "  {} - {} code, {} total (comment={}, blank={})",
-                        self.display_path(&file.path),
-                        file.stats.code,
-                        file.stats.total,
-                        file.stats.comment,
-                        file.stats.blank
-                    )
-                    .ok();
+                    for file in top_files {
+                        writeln!(
+                            output,
+                            "  {} - {} code, {} total (comment={}, blank={})",
+                            self.display_path(&file.path),
+                            file.stats.code,
+                            file.stats.total,
+                            file.stats.comment,
+                            file.stats.blank
+                        )
+                        .ok();
+                    }
+                } else {
+                    writeln!(output, "Top {} Largest Files:", top_files.len()).ok();
+                    writeln!(output).ok();
+
+                    for (i, file) in top_files.iter().enumerate() {
+                        writeln!(
+                            output,
+                            "  {}. {} ({} lines)",
+                            i + 1,
+                            self.display_path(&file.path),
+                            file.stats.code
+                        )
+                        .ok();
+                    }
+                    writeln!(output).ok();
                 }
-            } else {
-                writeln!(output, "Top {} Largest Files:", top_files.len()).ok();
-                writeln!(output).ok();
-
-                for (i, file) in top_files.iter().enumerate() {
-                    writeln!(
-                        output,
-                        "  {}. {} ({} lines)",
-                        i + 1,
-                        self.display_path(&file.path),
-                        file.stats.code
-                    )
-                    .ok();
-                }
-                writeln!(output).ok();
             }
         }
 
@@ -183,28 +186,31 @@ impl StatsFormatter for StatsTextFormatter {
             return Ok(String::from_utf8_lossy(&output).to_string());
         }
 
-        // Show language breakdown if available
-        if let Some(ref by_language) = stats.by_language {
-            format_language_breakdown(&mut output, by_language, stats.total_code);
-        } else if let Some(ref by_directory) = stats.by_directory {
-            format_directory_breakdown(&mut output, by_directory, stats.total_code);
-        } else {
-            // Original behavior: show per-file stats
-            for file in &stats.files {
-                writeln!(
-                    output,
-                    "{}: {} lines (code={}, comment={}, blank={})",
-                    self.display_path(&file.path),
-                    file.stats.total,
-                    file.stats.code,
-                    file.stats.comment,
-                    file.stats.blank
-                )
-                .ok();
-            }
+        // Skip breakdown sections in summary-only mode
+        if !is_summary_only {
+            // Show language breakdown if available
+            if let Some(ref by_language) = stats.by_language {
+                format_language_breakdown(&mut output, by_language, stats.total_code);
+            } else if let Some(ref by_directory) = stats.by_directory {
+                format_directory_breakdown(&mut output, by_directory, stats.total_code);
+            } else {
+                // Original behavior: show per-file stats
+                for file in &stats.files {
+                    writeln!(
+                        output,
+                        "{}: {} lines (code={}, comment={}, blank={})",
+                        self.display_path(&file.path),
+                        file.stats.total,
+                        file.stats.code,
+                        file.stats.comment,
+                        file.stats.blank
+                    )
+                    .ok();
+                }
 
-            if !stats.files.is_empty() {
-                writeln!(output).ok();
+                if !stats.files.is_empty() {
+                    writeln!(output).ok();
+                }
             }
         }
 

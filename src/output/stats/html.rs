@@ -12,7 +12,7 @@ use super::super::html::{HTML_FOOTER, HTML_HEADER, html_escape};
 use super::super::path::display_path;
 use super::super::svg::{LanguageBreakdownChart, SvgElement, TrendLineChart};
 use super::super::trend_formatting::{format_delta, format_trend_header_markdown};
-use super::{ProjectStatistics, StatsFormatter};
+use super::{ProjectStatistics, StatsFormatter, StatsOutputMode};
 
 /// HTML formatter for project statistics.
 ///
@@ -386,17 +386,30 @@ impl StatsFormatter for StatsHtmlFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
         let mut output = String::new();
 
+        let is_files_only = stats.output_mode == StatsOutputMode::FilesOnly;
+        let is_summary_only = stats.output_mode == StatsOutputMode::SummaryOnly;
+
         // HTML header with styles
         output.push_str(HTML_HEADER);
 
-        // Replace the title for stats report
-        // Note: HTML_HEADER has "SLOC Guard Report" - we'll leave it as is for consistency
+        // In files-only mode, skip summary and show only file list
+        if is_files_only {
+            self.write_top_files(&mut output, stats);
+            output.push_str(HTML_FOOTER);
+            return Ok(output);
+        }
 
-        // Summary cards
+        // Summary cards (always shown unless files-only mode)
         Self::write_summary_cards(&mut output, stats);
 
         // Trend section if available
         Self::write_trend_section(&mut output, stats);
+
+        // Skip detailed sections in summary-only mode
+        if is_summary_only {
+            output.push_str(HTML_FOOTER);
+            return Ok(output);
+        }
 
         // Charts section (language breakdown chart, trend chart)
         self.write_charts_section(&mut output, stats);

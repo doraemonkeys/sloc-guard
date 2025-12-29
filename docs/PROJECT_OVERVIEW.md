@@ -24,7 +24,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `git/diff` | `GitDiff` - gix-based diff between committed trees (`--diff ref` or `--diff base..target` for explicit range) and staged files detection (`--staged` mode); `GitContext` - current commit hash and branch for trend entries |
 | `baseline`/`cache` | `Baseline` (Content/Structure entries), `Cache` (mtime+size validation, file locking for concurrent access) |
 | `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection |
-| `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter` (with `with_stats()` for project stats, `with_trend_history()` for trend chart, `with_project_root()` for relative paths); `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `StatsHtmlFormatter` (with `with_project_root()`, `with_trend_history()` for trend chart); `ScanProgress` (progress bar); `ErrorOutput` (colored error/warning output); `path.rs`: `display_path()` for relative path output with forward-slash normalization; `trend_formatting.rs`: relative time, trend arrows/colors/percentages; `svg/`: chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart, FileSizeHistogram, LanguageBreakdownChart, TrendLineChart with delta indicators and smart X-axis labels, SvgBuilder) with viewBox scaling, CSS variables, hover effects, print styles, accessibility |
+| `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter` (with `with_stats()` for project stats, `with_trend_history()` for trend chart, `with_project_root()` for relative paths); `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `StatsHtmlFormatter` (with `with_project_root()`, `with_trend_history()` for trend chart, use `output_mode` field); `ScanProgress` (progress bar); `ErrorOutput` (colored error/warning output); `path.rs`: `display_path()` for relative path output with forward-slash normalization; `trend_formatting.rs`: relative time, trend arrows/colors/percentages; `svg/`: chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart, FileSizeHistogram, LanguageBreakdownChart, TrendLineChart with delta indicators and smart X-axis labels, SvgBuilder) with viewBox scaling, CSS variables, hover effects, print styles, accessibility |
 | `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `message()` includes error kind for `FileRead`/`Io` and glob details for `InvalidPattern` |
 | `commands/*` | `run_check`, `run_stats`, `run_snapshot`, `run_config`, `run_init`, `run_explain`; check split into: `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_validation.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
@@ -85,8 +85,9 @@ ColorMode::Auto | Always | Never
 
 // Stats
 FileStatistics { path, stats, language }
-ProjectStatistics { files, total_*, by_language, by_directory, top_files, average_code_lines, trend }
-FileSortOrder::Code | Total | Comment | Blank | Name  // --sort option for stats files
+ProjectStatistics { files, total_*, by_language, by_directory, top_files, average_code_lines, trend, output_mode }
+FileSortOrder::Code | Total | Comment | Blank | Name  // --sort option for stats files (unified: output re-exported via cli)
+StatsOutputMode::Full | SummaryOnly | FilesOnly  // Explicit output mode for formatters
 GroupBy::None | Lang | Dir
 
 // Trend (state::history_path() → .git/sloc-guard/history.json or .sloc-guard/history.json)

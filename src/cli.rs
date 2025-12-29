@@ -4,6 +4,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 
 use crate::output::OutputFormat;
 
+// Re-export FileSortOrder from output module for unified usage
+pub use crate::output::FileSortOrder;
+
 /// Grouping mode for stats command
 #[derive(Debug, Clone, Copy, Default, ValueEnum)]
 pub enum GroupBy {
@@ -292,22 +295,6 @@ pub enum HistoryOutputFormat {
     Text,
     /// JSON output
     Json,
-}
-
-/// Sort order for files subcommand
-#[derive(Debug, Clone, Copy, Default, ValueEnum, PartialEq, Eq)]
-pub enum FileSortOrder {
-    /// Sort by code lines (default)
-    #[default]
-    Code,
-    /// Sort by total lines
-    Total,
-    /// Sort by comment lines
-    Comment,
-    /// Sort by blank lines
-    Blank,
-    /// Sort alphabetically by name
-    Name,
 }
 
 /// Grouping mode for breakdown subcommand

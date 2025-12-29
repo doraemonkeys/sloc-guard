@@ -24,7 +24,7 @@ pub use sarif::SarifFormatter;
 pub use stats::{
     DirectoryStats, FileSortOrder, FileStatistics, LanguageStats, ProjectStatistics,
     StatsFormatter, StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter,
-    StatsTextFormatter,
+    StatsOutputMode, StatsTextFormatter,
 };
 pub use text::{ColorMode, TextFormatter};
 

@@ -349,3 +349,136 @@ fn json_formatter_summary_only_no_empty_files() {
         "files should be omitted or empty for summary-only mode"
     );
 }
+
+// ============================================================================
+// SummaryOnly mode tests (explicit mode handling)
+// ============================================================================
+
+#[test]
+fn json_formatter_summary_only_skips_top_files() {
+    let files = vec![
+        file_stats("large.rs", 200, 150, 30, 20, "Rust"),
+        file_stats("small.rs", 50, 30, 10, 10, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_top_files(5)
+        .with_summary_only();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    // Summary should be present
+    assert!(parsed.get("summary").is_some());
+
+    // top_files should be omitted in summary-only mode
+    assert!(
+        parsed.get("top_files").is_none(),
+        "top_files should be omitted in summary-only mode"
+    );
+}
+
+#[test]
+fn json_formatter_summary_only_skips_language_breakdown() {
+    let files = vec![
+        file_stats("main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("main.go", 50, 40, 5, 5, "Go"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_language_breakdown()
+        .with_summary_only();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    // Summary should be present
+    assert!(parsed.get("summary").is_some());
+
+    // by_language should be omitted in summary-only mode
+    assert!(
+        parsed.get("by_language").is_none(),
+        "by_language should be omitted in summary-only mode"
+    );
+}
+
+#[test]
+fn json_formatter_summary_only_skips_directory_breakdown() {
+    let files = vec![
+        file_stats("src/main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("tests/test.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_directory_breakdown()
+        .with_summary_only();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    // Summary should be present
+    assert!(parsed.get("summary").is_some());
+
+    // by_directory should be omitted in summary-only mode
+    assert!(
+        parsed.get("by_directory").is_none(),
+        "by_directory should be omitted in summary-only mode"
+    );
+}
+
+#[test]
+fn json_formatter_summary_only_preserves_trend() {
+    let files = vec![file_stats("test.rs", 100, 80, 15, 5, "Rust")];
+    let trend = TrendDelta {
+        files_delta: 5,
+        lines_delta: 100,
+        code_delta: 50,
+        comment_delta: 30,
+        blank_delta: 20,
+        previous_timestamp: Some(12345),
+        previous_git_ref: None,
+        previous_git_branch: None,
+    };
+
+    let stats = ProjectStatistics::new(files)
+        .with_trend(trend)
+        .with_summary_only();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    // Summary should be present
+    assert!(parsed.get("summary").is_some());
+
+    // Trend should still be present in summary-only mode
+    assert!(
+        parsed.get("trend").is_some(),
+        "trend should be preserved in summary-only mode"
+    );
+    let trend = parsed.get("trend").unwrap();
+    assert_eq!(trend.get("files").unwrap().as_i64().unwrap(), 5);
+    assert_eq!(trend.get("code").unwrap().as_i64().unwrap(), 50);
+}
+
+#[test]
+fn json_formatter_summary_only_includes_average_code_lines() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 10, 10, "Rust"),
+        file_stats("b.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_summary_only();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let summary = parsed.get("summary").expect("summary should be present");
+
+    // Average code lines should be computed and included
+    let avg = summary
+        .get("average_code_lines")
+        .expect("average_code_lines should be present");
+    assert!(
+        (avg.as_f64().unwrap() - 60.0).abs() < 0.1,
+        "average should be 60.0 ((80+40)/2)"
+    );
+}

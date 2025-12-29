@@ -105,14 +105,13 @@ Add `[stats.report]` config section:
 - `trend_since` - default comparison period
 - Validation for exclude values, breakdown_by values, and trend_since format
 
-### Task 21.10: Stats Output Refactoring
+### Task 21.10: Stats Output Refactoring ✅
 
 Clean up DRY violations and implicit state detection:
 - Unify `FileSortOrder` enum: re-export `output::stats::FileSortOrder` from CLI, remove duplicate
 - Add `StatsOutputMode` enum (`Full`, `SummaryOnly`, `FilesOnly`) to `ProjectStatistics`
 - Replace fragile `files.is_empty() && top_files.is_some()` detection with explicit `output_mode` field
 - Use `std::mem::take` in `with_sorted_files` instead of `.clone()` + clear
-- (Optional) Parameterize CLI sort order tests
 
 ---
 
@@ -120,5 +119,5 @@ Clean up DRY violations and implicit state detection:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, 21.10 |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
 

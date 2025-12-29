@@ -440,7 +440,50 @@ fn with_summary_only_preserves_trend() {
 // Sorted files tests (stats files subcommand)
 // ============================================================================
 
-use crate::output::stats::FileSortOrder;
+use crate::output::stats::{FileSortOrder, StatsOutputMode};
+
+// ============================================================================
+// Output mode tests
+// ============================================================================
+
+#[test]
+fn new_has_full_output_mode() {
+    let files = vec![file_stats("a.rs", 100, 80, 15, 5, "Rust")];
+    let stats = ProjectStatistics::new(files);
+    assert_eq!(stats.output_mode, StatsOutputMode::Full);
+}
+
+#[test]
+fn with_sorted_files_sets_files_only_mode() {
+    let files = vec![file_stats("a.rs", 100, 80, 15, 5, "Rust")];
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Code, None);
+    assert_eq!(stats.output_mode, StatsOutputMode::FilesOnly);
+}
+
+#[test]
+fn with_summary_only_sets_summary_only_mode() {
+    let files = vec![file_stats("a.rs", 100, 80, 15, 5, "Rust")];
+    let stats = ProjectStatistics::new(files).with_summary_only();
+    assert_eq!(stats.output_mode, StatsOutputMode::SummaryOnly);
+}
+
+#[test]
+fn with_language_breakdown_preserves_full_mode() {
+    let files = vec![file_stats("a.rs", 100, 80, 15, 5, "Rust")];
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    assert_eq!(stats.output_mode, StatsOutputMode::Full);
+}
+
+#[test]
+fn with_top_files_preserves_full_mode() {
+    let files = vec![file_stats("a.rs", 100, 80, 15, 5, "Rust")];
+    let stats = ProjectStatistics::new(files).with_top_files(5);
+    assert_eq!(stats.output_mode, StatsOutputMode::Full);
+}
+
+// ============================================================================
+// Sorted files tests (stats files subcommand)
+// ============================================================================
 
 #[test]
 fn with_sorted_files_default_code_order() {

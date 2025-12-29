@@ -103,19 +103,8 @@ fn format_with_language_breakdown() {
 #[test]
 fn format_empty_language_breakdown_omitted() {
     // Create stats without files (empty project)
-    let stats = ProjectStatistics {
-        files: vec![],
-        total_files: 0,
-        total_lines: 0,
-        total_code: 0,
-        total_comment: 0,
-        total_blank: 0,
-        by_language: Some(vec![]), // Empty language breakdown
-        by_directory: None,
-        top_files: None,
-        average_code_lines: None,
-        trend: None,
-    };
+    let mut stats = ProjectStatistics::new(vec![]);
+    stats.by_language = Some(vec![]); // Empty language breakdown
 
     let formatter = StatsHtmlFormatter::new();
     let output = formatter.format(&stats).unwrap();
@@ -305,26 +294,15 @@ fn format_no_charts_when_no_data() {
 
 #[test]
 fn format_escapes_special_characters_in_language() {
-    let stats = ProjectStatistics {
-        files: vec![],
-        total_files: 0,
-        total_lines: 0,
-        total_code: 0,
-        total_comment: 0,
-        total_blank: 0,
-        by_language: Some(vec![LanguageStats {
-            language: "C++ <special>".to_string(),
-            files: 1,
-            total_lines: 100,
-            code: 80,
-            comment: 15,
-            blank: 5,
-        }]),
-        by_directory: None,
-        top_files: None,
-        average_code_lines: None,
-        trend: None,
-    };
+    let mut stats = ProjectStatistics::new(vec![]);
+    stats.by_language = Some(vec![LanguageStats {
+        language: "C++ <special>".to_string(),
+        files: 1,
+        total_lines: 100,
+        code: 80,
+        comment: 15,
+        blank: 5,
+    }]);
 
     let formatter = StatsHtmlFormatter::new();
     let output = formatter.format(&stats).unwrap();
@@ -336,26 +314,15 @@ fn format_escapes_special_characters_in_language() {
 
 #[test]
 fn format_escapes_special_characters_in_directory() {
-    let stats = ProjectStatistics {
-        files: vec![],
-        total_files: 0,
-        total_lines: 0,
-        total_code: 0,
-        total_comment: 0,
-        total_blank: 0,
-        by_language: None,
-        by_directory: Some(vec![DirectoryStats {
-            directory: "src/<test>".to_string(),
-            files: 1,
-            total_lines: 100,
-            code: 80,
-            comment: 15,
-            blank: 5,
-        }]),
-        top_files: None,
-        average_code_lines: None,
-        trend: None,
-    };
+    let mut stats = ProjectStatistics::new(vec![]);
+    stats.by_directory = Some(vec![DirectoryStats {
+        directory: "src/<test>".to_string(),
+        files: 1,
+        total_lines: 100,
+        code: 80,
+        comment: 15,
+        blank: 5,
+    }]);
 
     let formatter = StatsHtmlFormatter::new();
     let output = formatter.format(&stats).unwrap();
@@ -431,6 +398,93 @@ fn format_trend_delta_css_classes() {
     // Verify negative values have delta-decrease class
     // Lines delta (-10) should be in a delta-decrease card
     assert!(output.contains(r#"class="summary-card delta-decrease">"#));
+}
+
+// ============================================================================
+// Output Mode: SummaryOnly
+// ============================================================================
+
+#[test]
+fn format_summary_only_mode_omits_detailed_sections() {
+    let stats = ProjectStatistics::new(sample_file_statistics())
+        .with_language_breakdown()
+        .with_top_files(5)
+        .with_summary_only();
+
+    let formatter = StatsHtmlFormatter::new();
+    let output = formatter.format(&stats).unwrap();
+
+    // Summary cards should be present
+    assert!(output.contains("Total Files"));
+    assert!(output.contains("Total Lines"));
+    assert!(output.contains("Code"));
+
+    // Detailed sections should NOT be present
+    assert!(!output.contains("Language Breakdown"));
+    assert!(!output.contains("Top"));
+    assert!(!output.contains("Largest Files"));
+    assert!(!output.contains("Visualizations"));
+}
+
+#[test]
+fn format_summary_only_includes_trend_if_available() {
+    let trend = crate::stats::TrendDelta {
+        files_delta: 5,
+        lines_delta: 100,
+        code_delta: 80,
+        comment_delta: 15,
+        blank_delta: 5,
+        previous_timestamp: None,
+        previous_git_ref: Some("abc123".to_string()),
+        previous_git_branch: Some("main".to_string()),
+    };
+
+    let stats = ProjectStatistics::new(sample_file_statistics())
+        .with_trend(trend)
+        .with_summary_only();
+
+    let formatter = StatsHtmlFormatter::new();
+    let output = formatter.format(&stats).unwrap();
+
+    // Trend section should still be visible in summary-only mode
+    assert!(output.contains("Changes since commit abc123 on main"));
+    assert!(output.contains("+80")); // code delta
+}
+
+// ============================================================================
+// Output Mode: FilesOnly
+// ============================================================================
+
+#[test]
+fn format_files_only_mode_shows_only_file_list() {
+    let stats = ProjectStatistics::new(sample_file_statistics())
+        .with_sorted_files(crate::output::FileSortOrder::Code, None);
+
+    let formatter = StatsHtmlFormatter::new();
+    let output = formatter.format(&stats).unwrap();
+
+    // File list should be present
+    assert!(output.contains("src/main.rs"));
+    assert!(output.contains("src/lib.rs"));
+
+    // Summary cards should NOT be present
+    assert!(!output.contains("Total Files"));
+    assert!(!output.contains("Total Lines"));
+    assert!(!output.contains("Summary"));
+}
+
+#[test]
+fn format_files_only_mode_omits_charts() {
+    let stats = ProjectStatistics::new(sample_file_statistics())
+        .with_language_breakdown()
+        .with_sorted_files(crate::output::FileSortOrder::Code, None);
+
+    let formatter = StatsHtmlFormatter::new();
+    let output = formatter.format(&stats).unwrap();
+
+    // Charts section should NOT be present
+    assert!(!output.contains("Visualizations"));
+    assert!(!output.contains("Language Breakdown"));
 }
 
 // ============================================================================

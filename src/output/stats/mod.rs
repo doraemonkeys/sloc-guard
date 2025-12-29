@@ -9,6 +9,7 @@ pub use json::StatsJsonFormatter;
 pub use markdown::StatsMarkdownFormatter;
 pub use statistics::{
     DirectoryStats, FileSortOrder, FileStatistics, LanguageStats, ProjectStatistics,
+    StatsOutputMode,
 };
 pub use text::StatsTextFormatter;
 

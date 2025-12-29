@@ -5,7 +5,7 @@ use crate::error::Result;
 
 use super::super::path::display_path;
 use super::super::trend_formatting::{format_delta, format_trend_header_markdown};
-use super::{ProjectStatistics, StatsFormatter};
+use super::{ProjectStatistics, StatsFormatter, StatsOutputMode};
 
 pub struct StatsMarkdownFormatter {
     project_root: Option<PathBuf>,
@@ -38,8 +38,8 @@ impl StatsFormatter for StatsMarkdownFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
         let mut output = String::new();
 
-        // Detect files-only mode: files cleared and top_files populated (from with_sorted_files)
-        let is_files_only = stats.files.is_empty() && stats.top_files.is_some();
+        let is_files_only = stats.output_mode == StatsOutputMode::FilesOnly;
+        let is_summary_only = stats.output_mode == StatsOutputMode::SummaryOnly;
 
         // In files-only mode, show only the file list without summary
         if is_files_only {
@@ -110,6 +110,11 @@ impl StatsFormatter for StatsMarkdownFormatter {
             .ok();
             writeln!(output, "| Blank | {} |", format_delta(trend.blank_delta)).ok();
             writeln!(output).ok();
+        }
+
+        // Skip detailed sections in summary-only mode
+        if is_summary_only {
+            return Ok(output);
         }
 
         // Top files if available

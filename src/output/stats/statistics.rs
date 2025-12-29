@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use clap::ValueEnum;
 use serde::Serialize;
 
 use crate::counter::LineStats;
@@ -30,7 +31,7 @@ fn truncate_path_to_depth(path: &str, depth: usize) -> String {
 }
 
 /// Sort order for file statistics output.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
 pub enum FileSortOrder {
     /// Sort by code lines descending (default)
     #[default]
@@ -43,6 +44,21 @@ pub enum FileSortOrder {
     Blank,
     /// Sort alphabetically by file name ascending
     Name,
+}
+
+/// Output mode for stats formatting.
+///
+/// Explicit mode eliminates fragile detection based on field state
+/// (e.g., `files.is_empty() && top_files.is_some()`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum StatsOutputMode {
+    /// Full output with summary and all available sections
+    #[default]
+    Full,
+    /// Summary only: no file list, no breakdown
+    SummaryOnly,
+    /// Files only: sorted file list without summary
+    FilesOnly,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +101,8 @@ pub struct ProjectStatistics {
     pub top_files: Option<Vec<FileStatistics>>,
     pub average_code_lines: Option<f64>,
     pub trend: Option<TrendDelta>,
+    /// Explicit output mode for formatters.
+    pub output_mode: StatsOutputMode,
 }
 
 impl ProjectStatistics {
@@ -113,6 +131,7 @@ impl ProjectStatistics {
             top_files: None,
             average_code_lines: None,
             trend: None,
+            output_mode: StatsOutputMode::Full,
         }
     }
 
@@ -218,9 +237,14 @@ impl ProjectStatistics {
     /// This method is used by `stats files` subcommand for custom sorting.
     /// Unlike `with_top_files`, this puts the sorted files in `top_files` field
     /// and marks the output as files-only mode (no summary appended).
+    ///
+    /// **Note**: This consumes `self.files` (via `std::mem::take`), so subsequent calls
+    /// to `with_language_breakdown()` or `with_directory_breakdown()` will produce
+    /// empty results. Call those methods before `with_sorted_files()` if needed.
     #[must_use]
     pub fn with_sorted_files(mut self, sort: FileSortOrder, limit: Option<usize>) -> Self {
-        let mut sorted_files = self.files.clone();
+        // Take ownership of files, avoiding clone
+        let mut sorted_files = std::mem::take(&mut self.files);
 
         match sort {
             FileSortOrder::Code => {
@@ -258,8 +282,7 @@ impl ProjectStatistics {
         };
 
         self.top_files = Some(sorted_files);
-        // Clear files to indicate files-only mode (formatters will use top_files)
-        self.files = Vec::new();
+        self.output_mode = StatsOutputMode::FilesOnly;
         self
     }
 
@@ -285,6 +308,7 @@ impl ProjectStatistics {
         self.top_files = None;
         self.by_language = None;
         self.by_directory = None;
+        self.output_mode = StatsOutputMode::SummaryOnly;
 
         self
     }
