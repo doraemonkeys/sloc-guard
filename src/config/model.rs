@@ -102,7 +102,7 @@ pub struct StatsReportConfig {
     pub exclude: Vec<String>,
 
     /// Number of top files to include in files section.
-    /// Default: 10
+    /// Default: 20
     #[serde(default)]
     pub top_count: Option<usize>,
 

@@ -9,6 +9,8 @@ use super::collection::{collect_stats_with_config, save_cache_if_enabled};
 use super::formatting::format_report_output;
 use crate::commands::context::{color_choice_to_mode, load_config, write_output};
 
+const DEFAULT_TOP_COUNT: usize = 20;
+
 /// Run the report subcommand: generate a comprehensive stats report.
 pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
     // Load config once and reuse for both report settings and stats collection
@@ -22,7 +24,10 @@ pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
 
     // Merge CLI flags with config (CLI takes precedence)
     let exclude_sections = build_exclude_set(&args.exclude_sections, &report_config.exclude);
-    let top_count = args.top.or(report_config.top_count).unwrap_or(10);
+    let top_count = args
+        .top
+        .or(report_config.top_count)
+        .unwrap_or(DEFAULT_TOP_COUNT);
     let breakdown_by = args
         .breakdown_by
         .or_else(|| parse_breakdown_by(report_config.breakdown_by.as_deref()))
