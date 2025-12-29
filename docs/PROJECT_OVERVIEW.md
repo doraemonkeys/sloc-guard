@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
 | `config/*` | `Config` (scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -43,7 +43,7 @@ ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
 TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta, auto_snapshot_on_check }  // Retention, significance, and auto-snapshot
 StatsConfig { report: StatsReportConfig }  // Stats command configuration
-StatsReportConfig { exclude, top_count, breakdown_by, trend_since }  // [stats.report] section for report defaults
+StatsReportConfig { exclude, top_count, breakdown_by, depth, trend_since }  // [stats.report] section for report defaults
 ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure, warn_at: absolute line threshold
 ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }  // [[content.rules]], warn_at takes precedence over warn_threshold
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }

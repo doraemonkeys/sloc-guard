@@ -343,6 +343,8 @@ fn cli_stats_report_with_config_flags() {
         "20",
         "--breakdown-by",
         "dir",
+        "--depth",
+        "2",
         "--since",
         "7d",
     ]);
@@ -355,6 +357,7 @@ fn cli_stats_report_with_config_flags() {
                 );
                 assert_eq!(report_args.top, Some(20));
                 assert_eq!(report_args.breakdown_by, Some(BreakdownBy::Dir));
+                assert_eq!(report_args.depth, Some(2));
                 assert_eq!(report_args.since, Some("7d".to_string()));
             }
             _ => panic!("Expected Report action"),

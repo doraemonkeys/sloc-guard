@@ -6,6 +6,7 @@ fn stats_config_default_all_empty() {
     assert!(config.report.exclude.is_empty());
     assert!(config.report.top_count.is_none());
     assert!(config.report.breakdown_by.is_none());
+    assert!(config.report.depth.is_none());
     assert!(config.report.trend_since.is_none());
 }
 
@@ -23,6 +24,7 @@ fn config_deserialize_stats_report_section() {
         exclude = ["trend", "breakdown"]
         top_count = 20
         breakdown_by = "dir"
+        depth = 2
         trend_since = "7d"
     "#;
 
@@ -30,6 +32,7 @@ fn config_deserialize_stats_report_section() {
     assert_eq!(config.stats.report.exclude, vec!["trend", "breakdown"]);
     assert_eq!(config.stats.report.top_count, Some(20));
     assert_eq!(config.stats.report.breakdown_by, Some("dir".to_string()));
+    assert_eq!(config.stats.report.depth, Some(2));
     assert_eq!(config.stats.report.trend_since, Some("7d".to_string()));
 }
 
@@ -44,6 +47,7 @@ fn config_deserialize_stats_report_partial() {
     assert!(config.stats.report.exclude.is_empty());
     assert_eq!(config.stats.report.top_count, Some(15));
     assert!(config.stats.report.breakdown_by.is_none());
+    assert!(config.stats.report.depth.is_none());
     assert!(config.stats.report.trend_since.is_none());
 }
 
@@ -89,6 +93,7 @@ fn stats_report_config_roundtrip_serialization() {
         exclude: vec!["trend".to_string()],
         top_count: Some(10),
         breakdown_by: Some("dir".to_string()),
+        depth: Some(3),
         trend_since: Some("30d".to_string()),
     };
 
@@ -96,6 +101,19 @@ fn stats_report_config_roundtrip_serialization() {
     let parsed: StatsReportConfig = serde_json::from_str(&json).unwrap();
 
     assert_eq!(original, parsed);
+}
+
+#[test]
+fn config_deserialize_stats_report_depth_only() {
+    let toml_str = r#"
+        [stats.report]
+        breakdown_by = "dir"
+        depth = 1
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.stats.report.breakdown_by, Some("dir".to_string()));
+    assert_eq!(config.stats.report.depth, Some(1));
 }
 
 #[test]

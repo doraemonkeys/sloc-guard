@@ -500,6 +500,10 @@ pub struct ReportArgs {
     /// Comparison period for trend section (e.g., 7d, 1w, 30d) (overrides config)
     #[arg(long, value_name = "DURATION")]
     pub since: Option<String>,
+
+    /// Maximum depth for directory grouping in breakdown section (only with --breakdown-by dir)
+    #[arg(long)]
+    pub depth: Option<usize>,
 }
 
 #[derive(Parser, Debug)]

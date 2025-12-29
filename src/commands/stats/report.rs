@@ -32,6 +32,7 @@ pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
         .breakdown_by
         .or_else(|| parse_breakdown_by(report_config.breakdown_by.as_deref()))
         .unwrap_or(BreakdownBy::Lang);
+    let breakdown_depth = args.depth.or(report_config.depth);
     let trend_since = args
         .since
         .as_ref()
@@ -67,10 +68,32 @@ pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
 
     // Breakdown section
     if !exclude_sections.contains("breakdown") {
+        // Warn if --depth is used with --breakdown-by lang (not applicable)
+        if let Some(depth) = breakdown_depth
+            && breakdown_by == BreakdownBy::Lang
+        {
+            crate::output::print_warning_full(
+                "--depth is only applicable with --breakdown-by dir",
+                Some(&format!("Ignoring depth: {depth}")),
+                None,
+            );
+        }
+
+        // Warn if depth = 0 (meaningless, behaves same as None)
+        if breakdown_depth == Some(0) && breakdown_by == BreakdownBy::Dir {
+            crate::output::print_warning_full(
+                "depth = 0 has no effect",
+                Some("Depth 0 behaves the same as no depth limit (shows full paths)"),
+                Some(
+                    "Use depth >= 1 for meaningful grouping (1 = top-level, 2 = two levels, etc.)",
+                ),
+            );
+        }
+
         project_stats = match breakdown_by {
             BreakdownBy::Lang => project_stats.with_language_breakdown(),
             BreakdownBy::Dir => {
-                project_stats.with_directory_breakdown_depth(Some(&project_root), None)
+                project_stats.with_directory_breakdown_depth(Some(&project_root), breakdown_depth)
             }
         };
     }

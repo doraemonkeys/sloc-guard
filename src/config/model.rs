@@ -112,6 +112,13 @@ pub struct StatsReportConfig {
     #[serde(default)]
     pub breakdown_by: Option<String>,
 
+    /// Maximum depth for directory grouping in breakdown section.
+    /// Only applicable when `breakdown_by = "dir"`.
+    /// 1 = top-level directories only, 2 = two levels, etc.
+    /// Default: None (shows full path of each file's parent directory without grouping).
+    #[serde(default)]
+    pub depth: Option<usize>,
+
     /// Default comparison period for trend section (e.g., "7d", "1w", "30d").
     /// When set, uses this duration for trend comparison instead of latest entry.
     #[serde(default)]

@@ -179,6 +179,25 @@ fn run_stats_breakdown_depth_with_lang_shows_warning() {
     assert_eq!(exit_code, EXIT_SUCCESS);
 }
 
+#[test]
+fn run_stats_breakdown_depth_zero_shows_warning() {
+    // depth = 0 is meaningless (behaves same as None), should warn
+    let args = StatsArgs {
+        action: StatsAction::Breakdown(BreakdownArgs {
+            common: make_common_args(vec![PathBuf::from("src")], Some(vec!["rs".to_string()])),
+            by: BreakdownBy::Dir,
+            depth: Some(0), // Should trigger warning
+            format: StatsOutputFormat::Text,
+        }),
+    };
+
+    // quiet = false to allow warnings
+    let cli = make_cli_for_stats(ColorChoice::Never, 0, false, true);
+    // Should still succeed despite warning
+    let exit_code = run_stats(&args, &cli);
+    assert_eq!(exit_code, EXIT_SUCCESS);
+}
+
 // ============================================================================
 // Trend Subcommand Tests
 // ============================================================================

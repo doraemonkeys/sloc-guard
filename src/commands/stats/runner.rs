@@ -92,6 +92,15 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
         );
     }
 
+    // Warn if depth = 0 (meaningless, behaves same as None)
+    if args.depth == Some(0) && args.by == BreakdownBy::Dir {
+        crate::output::print_warning_full(
+            "depth = 0 has no effect",
+            Some("Depth 0 behaves the same as no depth limit (shows full paths)"),
+            Some("Use depth >= 1 for meaningful grouping (1 = top-level, 2 = two levels, etc.)"),
+        );
+    }
+
     // Apply grouping
     let project_stats = match args.by {
         BreakdownBy::Lang => project_stats.with_language_breakdown(),
