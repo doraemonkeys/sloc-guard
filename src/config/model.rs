@@ -679,5 +679,5 @@ pub struct StructureRule {
 }
 
 #[cfg(test)]
-#[path = "model_tests.rs"]
-mod tests;
+#[path = "model_tests/mod.rs"]
+mod model_tests;
