@@ -22,59 +22,91 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 10-11**: IO Abstraction, Naming Convention, Co-location Check, Baseline Ratchet, Config Presets, Deny Patterns, Content Exclude, Granular Warn Thresholds
 - **Phase 12**: Rule Priority, State Consolidation, .gitignore, Remote Config (Offline/Hash Lock), --diff A..B Range
 - **Phase 13-15**: Project Root Discovery, Cache Optimization, File Locking, Path Matching, CheckOptions, Scanner Split, Colored Error Output
-- **Phase 18**: Unified Siblings Config (`siblings` array with Directed/Group rules)
-
-
-
-## Phase 16: Trend Enhancement (Pending)
-
-### ~~Task 16.6: History Command~~ ✅
+- **Phase 16-20**: Trend History Command, Relative Path Output, Unified Siblings Config, HTML Stats Format
 
 ---
 
-## Phase 19: Path Handling ✅
+## Phase 21: Stats Command Restructure (Pending)
 
-### ~~Task 19.1: Relative Path Output~~ ✅
+Refactor `stats` into explicit subcommands following design principles:
+- Subcommand = data scope (noun)
+- Flag = modifier/filter (verb/adjective)
+- Read/write separation
+- Bare `stats` requires subcommand
 
+### Task 21.1: CLI Subcommand Structure
 
+Restructure CLI to enforce subcommand requirement:
+- `stats summary` - project-level totals only
+- `stats files` - file list with `--top`, `--sort`, `--ext`
+- `stats breakdown` - grouped stats with `--by lang|dir`, `--depth`
+- `stats trend` - delta comparison with `--since`
+- `stats history` - list entries with `--limit` (existing, verify compatibility)
+- `stats report` - comprehensive output with `-o` for file output
+- Bare `stats` → error with subcommand list
+
+### Task 21.2: Stats Summary Subcommand
+
+Implement `stats summary`:
+- Output: Files, Code, Comments, Blank, Average metrics
+- Flags: `--format text|json|md`
+- No file list, no breakdown—summary only
+
+### Task 21.3: Stats Files Subcommand
+
+Implement `stats files` (migrate `--top N` functionality):
+- Default: all files sorted by code descending
+- Flags: `--top N`, `--sort code|total|comment|blank|name`, `--ext rs,go`, `--format`
+- No summary section appended
+
+### Task 21.4: Stats Breakdown Subcommand
+
+Implement `stats breakdown` (migrate `--group-by` functionality):
+- Default: by language
+- Flags: `--by lang|dir`, `--depth N` (for dir mode), `--format`
+- Visual progress bars in text output
+
+### Task 21.5: Stats Trend Subcommand
+
+Convert `--trend` flag to `stats trend` subcommand:
+- Read-only comparison with history
+- Flags: `--since <duration>` (7d, 1w, 12h), `--format`
+- Output: delta values with arrows, previous/current commit info
+
+### Task 21.6: Stats Report Subcommand
+
+Implement `stats report` for comprehensive output:
+- Combines summary + files + breakdown + trend
+- Flags: `--format text|json|md|html`, `-o <path>`
+- Content controlled by `[stats.report]` config (exclude list)
+
+### Task 21.7: Snapshot Command
+
+Create standalone `snapshot` command (read/write separation):
+- Records current stats to trend history
+- Respects `min_interval_secs` from config
+- Separate from stats viewing commands
+
+### Task 21.8: Trend Config Enhancement
+
+Extend `[trend]` config:
+- `auto_snapshot_on_check`: auto-record after successful `check`
+- Retention: `max_entries`, `max_age_days`, `min_interval_secs`
+- Significance: `min_code_delta` threshold
+
+### Task 21.9: Stats Report Config
+
+Add `[stats.report]` config section:
+- `exclude = []` - sections to omit (summary, files, breakdown, trend)
+- `top_count` - files section count
+- `breakdown_by` - default grouping
+- `trend_since` - default comparison period
 
 ---
-
-## Phase 18: Sibling Rules Redesign ✅
-
-### ~~Task 18.1: Unified Siblings Config~~ ✅
-
----
-
-
-
-## Phase 20: HTML Report Enhancement (Pending)
-
-### ~~Task 20.1: HTML Summary Stats~~ ✅
-
-### ~~Task 20.2: File Total Column~~ ✅
-
-### ~~Task 20.3: Stats HTML Format~~ ✅
-
-Implemented HTML output format for `stats` command (`--format html`):
-
-- Summary cards showing total files, lines, code, comments, blanks, and avg code/file
-- Trend delta section with colored cards when `--trend` is used
-- Language breakdown table when `--group-by lang`
-- Directory breakdown table when `--group-by dir`
-- Top files table when `--top N`
-- Inline SVG charts: language breakdown chart and trend line chart
-- Follows existing `HtmlFormatter` CSS styling and HTML template
 
 ## Priority Order
 
-| Priority                         | Tasks                                                        |
-| -------------------------------- | ------------------------------------------------------------ |
-| ~~**13. Sibling Rules Redesign**~~ | ~~18.1 Unified Siblings Config~~ ✅                          |
-| ~~**14. Path Output Fix**~~      | ~~19.1 Relative Path Output~~ ✅                              |
-| **15. HTML Report Enhancement**  | ~~20.1 HTML Summary Stats~~ ✅, ~~20.2 File Total Column~~ ✅, ~~20.3 Stats HTML Format~~ ✅ |
-
----
-
-
+| Priority               | Tasks                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| **16. Stats Restructure** | 21.1 CLI, 21.2 Summary, 21.3 Files, 21.4 Breakdown, 21.5 Trend, 21.6 Report, 21.7 Snapshot, 21.8-9 Config |
 
