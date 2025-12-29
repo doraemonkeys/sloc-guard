@@ -328,6 +328,42 @@ fn cli_stats_report_command() {
 }
 
 #[test]
+fn cli_stats_report_with_config_flags() {
+    use crate::cli::BreakdownBy;
+
+    let cli = Cli::parse_from([
+        "sloc-guard",
+        "stats",
+        "report",
+        "--exclude-section",
+        "trend",
+        "--exclude-section",
+        "files",
+        "--top",
+        "20",
+        "--breakdown-by",
+        "dir",
+        "--since",
+        "7d",
+    ]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Report(report_args) => {
+                assert_eq!(
+                    report_args.exclude_sections,
+                    vec!["trend".to_string(), "files".to_string()]
+                );
+                assert_eq!(report_args.top, Some(20));
+                assert_eq!(report_args.breakdown_by, Some(BreakdownBy::Dir));
+                assert_eq!(report_args.since, Some("7d".to_string()));
+            }
+            _ => panic!("Expected Report action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
 fn cli_stats_common_args() {
     let cli = Cli::parse_from([
         "sloc-guard",

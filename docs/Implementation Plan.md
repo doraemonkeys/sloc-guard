@@ -74,12 +74,12 @@ Convert `--trend` flag to `stats trend` subcommand:
 - Flags: `--since <duration>` (7d, 1w, 12h), `--format`
 - Output: delta values with arrows, previous/current commit info
 
-### Task 21.6: Stats Report Subcommand
+### Task 21.6: Stats Report Subcommand ✅
 
 Implement `stats report` for comprehensive output:
 - Combines summary + files + breakdown + trend
-- Flags: `--format text|json|md|html`, `-o <path>`
-- Content controlled by `[stats.report]` config (exclude list)
+- Flags: `--format text|json|md|html`, `-o <path>`, `--exclude-section`, `--top`, `--breakdown-by`, `--since`
+- Content controlled by `[stats.report]` config (exclude, top_count, breakdown_by, trend_since)
 
 ### Task 21.7: Snapshot Command ✅
 
@@ -119,5 +119,5 @@ Clean up DRY violations and implicit state detection:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-10 Config/Refactor |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, 21.8, 21.9, 21.10 |
 

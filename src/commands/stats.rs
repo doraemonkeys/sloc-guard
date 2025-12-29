@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -206,7 +207,31 @@ fn run_trend(args: &TrendArgs, cli: &Cli) -> crate::Result<i32> {
 // ============================================================================
 
 fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
-    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    // Load config once and reuse for both report settings and stats collection
+    let load_result = load_config(
+        args.common.config.as_deref(),
+        cli.no_config,
+        cli.no_extends,
+        cli.offline,
+    )?;
+    let report_config = &load_result.config.stats.report;
+
+    // Merge CLI flags with config (CLI takes precedence)
+    let exclude_sections = build_exclude_set(&args.exclude_sections, &report_config.exclude);
+    let top_count = args.top.or(report_config.top_count).unwrap_or(10);
+    let breakdown_by = args
+        .breakdown_by
+        .or_else(|| parse_breakdown_by(report_config.breakdown_by.as_deref()))
+        .unwrap_or(BreakdownBy::Lang);
+    let trend_since = args
+        .since
+        .as_ref()
+        .or(report_config.trend_since.as_ref())
+        .cloned();
+
+    // Pass the already-loaded config to avoid duplicate loading
+    let (project_stats, project_root, cache) =
+        collect_stats_with_config(&args.common, cli, load_result)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
     // Load history for trend
@@ -214,15 +239,61 @@ fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
     let history_path = args.history_file.as_ref().unwrap_or(&default_path);
     let history = TrendHistory::load_or_default(history_path);
 
-    // Build comprehensive stats with all sections
-    let project_stats = project_stats.with_language_breakdown().with_top_files(10);
+    // Warn if user tries to exclude summary (summary is always present in reports)
+    if exclude_sections.contains("summary") {
+        crate::output::print_warning_full(
+            "Cannot exclude 'summary' from report",
+            Some("Summary is always included in comprehensive reports"),
+            Some("Use 'stats files' or 'stats breakdown' for specific sections only"),
+        );
+    }
 
-    // Add trend if history exists
-    let project_stats = if let Some(delta) = history.compute_delta(&project_stats) {
-        project_stats.with_trend(delta)
-    } else {
-        project_stats
-    };
+    // Build stats with sections based on exclusion list
+    let mut project_stats = project_stats;
+
+    // Files section
+    if !exclude_sections.contains("files") {
+        project_stats = project_stats.with_top_files(top_count);
+    }
+
+    // Breakdown section
+    if !exclude_sections.contains("breakdown") {
+        project_stats = match breakdown_by {
+            BreakdownBy::Lang => project_stats.with_language_breakdown(),
+            BreakdownBy::Dir => {
+                project_stats.with_directory_breakdown_depth(Some(&project_root), None)
+            }
+        };
+    }
+
+    // Trend section
+    if !exclude_sections.contains("trend") {
+        let current_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time before UNIX_EPOCH")
+            .as_secs();
+
+        let trend = trend_since.as_ref().map_or_else(
+            || history.compute_delta(&project_stats),
+            |since_str| match parse_duration(since_str) {
+                Ok(duration_secs) => {
+                    history.compute_delta_since(duration_secs, &project_stats, current_time)
+                }
+                Err(e) => {
+                    crate::output::print_warning_full(
+                        "Invalid trend_since duration",
+                        Some(&e.message()),
+                        Some("Falling back to latest entry comparison"),
+                    );
+                    history.compute_delta(&project_stats)
+                }
+            },
+        );
+
+        if let Some(delta) = trend {
+            project_stats = project_stats.with_trend(delta);
+        }
+    }
 
     let color_mode = super::context::color_choice_to_mode(cli.color);
     let output = format_report_output(
@@ -237,6 +308,27 @@ fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
     write_output(args.output.as_deref(), &output, cli.quiet)?;
 
     Ok(EXIT_SUCCESS)
+}
+
+/// Build the set of sections to exclude, merging CLI args with config.
+fn build_exclude_set(cli_excludes: &[String], config_excludes: &[String]) -> HashSet<String> {
+    let mut excludes = HashSet::new();
+    for section in config_excludes {
+        excludes.insert(section.to_lowercase());
+    }
+    for section in cli_excludes {
+        excludes.insert(section.to_lowercase());
+    }
+    excludes
+}
+
+/// Parse `breakdown_by` string from config to enum.
+fn parse_breakdown_by(value: Option<&str>) -> Option<BreakdownBy> {
+    value.and_then(|v| match v.to_lowercase().as_str() {
+        "lang" | "language" => Some(BreakdownBy::Lang),
+        "dir" | "directory" => Some(BreakdownBy::Dir),
+        _ => None,
+    })
 }
 
 fn format_report_output(
@@ -272,24 +364,33 @@ fn collect_stats(
     common: &CommonStatsArgs,
     cli: &Cli,
 ) -> crate::Result<(ProjectStatistics, std::path::PathBuf, Mutex<Cache>)> {
-    // 1. Load configuration
     let load_result = load_config(
         common.config.as_deref(),
         cli.no_config,
         cli.no_extends,
         cli.offline,
     )?;
+    collect_stats_with_config(common, cli, load_result)
+}
+
+/// Collect file statistics using pre-loaded configuration.
+/// This avoids duplicate config loading when the caller already has a `LoadResult`.
+fn collect_stats_with_config(
+    common: &CommonStatsArgs,
+    cli: &Cli,
+    load_result: crate::config::LoadResult,
+) -> crate::Result<(ProjectStatistics, std::path::PathBuf, Mutex<Cache>)> {
     let mut config = load_result.config;
 
-    // 1a. Print preset info if a preset was used
+    // Print preset info if a preset was used
     if let Some(ref preset_name) = load_result.preset_used {
         print_preset_info(preset_name);
     }
 
-    // 1b. Discover project root
+    // Discover project root
     let project_root = state::discover_project_root(Path::new("."));
 
-    // 1c. Load cache if not disabled
+    // Load cache if not disabled
     let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
     let cache = if common.no_cache {
@@ -304,21 +405,21 @@ fn collect_stats(
         config.content.extensions.clone_from(cli_extensions);
     }
 
-    // 2. Build stats context
+    // Build stats context
     let ctx = StatsContext::from_config(&config);
 
-    // 3. Prepare exclude patterns
+    // Prepare exclude patterns
     let mut exclude_patterns = config.scanner.exclude.clone();
     exclude_patterns.extend(common.exclude.clone());
 
-    // 4. Determine paths to scan
+    // Determine paths to scan
     let paths_to_scan = resolve_scan_paths(&common.paths, &common.include);
 
-    // 5. Scan directories
+    // Scan directories
     let use_gitignore = config.scanner.gitignore && !common.no_gitignore;
     let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
-    // 6. Process files in parallel
+    // Process files in parallel
     let reader = RealFileReader;
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files

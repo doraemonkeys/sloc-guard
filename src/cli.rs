@@ -496,6 +496,23 @@ pub struct ReportArgs {
     /// Path to history file for trend data (default: auto-discovered in project state dir)
     #[arg(long, value_name = "PATH")]
     pub history_file: Option<PathBuf>,
+
+    /// Sections to exclude from report (can be specified multiple times).
+    /// Valid values: summary, files, breakdown, trend
+    #[arg(long = "exclude-section", value_name = "SECTION")]
+    pub exclude_sections: Vec<String>,
+
+    /// Number of top files to include (overrides config)
+    #[arg(long, value_name = "N")]
+    pub top: Option<usize>,
+
+    /// Grouping mode for breakdown section (overrides config)
+    #[arg(long, value_enum)]
+    pub breakdown_by: Option<BreakdownBy>,
+
+    /// Comparison period for trend section (e.g., 7d, 1w, 30d) (overrides config)
+    #[arg(long, value_name = "DURATION")]
+    pub since: Option<String>,
 }
 
 #[derive(Parser, Debug)]

@@ -77,6 +77,41 @@ pub struct TrendConfig {
     pub min_code_delta: Option<u64>,
 }
 
+/// Stats command configuration, specifically for report subcommand defaults.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StatsConfig {
+    /// Report subcommand configuration.
+    #[serde(default)]
+    pub report: StatsReportConfig,
+}
+
+/// Configuration for `stats report` subcommand defaults.
+///
+/// Controls which sections to include in comprehensive reports and their defaults.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct StatsReportConfig {
+    /// Sections to exclude from report output.
+    /// Valid values: "summary", "files", "breakdown", "trend"
+    #[serde(default)]
+    pub exclude: Vec<String>,
+
+    /// Number of top files to include in files section.
+    /// Default: 10
+    #[serde(default)]
+    pub top_count: Option<usize>,
+
+    /// Default grouping for breakdown section.
+    /// Valid values: "lang", "dir"
+    /// Default: "lang"
+    #[serde(default)]
+    pub breakdown_by: Option<String>,
+
+    /// Default comparison period for trend section (e.g., "7d", "1w", "30d").
+    /// When set, uses this duration for trend comparison instead of latest entry.
+    #[serde(default)]
+    pub trend_since: Option<String>,
+}
+
 /// Scanner configuration for physical file discovery.
 /// Scanner finds ALL files - no extension filtering here.
 /// This ensures Structure Guard sees the complete directory structure.
@@ -237,6 +272,10 @@ pub struct Config {
     /// Trend tracking configuration (history retention policy).
     #[serde(default)]
     pub trend: TrendConfig,
+
+    /// Stats command configuration.
+    #[serde(default)]
+    pub stats: StatsConfig,
 
     /// Custom language definitions (comment syntax).
     #[serde(default)]

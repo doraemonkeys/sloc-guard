@@ -38,10 +38,12 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Schema separates scanner/content/structure concerns
 // Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
-Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend }
+Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
 TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta }  // Retention and significance thresholds
+StatsConfig { report: StatsReportConfig }  // Stats command configuration
+StatsReportConfig { exclude, top_count, breakdown_by, trend_since }  // [stats.report] section for report defaults
 ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure, warn_at: absolute line threshold
 ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }  // [[content.rules]], warn_at takes precedence over warn_threshold
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
