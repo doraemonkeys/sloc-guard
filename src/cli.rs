@@ -362,7 +362,7 @@ pub struct SnapshotArgs {
     #[arg(long)]
     pub history_file: Option<PathBuf>,
 
-    /// Force snapshot even if min_interval_secs hasn't elapsed
+    /// Force snapshot even if `min_interval_secs` hasn't elapsed
     #[arg(long)]
     pub force: bool,
 

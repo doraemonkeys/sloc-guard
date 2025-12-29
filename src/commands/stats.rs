@@ -57,8 +57,12 @@ fn run_summary(args: &SummaryArgs, cli: &Cli) -> crate::Result<i32> {
     let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
+    // Summary only: no file list, no breakdown
+    let project_stats = project_stats.with_summary_only();
+
     let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    let output =
+        format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
     println!("{output}");
     Ok(EXIT_SUCCESS)
 }
@@ -96,7 +100,10 @@ fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
     if args.sort != FileSortOrder::Code {
         crate::output::print_warning_full(
             "--sort option is not yet implemented",
-            Some(&format!("Using default sort order (code lines). Requested: {:?}", args.sort)),
+            Some(&format!(
+                "Using default sort order (code lines). Requested: {:?}",
+                args.sort
+            )),
             None,
         );
     }
@@ -111,12 +118,13 @@ fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
     };
 
     let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    let output =
+        format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
     println!("{output}");
     Ok(EXIT_SUCCESS)
 }
 
-#[allow(unused_variables)] // _sort will be used in Task 21.3
+#[allow(unused_variables, clippy::missing_const_for_fn)] // _sort will be used in Task 21.3
 fn apply_file_sorting(stats: ProjectStatistics, _sort: FileSortOrder) -> ProjectStatistics {
     // ProjectStatistics::with_top_files sorts by code by default
     // TODO: Task 21.3 will implement custom sorting in ProjectStatistics
@@ -136,7 +144,10 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
     if args.depth.is_some() {
         crate::output::print_warning_full(
             "--depth option is not yet implemented",
-            Some(&format!("Showing all directory levels. Requested depth: {}", args.depth.unwrap())),
+            Some(&format!(
+                "Showing all directory levels. Requested depth: {}",
+                args.depth.unwrap()
+            )),
             None,
         );
     }
@@ -148,7 +159,8 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
     };
 
     let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    let output =
+        format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
     println!("{output}");
     Ok(EXIT_SUCCESS)
 }
@@ -198,7 +210,8 @@ fn run_trend(args: &TrendArgs, cli: &Cli) -> crate::Result<i32> {
     };
 
     let color_mode = super::context::color_choice_to_mode(cli.color);
-    let output = format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
+    let output =
+        format_stats_subcommand_output(args.format, &project_stats, color_mode, &project_root)?;
     println!("{output}");
     Ok(EXIT_SUCCESS)
 }

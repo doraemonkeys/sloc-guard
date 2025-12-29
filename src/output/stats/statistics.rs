@@ -161,6 +161,25 @@ impl ProjectStatistics {
         self.trend = Some(trend);
         self
     }
+
+    /// Return summary-only statistics (no file list, no breakdown).
+    /// Computes average code lines per file and clears detailed data.
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)] // Precision loss is acceptable for average calculation
+    pub fn with_summary_only(mut self) -> Self {
+        // Compute average if not already set
+        if self.average_code_lines.is_none() && self.total_files > 0 {
+            self.average_code_lines = Some(self.total_code as f64 / self.total_files as f64);
+        }
+
+        // Clear detailed data - formatters will skip these sections
+        self.files = Vec::new();
+        self.top_files = None;
+        self.by_language = None;
+        self.by_directory = None;
+
+        self
+    }
 }
 
 #[cfg(test)]

@@ -234,3 +234,92 @@ fn project_statistics_with_trend() {
     assert_eq!(trend.files_delta, 5);
     assert_eq!(trend.code_delta, 50);
 }
+
+// ============================================================================
+// Summary-only tests
+// ============================================================================
+
+#[test]
+fn with_summary_only_clears_files_and_breakdowns() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("b.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files)
+        .with_language_breakdown()
+        .with_top_files(10)
+        .with_summary_only();
+
+    // Summary totals are preserved
+    assert_eq!(stats.total_files, 2);
+    assert_eq!(stats.total_code, 120);
+    assert_eq!(stats.total_comment, 20);
+    assert_eq!(stats.total_blank, 10);
+
+    // Average is computed
+    assert!(stats.average_code_lines.is_some());
+    let avg = stats.average_code_lines.unwrap();
+    assert!((avg - 60.0).abs() < 0.001);
+
+    // Detailed data is cleared
+    assert!(stats.files.is_empty());
+    assert!(stats.top_files.is_none());
+    assert!(stats.by_language.is_none());
+    assert!(stats.by_directory.is_none());
+}
+
+#[test]
+fn with_summary_only_computes_average_if_not_set() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("b.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    // Without calling with_top_files (which normally computes average)
+    let stats = ProjectStatistics::new(files).with_summary_only();
+
+    // Average should be computed anyway
+    assert!(stats.average_code_lines.is_some());
+    let avg = stats.average_code_lines.unwrap();
+    assert!((avg - 60.0).abs() < 0.001);
+}
+
+#[test]
+fn with_summary_only_empty_project_no_average() {
+    let stats = ProjectStatistics::new(vec![]).with_summary_only();
+
+    assert_eq!(stats.total_files, 0);
+    assert!(stats.average_code_lines.is_none()); // No division by zero
+    assert!(stats.files.is_empty());
+}
+
+#[test]
+fn with_summary_only_preserves_existing_average() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("b.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    // Compute average via with_top_files first
+    let stats = ProjectStatistics::new(files).with_top_files(10);
+    let original_avg = stats.average_code_lines;
+
+    let stats = stats.with_summary_only();
+
+    // Average should be preserved, not recomputed
+    assert_eq!(stats.average_code_lines, original_avg);
+}
+
+#[test]
+fn with_summary_only_preserves_trend() {
+    let files = vec![file_stats("a.rs", 100, 80, 15, 5, "Rust")];
+
+    let stats = ProjectStatistics::new(files)
+        .with_trend(sample_trend_delta())
+        .with_summary_only();
+
+    // Trend should be preserved
+    assert!(stats.trend.is_some());
+    assert_eq!(stats.trend.as_ref().unwrap().code_delta, 50);
+}

@@ -67,4 +67,3 @@ fn test_print_snapshot_summary_with_git_context() {
 
     print_snapshot_summary(&stats, Some(&git_context), &history_path);
 }
-

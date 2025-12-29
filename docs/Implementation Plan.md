@@ -45,7 +45,7 @@ Restructure CLI to enforce subcommand requirement:
 - `stats report` - comprehensive output with `-o` for file output
 - Bare `stats` → error with subcommand list
 
-### Task 21.2: Stats Summary Subcommand
+### Task 21.2: Stats Summary Subcommand ✅
 
 Implement `stats summary`:
 - Output: Files, Code, Comments, Blank, Average metrics
@@ -109,5 +109,5 @@ Add `[stats.report]` config section:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, 21.2 Summary, 21.3 Files, 21.4 Breakdown, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-9 Config |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, 21.3 Files, 21.4 Breakdown, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-9 Config |
 
