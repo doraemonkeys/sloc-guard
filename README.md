@@ -67,7 +67,7 @@ sloc-guard init --detect
 sloc-guard check
 
 # 3. See project statistics
-sloc-guard stats
+sloc-guard stats summary
 ```
 
 That's it! sloc-guard will enforce a 600-line limit per file by default.
@@ -114,6 +114,7 @@ max_entries = 100                            # Keep last N snapshots
 max_age_days = 90                            # Delete older entries
 min_interval_secs = 3600                     # At most one entry per hour
 min_code_delta = 10                          # Ignore changes < N lines
+auto_snapshot_on_check = false               # Auto-record on successful check
 ```
 
 ---
@@ -203,29 +204,46 @@ sloc-guard check --baseline
 sloc-guard check --baseline --ratchet strict
 ```
 
-### Trend Tracking
+### Stats Subcommands
 
-Monitor codebase growth over time:
+Analyze your codebase with focused subcommands:
 
 ```bash
-# Show stats with trend delta
-sloc-guard stats --trend
+# Project-level summary
+sloc-guard stats summary
 
-# Compare against 7 days ago
-sloc-guard stats --since 7d
+# Top files by code lines
+sloc-guard stats files --top 10 --sort code
 
-# View history
+# Language or directory breakdown
+sloc-guard stats breakdown                   # By language (default)
+sloc-guard stats breakdown --by dir --depth 2
+
+# Trend comparison with history
+sloc-guard stats trend                       # vs. last entry
+sloc-guard stats trend --since 7d            # vs. 7 days ago
+
+# View historical snapshots
 sloc-guard stats history --limit 20
+
+# Comprehensive report (combines all above)
+sloc-guard stats report --format html -o report.html
 ```
 
-Output:
+Record a snapshot manually:
+```bash
+sloc-guard snapshot                          # Record current state to history
 ```
-📊 Project Statistics
-  Files: 142 (+3)
-  Code:  28,451 (+127)
-  Comments: 4,231 (-12)
-  
-  Trend: ↗ +0.4% code since last run
+
+Output example (`stats trend --since 7d`):
+```
+Trend (vs 7 days ago):
+  Code:     +127 lines (+0.4%)  ↑
+  Comments:  -12 lines (-0.3%)  ↓
+  Files:      +3               ↑
+
+  Previous: 2024-12-22 @ abc123f (main)
+  Current:  2024-12-29 @ def456a (main)
 ```
 
 ### Split Suggestions
@@ -307,15 +325,16 @@ multi_line_comments = [["/*", "*/"]]
 ## CLI Reference
 
 ```bash
-Usage: sloc-guard.exe [OPTIONS] <COMMAND>
+Usage: sloc-guard [OPTIONS] <COMMAND>
 
 Commands:
-  check    Check files against line count thresholds
-  stats    Display statistics without checking thresholds
-  init     Generate a default configuration file
-  config   Configuration file utilities
-  explain  Explain which rules apply to a path
-  help     Print this message or the help of the given subcommand(s)
+  check     Check files against line count thresholds
+  stats     Display statistics (subcommands: summary, files, breakdown, trend, history, report)
+  snapshot  Record a statistics snapshot to trend history
+  init      Generate a default configuration file
+  config    Configuration file utilities
+  explain   Explain which rules apply to a path
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
   -v, --verbose...     Increase output verbosity (-v, -vv for more)
@@ -327,6 +346,17 @@ Options:
   -h, --help           Print help (see more with '--help')
   -V, --version        Print version
 ```
+
+### Stats Subcommands
+
+| Subcommand | Description | Key Flags |
+|------------|-------------|-----------|
+| `summary`  | Project totals (files, code, comments, blanks) | `--format` |
+| `files`    | File list with sorting | `--top`, `--sort`, `--format` |
+| `breakdown`| Group by language or directory | `--by`, `--depth`, `--format` |
+| `trend`    | Delta comparison with history | `--since`, `--format` |
+| `history`  | List historical snapshots | `--limit`, `--format` |
+| `report`   | Comprehensive report | `--format`, `-o`, `--exclude-section` |
 
 
 
