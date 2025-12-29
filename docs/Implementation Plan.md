@@ -67,7 +67,7 @@ Implement `stats breakdown` (migrate `--group-by` functionality):
 - Flags: `--by lang|dir`, `--depth N` (for dir mode), `--format`
 - Visual progress bars in text output
 
-### Task 21.5: Stats Trend Subcommand
+### Task 21.5: Stats Trend Subcommand ✅
 
 Convert `--trend` flag to `stats trend` subcommand:
 - Read-only comparison with history
@@ -119,5 +119,5 @@ Clean up DRY violations and implicit state detection:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-10 Config/Refactor |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-10 Config/Refactor |
 

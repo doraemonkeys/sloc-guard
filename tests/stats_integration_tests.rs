@@ -239,6 +239,175 @@ fn stats_trend_with_since() {
         .success();
 }
 
+#[test]
+fn stats_trend_empty_history() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    // No history file exists - should succeed without trend delta
+    let history_path = fixture.path().join("nonexistent-history.json");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        // Should still show summary without trend section
+        .stdout(predicate::str::contains("Summary"));
+}
+
+#[test]
+fn stats_trend_json_format() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 40, "code": 35, "comment": 3, "blank": 2, "git_ref": "abc1234", "git_branch": "main"}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--format",
+            "json",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"summary\""))
+        .stdout(predicate::str::contains("\"trend\""));
+}
+
+#[test]
+fn stats_trend_markdown_format() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 40, "code": 35, "comment": 3, "blank": 2}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--format",
+            "md",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("# SLOC Statistics"));
+}
+
+#[test]
+fn stats_trend_shows_delta_values() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    // Create file with 50 lines of code
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let history_path = fixture.path().join("history.json");
+    // Previous entry had 30 code lines, so delta should be ~+20
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 40, "code": 30, "comment": 5, "blank": 5, "git_ref": "abc1234"}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        // Should show trend arrows and delta values
+        .stdout(predicate::str::contains("Changes since"))
+        .stdout(predicate::str::contains("Code:"));
+}
+
+#[test]
+fn stats_trend_with_git_context_display() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let history_path = fixture.path().join("history.json");
+    // Include git context in history entry
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 50, "code": 45, "comment": 3, "blank": 2, "git_ref": "a1b2c3d", "git_branch": "feature-branch"}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        // Should display git commit reference in header
+        .stdout(predicate::str::contains("a1b2c3d"));
+}
+
+#[test]
+fn stats_trend_invalid_since_falls_back() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 1, "total_lines": 50, "code": 45, "comment": 3, "blank": 2}]}"#,
+    ).unwrap();
+
+    // Invalid duration format should warn but succeed with fallback
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-cache",
+            "--since",
+            "invalid_duration",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        // Should still produce output (fallback to latest entry comparison)
+        .stdout(predicate::str::contains("Summary"));
+}
+
 // =============================================================================
 // History Subcommand Tests
 // =============================================================================
