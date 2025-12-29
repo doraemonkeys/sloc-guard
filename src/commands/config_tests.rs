@@ -325,3 +325,197 @@ fn validate_config_semantics_rule_warn_at_less_than_rule_max_lines_is_valid() {
     let result = validate_config_semantics(&config);
     assert!(result.is_ok());
 }
+
+// ============================================================================
+// Stats Report Config Validation Tests
+// ============================================================================
+
+#[test]
+fn validate_config_semantics_stats_report_exclude_valid_values() {
+    let mut config = Config::default();
+    config.stats.report.exclude = vec![
+        "summary".to_string(),
+        "files".to_string(),
+        "breakdown".to_string(),
+        "trend".to_string(),
+    ];
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_exclude_case_insensitive() {
+    let mut config = Config::default();
+    config.stats.report.exclude = vec!["SUMMARY".to_string(), "Trend".to_string()];
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_exclude_invalid_section() {
+    let mut config = Config::default();
+    config.stats.report.exclude = vec!["invalid_section".to_string()];
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("stats.report.exclude"));
+    assert!(err_msg.contains("invalid_section"));
+    assert!(err_msg.contains("summary, files, breakdown, trend"));
+}
+
+#[test]
+fn validate_config_semantics_stats_report_breakdown_by_valid_lang() {
+    let mut config = Config::default();
+    config.stats.report.breakdown_by = Some("lang".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_breakdown_by_valid_language() {
+    let mut config = Config::default();
+    config.stats.report.breakdown_by = Some("language".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_breakdown_by_valid_dir() {
+    let mut config = Config::default();
+    config.stats.report.breakdown_by = Some("dir".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_breakdown_by_valid_directory() {
+    let mut config = Config::default();
+    config.stats.report.breakdown_by = Some("directory".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_breakdown_by_case_insensitive() {
+    let mut config = Config::default();
+    config.stats.report.breakdown_by = Some("LANG".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_breakdown_by_invalid() {
+    let mut config = Config::default();
+    config.stats.report.breakdown_by = Some("invalid".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("stats.report.breakdown_by"));
+    assert!(err_msg.contains("invalid"));
+}
+
+#[test]
+fn validate_config_semantics_stats_report_trend_since_valid() {
+    let mut config = Config::default();
+    config.stats.report.trend_since = Some("7d".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_trend_since_valid_week() {
+    let mut config = Config::default();
+    config.stats.report.trend_since = Some("1w".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_trend_since_valid_hours() {
+    let mut config = Config::default();
+    config.stats.report.trend_since = Some("12h".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn validate_config_semantics_stats_report_trend_since_invalid() {
+    let mut config = Config::default();
+    config.stats.report.trend_since = Some("invalid".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("stats.report.trend_since"));
+    assert!(err_msg.contains("invalid"));
+}
+
+#[test]
+fn validate_config_semantics_stats_report_trend_since_missing_unit() {
+    let mut config = Config::default();
+    config.stats.report.trend_since = Some("30".to_string());
+
+    let result = validate_config_semantics(&config);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(err_msg.contains("stats.report.trend_since"));
+}
+
+#[test]
+fn format_config_text_shows_stats_report() {
+    let mut config = Config::default();
+    config.stats.report.top_count = Some(20);
+    config.stats.report.breakdown_by = Some("dir".to_string());
+    config.stats.report.exclude = vec!["trend".to_string()];
+    config.stats.report.trend_since = Some("7d".to_string());
+
+    let output = format_config_text(&config);
+    assert!(output.contains("[stats.report]"));
+    assert!(output.contains("top_count = 20"));
+    assert!(output.contains("breakdown_by = \"dir\""));
+    assert!(output.contains("trend"));
+    assert!(output.contains("trend_since = \"7d\""));
+}
+
+#[test]
+fn format_config_text_omits_empty_stats_report() {
+    let config = Config::default();
+
+    let output = format_config_text(&config);
+    // Default config has no stats.report settings, so section should be omitted
+    assert!(!output.contains("[stats.report]"));
+}
+
+#[test]
+fn validate_config_valid_full_config_with_stats_report() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("full_stats.toml");
+    let content = r#"
+version = "2"
+
+[content]
+max_lines = 500
+
+[stats.report]
+exclude = ["trend"]
+top_count = 15
+breakdown_by = "lang"
+trend_since = "30d"
+"#;
+    std::fs::write(&config_path, content).unwrap();
+
+    let result = run_config_validate_impl(&config_path);
+    assert!(result.is_ok());
+}

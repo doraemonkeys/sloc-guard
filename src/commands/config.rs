@@ -3,9 +3,16 @@ use std::path::Path;
 
 use crate::cli::{Cli, ConfigAction, ConfigOutputFormat};
 use crate::config::{Config, ConfigLoader, FileConfigLoader};
+use crate::stats::parse_duration;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
 use super::context::print_preset_info;
+
+/// Valid section names for `stats.report.exclude`.
+const VALID_REPORT_SECTIONS: &[&str] = &["summary", "files", "breakdown", "trend"];
+
+/// Valid values for `stats.report.breakdown_by`.
+const VALID_BREAKDOWN_BY: &[&str] = &["lang", "language", "dir", "directory"];
 
 #[must_use]
 pub fn run_config(args: &crate::cli::ConfigArgs, cli: &Cli) -> i32 {
@@ -102,6 +109,36 @@ pub(crate) fn validate_config_semantics(config: &Config) -> Result<()> {
         globset::Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
             pattern: pattern.clone(),
             source: e,
+        })?;
+    }
+
+    // Validate stats.report.exclude values
+    for section in &config.stats.report.exclude {
+        let normalized = section.to_lowercase();
+        if !VALID_REPORT_SECTIONS.contains(&normalized.as_str()) {
+            return Err(SlocGuardError::Config(format!(
+                "stats.report.exclude contains invalid section '{section}'. Valid values: {}",
+                VALID_REPORT_SECTIONS.join(", ")
+            )));
+        }
+    }
+
+    // Validate stats.report.breakdown_by value
+    if let Some(breakdown_by) = &config.stats.report.breakdown_by {
+        let normalized = breakdown_by.to_lowercase();
+        if !VALID_BREAKDOWN_BY.contains(&normalized.as_str()) {
+            return Err(SlocGuardError::Config(format!(
+                "stats.report.breakdown_by has invalid value '{breakdown_by}'. Valid values: lang, dir"
+            )));
+        }
+    }
+
+    // Validate stats.report.trend_since format
+    if let Some(trend_since) = &config.stats.report.trend_since {
+        parse_duration(trend_since).map_err(|_| {
+            SlocGuardError::Config(format!(
+                "stats.report.trend_since has invalid duration format '{trend_since}'. Expected format: <number><unit> (e.g., 7d, 1w, 12h)"
+            ))
         })?;
     }
 
@@ -245,6 +282,28 @@ pub(crate) fn format_config_text(config: &Config) -> String {
         }
         if let Some(warn_threshold) = config.structure.warn_threshold {
             let _ = writeln!(output, "  warn_threshold = {warn_threshold}");
+        }
+    }
+
+    // Stats section (if configured)
+    let report = &config.stats.report;
+    if !report.exclude.is_empty()
+        || report.top_count.is_some()
+        || report.breakdown_by.is_some()
+        || report.trend_since.is_some()
+    {
+        output.push_str("\n[stats.report]\n");
+        if !report.exclude.is_empty() {
+            let _ = writeln!(output, "  exclude = {:?}", report.exclude);
+        }
+        if let Some(top_count) = report.top_count {
+            let _ = writeln!(output, "  top_count = {top_count}");
+        }
+        if let Some(breakdown_by) = &report.breakdown_by {
+            let _ = writeln!(output, "  breakdown_by = \"{breakdown_by}\"");
+        }
+        if let Some(trend_since) = &report.trend_since {
+            let _ = writeln!(output, "  trend_since = \"{trend_since}\"");
         }
     }
 

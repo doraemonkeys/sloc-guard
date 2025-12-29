@@ -96,13 +96,14 @@ Extend `[trend]` config:
 - Retention: `max_entries`, `max_age_days`, `min_interval_secs`
 - Significance: `min_code_delta` threshold
 
-### Task 21.9: Stats Report Config
+### Task 21.9: Stats Report Config ✅
 
 Add `[stats.report]` config section:
 - `exclude = []` - sections to omit (summary, files, breakdown, trend)
 - `top_count` - files section count
 - `breakdown_by` - default grouping
 - `trend_since` - default comparison period
+- Validation for exclude values, breakdown_by values, and trend_since format
 
 ### Task 21.10: Stats Output Refactoring
 
@@ -119,5 +120,5 @@ Clean up DRY violations and implicit state detection:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, 21.9, 21.10 |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, 21.10 |
 
