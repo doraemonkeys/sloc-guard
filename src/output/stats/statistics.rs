@@ -9,6 +9,26 @@ use crate::stats::TrendDelta;
 
 use super::super::path::display_path;
 
+/// Truncate a path string to the specified depth.
+///
+/// # Arguments
+/// - `path`: Path string with forward-slash separators (from `display_path`)
+/// - `depth`: Maximum number of path components to keep (1 = first component only)
+///
+/// # Examples
+/// - `truncate_path_to_depth("src/commands/check", 1)` → `"src"`
+/// - `truncate_path_to_depth("src/commands/check", 2)` → `"src/commands"`
+/// - `truncate_path_to_depth(".", 1)` → `"."`
+fn truncate_path_to_depth(path: &str, depth: usize) -> String {
+    if path == "." || depth == 0 {
+        return path.to_string();
+    }
+
+    // split('/').take(depth) always produces at least one element when depth > 0
+    // because split yields at least one item (possibly empty string for leading /)
+    path.split('/').take(depth).collect::<Vec<_>>().join("/")
+}
+
 /// Sort order for file statistics output.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FileSortOrder {
@@ -123,20 +143,41 @@ impl ProjectStatistics {
 
     #[must_use]
     pub fn with_directory_breakdown(self) -> Self {
-        self.with_directory_breakdown_relative(None)
+        self.with_directory_breakdown_depth(None, None)
     }
 
     /// Compute directory breakdown with paths relative to project root.
     #[must_use]
-    pub fn with_directory_breakdown_relative(mut self, project_root: Option<&Path>) -> Self {
+    pub fn with_directory_breakdown_relative(self, project_root: Option<&Path>) -> Self {
+        self.with_directory_breakdown_depth(project_root, None)
+    }
+
+    /// Compute directory breakdown with optional depth limiting.
+    ///
+    /// - `project_root`: Optional project root for relative path display
+    /// - `max_depth`: Maximum directory depth to show (1 = top-level only, 2 = two levels, etc.)
+    ///   If None, shows the immediate parent directory of each file.
+    #[must_use]
+    pub fn with_directory_breakdown_depth(
+        mut self,
+        project_root: Option<&Path>,
+        max_depth: Option<usize>,
+    ) -> Self {
         let mut dir_map: HashMap<String, DirectoryStats> = HashMap::new();
 
         for file in &self.files {
-            // display_path returns "." for empty relative paths
-            let dir_name = file
+            // Get full relative path of directory
+            let dir_path = file
                 .path
                 .parent()
                 .map_or_else(|| ".".to_string(), |p| display_path(p, project_root));
+
+            // Apply depth limiting if specified
+            let dir_name = match max_depth {
+                Some(depth) if depth > 0 => truncate_path_to_depth(&dir_path, depth),
+                _ => dir_path,
+            };
+
             let entry = dir_map
                 .entry(dir_name.clone())
                 .or_insert_with(|| DirectoryStats {

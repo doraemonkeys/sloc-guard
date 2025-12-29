@@ -5,6 +5,8 @@ use crate::output::ColorMode;
 use crate::output::stats::{FileStatistics, ProjectStatistics, StatsFormatter, StatsTextFormatter};
 use crate::stats::TrendDelta;
 
+use super::{PROGRESS_EMPTY, PROGRESS_FILLED, render_progress_bar};
+
 // Helper function to create test FileStatistics
 fn file_stats(
     path: &str,
@@ -102,6 +104,141 @@ fn text_formatter_with_directory_breakdown() {
     assert!(output.contains("src (1 files):"));
     assert!(output.contains("tests (1 files):"));
     assert!(output.contains("Summary:"));
+}
+
+// ============================================================================
+// Progress bar tests
+// ============================================================================
+
+#[test]
+fn text_formatter_language_breakdown_shows_progress_bar() {
+    let files = vec![
+        file_stats("main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("main.go", 50, 20, 20, 10, "Go"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let output = formatter().format(&stats).unwrap();
+
+    // Progress bar characters should be present
+    assert!(output.contains('█'), "Should contain filled bar chars");
+    assert!(output.contains('░'), "Should contain empty bar chars");
+    // Rust has 80% of code (80/100)
+    assert!(output.contains("80.0%"), "Should show Rust percentage");
+    // Go has 20% of code (20/100)
+    assert!(output.contains("20.0%"), "Should show Go percentage");
+    // Should show code counts
+    assert!(output.contains("(80 code)"), "Should show Rust code count");
+    assert!(output.contains("(20 code)"), "Should show Go code count");
+}
+
+#[test]
+fn text_formatter_directory_breakdown_shows_progress_bar() {
+    let files = vec![
+        file_stats("src/main.rs", 100, 75, 15, 10, "Rust"),
+        file_stats("tests/test.rs", 50, 25, 15, 10, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown();
+    let output = formatter().format(&stats).unwrap();
+
+    // Progress bar characters should be present
+    assert!(output.contains('█'));
+    assert!(output.contains('░'));
+    // src has 75% of code (75/100)
+    assert!(output.contains("75.0%"));
+    // tests has 25% of code (25/100)
+    assert!(output.contains("25.0%"));
+}
+
+#[test]
+fn text_formatter_progress_bar_with_zero_code() {
+    let files = vec![file_stats("readme.md", 50, 0, 0, 50, "Markdown")];
+
+    let stats = ProjectStatistics::new(files).with_language_breakdown();
+    let output = formatter().format(&stats).unwrap();
+
+    // Should handle zero code gracefully (no division by zero)
+    assert!(output.contains("0.0%") || output.contains("░░░░░"));
+}
+
+// ============================================================================
+// render_progress_bar unit tests
+// ============================================================================
+
+#[test]
+fn render_progress_bar_zero_ratio_all_empty() {
+    let bar = render_progress_bar(0.0, 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 0);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_EMPTY).count(), 10);
+}
+
+#[test]
+fn render_progress_bar_full_ratio_all_filled() {
+    let bar = render_progress_bar(1.0, 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_EMPTY).count(), 0);
+}
+
+#[test]
+fn render_progress_bar_half_ratio() {
+    let bar = render_progress_bar(0.5, 10);
+    // 0.5 * 10 = 5.0, rounds to 5
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 5);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_EMPTY).count(), 5);
+}
+
+#[test]
+fn render_progress_bar_negative_ratio_clamped_to_zero() {
+    let bar = render_progress_bar(-0.5, 10);
+    // Negative values should be clamped to 0
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 0);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_EMPTY).count(), 10);
+}
+
+#[test]
+fn render_progress_bar_ratio_above_one_clamped() {
+    let bar = render_progress_bar(1.5, 10);
+    // Values > 1.0 should be clamped to 1.0
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_EMPTY).count(), 0);
+}
+
+#[test]
+fn render_progress_bar_rounding_boundary() {
+    // 0.44 * 10 = 4.4, rounds to 4
+    let bar = render_progress_bar(0.44, 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 4);
+
+    // 0.45 * 10 = 4.5, rounds to 5 (round half to even, but .round() uses away from zero)
+    let bar = render_progress_bar(0.45, 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 5);
+
+    // 0.46 * 10 = 4.6, rounds to 5
+    let bar = render_progress_bar(0.46, 10);
+    assert_eq!(bar.chars().filter(|&c| c == PROGRESS_FILLED).count(), 5);
+}
+
+#[test]
+fn render_progress_bar_width_zero() {
+    let bar = render_progress_bar(0.5, 0);
+    assert!(bar.is_empty());
+}
+
+#[test]
+fn render_progress_bar_preserves_total_width() {
+    // Ensure the bar always has exactly the specified width
+    for ratio in [0.0, 0.1, 0.25, 0.33, 0.5, 0.67, 0.75, 0.9, 1.0] {
+        let bar = render_progress_bar(ratio, 25);
+        let total_chars = bar
+            .chars()
+            .filter(|&c| c == PROGRESS_FILLED || c == PROGRESS_EMPTY)
+            .count();
+        assert_eq!(
+            total_chars, 25,
+            "Width should always be 25 for ratio {ratio}"
+        );
+    }
 }
 
 // ============================================================================

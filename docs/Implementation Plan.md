@@ -60,7 +60,7 @@ Implement `stats files` (migrate `--top N` functionality):
 - No summary section appended
 - Fix: `JsonStatsOutput.files` should use `Option<Vec>` + `skip_serializing_if` (avoid empty `"files": []` in summary-only JSON)
 
-### Task 21.4: Stats Breakdown Subcommand
+### Task 21.4: Stats Breakdown Subcommand ✅
 
 Implement `stats breakdown` (migrate `--group-by` functionality):
 - Default: by language
@@ -119,5 +119,5 @@ Clean up DRY violations and implicit state detection:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, 21.4 Breakdown, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-10 Config/Refactor |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-10 Config/Refactor |
 

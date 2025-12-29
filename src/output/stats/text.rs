@@ -8,6 +8,39 @@ use super::super::text::ColorMode;
 use super::super::trend_formatting::{TrendLineFormatter, format_trend_header};
 use super::{ProjectStatistics, StatsFormatter};
 
+/// Characters for rendering progress bars (using Unicode block elements).
+const PROGRESS_FILLED: char = '█';
+const PROGRESS_EMPTY: char = '░';
+const PROGRESS_WIDTH: usize = 25;
+
+/// Render a visual progress bar showing the percentage filled.
+///
+/// # Arguments
+/// - `filled_ratio`: Value between 0.0 and 1.0 representing the fill percentage.
+///   Values outside this range are clamped.
+/// - `width`: Total width of the bar in characters
+///
+/// # Safety justification for `#[allow]` attributes
+/// - `cast_precision_loss`: width is a small constant (25), so f64 can represent it exactly
+/// - `cast_possible_truncation`: result of `width * ratio` is at most `width` after clamping
+/// - `cast_sign_loss`: ratio is clamped to [0,1], so product is always non-negative
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+fn render_progress_bar(filled_ratio: f64, width: usize) -> String {
+    let filled_ratio = filled_ratio.clamp(0.0, 1.0);
+    let filled_count = (filled_ratio * width as f64).round() as usize;
+    let empty_count = width.saturating_sub(filled_count);
+
+    format!(
+        "{}{}",
+        PROGRESS_FILLED.to_string().repeat(filled_count),
+        PROGRESS_EMPTY.to_string().repeat(empty_count)
+    )
+}
+
 pub struct StatsTextFormatter {
     trend_formatter: TrendLineFormatter,
     project_root: Option<PathBuf>,
@@ -36,6 +69,68 @@ impl StatsTextFormatter {
 
     fn display_path(&self, path: &Path) -> String {
         display_path(path, self.project_root.as_deref())
+    }
+}
+
+/// Format language breakdown with progress bars.
+#[allow(clippy::cast_precision_loss)] // Precision loss acceptable: percentages for display
+fn format_language_breakdown(
+    output: &mut Vec<u8>,
+    by_language: &[super::LanguageStats],
+    total_code: usize,
+) {
+    writeln!(output, "By Language:").ok();
+    writeln!(output).ok();
+
+    for lang in by_language {
+        let ratio = if total_code > 0 {
+            lang.code as f64 / total_code as f64
+        } else {
+            0.0
+        };
+        let progress = render_progress_bar(ratio, PROGRESS_WIDTH);
+        let percent = ratio * 100.0;
+
+        writeln!(output, "{} ({} files):", lang.language, lang.files).ok();
+        writeln!(output, "  {progress} {percent:5.1}%  ({} code)", lang.code).ok();
+        writeln!(
+            output,
+            "  Total: {}  Comments: {}  Blank: {}",
+            lang.total_lines, lang.comment, lang.blank
+        )
+        .ok();
+        writeln!(output).ok();
+    }
+}
+
+/// Format directory breakdown with progress bars.
+#[allow(clippy::cast_precision_loss)] // Precision loss acceptable: percentages for display
+fn format_directory_breakdown(
+    output: &mut Vec<u8>,
+    by_directory: &[super::DirectoryStats],
+    total_code: usize,
+) {
+    writeln!(output, "By Directory:").ok();
+    writeln!(output).ok();
+
+    for dir in by_directory {
+        let ratio = if total_code > 0 {
+            dir.code as f64 / total_code as f64
+        } else {
+            0.0
+        };
+        let progress = render_progress_bar(ratio, PROGRESS_WIDTH);
+        let percent = ratio * 100.0;
+
+        writeln!(output, "{} ({} files):", dir.directory, dir.files).ok();
+        writeln!(output, "  {progress} {percent:5.1}%  ({} code)", dir.code).ok();
+        writeln!(
+            output,
+            "  Total: {}  Comments: {}  Blank: {}",
+            dir.total_lines, dir.comment, dir.blank
+        )
+        .ok();
+        writeln!(output).ok();
     }
 }
 
@@ -90,29 +185,9 @@ impl StatsFormatter for StatsTextFormatter {
 
         // Show language breakdown if available
         if let Some(ref by_language) = stats.by_language {
-            writeln!(output, "By Language:").ok();
-            writeln!(output).ok();
-
-            for lang in by_language {
-                writeln!(output, "{} ({} files):", lang.language, lang.files).ok();
-                writeln!(output, "  Total lines: {}", lang.total_lines).ok();
-                writeln!(output, "  Code: {}", lang.code).ok();
-                writeln!(output, "  Comments: {}", lang.comment).ok();
-                writeln!(output, "  Blank: {}", lang.blank).ok();
-                writeln!(output).ok();
-            }
+            format_language_breakdown(&mut output, by_language, stats.total_code);
         } else if let Some(ref by_directory) = stats.by_directory {
-            writeln!(output, "By Directory:").ok();
-            writeln!(output).ok();
-
-            for dir in by_directory {
-                writeln!(output, "{} ({} files):", dir.directory, dir.files).ok();
-                writeln!(output, "  Total lines: {}", dir.total_lines).ok();
-                writeln!(output, "  Code: {}", dir.code).ok();
-                writeln!(output, "  Comments: {}", dir.comment).ok();
-                writeln!(output, "  Blank: {}", dir.blank).ok();
-                writeln!(output).ok();
-            }
+            format_directory_breakdown(&mut output, by_directory, stats.total_code);
         } else {
             // Original behavior: show per-file stats
             for file in &stats.files {

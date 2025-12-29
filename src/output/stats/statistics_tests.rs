@@ -4,6 +4,8 @@ use crate::counter::LineStats;
 use crate::output::stats::{FileStatistics, ProjectStatistics};
 use crate::stats::TrendDelta;
 
+use super::truncate_path_to_depth;
+
 // Helper function to create test FileStatistics
 fn file_stats(
     path: &str,
@@ -153,6 +155,116 @@ fn directory_breakdown_multiple_directories() {
     assert_eq!(by_directory[1].directory, "src");
     assert_eq!(by_directory[1].files, 2);
     assert_eq!(by_directory[1].code, 120);
+}
+
+// ============================================================================
+// Directory breakdown depth tests
+// ============================================================================
+
+#[test]
+fn directory_breakdown_depth_1_groups_top_level() {
+    let files = vec![
+        file_stats("src/commands/check.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("src/commands/stats.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("src/output/text.rs", 50, 40, 5, 5, "Rust"),
+        file_stats("tests/integration/test.rs", 75, 60, 10, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown_depth(None, Some(1));
+    let by_directory = stats.by_directory.unwrap();
+
+    assert_eq!(by_directory.len(), 2);
+
+    // Find src entry (should have all 3 src/* files)
+    let src = by_directory.iter().find(|d| d.directory == "src").unwrap();
+    assert_eq!(src.files, 3);
+    assert_eq!(src.code, 200); // 80 + 80 + 40
+
+    // Find tests entry (should have 1 file)
+    let tests = by_directory
+        .iter()
+        .find(|d| d.directory == "tests")
+        .unwrap();
+    assert_eq!(tests.files, 1);
+    assert_eq!(tests.code, 60);
+}
+
+#[test]
+fn directory_breakdown_depth_2_shows_two_levels() {
+    let files = vec![
+        file_stats("src/commands/check.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("src/commands/stats.rs", 100, 70, 20, 10, "Rust"),
+        file_stats("src/output/text.rs", 50, 40, 5, 5, "Rust"),
+        file_stats("src/output/json.rs", 60, 50, 5, 5, "Rust"),
+        file_stats("tests/integration/test.rs", 75, 60, 10, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown_depth(None, Some(2));
+    let by_directory = stats.by_directory.unwrap();
+
+    assert_eq!(by_directory.len(), 3); // src/commands, src/output, tests/integration
+
+    let commands = by_directory
+        .iter()
+        .find(|d| d.directory == "src/commands")
+        .unwrap();
+    assert_eq!(commands.files, 2);
+    assert_eq!(commands.code, 150); // 80 + 70
+
+    let output = by_directory
+        .iter()
+        .find(|d| d.directory == "src/output")
+        .unwrap();
+    assert_eq!(output.files, 2);
+    assert_eq!(output.code, 90); // 40 + 50
+}
+
+#[test]
+fn directory_breakdown_depth_none_shows_full_path() {
+    let files = vec![
+        file_stats("src/commands/check/runner.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("src/commands/check/tests.rs", 50, 40, 5, 5, "Rust"),
+    ];
+
+    // Without depth limiting
+    let stats = ProjectStatistics::new(files).with_directory_breakdown_depth(None, None);
+    let by_directory = stats.by_directory.unwrap();
+
+    assert_eq!(by_directory.len(), 1);
+    assert_eq!(by_directory[0].directory, "src/commands/check");
+}
+
+#[test]
+fn directory_breakdown_depth_handles_root_files() {
+    let files = vec![
+        file_stats("main.rs", 100, 80, 15, 5, "Rust"),
+        file_stats("lib.rs", 50, 40, 5, 5, "Rust"),
+        file_stats("src/mod.rs", 30, 25, 3, 2, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown_depth(None, Some(1));
+    let by_directory = stats.by_directory.unwrap();
+
+    // Root files grouped as "."
+    let root = by_directory.iter().find(|d| d.directory == ".").unwrap();
+    assert_eq!(root.files, 2);
+    assert_eq!(root.code, 120); // 80 + 40
+
+    // src files grouped separately
+    let src = by_directory.iter().find(|d| d.directory == "src").unwrap();
+    assert_eq!(src.files, 1);
+    assert_eq!(src.code, 25);
+}
+
+#[test]
+fn directory_breakdown_depth_zero_shows_full_path() {
+    // depth=0 should behave like no depth limit (show full paths)
+    let files = vec![file_stats("src/commands/check.rs", 100, 80, 15, 5, "Rust")];
+
+    let stats = ProjectStatistics::new(files).with_directory_breakdown_depth(None, Some(0));
+    let by_directory = stats.by_directory.unwrap();
+
+    assert_eq!(by_directory[0].directory, "src/commands");
 }
 
 // ============================================================================
@@ -451,4 +563,61 @@ fn with_sorted_files_empty() {
 
     assert!(sorted.is_empty());
     assert!(stats.files.is_empty());
+}
+
+// ============================================================================
+// truncate_path_to_depth unit tests
+// ============================================================================
+
+#[test]
+fn truncate_path_to_depth_dot_returns_unchanged() {
+    // Special case: "." always returns unchanged regardless of depth
+    assert_eq!(truncate_path_to_depth(".", 0), ".");
+    assert_eq!(truncate_path_to_depth(".", 1), ".");
+    assert_eq!(truncate_path_to_depth(".", 5), ".");
+}
+
+#[test]
+fn truncate_path_to_depth_zero_returns_unchanged() {
+    // depth=0 means no truncation (show full path)
+    assert_eq!(
+        truncate_path_to_depth("src/commands/check", 0),
+        "src/commands/check"
+    );
+    assert_eq!(truncate_path_to_depth("a/b/c/d/e", 0), "a/b/c/d/e");
+}
+
+#[test]
+fn truncate_path_to_depth_one_returns_first_component() {
+    assert_eq!(truncate_path_to_depth("src/commands/check", 1), "src");
+    assert_eq!(truncate_path_to_depth("a/b/c", 1), "a");
+}
+
+#[test]
+fn truncate_path_to_depth_two_returns_two_components() {
+    assert_eq!(
+        truncate_path_to_depth("src/commands/check", 2),
+        "src/commands"
+    );
+    assert_eq!(truncate_path_to_depth("a/b/c/d", 2), "a/b");
+}
+
+#[test]
+fn truncate_path_to_depth_exceeds_path_components() {
+    // When depth exceeds actual components, return full path
+    assert_eq!(truncate_path_to_depth("src/commands", 5), "src/commands");
+    assert_eq!(truncate_path_to_depth("single", 3), "single");
+}
+
+#[test]
+fn truncate_path_to_depth_single_component() {
+    // Single component path with various depths
+    assert_eq!(truncate_path_to_depth("src", 1), "src");
+    assert_eq!(truncate_path_to_depth("src", 2), "src");
+}
+
+#[test]
+fn truncate_path_to_depth_exact_match() {
+    // Depth exactly matches number of components
+    assert_eq!(truncate_path_to_depth("a/b/c", 3), "a/b/c");
 }

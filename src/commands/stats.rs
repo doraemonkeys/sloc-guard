@@ -126,14 +126,11 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
     let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
-    // Warn about unimplemented --depth option (Task 21.4)
-    if args.depth.is_some() {
+    // Warn if --depth is used with --by lang (not applicable)
+    if args.depth.is_some() && args.by == BreakdownBy::Lang {
         crate::output::print_warning_full(
-            "--depth option is not yet implemented",
-            Some(&format!(
-                "Showing all directory levels. Requested depth: {}",
-                args.depth.unwrap()
-            )),
+            "--depth is only applicable with --by dir",
+            Some(&format!("Ignoring depth: {}", args.depth.unwrap())),
             None,
         );
     }
@@ -141,7 +138,9 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
     // Apply grouping
     let project_stats = match args.by {
         BreakdownBy::Lang => project_stats.with_language_breakdown(),
-        BreakdownBy::Dir => project_stats.with_directory_breakdown_relative(Some(&project_root)),
+        BreakdownBy::Dir => {
+            project_stats.with_directory_breakdown_depth(Some(&project_root), args.depth)
+        }
     };
 
     let color_mode = super::context::color_choice_to_mode(cli.color);
