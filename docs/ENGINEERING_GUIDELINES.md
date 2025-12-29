@@ -5,7 +5,7 @@
 * Comments must be added only when necessary.
 * Use comments to explain "why," not "what." Good code is self-documenting and explains what it does. Comments should be reserved for explaining design decisions or complex logic.
 * Avoid clutter. Do not write obvious comments, such as `i++ // Increment i by 1`.
-* Avoid Magic Numbers: Replace unexplained numeric literals with named constants.
+* Avoid Hardcoding: Extract unexplained numeric and string values into named constants.
 
 
 ### Best Practices
