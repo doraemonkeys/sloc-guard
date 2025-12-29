@@ -116,10 +116,20 @@ ratchet = "warn" # warn|auto|strict - enforce violations can only decrease
 # Trend: History tracking settings
 # =============================================================================
 [trend]
-max_entries = 100        # Keep last 100 snapshots
-max_age_days = 90        # Delete entries older than 90 days
-min_interval_secs = 3600 # At most one entry per hour
-min_code_delta = 10      # Ignore changes < 10 lines
+max_entries = 100            # Keep last 100 snapshots
+max_age_days = 90            # Delete entries older than 90 days
+min_interval_secs = 3600     # At most one entry per hour
+min_code_delta = 10          # Ignore changes < 10 lines
+auto_snapshot_on_check = true # Record snapshot after successful check (CI-friendly)
+
+# =============================================================================
+# Stats: Configuration for stats subcommands
+# =============================================================================
+[stats.report]
+exclude = []           # Sections to exclude: "summary", "files", "breakdown", "trend"
+top_count = 20         # Number of top files to show
+breakdown_by = "lang"  # Grouping mode: "lang" or "dir"
+trend_since = "7d"     # Trend comparison period (e.g., "7d", "1w", "30d")
 
 # =============================================================================
 # Custom Languages: Define comment syntax for unsupported languages
