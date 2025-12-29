@@ -264,6 +264,7 @@ fn test_config_serialization() {
         max_age_days: Some(365),
         min_interval_secs: Some(60),
         min_code_delta: Some(20),
+        auto_snapshot_on_check: Some(true),
     };
 
     let json = serde_json::to_string(&config).unwrap();
@@ -273,6 +274,7 @@ fn test_config_serialization() {
     assert_eq!(parsed.max_age_days, Some(365));
     assert_eq!(parsed.min_interval_secs, Some(60));
     assert_eq!(parsed.min_code_delta, Some(20));
+    assert_eq!(parsed.auto_snapshot_on_check, Some(true));
 }
 
 #[test]

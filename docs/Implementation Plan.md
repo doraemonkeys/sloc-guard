@@ -89,7 +89,7 @@ Create standalone `snapshot` command (read/write separation):
 - Flags: `--history-file`, `--force`, `--dry-run`
 - Separate from stats viewing commands
 
-### Task 21.8: Trend Config Enhancement
+### Task 21.8: Trend Config Enhancement ✅
 
 Extend `[trend]` config:
 - `auto_snapshot_on_check`: auto-record after successful `check`
@@ -119,5 +119,5 @@ Clean up DRY violations and implicit state detection:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, 21.8, 21.9, 21.10 |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, 21.9, 21.10 |
 

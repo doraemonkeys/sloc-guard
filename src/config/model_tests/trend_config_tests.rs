@@ -6,6 +6,8 @@ fn trend_config_default_all_none() {
     assert!(config.max_entries.is_none());
     assert!(config.max_age_days.is_none());
     assert!(config.min_interval_secs.is_none());
+    assert!(config.min_code_delta.is_none());
+    assert!(config.auto_snapshot_on_check.is_none());
 }
 
 #[test]
@@ -76,12 +78,14 @@ fn trend_config_equality() {
         max_age_days: Some(30),
         min_interval_secs: Some(60),
         min_code_delta: Some(10),
+        auto_snapshot_on_check: Some(true),
     };
     let config2 = TrendConfig {
         max_entries: Some(100),
         max_age_days: Some(30),
         min_interval_secs: Some(60),
         min_code_delta: Some(10),
+        auto_snapshot_on_check: Some(true),
     };
     let config3 = TrendConfig {
         max_entries: Some(200),
@@ -111,10 +115,57 @@ fn trend_config_roundtrip_serialization() {
         max_age_days: Some(365),
         min_interval_secs: Some(3600),
         min_code_delta: Some(25),
+        auto_snapshot_on_check: Some(true),
     };
 
     let json = serde_json::to_string(&original).unwrap();
     let parsed: TrendConfig = serde_json::from_str(&json).unwrap();
 
     assert_eq!(original, parsed);
+}
+
+#[test]
+fn config_deserialize_auto_snapshot_on_check() {
+    let toml_str = r"
+        [trend]
+        auto_snapshot_on_check = true
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.trend.auto_snapshot_on_check, Some(true));
+}
+
+#[test]
+fn config_deserialize_auto_snapshot_on_check_false() {
+    let toml_str = r"
+        [trend]
+        auto_snapshot_on_check = false
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.trend.auto_snapshot_on_check, Some(false));
+}
+
+#[test]
+fn config_deserialize_trend_with_auto_snapshot() {
+    let toml_str = r"
+        [trend]
+        max_entries = 100
+        min_interval_secs = 3600
+        auto_snapshot_on_check = true
+    ";
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(config.trend.max_entries, Some(100));
+    assert_eq!(config.trend.min_interval_secs, Some(3600));
+    assert_eq!(config.trend.auto_snapshot_on_check, Some(true));
+}
+
+#[test]
+fn config_serialize_auto_snapshot_on_check() {
+    let mut config = Config::default();
+    config.trend.auto_snapshot_on_check = Some(true);
+
+    let serialized = toml::to_string(&config).unwrap();
+    assert!(serialized.contains("auto_snapshot_on_check = true"));
 }

@@ -75,6 +75,12 @@ pub struct TrendConfig {
     /// when this is set to `0`, because `0 > 0` is false.
     #[serde(default)]
     pub min_code_delta: Option<u64>,
+
+    /// Automatically record a snapshot after a successful `check` command.
+    /// Respects `min_interval_secs` to avoid duplicate entries.
+    /// Default: false (disabled).
+    #[serde(default)]
+    pub auto_snapshot_on_check: Option<bool>,
 }
 
 /// Stats command configuration, specifically for report subcommand defaults.

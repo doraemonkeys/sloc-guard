@@ -661,3 +661,111 @@ fn check_color_never_disables_colors() {
     let output_str = String::from_utf8_lossy(&output);
     assert!(!output_str.contains("\x1b["));
 }
+
+// =============================================================================
+// Auto-Snapshot Tests
+// =============================================================================
+
+#[test]
+fn check_auto_snapshot_creates_history_file() {
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
+[content]
+extensions = ["rs"]
+max_lines = 100
+
+[trend]
+auto_snapshot_on_check = true
+"#,
+    );
+    fixture.create_rust_file("src/main.rs", 10);
+
+    // Create .sloc-guard directory for history (non-git repo)
+    fixture.create_dir(".sloc-guard");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "--no-cache"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Auto-snapshot recorded"));
+
+    // Verify history file was created
+    let history_path = fixture.path().join(".sloc-guard/history.json");
+    assert!(history_path.exists());
+
+    let content = std::fs::read_to_string(&history_path).unwrap();
+    assert!(content.contains("\"total_files\""));
+    assert!(content.contains("\"code\""));
+}
+
+#[test]
+fn check_auto_snapshot_disabled_by_default() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 10);
+
+    // Create .sloc-guard directory
+    fixture.create_dir(".sloc-guard");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "--no-cache"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Auto-snapshot").not());
+
+    // History file should NOT be created
+    let history_path = fixture.path().join(".sloc-guard/history.json");
+    assert!(!history_path.exists());
+}
+
+#[test]
+fn check_auto_snapshot_respects_min_interval() {
+    let fixture = TestFixture::new();
+    // Set a very high min_interval_secs to ensure second snapshot is skipped
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
+[content]
+extensions = ["rs"]
+max_lines = 100
+
+[trend]
+auto_snapshot_on_check = true
+min_interval_secs = 3600
+"#,
+    );
+    fixture.create_rust_file("src/main.rs", 10);
+
+    // Create .sloc-guard directory
+    fixture.create_dir(".sloc-guard");
+
+    // First run - should create snapshot
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "--no-cache"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Auto-snapshot recorded"));
+
+    // Second run - should skip due to min_interval_secs (with verbose flag)
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "--no-cache", "-v"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Skipping auto-snapshot"));
+}

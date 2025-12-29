@@ -9,10 +9,12 @@ use crate::cache::{Cache, compute_config_hash};
 use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
 use crate::config::collect_expired_rules;
+use crate::git::GitContext;
 use crate::output::{
     OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter,
 };
 use crate::state;
+use crate::stats::TrendHistory;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
 use super::check_baseline_ops::{
@@ -281,8 +283,10 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         generate_split_suggestions(&mut results, &ctx.registry);
     }
 
-    // 7.2 Build project statistics for report-json or HTML charts
-    let needs_stats = args.report_json.is_some() || args.format == OutputFormat::Html;
+    // 7.2 Build project statistics for report-json, HTML charts, or auto-snapshot
+    let auto_snapshot_enabled = config.trend.auto_snapshot_on_check == Some(true);
+    let needs_stats =
+        args.report_json.is_some() || args.format == OutputFormat::Html || auto_snapshot_enabled;
     let project_stats = if needs_stats {
         Some(ProjectStatistics::new(file_stats).with_language_breakdown())
     } else {
@@ -307,7 +311,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         color_mode,
         cli.verbose,
         args.suggest,
-        project_stats,
+        project_stats.clone(),
         Some(project_root.to_path_buf()),
     )?;
 
@@ -325,11 +329,21 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     // Strict mode: CLI flag takes precedence, otherwise use config
     let strict = args.strict || config.content.strict;
 
-    if has_failures || (strict && has_warnings) || ratchet_failed {
-        Ok(EXIT_THRESHOLD_EXCEEDED)
+    let exit_code = if has_failures || (strict && has_warnings) || ratchet_failed {
+        EXIT_THRESHOLD_EXCEEDED
     } else {
-        Ok(EXIT_SUCCESS)
+        EXIT_SUCCESS
+    };
+
+    // 11. Auto-snapshot on successful check if enabled
+    if exit_code == EXIT_SUCCESS
+        && auto_snapshot_enabled
+        && let Some(ref stats) = project_stats
+    {
+        perform_auto_snapshot(stats, config, project_root, cli.quiet, cli.verbose);
     }
+
+    Ok(exit_code)
 }
 
 /// Handle baseline ratchet enforcement.
@@ -485,5 +499,62 @@ pub const fn apply_cli_overrides(config: &mut crate::config::Config, args: &Chec
 
     if let Some(max_depth) = args.max_depth {
         config.structure.max_depth = Some(max_depth);
+    }
+}
+
+/// Perform auto-snapshot after a successful check.
+///
+/// Records current statistics to trend history, respecting retention policies.
+/// Skips (with verbose log) if:
+/// - `min_interval_secs` hasn't elapsed since last entry
+/// - History file cannot be written (logs warning instead of failing)
+fn perform_auto_snapshot(
+    project_stats: &ProjectStatistics,
+    config: &crate::config::Config,
+    project_root: &Path,
+    quiet: bool,
+    verbose: u8,
+) {
+    // Get git context for the snapshot
+    let git_context = GitContext::from_path(project_root);
+
+    // Load history
+    let history_path = state::history_path(project_root);
+    let mut history = TrendHistory::load_or_default(&history_path);
+
+    // Check if we should add (respects min_interval_secs)
+    let current_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("system time before UNIX_EPOCH")
+        .as_secs();
+
+    if !history.should_add(&config.trend, current_time) {
+        if verbose > 0 && !quiet {
+            eprintln!(
+                "Skipping auto-snapshot: min_interval_secs ({}) not elapsed since last entry",
+                config.trend.min_interval_secs.unwrap_or(0)
+            );
+        }
+        return;
+    }
+
+    // Add entry with git context
+    history.add_with_context(project_stats, git_context.as_ref());
+
+    // Save with retention policy applied
+    if let Err(e) = history.save_with_retention(&history_path, &config.trend) {
+        // Log warning but don't fail the check
+        if !quiet {
+            crate::output::print_warning_full(
+                "Auto-snapshot failed to save",
+                Some(&format!("{}: {e}", history_path.display())),
+                None,
+            );
+        }
+        return;
+    }
+
+    if !quiet {
+        eprintln!("Auto-snapshot recorded to {}", history_path.display());
     }
 }

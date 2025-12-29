@@ -41,7 +41,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
-TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta }  // Retention and significance thresholds
+TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta, auto_snapshot_on_check }  // Retention, significance, and auto-snapshot
 StatsConfig { report: StatsReportConfig }  // Stats command configuration
 StatsReportConfig { exclude, top_count, breakdown_by, trend_since }  // [stats.report] section for report defaults
 ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure, warn_at: absolute line threshold
