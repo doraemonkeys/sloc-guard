@@ -7,7 +7,9 @@ mod text;
 pub use html::StatsHtmlFormatter;
 pub use json::StatsJsonFormatter;
 pub use markdown::StatsMarkdownFormatter;
-pub use statistics::{DirectoryStats, FileStatistics, LanguageStats, ProjectStatistics};
+pub use statistics::{
+    DirectoryStats, FileSortOrder, FileStatistics, LanguageStats, ProjectStatistics,
+};
 pub use text::StatsTextFormatter;
 
 use crate::error::Result;

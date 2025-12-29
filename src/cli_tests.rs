@@ -163,6 +163,106 @@ fn cli_stats_files_command() {
 }
 
 #[test]
+fn cli_stats_files_sort_total() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files", "--sort", "total"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.sort, FileSortOrder::Total);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_files_sort_comment() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files", "--sort", "comment"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.sort, FileSortOrder::Comment);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_files_sort_blank() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files", "--sort", "blank"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.sort, FileSortOrder::Blank);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_files_sort_name() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files", "--sort", "name"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.sort, FileSortOrder::Name);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_files_default_sort() {
+    // Default sort order should be code
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.sort, FileSortOrder::Code);
+                assert!(files_args.top.is_none()); // No top limit by default
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_files_format_json() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files", "--format", "json"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.format, StatsOutputFormat::Json);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
+fn cli_stats_files_format_markdown() {
+    let cli = Cli::parse_from(["sloc-guard", "stats", "files", "--format", "md"]);
+    match cli.command {
+        Commands::Stats(args) => match args.action {
+            StatsAction::Files(files_args) => {
+                assert_eq!(files_args.format, StatsOutputFormat::Markdown);
+            }
+            _ => panic!("Expected Files action"),
+        },
+        _ => panic!("Expected Stats command"),
+    }
+}
+
+#[test]
 fn cli_stats_breakdown_command() {
     let cli = Cli::parse_from(["sloc-guard", "stats", "breakdown", "--by", "dir"]);
     match cli.command {

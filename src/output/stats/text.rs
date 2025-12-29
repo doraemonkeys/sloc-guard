@@ -43,22 +43,49 @@ impl StatsFormatter for StatsTextFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
         let mut output = Vec::new();
 
+        // Detect files-only mode: files cleared and top_files populated (from with_sorted_files)
+        let is_files_only = stats.files.is_empty() && stats.top_files.is_some();
+
         // Show top files if available
         if let Some(ref top_files) = stats.top_files {
-            writeln!(output, "Top {} Largest Files:", top_files.len()).ok();
-            writeln!(output).ok();
+            // In files-only mode, show as file list without "Top N" header
+            if is_files_only {
+                writeln!(output, "Files ({} total):", top_files.len()).ok();
+                writeln!(output).ok();
 
-            for (i, file) in top_files.iter().enumerate() {
-                writeln!(
-                    output,
-                    "  {}. {} ({} lines)",
-                    i + 1,
-                    self.display_path(&file.path),
-                    file.stats.code
-                )
-                .ok();
+                for file in top_files {
+                    writeln!(
+                        output,
+                        "  {} - {} code, {} total (comment={}, blank={})",
+                        self.display_path(&file.path),
+                        file.stats.code,
+                        file.stats.total,
+                        file.stats.comment,
+                        file.stats.blank
+                    )
+                    .ok();
+                }
+            } else {
+                writeln!(output, "Top {} Largest Files:", top_files.len()).ok();
+                writeln!(output).ok();
+
+                for (i, file) in top_files.iter().enumerate() {
+                    writeln!(
+                        output,
+                        "  {}. {} ({} lines)",
+                        i + 1,
+                        self.display_path(&file.path),
+                        file.stats.code
+                    )
+                    .ok();
+                }
+                writeln!(output).ok();
             }
-            writeln!(output).ok();
+        }
+
+        // Skip remaining output sections in files-only mode
+        if is_files_only {
+            return Ok(String::from_utf8_lossy(&output).to_string());
         }
 
         // Show language breakdown if available

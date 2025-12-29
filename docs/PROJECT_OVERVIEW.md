@@ -84,6 +84,7 @@ ColorMode::Auto | Always | Never
 // Stats
 FileStatistics { path, stats, language }
 ProjectStatistics { files, total_*, by_language, by_directory, top_files, average_code_lines, trend }
+FileSortOrder::Code | Total | Comment | Blank | Name  // --sort option for stats files
 GroupBy::None | Lang | Dir
 
 // Trend (state::history_path() → .git/sloc-guard/history.json or .sloc-guard/history.json)

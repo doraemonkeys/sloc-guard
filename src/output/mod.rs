@@ -22,8 +22,9 @@ pub use path::display_path;
 pub use progress::ScanProgress;
 pub use sarif::SarifFormatter;
 pub use stats::{
-    DirectoryStats, FileStatistics, LanguageStats, ProjectStatistics, StatsFormatter,
-    StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
+    DirectoryStats, FileSortOrder, FileStatistics, LanguageStats, ProjectStatistics,
+    StatsFormatter, StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter,
+    StatsTextFormatter,
 };
 pub use text::{ColorMode, TextFormatter};
 

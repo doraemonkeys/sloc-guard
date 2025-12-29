@@ -37,7 +37,8 @@ impl Default for StatsJsonFormatter {
 
 #[derive(Serialize)]
 struct JsonStatsOutput {
-    summary: JsonStatsSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<JsonStatsSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
     trend: Option<JsonTrendDelta>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -46,6 +47,7 @@ struct JsonStatsOutput {
     by_directory: Option<Vec<DirectoryStats>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     top_files: Option<Vec<JsonFileStats>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     files: Vec<JsonFileStats>,
 }
 
@@ -99,15 +101,25 @@ struct JsonFileStats {
 
 impl StatsFormatter for StatsJsonFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
-        let output = JsonStatsOutput {
-            summary: JsonStatsSummary {
+        // Detect files-only mode: files cleared and top_files populated (from with_sorted_files)
+        let is_files_only = stats.files.is_empty() && stats.top_files.is_some();
+
+        // Include summary unless in files-only mode
+        let summary = if is_files_only {
+            None
+        } else {
+            Some(JsonStatsSummary {
                 total_files: stats.total_files,
                 total_lines: stats.total_lines,
                 code: stats.total_code,
                 comment: stats.total_comment,
                 blank: stats.total_blank,
                 average_code_lines: stats.average_code_lines,
-            },
+            })
+        };
+
+        let output = JsonStatsOutput {
+            summary,
             trend: stats.trend.as_ref().map(JsonTrendDelta::from),
             by_language: stats.by_language.clone(),
             by_directory: stats.by_directory.clone(),

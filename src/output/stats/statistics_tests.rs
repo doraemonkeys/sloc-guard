@@ -323,3 +323,132 @@ fn with_summary_only_preserves_trend() {
     assert!(stats.trend.is_some());
     assert_eq!(stats.trend.as_ref().unwrap().code_delta, 50);
 }
+
+// ============================================================================
+// Sorted files tests (stats files subcommand)
+// ============================================================================
+
+use crate::output::stats::FileSortOrder;
+
+#[test]
+fn with_sorted_files_default_code_order() {
+    let files = vec![
+        file_stats("small.rs", 50, 30, 10, 10, "Rust"),
+        file_stats("large.rs", 200, 150, 30, 20, "Rust"),
+        file_stats("medium.rs", 100, 80, 15, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Code, None);
+    let sorted = stats.top_files.unwrap();
+
+    assert_eq!(sorted.len(), 3);
+    assert_eq!(sorted[0].path, PathBuf::from("large.rs"));
+    assert_eq!(sorted[1].path, PathBuf::from("medium.rs"));
+    assert_eq!(sorted[2].path, PathBuf::from("small.rs"));
+
+    // Files should be cleared (files-only mode)
+    assert!(stats.files.is_empty());
+}
+
+#[test]
+fn with_sorted_files_total_order() {
+    let files = vec![
+        file_stats("a.rs", 100, 50, 30, 20, "Rust"), // high total, low code
+        file_stats("b.rs", 50, 40, 5, 5, "Rust"),    // low total, high code
+        file_stats("c.rs", 150, 60, 50, 40, "Rust"), // highest total
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Total, None);
+    let sorted = stats.top_files.unwrap();
+
+    assert_eq!(sorted[0].path, PathBuf::from("c.rs")); // 150 total
+    assert_eq!(sorted[1].path, PathBuf::from("a.rs")); // 100 total
+    assert_eq!(sorted[2].path, PathBuf::from("b.rs")); // 50 total
+}
+
+#[test]
+fn with_sorted_files_comment_order() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 10, 10, "Rust"), // 10 comments
+        file_stats("b.rs", 100, 50, 40, 10, "Rust"), // 40 comments
+        file_stats("c.rs", 100, 70, 25, 5, "Rust"),  // 25 comments
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Comment, None);
+    let sorted = stats.top_files.unwrap();
+
+    assert_eq!(sorted[0].path, PathBuf::from("b.rs")); // 40 comments
+    assert_eq!(sorted[1].path, PathBuf::from("c.rs")); // 25 comments
+    assert_eq!(sorted[2].path, PathBuf::from("a.rs")); // 10 comments
+}
+
+#[test]
+fn with_sorted_files_blank_order() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 10, 10, "Rust"), // 10 blanks
+        file_stats("b.rs", 100, 50, 10, 40, "Rust"), // 40 blanks
+        file_stats("c.rs", 100, 70, 10, 20, "Rust"), // 20 blanks
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Blank, None);
+    let sorted = stats.top_files.unwrap();
+
+    assert_eq!(sorted[0].path, PathBuf::from("b.rs")); // 40 blanks
+    assert_eq!(sorted[1].path, PathBuf::from("c.rs")); // 20 blanks
+    assert_eq!(sorted[2].path, PathBuf::from("a.rs")); // 10 blanks
+}
+
+#[test]
+fn with_sorted_files_name_order() {
+    let files = vec![
+        file_stats("src/charlie.rs", 100, 80, 10, 10, "Rust"),
+        file_stats("src/alpha.rs", 100, 50, 10, 40, "Rust"),
+        file_stats("tests/beta.rs", 100, 70, 10, 20, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Name, None);
+    let sorted = stats.top_files.unwrap();
+
+    // Sorted by file name only (not full path)
+    assert_eq!(sorted[0].path, PathBuf::from("src/alpha.rs"));
+    assert_eq!(sorted[1].path, PathBuf::from("tests/beta.rs"));
+    assert_eq!(sorted[2].path, PathBuf::from("src/charlie.rs"));
+}
+
+#[test]
+fn with_sorted_files_with_limit() {
+    let files = vec![
+        file_stats("small.rs", 50, 30, 10, 10, "Rust"),
+        file_stats("large.rs", 200, 150, 30, 20, "Rust"),
+        file_stats("medium.rs", 100, 80, 15, 5, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Code, Some(2));
+    let sorted = stats.top_files.unwrap();
+
+    assert_eq!(sorted.len(), 2);
+    assert_eq!(sorted[0].path, PathBuf::from("large.rs"));
+    assert_eq!(sorted[1].path, PathBuf::from("medium.rs"));
+}
+
+#[test]
+fn with_sorted_files_limit_exceeds_count() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 10, 10, "Rust"),
+        file_stats("b.rs", 50, 30, 10, 10, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Code, Some(10));
+    let sorted = stats.top_files.unwrap();
+
+    assert_eq!(sorted.len(), 2); // Only 2 files exist
+}
+
+#[test]
+fn with_sorted_files_empty() {
+    let stats = ProjectStatistics::new(vec![]).with_sorted_files(FileSortOrder::Code, None);
+    let sorted = stats.top_files.unwrap();
+
+    assert!(sorted.is_empty());
+    assert!(stats.files.is_empty());
+}

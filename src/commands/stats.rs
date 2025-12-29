@@ -5,14 +5,14 @@ use rayon::prelude::*;
 
 use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{
-    BreakdownArgs, BreakdownBy, Cli, CommonStatsArgs, FileSortOrder, FilesArgs, HistoryArgs,
-    HistoryOutputFormat, ReportArgs, ReportOutputFormat, StatsAction, StatsArgs, StatsOutputFormat,
-    SummaryArgs, TrendArgs,
+    BreakdownArgs, BreakdownBy, Cli, CommonStatsArgs, FileSortOrder as CliFileSortOrder, FilesArgs,
+    HistoryArgs, HistoryOutputFormat, ReportArgs, ReportOutputFormat, StatsAction, StatsArgs,
+    StatsOutputFormat, SummaryArgs, TrendArgs,
 };
 use crate::language::LanguageRegistry;
 use crate::output::{
-    ColorMode, FileStatistics, ProjectStatistics, ScanProgress, StatsFormatter, StatsHtmlFormatter,
-    StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
+    ColorMode, FileSortOrder, FileStatistics, ProjectStatistics, ScanProgress, StatsFormatter,
+    StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter, StatsTextFormatter,
 };
 use crate::scanner::scan_files;
 use crate::state;
@@ -96,26 +96,9 @@ fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
     let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
-    // Warn about unimplemented --sort option (Task 21.3)
-    if args.sort != FileSortOrder::Code {
-        crate::output::print_warning_full(
-            "--sort option is not yet implemented",
-            Some(&format!(
-                "Using default sort order (code lines). Requested: {:?}",
-                args.sort
-            )),
-            None,
-        );
-    }
-
-    // Apply sorting and top-N filtering
-    let project_stats = apply_file_sorting(project_stats, args.sort);
-    let project_stats = if let Some(n) = args.top {
-        project_stats.with_top_files(n)
-    } else {
-        // Show all files in sorted order
-        project_stats.with_top_files(usize::MAX)
-    };
+    // Convert CLI sort order to output sort order and apply sorting
+    let sort_order = cli_sort_to_output_sort(args.sort);
+    let project_stats = project_stats.with_sorted_files(sort_order, args.top);
 
     let color_mode = super::context::color_choice_to_mode(cli.color);
     let output =
@@ -124,12 +107,15 @@ fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
     Ok(EXIT_SUCCESS)
 }
 
-#[allow(unused_variables, clippy::missing_const_for_fn)] // _sort will be used in Task 21.3
-fn apply_file_sorting(stats: ProjectStatistics, _sort: FileSortOrder) -> ProjectStatistics {
-    // ProjectStatistics::with_top_files sorts by code by default
-    // TODO: Task 21.3 will implement custom sorting in ProjectStatistics
-    // For now, always use default code sorting
-    stats
+/// Convert CLI's `FileSortOrder` to output module's `FileSortOrder`.
+const fn cli_sort_to_output_sort(cli_sort: CliFileSortOrder) -> FileSortOrder {
+    match cli_sort {
+        CliFileSortOrder::Code => FileSortOrder::Code,
+        CliFileSortOrder::Total => FileSortOrder::Total,
+        CliFileSortOrder::Comment => FileSortOrder::Comment,
+        CliFileSortOrder::Blank => FileSortOrder::Blank,
+        CliFileSortOrder::Name => FileSortOrder::Name,
+    }
 }
 
 // ============================================================================

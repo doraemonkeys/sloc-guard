@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -7,6 +8,22 @@ use crate::counter::LineStats;
 use crate::stats::TrendDelta;
 
 use super::super::path::display_path;
+
+/// Sort order for file statistics output.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FileSortOrder {
+    /// Sort by code lines descending (default)
+    #[default]
+    Code,
+    /// Sort by total lines descending
+    Total,
+    /// Sort by comment lines descending
+    Comment,
+    /// Sort by blank lines descending
+    Blank,
+    /// Sort alphabetically by file name ascending
+    Name,
+}
 
 #[derive(Debug, Clone)]
 pub struct FileStatistics {
@@ -152,6 +169,56 @@ impl ProjectStatistics {
             self.average_code_lines = Some(self.total_code as f64 / self.total_files as f64);
         }
 
+        self
+    }
+
+    /// Sort files using the specified sort order and optionally limit to top N.
+    ///
+    /// This method is used by `stats files` subcommand for custom sorting.
+    /// Unlike `with_top_files`, this puts the sorted files in `top_files` field
+    /// and marks the output as files-only mode (no summary appended).
+    #[must_use]
+    pub fn with_sorted_files(mut self, sort: FileSortOrder, limit: Option<usize>) -> Self {
+        let mut sorted_files = self.files.clone();
+
+        match sort {
+            FileSortOrder::Code => {
+                sorted_files.sort_by(|a, b| b.stats.code.cmp(&a.stats.code));
+            }
+            FileSortOrder::Total => {
+                sorted_files.sort_by(|a, b| b.stats.total.cmp(&a.stats.total));
+            }
+            FileSortOrder::Comment => {
+                sorted_files.sort_by(|a, b| b.stats.comment.cmp(&a.stats.comment));
+            }
+            FileSortOrder::Blank => {
+                sorted_files.sort_by(|a, b| b.stats.blank.cmp(&a.stats.blank));
+            }
+            FileSortOrder::Name => {
+                sorted_files.sort_by(|a, b| {
+                    // Sort by file name, not full path, for more intuitive ordering
+                    let name_a = a.path.file_name().map(|n| n.to_string_lossy());
+                    let name_b = b.path.file_name().map(|n| n.to_string_lossy());
+                    match (name_a, name_b) {
+                        (Some(a), Some(b)) => a.cmp(&b),
+                        (Some(_), None) => Ordering::Less,
+                        (None, Some(_)) => Ordering::Greater,
+                        (None, None) => a.path.cmp(&b.path),
+                    }
+                });
+            }
+        }
+
+        // Apply limit if specified
+        let sorted_files = if let Some(n) = limit {
+            sorted_files.into_iter().take(n).collect()
+        } else {
+            sorted_files
+        };
+
+        self.top_files = Some(sorted_files);
+        // Clear files to indicate files-only mode (formatters will use top_files)
+        self.files = Vec::new();
         self
     }
 

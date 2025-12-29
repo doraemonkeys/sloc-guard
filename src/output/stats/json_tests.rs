@@ -32,7 +32,11 @@ fn json_formatter_empty() {
     let output = StatsJsonFormatter::new().format(&stats).unwrap();
 
     assert!(output.contains("\"total_files\": 0"));
-    assert!(output.contains("\"files\": []"));
+    // Empty files array is now omitted (skip_serializing_if = "Vec::is_empty")
+    assert!(
+        !output.contains("\"files\":"),
+        "empty files array should be omitted"
+    );
 }
 
 #[test]
@@ -240,5 +244,108 @@ fn json_formatter_trend_partial_git_context() {
     assert!(
         trend.get("previous_branch").is_none(),
         "previous_branch should be omitted for detached HEAD"
+    );
+}
+
+// ============================================================================
+// Files-only mode tests (stats files subcommand)
+// ============================================================================
+
+use crate::output::stats::FileSortOrder;
+
+#[test]
+fn json_formatter_files_only_mode_skips_summary() {
+    let files = vec![
+        file_stats("large.rs", 200, 150, 30, 20, "Rust"),
+        file_stats("small.rs", 50, 30, 10, 10, "Rust"),
+    ];
+
+    // with_sorted_files creates files-only mode
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Code, None);
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    // Summary should be omitted in files-only mode
+    assert!(
+        parsed.get("summary").is_none(),
+        "summary should be omitted in files-only mode"
+    );
+
+    // top_files should contain the sorted files
+    assert!(parsed.get("top_files").is_some());
+    let top_files = parsed.get("top_files").unwrap().as_array().unwrap();
+    assert_eq!(top_files.len(), 2);
+
+    // Files should be empty (cleared by with_sorted_files)
+    assert!(
+        parsed.get("files").is_none()
+            || parsed.get("files").unwrap().as_array().unwrap().is_empty(),
+        "files should be empty or omitted"
+    );
+}
+
+#[test]
+fn json_formatter_files_only_sorted_by_name() {
+    let files = vec![
+        file_stats("charlie.rs", 100, 80, 10, 10, "Rust"),
+        file_stats("alpha.rs", 100, 50, 10, 40, "Rust"),
+        file_stats("beta.rs", 100, 70, 10, 20, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Name, None);
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let top_files = parsed.get("top_files").unwrap().as_array().unwrap();
+
+    // Verify sort order (by file name ascending)
+    assert!(top_files[0]["path"].as_str().unwrap().contains("alpha"));
+    assert!(top_files[1]["path"].as_str().unwrap().contains("beta"));
+    assert!(top_files[2]["path"].as_str().unwrap().contains("charlie"));
+}
+
+#[test]
+fn json_formatter_files_only_with_limit() {
+    let files = vec![
+        file_stats("a.rs", 200, 150, 30, 20, "Rust"),
+        file_stats("b.rs", 100, 80, 10, 10, "Rust"),
+        file_stats("c.rs", 50, 30, 10, 10, "Rust"),
+    ];
+
+    let stats = ProjectStatistics::new(files).with_sorted_files(FileSortOrder::Code, Some(2));
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    let top_files = parsed.get("top_files").unwrap().as_array().unwrap();
+
+    // Only top 2 files
+    assert_eq!(top_files.len(), 2);
+    assert!(top_files[0]["path"].as_str().unwrap().contains("a.rs"));
+    assert!(top_files[1]["path"].as_str().unwrap().contains("b.rs"));
+}
+
+#[test]
+fn json_formatter_summary_only_no_empty_files() {
+    let files = vec![
+        file_stats("a.rs", 100, 80, 10, 10, "Rust"),
+        file_stats("b.rs", 50, 30, 10, 10, "Rust"),
+    ];
+
+    // with_summary_only clears files but doesn't set top_files
+    let stats = ProjectStatistics::new(files).with_summary_only();
+    let output = StatsJsonFormatter::new().format(&stats).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+    // Summary should be present
+    assert!(parsed.get("summary").is_some());
+
+    // files array should be omitted when empty (skip_serializing_if Vec::is_empty)
+    // Note: Vec::is_empty skips serialization, so files key shouldn't be present
+    let files_value = parsed.get("files");
+    assert!(
+        files_value.is_none() || files_value.unwrap().as_array().unwrap().is_empty(),
+        "files should be omitted or empty for summary-only mode"
     );
 }

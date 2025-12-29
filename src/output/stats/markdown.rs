@@ -38,6 +38,40 @@ impl StatsFormatter for StatsMarkdownFormatter {
     fn format(&self, stats: &ProjectStatistics) -> Result<String> {
         let mut output = String::new();
 
+        // Detect files-only mode: files cleared and top_files populated (from with_sorted_files)
+        let is_files_only = stats.files.is_empty() && stats.top_files.is_some();
+
+        // In files-only mode, show only the file list without summary
+        if is_files_only {
+            if let Some(ref top_files) = stats.top_files {
+                writeln!(output, "## Files ({} total)\n", top_files.len()).ok();
+                writeln!(
+                    output,
+                    "| File | Language | Code | Total | Comment | Blank |"
+                )
+                .ok();
+                writeln!(
+                    output,
+                    "|------|----------|-----:|------:|--------:|------:|"
+                )
+                .ok();
+                for file in top_files {
+                    writeln!(
+                        output,
+                        "| `{}` | {} | {} | {} | {} | {} |",
+                        self.display_path(&file.path),
+                        file.language,
+                        file.stats.code,
+                        file.stats.total,
+                        file.stats.comment,
+                        file.stats.blank
+                    )
+                    .ok();
+                }
+            }
+            return Ok(output);
+        }
+
         writeln!(output, "## SLOC Statistics\n").ok();
 
         // Summary section

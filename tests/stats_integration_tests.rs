@@ -116,7 +116,7 @@ fn stats_files_top_largest_files() {
         .assert()
         .success()
         .stdout(predicate::str::contains("large.rs"))
-        .stdout(predicate::str::contains("Top 2"));
+        .stdout(predicate::str::contains("Files (2 total):"));
 }
 
 #[test]

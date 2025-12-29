@@ -52,12 +52,13 @@ Implement `stats summary`:
 - Flags: `--format text|json|md`
 - No file list, no breakdown—summary only
 
-### Task 21.3: Stats Files Subcommand
+### Task 21.3: Stats Files Subcommand ✅
 
 Implement `stats files` (migrate `--top N` functionality):
 - Default: all files sorted by code descending
 - Flags: `--top N`, `--sort code|total|comment|blank|name`, `--ext rs,go`, `--format`
 - No summary section appended
+- Fix: `JsonStatsOutput.files` should use `Option<Vec>` + `skip_serializing_if` (avoid empty `"files": []` in summary-only JSON)
 
 ### Task 21.4: Stats Breakdown Subcommand
 
@@ -103,11 +104,20 @@ Add `[stats.report]` config section:
 - `breakdown_by` - default grouping
 - `trend_since` - default comparison period
 
+### Task 21.10: Stats Output Refactoring
+
+Clean up DRY violations and implicit state detection:
+- Unify `FileSortOrder` enum: re-export `output::stats::FileSortOrder` from CLI, remove duplicate
+- Add `StatsOutputMode` enum (`Full`, `SummaryOnly`, `FilesOnly`) to `ProjectStatistics`
+- Replace fragile `files.is_empty() && top_files.is_some()` detection with explicit `output_mode` field
+- Use `std::mem::take` in `with_sorted_files` instead of `.clone()` + clear
+- (Optional) Parameterize CLI sort order tests
+
 ---
 
 ## Priority Order
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, 21.3 Files, 21.4 Breakdown, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-9 Config |
+| **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, 21.4 Breakdown, 21.5 Trend, 21.6 Report, ~~21.7 Snapshot~~ ✅, 21.8-10 Config/Refactor |
 
