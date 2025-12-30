@@ -106,6 +106,10 @@ jobs:
               if: matrix.target == 'aarch64-unknown-linux-musl'
               run: cross build --release --locked --target ${{ matrix.target }}
 
+            - name: Sign binary (macOS)
+              if: contains(matrix.target, 'apple-darwin')
+              run: codesign -s - "target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}"
+
             - name: Determine platform name
               id: platform
               shell: bash
@@ -175,24 +179,31 @@ jobs:
               run: |
                   if [ -n "${{ github.event.inputs.tag }}" ]; then
                     CURRENT_VERSION="${{ github.event.inputs.tag }}"
+                    CURRENT_REF="${{ github.event.inputs.tag }}"
                   elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
                     CURRENT_VERSION="${{ github.ref_name }}"
+                    CURRENT_REF="${{ github.ref_name }}"
                   else
                     CURRENT_VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")"
+                    # Use full SHA for changelog link when no tag
+                    CURRENT_REF="$(git rev-parse HEAD)"
                   fi
                   echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+                  echo "current_ref=$CURRENT_REF" >> $GITHUB_OUTPUT
 
                   # Get previous version for changelog
-                  PREV_VERSION=$(git describe --tags --abbrev=0 "${CURRENT_VERSION}^" 2>/dev/null || echo '')
+                  PREV_VERSION=$(git describe --tags --abbrev=0 "${CURRENT_REF}^" 2>/dev/null || echo '')
                   echo "previous=$PREV_VERSION" >> $GITHUB_OUTPUT
 
                   echo "Current version: $CURRENT_VERSION"
+                  echo "Current ref: $CURRENT_REF"
                   echo "Previous version: $PREV_VERSION"
 
             - name: Generate release notes
               id: release_notes
               run: |
                   CURRENT="${{ steps.version.outputs.current }}"
+                  CURRENT_REF="${{ steps.version.outputs.current_ref }}"
                   PREVIOUS="${{ steps.version.outputs.previous }}"
 
                   {
@@ -203,22 +214,20 @@ jobs:
                       # Generate changelog from commits
                       echo "### Commits"
                       echo ""
-                      git log --pretty=format:"- %s (%h)" "${PREVIOUS}..${CURRENT}" 2>/dev/null || \
+                      git log --pretty=format:"- %s (%h)" "${PREVIOUS}..${CURRENT_REF}" 2>/dev/null || \
                         git log --pretty=format:"- %s (%h)" -20
+                      echo ""
+                      echo ""
+                      echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS}...${CURRENT_REF}"
                     else
                       echo "Initial release"
+                      echo ""
+                      echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/${CURRENT_REF}"
                     fi
                     
                     echo ""
                     echo ""
                     echo "## Installation"
-                    echo ""
-                    echo "### Using Cargo"
-                    echo '```bash'
-                    echo "cargo install sloc-guard"
-                    echo '```'
-                    echo ""
-                    echo "### Download Binary"
                     echo ""
                     echo "Download the appropriate binary for your platform from the assets below."
                     echo ""
