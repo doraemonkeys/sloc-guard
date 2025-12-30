@@ -1,0 +1,68 @@
+name: CI
+
+on:
+    push:
+        branches: [main, master]
+    pull_request:
+
+env:
+    CARGO_TERM_COLOR: always
+
+jobs:
+    # Fast lint check - runs in parallel with coverage
+    lint:
+        name: Clippy & Format
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: rustfmt, clippy
+
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Check formatting
+              run: cargo fmt --all --check
+
+            - name: Clippy
+              run: cargo clippy --all-targets --all-features -- -D warnings
+
+    # Coverage with tarpaulin (90% threshold enforced)
+    coverage:
+        name: Coverage
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  components: llvm-tools-preview
+
+            - uses: Swatinem/rust-cache@v2
+
+            - name: Install cargo-tarpaulin
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: cargo-tarpaulin
+
+            - name: Run coverage
+              run: cargo tarpaulin --config tarpaulin.toml
+              env:
+                  TEMP: ${{ runner.temp }}
+                  TMP: ${{ runner.temp }}
+
+    # Self-check with sloc-guard
+    sloc-guard:
+        name: SLOC Guard
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install sloc-guard
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: sloc-guard
+
+            - name: Run sloc-guard check
+              run: sloc-guard check
