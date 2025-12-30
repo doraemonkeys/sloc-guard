@@ -11,14 +11,22 @@ use crate::error::Result;
 /// Converts paths like `./src/foo` or `.\src\foo` (Windows) to `src/foo`,
 /// ensuring scope patterns like `{src,src/**}` match regardless of scan root.
 fn strip_dot_prefix(path: &Path) -> PathBuf {
-    let mut components = path.components().peekable();
+    let path_str = path.to_string_lossy();
 
-    // Skip leading CurDir (`.`) component if present
-    if matches!(components.peek(), Some(std::path::Component::CurDir)) {
-        components.next();
+    // Strip leading "./" (Unix) or ".\" (Windows)
+    if let Some(rest) = path_str
+        .strip_prefix("./")
+        .or_else(|| path_str.strip_prefix(".\\"))
+    {
+        return PathBuf::from(rest);
     }
 
-    components.collect()
+    // Handle bare "."
+    if path_str == "." {
+        return PathBuf::new();
+    }
+
+    path.to_path_buf()
 }
 
 /// A compiled allowlist rule for checking allowed file types in a directory.
@@ -449,5 +457,36 @@ mod strip_dot_prefix_tests {
     #[test]
     fn handles_just_dot() {
         assert_eq!(strip_dot_prefix(Path::new(".")), PathBuf::from(""));
+    }
+
+    #[test]
+    fn preserves_parent_dir_prefix() {
+        // "../" is ParentDir, NOT CurDir - it should not be stripped
+        assert_eq!(
+            strip_dot_prefix(Path::new("../src")),
+            PathBuf::from("../src")
+        );
+        assert_eq!(
+            strip_dot_prefix(Path::new("..\\src")),
+            PathBuf::from("..\\src")
+        );
+        assert_eq!(
+            strip_dot_prefix(Path::new("../../lib")),
+            PathBuf::from("../../lib")
+        );
+    }
+
+    #[test]
+    fn handles_mixed_separators() {
+        // Path with Unix prefix "./" but Windows separators internally
+        assert_eq!(
+            strip_dot_prefix(Path::new("./src\\lib")),
+            PathBuf::from("src\\lib")
+        );
+        // Path with Windows prefix ".\" but Unix separators internally
+        assert_eq!(
+            strip_dot_prefix(Path::new(".\\src/lib")),
+            PathBuf::from("src/lib")
+        );
     }
 }
