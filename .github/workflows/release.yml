@@ -205,6 +205,7 @@ jobs:
                   CURRENT="${{ steps.version.outputs.current }}"
                   CURRENT_REF="${{ steps.version.outputs.current_ref }}"
                   PREVIOUS="${{ steps.version.outputs.previous }}"
+                  SHORT_REF="$(git rev-parse --short HEAD)"
 
                   {
                     echo "## What's Changed"
@@ -216,13 +217,8 @@ jobs:
                       echo ""
                       git log --pretty=format:"- %s (%h)" "${PREVIOUS}..${CURRENT_REF}" 2>/dev/null || \
                         git log --pretty=format:"- %s (%h)" -20
-                      echo ""
-                      echo ""
-                      echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS}...${CURRENT_REF}"
                     else
                       echo "Initial release"
-                      echo ""
-                      echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/${CURRENT_REF}"
                     fi
                     
                     echo ""
@@ -239,6 +235,13 @@ jobs:
                     echo "| Linux | arm64 | \`sloc-guard-${CURRENT}-linux-arm64.tar.gz\` |"
                     echo "| macOS | x64 | \`sloc-guard-${CURRENT}-macos-x64.tar.gz\` |"
                     echo "| macOS | arm64 | \`sloc-guard-${CURRENT}-macos-arm64.tar.gz\` |"
+                    echo ""
+                    echo ""
+                    if [ -n "$PREVIOUS" ]; then
+                      echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS}...${CURRENT_REF}"
+                    else
+                      echo "**Full Changelog**: https://github.com/${{ github.repository }}/commits/${SHORT_REF}"
+                    fi
                   } > release_notes.md
 
                   cat release_notes.md
@@ -268,7 +271,7 @@ jobs:
                   name: ${{ steps.version.outputs.current }}
                   body_path: ./release_notes.md
                   draft: true
-                  generate_release_notes: true
+                  generate_release_notes: false
                   files: |
                       ./artifacts/*
 
