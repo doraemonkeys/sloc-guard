@@ -72,6 +72,16 @@ sloc-guard stats summary
 
 That's it! sloc-guard will enforce a 600-line limit per file by default.
 
+- HTML report
+
+```bash
+# (Optional) Generate a visual HTML report
+sloc-guard check -f html -o output.html
+# OR
+sloc-guard stats report -f html -o report.html
+```
+
+
 ### Configuration
 
 Create `.sloc-guard.toml` in your project root:
