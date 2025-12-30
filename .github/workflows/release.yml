@@ -1,0 +1,280 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Tag to build (e.g., v0.2.1). Leave empty for current HEAD."
+                required: false
+                default: ""
+
+env:
+    CARGO_TERM_COLOR: always
+    BINARY_NAME: sloc-guard
+
+jobs:
+    # Build matrix for all platforms
+    build:
+        name: Build ${{ matrix.target }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    # Windows
+                    - target: x86_64-pc-windows-msvc
+                      os: windows-latest
+                      arch: x64
+                      ext: .exe
+                      archive: zip
+                    - target: aarch64-pc-windows-msvc
+                      os: windows-latest
+                      arch: arm64
+                      ext: .exe
+                      archive: zip
+                    # Linux (musl for static binaries)
+                    - target: x86_64-unknown-linux-musl
+                      os: ubuntu-latest
+                      arch: x64
+                      ext: ""
+                      archive: tar.gz
+                    - target: aarch64-unknown-linux-musl
+                      os: ubuntu-latest
+                      arch: arm64
+                      ext: ""
+                      archive: tar.gz
+                    # macOS
+                    - target: x86_64-apple-darwin
+                      os: macos-latest
+                      arch: x64
+                      ext: ""
+                      archive: tar.gz
+                    - target: aarch64-apple-darwin
+                      os: macos-latest
+                      arch: arm64
+                      ext: ""
+                      archive: tar.gz
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag || github.ref }}
+                  fetch-depth: 0
+                  fetch-tags: true
+
+            - name: Get version
+              id: version
+              shell: bash
+              run: |
+                  if [ -n "${{ github.event.inputs.tag }}" ]; then
+                    VERSION="${{ github.event.inputs.tag }}"
+                  elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+                    VERSION="${{ github.ref_name }}"
+                  else
+                    VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")"
+                  fi
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+                  echo "Building version: $VERSION"
+
+            - name: Install Rust toolchain
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.target }}
+
+            - name: Install musl-tools (Linux)
+              if: contains(matrix.target, 'linux-musl')
+              run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+            - name: Install cross (for cross-compilation)
+              if: matrix.target == 'aarch64-unknown-linux-musl'
+              uses: taiki-e/install-action@v2
+              with:
+                  tool: cross
+
+            - uses: Swatinem/rust-cache@v2
+              with:
+                  key: ${{ matrix.target }}
+
+            - name: Build (native)
+              if: matrix.target != 'aarch64-unknown-linux-musl'
+              run: cargo build --release --locked --target ${{ matrix.target }}
+
+            - name: Build (cross)
+              if: matrix.target == 'aarch64-unknown-linux-musl'
+              run: cross build --release --locked --target ${{ matrix.target }}
+
+            - name: Determine platform name
+              id: platform
+              shell: bash
+              run: |
+                  case "${{ matrix.target }}" in
+                    *-windows-*) PLATFORM="windows" ;;
+                    *-linux-*) PLATFORM="linux" ;;
+                    *-apple-*) PLATFORM="macos" ;;
+                    *) PLATFORM="unknown" ;;
+                  esac
+                  echo "name=$PLATFORM" >> $GITHUB_OUTPUT
+
+            - name: Create archive name
+              id: archive
+              shell: bash
+              run: |
+                  VERSION="${{ steps.version.outputs.version }}"
+                  ARCHIVE_NAME="${{ env.BINARY_NAME }}-${VERSION}-${{ steps.platform.outputs.name }}-${{ matrix.arch }}"
+                  echo "name=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
+                  echo "Archive name: $ARCHIVE_NAME"
+
+            - name: Package (Windows)
+              if: matrix.archive == 'zip'
+              shell: pwsh
+              run: |
+                  $archiveName = "${{ steps.archive.outputs.name }}"
+                  New-Item -ItemType Directory -Path $archiveName -Force
+                  Copy-Item "target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.ext }}" -Destination "$archiveName/"
+                  Copy-Item "README.md" -Destination "$archiveName/" -ErrorAction SilentlyContinue
+                  Copy-Item "LICENSE" -Destination "$archiveName/" -ErrorAction SilentlyContinue
+                  Compress-Archive -Path "$archiveName/*" -DestinationPath "$archiveName.zip"
+
+            - name: Package (Unix)
+              if: matrix.archive == 'tar.gz'
+              shell: bash
+              run: |
+                  ARCHIVE_NAME="${{ steps.archive.outputs.name }}"
+                  mkdir -p "$ARCHIVE_NAME"
+                  cp "target/${{ matrix.target }}/release/${{ env.BINARY_NAME }}${{ matrix.ext }}" "$ARCHIVE_NAME/"
+                  cp README.md "$ARCHIVE_NAME/" 2>/dev/null || true
+                  cp LICENSE "$ARCHIVE_NAME/" 2>/dev/null || true
+                  tar -czvf "$ARCHIVE_NAME.tar.gz" "$ARCHIVE_NAME"
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: ${{ steps.archive.outputs.name }}
+                  path: ${{ steps.archive.outputs.name }}.${{ matrix.archive }}
+                  retention-days: 7
+
+    # Release job - only runs on tag push or manual trigger
+    release:
+        name: Create Release
+        needs: [build]
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.inputs.tag || github.ref }}
+                  fetch-depth: 0
+                  fetch-tags: true
+
+            - name: Get version info
+              id: version
+              run: |
+                  if [ -n "${{ github.event.inputs.tag }}" ]; then
+                    CURRENT_VERSION="${{ github.event.inputs.tag }}"
+                  elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+                    CURRENT_VERSION="${{ github.ref_name }}"
+                  else
+                    CURRENT_VERSION="$(git describe --tags --abbrev=0 2>/dev/null || echo "dev-$(git rev-parse --short HEAD)")"
+                  fi
+                  echo "current=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+                  # Get previous version for changelog
+                  PREV_VERSION=$(git describe --tags --abbrev=0 "${CURRENT_VERSION}^" 2>/dev/null || echo '')
+                  echo "previous=$PREV_VERSION" >> $GITHUB_OUTPUT
+
+                  echo "Current version: $CURRENT_VERSION"
+                  echo "Previous version: $PREV_VERSION"
+
+            - name: Generate release notes
+              id: release_notes
+              run: |
+                  CURRENT="${{ steps.version.outputs.current }}"
+                  PREVIOUS="${{ steps.version.outputs.previous }}"
+
+                  {
+                    echo "## What's Changed"
+                    echo ""
+                    
+                    if [ -n "$PREVIOUS" ]; then
+                      # Generate changelog from commits
+                      echo "### Commits"
+                      echo ""
+                      git log --pretty=format:"- %s (%h)" "${PREVIOUS}..${CURRENT}" 2>/dev/null || \
+                        git log --pretty=format:"- %s (%h)" -20
+                    else
+                      echo "Initial release"
+                    fi
+                    
+                    echo ""
+                    echo ""
+                    echo "## Installation"
+                    echo ""
+                    echo "### Using Cargo"
+                    echo '```bash'
+                    echo "cargo install sloc-guard"
+                    echo '```'
+                    echo ""
+                    echo "### Download Binary"
+                    echo ""
+                    echo "Download the appropriate binary for your platform from the assets below."
+                    echo ""
+                    echo "| Platform | Architecture | File |"
+                    echo "|----------|--------------|------|"
+                    echo "| Windows | x64 | \`sloc-guard-${CURRENT}-windows-x64.zip\` |"
+                    echo "| Windows | arm64 | \`sloc-guard-${CURRENT}-windows-arm64.zip\` |"
+                    echo "| Linux | x64 | \`sloc-guard-${CURRENT}-linux-x64.tar.gz\` |"
+                    echo "| Linux | arm64 | \`sloc-guard-${CURRENT}-linux-arm64.tar.gz\` |"
+                    echo "| macOS | x64 | \`sloc-guard-${CURRENT}-macos-x64.tar.gz\` |"
+                    echo "| macOS | arm64 | \`sloc-guard-${CURRENT}-macos-arm64.tar.gz\` |"
+                  } > release_notes.md
+
+                  cat release_notes.md
+
+            - name: Download all build artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: ./artifacts
+                  merge-multiple: true
+
+            - name: List downloaded artifacts
+              run: ls -la ./artifacts/
+
+            - name: Generate checksums
+              run: |
+                  cd ./artifacts
+                  sha256sum * > checksums-sha256.txt
+                  echo "Generated checksums:"
+                  cat checksums-sha256.txt
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  tag_name: ${{ steps.version.outputs.current }}
+                  name: ${{ steps.version.outputs.current }}
+                  body_path: ./release_notes.md
+                  draft: true
+                  generate_release_notes: true
+                  files: |
+                      ./artifacts/*
+
+            - name: Generate summary
+              run: |
+                  {
+                    echo "## Release Created"
+                    echo ""
+                    echo "**Version**: \`${{ steps.version.outputs.current }}\`"
+                    echo ""
+                    echo "### Artifacts"
+                    echo ""
+                    ls -1 ./artifacts/ | while read -r file; do
+                      echo "- \`$file\`"
+                    done
+                    echo ""
+                    echo "> **Note**: The release is created as a **draft**. Please review and publish it manually."
+                  } >> $GITHUB_STEP_SUMMARY
