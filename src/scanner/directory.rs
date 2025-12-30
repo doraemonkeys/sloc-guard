@@ -296,10 +296,11 @@ impl<'a> StructureScanState<'a> {
                         path.to_path_buf(),
                         rule.scope.clone(),
                     ));
+                return; // Disallowed files don't need further checks
             }
         }
 
-        // Check naming convention (applies regardless of mode)
+        // Check naming convention (only for allowed files)
         if !rule.filename_matches_naming_pattern(abs_path)
             && let Some(ref pattern_str) = rule.naming_pattern_str
         {

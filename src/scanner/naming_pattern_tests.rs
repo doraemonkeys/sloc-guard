@@ -174,9 +174,10 @@ fn scan_with_structure_combined_allowlist_and_naming_violations() {
     let temp_dir = TempDir::new().unwrap();
     let src_dir = temp_dir.path().join("src");
     std::fs::create_dir(&src_dir).unwrap();
+    // Use distinct filenames for cross-platform compatibility (Windows is case-insensitive)
     std::fs::write(src_dir.join("Button.tsx"), "").unwrap();
-    std::fs::write(src_dir.join("button.tsx"), "").unwrap();
-    std::fs::write(src_dir.join("config.json"), "").unwrap();
+    std::fs::write(src_dir.join("userCard.tsx"), "").unwrap(); // lowercase start = naming violation
+    std::fs::write(src_dir.join("config.json"), "").unwrap(); // wrong extension = disallowed
 
     let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
         .with_extensions(vec![".tsx".to_string()])
@@ -193,6 +194,45 @@ fn scan_with_structure_combined_allowlist_and_naming_violations() {
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
 
-    // Two violations: config.json (disallowed) and button.tsx (naming)
+    // Two violations: config.json (disallowed) and userCard.tsx (naming)
     assert_eq!(result.allowlist_violations.len(), 2);
+}
+
+/// Regression test: Disallowed files should NOT trigger naming pattern violations.
+///
+/// When a file is already disallowed (e.g., wrong extension), checking its naming
+/// pattern is redundant and would produce confusing duplicate violations.
+#[test]
+fn disallowed_file_does_not_trigger_naming_violation() {
+    let temp_dir = TempDir::new().unwrap();
+    let src_dir = temp_dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+
+    // This file would fail BOTH checks if the bug existed:
+    // - Wrong extension (.json, not .tsx) → DisallowedFile
+    // - Lowercase start → would fail naming pattern "^[A-Z]..."
+    // We expect ONLY the DisallowedFile violation.
+    std::fs::write(src_dir.join("lowercase.json"), "").unwrap();
+
+    let allowlist_rule = AllowlistRuleBuilder::new("**/src".to_string())
+        .with_extensions(vec![".tsx".to_string()])
+        .with_naming_pattern(Some("^[A-Z][a-zA-Z0-9]*\\.tsx$".to_string()))
+        .build()
+        .unwrap();
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    // Exactly one violation: DisallowedFile, NOT NamingConvention
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(matches!(
+        result.allowlist_violations[0].violation_type,
+        ViolationType::DisallowedFile
+    ));
 }
