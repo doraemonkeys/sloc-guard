@@ -6,27 +6,35 @@ use regex::Regex;
 use crate::SlocGuardError;
 use crate::error::Result;
 
-/// Strip leading `.` component from a path for consistent scope matching.
+/// Normalize a path for consistent scope matching.
 ///
-/// Converts paths like `./src/foo` or `.\src\foo` (Windows) to `src/foo`,
-/// ensuring scope patterns like `{src,src/**}` match regardless of scan root.
-fn strip_dot_prefix(path: &Path) -> PathBuf {
+/// This function performs two normalizations:
+/// 1. Strips leading `.` component (e.g., `./src/foo` or `.\src\foo` → `src/foo`)
+/// 2. Normalizes backslashes to forward slashes for cross-platform glob matching
+///
+/// These ensure scope patterns like `{src,src/**}` match regardless of scan root
+/// or platform-specific path separators.
+fn normalize_for_scope_matching(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
 
     // Strip leading "./" (Unix) or ".\" (Windows)
-    if let Some(rest) = path_str
+    let stripped = path_str
         .strip_prefix("./")
         .or_else(|| path_str.strip_prefix(".\\"))
-    {
-        return PathBuf::from(rest);
-    }
+        .unwrap_or(&path_str);
 
     // Handle bare "."
-    if path_str == "." {
+    if stripped.is_empty() || stripped == "." {
         return PathBuf::new();
     }
 
-    path.to_path_buf()
+    // Normalize backslashes to forward slashes for consistent glob matching on all platforms.
+    // Avoid allocation when no backslashes are present (common on Unix).
+    if stripped.contains('\\') {
+        PathBuf::from(stripped.replace('\\', "/"))
+    } else {
+        PathBuf::from(stripped)
+    }
 }
 
 /// A compiled allowlist rule for checking allowed file types in a directory.
@@ -161,7 +169,7 @@ impl AllowlistRule {
     /// to ensure consistent scope matching regardless of scan root.
     #[must_use]
     pub fn matches_directory(&self, dir: &Path) -> bool {
-        let normalized = strip_dot_prefix(dir);
+        let normalized = normalize_for_scope_matching(dir);
         self.matcher.is_match(normalized)
     }
 
@@ -410,34 +418,48 @@ impl AllowlistRuleBuilder {
 }
 
 #[cfg(test)]
-mod strip_dot_prefix_tests {
+mod normalize_for_scope_matching_tests {
     use super::*;
 
     #[test]
     fn removes_leading_dot() {
-        assert_eq!(strip_dot_prefix(Path::new("./src")), PathBuf::from("src"));
         assert_eq!(
-            strip_dot_prefix(Path::new("./src/lib")),
+            normalize_for_scope_matching(Path::new("./src")),
+            PathBuf::from("src")
+        );
+        assert_eq!(
+            normalize_for_scope_matching(Path::new("./src/lib")),
             PathBuf::from("src/lib")
         );
     }
 
     #[test]
     fn handles_backslash_paths() {
-        // On Windows, paths may use backslashes
-        assert_eq!(strip_dot_prefix(Path::new(".\\src")), PathBuf::from("src"));
+        // Backslash paths are normalized to forward slashes for consistent glob matching
         assert_eq!(
-            strip_dot_prefix(Path::new(".\\src\\lib")),
-            PathBuf::from("src\\lib")
+            normalize_for_scope_matching(Path::new(".\\src")),
+            PathBuf::from("src")
+        );
+        assert_eq!(
+            normalize_for_scope_matching(Path::new(".\\src\\lib")),
+            PathBuf::from("src/lib") // Backslashes normalized to forward slashes
         );
     }
 
     #[test]
-    fn no_op_for_paths_without_dot() {
-        assert_eq!(strip_dot_prefix(Path::new("src")), PathBuf::from("src"));
+    fn normalizes_backslashes_in_paths_without_dot_prefix() {
         assert_eq!(
-            strip_dot_prefix(Path::new("src/lib")),
+            normalize_for_scope_matching(Path::new("src")),
+            PathBuf::from("src")
+        );
+        assert_eq!(
+            normalize_for_scope_matching(Path::new("src/lib")),
             PathBuf::from("src/lib")
+        );
+        // Backslashes are normalized even without leading "./"
+        assert_eq!(
+            normalize_for_scope_matching(Path::new("src\\lib\\mod.rs")),
+            PathBuf::from("src/lib/mod.rs")
         );
     }
 
@@ -445,47 +467,63 @@ mod strip_dot_prefix_tests {
     fn preserves_dot_in_filename() {
         // Dot in filename should not be stripped
         assert_eq!(
-            strip_dot_prefix(Path::new("src/.gitignore")),
+            normalize_for_scope_matching(Path::new("src/.gitignore")),
             PathBuf::from("src/.gitignore")
         );
         assert_eq!(
-            strip_dot_prefix(Path::new("./.gitignore")),
+            normalize_for_scope_matching(Path::new("./.gitignore")),
             PathBuf::from(".gitignore")
         );
     }
 
     #[test]
     fn handles_just_dot() {
-        assert_eq!(strip_dot_prefix(Path::new(".")), PathBuf::from(""));
+        assert_eq!(
+            normalize_for_scope_matching(Path::new(".")),
+            PathBuf::from("")
+        );
+    }
+
+    #[test]
+    fn handles_bare_dot_slash() {
+        // When path is "./" or ".\\", stripped becomes empty string
+        assert_eq!(
+            normalize_for_scope_matching(Path::new("./")),
+            PathBuf::new()
+        );
+        assert_eq!(
+            normalize_for_scope_matching(Path::new(".\\")),
+            PathBuf::new()
+        );
     }
 
     #[test]
     fn preserves_parent_dir_prefix() {
         // "../" is ParentDir, NOT CurDir - it should not be stripped
         assert_eq!(
-            strip_dot_prefix(Path::new("../src")),
+            normalize_for_scope_matching(Path::new("../src")),
             PathBuf::from("../src")
         );
         assert_eq!(
-            strip_dot_prefix(Path::new("..\\src")),
-            PathBuf::from("..\\src")
+            normalize_for_scope_matching(Path::new("..\\src")),
+            PathBuf::from("../src") // Backslashes normalized
         );
         assert_eq!(
-            strip_dot_prefix(Path::new("../../lib")),
+            normalize_for_scope_matching(Path::new("../../lib")),
             PathBuf::from("../../lib")
         );
     }
 
     #[test]
     fn handles_mixed_separators() {
-        // Path with Unix prefix "./" but Windows separators internally
+        // Path with Unix prefix "./" but Windows separators internally - backslashes normalized
         assert_eq!(
-            strip_dot_prefix(Path::new("./src\\lib")),
-            PathBuf::from("src\\lib")
+            normalize_for_scope_matching(Path::new("./src\\lib")),
+            PathBuf::from("src/lib")
         );
         // Path with Windows prefix ".\" but Unix separators internally
         assert_eq!(
-            strip_dot_prefix(Path::new(".\\src/lib")),
+            normalize_for_scope_matching(Path::new(".\\src/lib")),
             PathBuf::from("src/lib")
         );
     }
