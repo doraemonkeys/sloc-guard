@@ -48,14 +48,19 @@ Instead of endlessly reminding AI to keep files small, just let it hit the wall 
 
 ### Installation
 
+**From crates.io:**
+
 ```bash
-# From source (requires Rust 1.85+)
-cargo install --git https://github.com/doraemonkeys/sloc-guard
-
 cargo install sloc-guard
-
-# Or download pre-built binary from GitHub Releases
 ```
+
+**From source**
+
+```bash
+cargo install --git https://github.com/doraemonkeys/sloc-guard
+```
+
+**Or download pre-built binary from [GitHub Releases](https://github.com/doraemonkeys/sloc-guard/releases).**
 
 ### 30-Second Setup
 
@@ -388,7 +393,7 @@ The hook uses `--staged` mode for fast incremental checks.
 
 ## Advanced Usage
 
-### GitHub Actions
+### GitHub Actions (Coming Soon 🚧)
 
 ```yaml
 name: Code Quality
@@ -416,7 +421,7 @@ jobs:
           sarif_file: results.sarif
 ```
 
-### Docker
+### Docker (Coming Soon 🚧)
 
 ```bash
 # Run directly
