@@ -5,7 +5,7 @@ edition = "2024"
 repository = "https://github.com/doraemonkeys/sloc-guard"
 homepage = "https://github.com/doraemonkeys/sloc-guard"
 license = "Apache-2.0"
-description = ""
+description = "A CLI tool that enforces SLOC limits and directory structure rules to guard against codebase complexity"
 
 [dependencies]
 # CLI parsing
