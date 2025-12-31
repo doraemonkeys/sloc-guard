@@ -56,23 +56,21 @@ jobs:
   sloc-guard:
     name: SLOC Guard
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0 # For --diff mode
 
-      - name: Install sloc-guard
-        run: |
-          gh release download --repo doraemonkeys/sloc-guard --pattern '*linux-x64.tar.gz'
-          tar xzf sloc-guard-*-linux-x64.tar.gz --strip-components=1
-          sudo mv sloc-guard /usr/local/bin/
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Check SLOC limits
-        run: sloc-guard check --diff origin/master --format sarif --output results.sarif
+      - name: Run sloc-guard
+        uses: doraemonkeys/sloc-guard/.github/action@v0.2
+        with:
+          sarif-output: results.sarif
+          diff: origin/master
 
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif

@@ -119,20 +119,20 @@ Clean up DRY violations and implicit state detection:
 
 Fix semantic issues in SARIF output and improve GitHub Action reliability.
 
-### Task 22.1: SARIF Structure Violation Rule IDs
+### Task 22.1: SARIF Structure Violation Rule IDs ✅
 
 Add proper SARIF rules for Structure violations. Currently only 2 rules defined (`sloc-guard/line-limit-exceeded`, `sloc-guard/line-limit-warning`) but Structure violations (file count, dir count, max depth, naming, etc.) incorrectly use these SLOC rules.
 
-- Add rule IDs per `ViolationType`: `sloc-guard/structure-file-count`, `sloc-guard/structure-dir-count`, `sloc-guard/structure-max-depth`, `sloc-guard/structure-disallowed-file`, `sloc-guard/structure-denied`, `sloc-guard/structure-naming`, `sloc-guard/structure-sibling`
+- Add rule IDs per `ViolationType`: `sloc-guard/structure-file-count`, `sloc-guard/structure-dir-count`, `sloc-guard/structure-max-depth`, `sloc-guard/structure-disallowed-file`, `sloc-guard/structure-disallowed-dir`, `sloc-guard/structure-denied`, `sloc-guard/structure-naming`, `sloc-guard/structure-sibling`
 - Use `violation_category()` to branch Content vs Structure in `convert_result()`
-- Update `rules` array in `build_sarif_report()`
+- Update `rules` array in `build_rules()` (10 rules total: 2 content + 8 structure)
 
-### Task 22.2: SARIF Structure Violation Messages
+### Task 22.2: SARIF Structure Violation Messages ✅
 
 Fix message text for Structure violations. Currently shows "File has N SLOC" for all violations including structure (e.g., "Directory has 15 files" should not show as "File has 15 SLOC").
 
-- Match on `ViolationType` to generate contextually correct messages
-- Reference Text formatter's `format_structure_violation()` for message patterns
+- Match on `ViolationType` to generate contextually correct messages via `format_structure_message()`
+- Content messages via `format_content_message()` for SLOC violations
 
 ### Task 22.3: GitHub Action Multi-Format Efficiency
 
@@ -151,12 +151,22 @@ Address shell and caching issues in `.github/action/action.yml`:
 - Fix SARIF `--format` argument construction (may conflict when JSON/Text added)
 - Verify Problem Matcher regex matches actual `--format text --color never` output
 
+### Task 22.5: Action Binary Download Format Alignment ✅
+
+Align `action.yml` binary download with `release.yml` naming convention:
+
+- Map runner OS/arch to platform (linux/macos/windows) and arch (x64/arm64) instead of target triples
+- Archive naming: `sloc-guard-${VERSION}-${PLATFORM}-${ARCH}.${EXT}` (e.g., `sloc-guard-v0.2.1-linux-x64.tar.gz`)
+- Checksum file: `checksums-sha256.txt` (was `SHA256SUMS`)
+- Version handling: preserve `v` prefix consistently (e.g., `v0.2.1` not `0.2.1`)
+- Update cache key to use platform/arch format
+
 ---
 
 ## Priority Order
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **17. SARIF & Action** | 22.1 SARIF Rules, 22.2 SARIF Messages, 22.3 Multi-Format, 22.4 Action Fixes |
+| **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, 22.3 Multi-Format, 22.4 Action Fixes, ~~22.5 Binary Format~~ ✅ |
 | **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
 

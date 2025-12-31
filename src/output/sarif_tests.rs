@@ -125,9 +125,14 @@ fn sarif_rules_defined() {
     let rules = parsed["runs"][0]["tool"]["driver"]["rules"]
         .as_array()
         .unwrap();
-    assert_eq!(rules.len(), 2);
+    // 2 content rules + 8 structure rules = 10 total
+    assert_eq!(rules.len(), 10);
+    // Content rules at indices 0-1
     assert_eq!(rules[0]["id"], "sloc-guard/line-limit-exceeded");
     assert_eq!(rules[1]["id"], "sloc-guard/line-limit-warning");
+    // Structure rules at indices 2-9
+    assert_eq!(rules[2]["id"], "sloc-guard/structure-file-count");
+    assert_eq!(rules[3]["id"], "sloc-guard/structure-dir-count");
 }
 
 #[test]
@@ -333,4 +338,414 @@ fn sarif_override_reason_included() {
 
     let props = &parsed["runs"][0]["results"][0]["properties"];
     assert_eq!(props["overrideReason"], "Legacy migration code");
+}
+
+// ============================================================================
+// Structure violation tests
+// ============================================================================
+
+mod structure_violations {
+    use super::*;
+    use crate::checker::{ViolationCategory, ViolationType};
+
+    fn make_structure_failed(
+        path: &str,
+        violation_type: ViolationType,
+        actual: usize,
+        limit: usize,
+    ) -> CheckResult {
+        CheckResult::Failed {
+            path: PathBuf::from(path),
+            stats: LineStats {
+                total: 0,
+                code: actual,
+                comment: 0,
+                blank: 0,
+                ignored: 0,
+            },
+            raw_stats: None,
+            limit,
+            override_reason: None,
+            suggestions: None,
+            violation_category: Some(ViolationCategory::Structure {
+                violation_type,
+                triggering_rule: None,
+            }),
+        }
+    }
+
+    fn make_structure_warning(
+        path: &str,
+        violation_type: ViolationType,
+        actual: usize,
+        limit: usize,
+    ) -> CheckResult {
+        CheckResult::Warning {
+            path: PathBuf::from(path),
+            stats: LineStats {
+                total: 0,
+                code: actual,
+                comment: 0,
+                blank: 0,
+                ignored: 0,
+            },
+            raw_stats: None,
+            limit,
+            override_reason: None,
+            suggestions: None,
+            violation_category: Some(ViolationCategory::Structure {
+                violation_type,
+                triggering_rule: None,
+            }),
+        }
+    }
+
+    fn make_structure_grandfathered(
+        path: &str,
+        violation_type: ViolationType,
+        actual: usize,
+        limit: usize,
+    ) -> CheckResult {
+        CheckResult::Grandfathered {
+            path: PathBuf::from(path),
+            stats: LineStats {
+                total: 0,
+                code: actual,
+                comment: 0,
+                blank: 0,
+                ignored: 0,
+            },
+            raw_stats: None,
+            limit,
+            override_reason: None,
+            violation_category: Some(ViolationCategory::Structure {
+                violation_type,
+                triggering_rule: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn sarif_rules_include_structure_rules() {
+        let formatter = SarifFormatter::new();
+        let results: Vec<CheckResult> = vec![];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let rules = parsed["runs"][0]["tool"]["driver"]["rules"]
+            .as_array()
+            .unwrap();
+        // 2 content rules + 8 structure rules = 10 total
+        assert_eq!(rules.len(), 10);
+
+        // Verify structure rule IDs exist
+        let rule_ids: Vec<&str> = rules.iter().map(|r| r["id"].as_str().unwrap()).collect();
+        assert!(rule_ids.contains(&"sloc-guard/structure-file-count"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-dir-count"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-max-depth"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-disallowed-file"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-disallowed-dir"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-denied"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-naming"));
+        assert!(rule_ids.contains(&"sloc-guard/structure-sibling"));
+    }
+
+    #[test]
+    fn sarif_file_count_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/components",
+            ViolationType::FileCount,
+            25,
+            20,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-file-count");
+        assert_eq!(result["level"], "error");
+        assert_eq!(result["ruleIndex"], 2);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("25 files"));
+        assert!(message.contains("limit of 20"));
+    }
+
+    #[test]
+    fn sarif_dir_count_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/modules",
+            ViolationType::DirCount,
+            15,
+            10,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-dir-count");
+        assert_eq!(result["ruleIndex"], 3);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("15 subdirectories"));
+        assert!(message.contains("limit of 10"));
+    }
+
+    #[test]
+    fn sarif_max_depth_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/a/b/c/d/e/f",
+            ViolationType::MaxDepth,
+            6,
+            5,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-max-depth");
+        assert_eq!(result["ruleIndex"], 4);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("depth is 6"));
+        assert!(message.contains("limit of 5"));
+    }
+
+    #[test]
+    fn sarif_disallowed_file_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/components/test.txt",
+            ViolationType::DisallowedFile,
+            1,
+            0,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-disallowed-file");
+        assert_eq!(result["ruleIndex"], 5);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("not allowed"));
+    }
+
+    #[test]
+    fn sarif_disallowed_directory_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/temp",
+            ViolationType::DisallowedDirectory,
+            1,
+            0,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-disallowed-dir");
+        assert_eq!(result["ruleIndex"], 6);
+    }
+
+    #[test]
+    fn sarif_denied_file_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "build/output.exe",
+            ViolationType::DeniedFile {
+                pattern_or_extension: ".exe".to_string(),
+            },
+            1,
+            0,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-denied");
+        assert_eq!(result["ruleIndex"], 7);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("deny pattern '.exe'"));
+    }
+
+    #[test]
+    fn sarif_denied_directory_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "vendor/node_modules",
+            ViolationType::DeniedDirectory {
+                pattern: "**/node_modules/".to_string(),
+            },
+            1,
+            0,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-denied");
+        assert_eq!(result["ruleIndex"], 7);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("deny pattern"));
+        assert!(message.contains("node_modules"));
+    }
+
+    #[test]
+    fn sarif_naming_convention_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/components/MyComponent.tsx",
+            ViolationType::NamingConvention {
+                expected_pattern: "^[a-z][a-z0-9_]*\\.tsx$".to_string(),
+            },
+            1,
+            0,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-naming");
+        assert_eq!(result["ruleIndex"], 8);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("does not match required pattern"));
+    }
+
+    #[test]
+    fn sarif_missing_sibling_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/components/Button.tsx",
+            ViolationType::MissingSibling {
+                expected_sibling_pattern: "{stem}.test.tsx".to_string(),
+            },
+            1,
+            1,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-sibling");
+        assert_eq!(result["ruleIndex"], 9);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("Missing required sibling"));
+        assert!(message.contains("{stem}.test.tsx"));
+    }
+
+    #[test]
+    fn sarif_group_incomplete_violation() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_failed(
+            "src/models/user.rs",
+            ViolationType::GroupIncomplete {
+                group_patterns: vec![
+                    "{stem}.rs".to_string(),
+                    "{stem}_test.rs".to_string(),
+                    "{stem}_mock.rs".to_string(),
+                ],
+                missing_patterns: vec!["{stem}_mock.rs".to_string()],
+            },
+            1,
+            1,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-sibling");
+        assert_eq!(result["ruleIndex"], 9);
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("Incomplete file group"));
+        assert!(message.contains("{stem}_mock.rs"));
+    }
+
+    #[test]
+    fn sarif_structure_warning_level() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_warning(
+            "src/large_dir",
+            ViolationType::FileCount,
+            18,
+            20,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-file-count");
+        assert_eq!(result["level"], "warning");
+    }
+
+    #[test]
+    fn sarif_structure_grandfathered() {
+        let formatter = SarifFormatter::new();
+        let results = vec![make_structure_grandfathered(
+            "legacy/big_dir",
+            ViolationType::FileCount,
+            30,
+            20,
+        )];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let result = &parsed["runs"][0]["results"][0];
+        assert_eq!(result["ruleId"], "sloc-guard/structure-file-count");
+        assert_eq!(result["level"], "note");
+        assert!(result.get("suppressions").is_some());
+
+        let message = result["message"]["text"].as_str().unwrap();
+        assert!(message.contains("(grandfathered)"));
+    }
+
+    #[test]
+    fn sarif_mixed_content_and_structure_violations() {
+        let formatter = SarifFormatter::new();
+        let results = vec![
+            make_failed_result("src/big_file.rs", 600, 500),
+            make_structure_failed("src/components", ViolationType::FileCount, 25, 20),
+            make_warning_result("src/medium_file.rs", 460, 500),
+            make_structure_warning("src/modules", ViolationType::DirCount, 9, 10),
+        ];
+
+        let output = formatter.format(&results).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        let sarif_results = parsed["runs"][0]["results"].as_array().unwrap();
+        assert_eq!(sarif_results.len(), 4);
+
+        // Content violation
+        assert_eq!(sarif_results[0]["ruleId"], "sloc-guard/line-limit-exceeded");
+        // Structure violation
+        assert_eq!(
+            sarif_results[1]["ruleId"],
+            "sloc-guard/structure-file-count"
+        );
+        // Content warning
+        assert_eq!(sarif_results[2]["ruleId"], "sloc-guard/line-limit-warning");
+        // Structure warning
+        assert_eq!(sarif_results[3]["ruleId"], "sloc-guard/structure-dir-count");
+    }
 }

@@ -75,33 +75,42 @@ runs:
         restore-keys: |
           ${{ runner.os }}-cargo-registry-
 
-    - name: Detect target triple
-      id: detect-target
+    - name: Detect platform and architecture
+      id: detect-platform
       shell: bash
       run: |
-        case "${{ runner.os }}-${{ runner.arch }}" in
-          Linux-X64)   TARGET="x86_64-unknown-linux-gnu" ;;
-          Linux-ARM64) TARGET="aarch64-unknown-linux-gnu" ;;
-          macOS-X64)   TARGET="x86_64-apple-darwin" ;;
-          macOS-ARM64) TARGET="aarch64-apple-darwin" ;;
-          Windows-X64) TARGET="x86_64-pc-windows-msvc" ;;
-          *)           TARGET="" ;;
+        # Map runner OS to release platform name
+        case "${{ runner.os }}" in
+          Linux)   PLATFORM="linux" ;;
+          macOS)   PLATFORM="macos" ;;
+          Windows) PLATFORM="windows" ;;
+          *)       PLATFORM="" ;;
         esac
-        echo "target=$TARGET" >> $GITHUB_OUTPUT
+
+        # Map runner arch to release arch name
+        case "${{ runner.arch }}" in
+          X64)   ARCH="x64" ;;
+          ARM64) ARCH="arm64" ;;
+          *)     ARCH="" ;;
+        esac
+
+        echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
+        echo "arch=$ARCH" >> $GITHUB_OUTPUT
 
     - name: Cache sloc-guard binary
       id: cache-binary
       uses: actions/cache@v4
       with:
         path: ~/.cargo/bin/sloc-guard*
-        key: ${{ runner.os }}-${{ runner.arch }}-sloc-guard-${{ inputs.version }}
+        key: sloc-guard-${{ steps.detect-platform.outputs.platform }}-${{ steps.detect-platform.outputs.arch }}-${{ inputs.version }}
 
     - name: Install sloc-guard
       if: steps.cache-binary.outputs.cache-hit != 'true'
       shell: bash
       env:
         ACTION_REPO: ${{ github.action_repository }}
-        TARGET: ${{ steps.detect-target.outputs.target }}
+        PLATFORM: ${{ steps.detect-platform.outputs.platform }}
+        ARCH: ${{ steps.detect-platform.outputs.arch }}
         VERSION: ${{ inputs.version }}
       run: |
         REPO_URL="https://github.com/${ACTION_REPO}"
@@ -158,14 +167,15 @@ runs:
           fi
         }
 
-        # Skip binary download if target is unknown
-        if [ -z "$TARGET" ]; then
-          echo "Unknown target: ${{ runner.os }}-${{ runner.arch }}"
+        # Skip binary download if platform/arch is unknown
+        if [ -z "$PLATFORM" ] || [ -z "$ARCH" ]; then
+          echo "Unknown platform/arch: ${{ runner.os }}-${{ runner.arch }}"
           fallback_cargo_install
           exit 0
         fi
 
         # Resolve version for "latest"
+        RESOLVED_VERSION="$VERSION"
         if [ "$VERSION" = "latest" ]; then
           echo "Resolving latest version..."
           LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${ACTION_REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' || echo "")
@@ -174,36 +184,42 @@ runs:
             fallback_cargo_install
             exit 0
           fi
-          VERSION="${LATEST_TAG#v}"
-          echo "Latest version: $VERSION"
+          RESOLVED_VERSION="$LATEST_TAG"
+          echo "Latest version: $RESOLVED_VERSION"
+        else
+          # Ensure version has 'v' prefix for URL construction
+          if [[ "$VERSION" != v* ]]; then
+            RESOLVED_VERSION="v$VERSION"
+          fi
         fi
 
         # Determine archive extension
-        if [ "${{ runner.os }}" = "Windows" ]; then
+        if [ "$PLATFORM" = "windows" ]; then
           ARCHIVE_EXT="zip"
         else
           ARCHIVE_EXT="tar.gz"
         fi
 
-        # Construct download URLs
-        BINARY_NAME="sloc-guard-${TARGET}.${ARCHIVE_EXT}"
-        BINARY_URL="${REPO_URL}/releases/download/v${VERSION}/${BINARY_NAME}"
-        SUMS_URL="${REPO_URL}/releases/download/v${VERSION}/SHA256SUMS"
+        # Construct download URLs matching release.yml format:
+        # sloc-guard-${VERSION}-${PLATFORM}-${ARCH}.${EXT}
+        ARCHIVE_NAME="sloc-guard-${RESOLVED_VERSION}-${PLATFORM}-${ARCH}.${ARCHIVE_EXT}"
+        ARCHIVE_URL="${REPO_URL}/releases/download/${RESOLVED_VERSION}/${ARCHIVE_NAME}"
+        SUMS_URL="${REPO_URL}/releases/download/${RESOLVED_VERSION}/checksums-sha256.txt"
 
         # Create temp directory
         TEMP_DIR=$(mktemp -d)
         trap "rm -rf '$TEMP_DIR'" EXIT
 
         # Download binary archive
-        ARCHIVE_PATH="$TEMP_DIR/$BINARY_NAME"
-        if ! download_with_retry "$BINARY_URL" "$ARCHIVE_PATH"; then
+        ARCHIVE_PATH="$TEMP_DIR/$ARCHIVE_NAME"
+        if ! download_with_retry "$ARCHIVE_URL" "$ARCHIVE_PATH"; then
           echo "Binary download failed"
           fallback_cargo_install
           exit 0
         fi
 
         # Download checksums
-        SUMS_PATH="$TEMP_DIR/SHA256SUMS"
+        SUMS_PATH="$TEMP_DIR/checksums-sha256.txt"
         if ! download_with_retry "$SUMS_URL" "$SUMS_PATH"; then
           echo "Checksum file download failed"
           fallback_cargo_install
@@ -219,7 +235,7 @@ runs:
 
         # Extract archive
         echo "Extracting binary..."
-        if [ "${{ runner.os }}" = "Windows" ]; then
+        if [ "$PLATFORM" = "windows" ]; then
           unzip -q "$ARCHIVE_PATH" -d "$TEMP_DIR/extracted"
         else
           mkdir -p "$TEMP_DIR/extracted"
@@ -227,7 +243,7 @@ runs:
         fi
 
         # Find and install binary
-        if [ "${{ runner.os }}" = "Windows" ]; then
+        if [ "$PLATFORM" = "windows" ]; then
           BINARY=$(find "$TEMP_DIR/extracted" -name "sloc-guard.exe" -type f | head -1)
         else
           BINARY=$(find "$TEMP_DIR/extracted" -name "sloc-guard" -type f | head -1)
@@ -305,17 +321,18 @@ runs:
         fi
 
         # Run check and capture output
+        PATHS="${{ inputs.paths }}"
         set +e
         if [ -n "$SARIF_FILE" ]; then
-          OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS 2>&1)
+          OUTPUT=$(sloc-guard check $PATHS $ARGS 2>&1)
           echo "$OUTPUT" > "$SARIF_FILE"
           # Run again for JSON and text output
-          JSON_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format json 2>&1)
-          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text --color never 2>&1)
+          JSON_OUTPUT=$(sloc-guard check $PATHS $ARGS --format json 2>&1)
+          TEXT_OUTPUT=$(sloc-guard check $PATHS $ARGS --format text --color never 2>&1)
           EXIT_CODE=$?
         else
-          JSON_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format json 2>&1)
-          TEXT_OUTPUT=$(sloc-guard check ${{ inputs.paths }} $ARGS --format text --color never 2>&1)
+          JSON_OUTPUT=$(sloc-guard check $PATHS $ARGS --format json 2>&1)
+          TEXT_OUTPUT=$(sloc-guard check $PATHS $ARGS --format text --color never 2>&1)
           EXIT_CODE=$?
         fi
         set -e

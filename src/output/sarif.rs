@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::analyzer::SplitSuggestion;
-use crate::checker::CheckResult;
+use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::error::Result;
 
 use super::OutputFormatter;
@@ -53,8 +53,19 @@ const TOOL_NAME: &str = "sloc-guard";
 const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TOOL_INFO_URI: &str = "https://github.com/doraemonkeys/sloc-guard";
 
+// Content (SLOC) rule IDs
 const RULE_LINE_LIMIT_EXCEEDED: &str = "sloc-guard/line-limit-exceeded";
 const RULE_LINE_LIMIT_WARNING: &str = "sloc-guard/line-limit-warning";
+
+// Structure rule IDs
+const RULE_STRUCTURE_FILE_COUNT: &str = "sloc-guard/structure-file-count";
+const RULE_STRUCTURE_DIR_COUNT: &str = "sloc-guard/structure-dir-count";
+const RULE_STRUCTURE_MAX_DEPTH: &str = "sloc-guard/structure-max-depth";
+const RULE_STRUCTURE_DISALLOWED_FILE: &str = "sloc-guard/structure-disallowed-file";
+const RULE_STRUCTURE_DISALLOWED_DIR: &str = "sloc-guard/structure-disallowed-dir";
+const RULE_STRUCTURE_DENIED: &str = "sloc-guard/structure-denied";
+const RULE_STRUCTURE_NAMING: &str = "sloc-guard/structure-naming";
+const RULE_STRUCTURE_SIBLING: &str = "sloc-guard/structure-sibling";
 
 #[derive(Serialize)]
 struct SarifLog {
@@ -174,6 +185,7 @@ struct StatsProperties {
 impl SarifFormatter {
     fn build_rules() -> Vec<ReportingDescriptor> {
         vec![
+            // Content (SLOC) rules - indices 0-1
             ReportingDescriptor {
                 id: RULE_LINE_LIMIT_EXCEEDED,
                 name: "LineLimitExceeded",
@@ -196,7 +208,227 @@ impl SarifFormatter {
                 },
                 default_configuration: ReportingConfiguration { level: "warning" },
             },
+            // Structure rules - indices 2-9
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_FILE_COUNT,
+                name: "StructureFileCount",
+                short_description: MultiformatMessageString {
+                    text: "Directory exceeds file count limit",
+                },
+                full_description: MultiformatMessageString {
+                    text: "The number of files in this directory exceeds the configured maximum limit.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_DIR_COUNT,
+                name: "StructureDirCount",
+                short_description: MultiformatMessageString {
+                    text: "Directory exceeds subdirectory count limit",
+                },
+                full_description: MultiformatMessageString {
+                    text: "The number of subdirectories in this directory exceeds the configured maximum limit.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_MAX_DEPTH,
+                name: "StructureMaxDepth",
+                short_description: MultiformatMessageString {
+                    text: "Directory exceeds maximum depth",
+                },
+                full_description: MultiformatMessageString {
+                    text: "The directory nesting depth exceeds the configured maximum limit.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_DISALLOWED_FILE,
+                name: "StructureDisallowedFile",
+                short_description: MultiformatMessageString {
+                    text: "File type not allowed",
+                },
+                full_description: MultiformatMessageString {
+                    text: "This file type is not in the allowlist for this directory.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_DISALLOWED_DIR,
+                name: "StructureDisallowedDir",
+                short_description: MultiformatMessageString {
+                    text: "Directory not allowed",
+                },
+                full_description: MultiformatMessageString {
+                    text: "This directory is not in the allowlist.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_DENIED,
+                name: "StructureDenied",
+                short_description: MultiformatMessageString {
+                    text: "File or directory denied",
+                },
+                full_description: MultiformatMessageString {
+                    text: "This file or directory matches a deny pattern and is not allowed.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_NAMING,
+                name: "StructureNaming",
+                short_description: MultiformatMessageString {
+                    text: "File naming convention violated",
+                },
+                full_description: MultiformatMessageString {
+                    text: "The file name does not match the required naming pattern for this directory.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
+            ReportingDescriptor {
+                id: RULE_STRUCTURE_SIBLING,
+                name: "StructureSibling",
+                short_description: MultiformatMessageString {
+                    text: "Required sibling file missing",
+                },
+                full_description: MultiformatMessageString {
+                    text: "A required sibling file is missing for this file.",
+                },
+                default_configuration: ReportingConfiguration { level: "error" },
+            },
         ]
+    }
+
+    /// Get rule ID and index based on violation category and result type.
+    fn get_rule_info(result: &CheckResult) -> (&'static str, usize, &'static str) {
+        let is_warning = result.is_warning();
+        let is_grandfathered = result.is_grandfathered();
+
+        match result.violation_category() {
+            Some(ViolationCategory::Structure { violation_type, .. }) => {
+                let (rule_id, rule_index) = match violation_type {
+                    ViolationType::FileCount => (RULE_STRUCTURE_FILE_COUNT, 2),
+                    ViolationType::DirCount => (RULE_STRUCTURE_DIR_COUNT, 3),
+                    ViolationType::MaxDepth => (RULE_STRUCTURE_MAX_DEPTH, 4),
+                    ViolationType::DisallowedFile => (RULE_STRUCTURE_DISALLOWED_FILE, 5),
+                    ViolationType::DisallowedDirectory => (RULE_STRUCTURE_DISALLOWED_DIR, 6),
+                    ViolationType::DeniedFile { .. } | ViolationType::DeniedDirectory { .. } => {
+                        (RULE_STRUCTURE_DENIED, 7)
+                    }
+                    ViolationType::NamingConvention { .. } => (RULE_STRUCTURE_NAMING, 8),
+                    ViolationType::MissingSibling { .. }
+                    | ViolationType::GroupIncomplete { .. } => (RULE_STRUCTURE_SIBLING, 9),
+                };
+                let level = if is_grandfathered {
+                    "note"
+                } else if is_warning {
+                    "warning"
+                } else {
+                    "error"
+                };
+                (rule_id, rule_index, level)
+            }
+            Some(ViolationCategory::Content) | None => {
+                // Content (SLOC) violation
+                if is_grandfathered {
+                    (RULE_LINE_LIMIT_EXCEEDED, 0, "note")
+                } else if is_warning {
+                    (RULE_LINE_LIMIT_WARNING, 1, "warning")
+                } else {
+                    (RULE_LINE_LIMIT_EXCEEDED, 0, "error")
+                }
+            }
+        }
+    }
+
+    /// Generate message text based on violation category.
+    fn get_message_text(result: &CheckResult) -> String {
+        match result.violation_category() {
+            Some(ViolationCategory::Structure { violation_type, .. }) => {
+                Self::format_structure_message(result, violation_type)
+            }
+            Some(ViolationCategory::Content) | None => Self::format_content_message(result),
+        }
+    }
+
+    fn format_content_message(result: &CheckResult) -> String {
+        let sloc = result.stats().sloc();
+        let limit = result.limit();
+
+        if result.is_grandfathered() {
+            format!("File has {sloc} SLOC, exceeding limit of {limit} (grandfathered)")
+        } else if result.is_warning() {
+            format!(
+                "File has {sloc} SLOC ({:.1}% of {limit} limit)",
+                result.usage_percent()
+            )
+        } else {
+            format!(
+                "File has {sloc} SLOC, exceeding limit of {limit} by {} lines",
+                sloc.saturating_sub(limit)
+            )
+        }
+    }
+
+    fn format_structure_message(result: &CheckResult, violation_type: &ViolationType) -> String {
+        let actual = result.stats().sloc();
+        let limit = result.limit();
+        let grandfathered_suffix = if result.is_grandfathered() {
+            " (grandfathered)"
+        } else {
+            ""
+        };
+
+        match violation_type {
+            ViolationType::FileCount => {
+                format!(
+                    "Directory has {actual} files, exceeding limit of {limit}{grandfathered_suffix}"
+                )
+            }
+            ViolationType::DirCount => {
+                format!(
+                    "Directory has {actual} subdirectories, exceeding limit of {limit}{grandfathered_suffix}"
+                )
+            }
+            ViolationType::MaxDepth => {
+                format!(
+                    "Directory depth is {actual}, exceeding limit of {limit}{grandfathered_suffix}"
+                )
+            }
+            ViolationType::DisallowedFile => {
+                format!("File type not allowed in this directory{grandfathered_suffix}")
+            }
+            ViolationType::DisallowedDirectory => {
+                format!("Directory not allowed{grandfathered_suffix}")
+            }
+            ViolationType::DeniedFile {
+                pattern_or_extension,
+            } => {
+                format!("File matches deny pattern '{pattern_or_extension}'{grandfathered_suffix}")
+            }
+            ViolationType::DeniedDirectory { pattern } => {
+                format!("Directory matches deny pattern '{pattern}'{grandfathered_suffix}")
+            }
+            ViolationType::NamingConvention { expected_pattern } => {
+                format!(
+                    "File name does not match required pattern '{expected_pattern}'{grandfathered_suffix}"
+                )
+            }
+            ViolationType::MissingSibling {
+                expected_sibling_pattern,
+            } => {
+                format!(
+                    "Missing required sibling file matching '{expected_sibling_pattern}'{grandfathered_suffix}"
+                )
+            }
+            ViolationType::GroupIncomplete {
+                missing_patterns, ..
+            } => {
+                let missing = missing_patterns.join(", ");
+                format!("Incomplete file group, missing: {missing}{grandfathered_suffix}")
+            }
+        }
     }
 
     fn convert_result(&self, result: &CheckResult) -> Option<SarifResult> {
@@ -204,12 +436,8 @@ impl SarifFormatter {
             return None;
         }
 
-        let (rule_id, rule_index, level) = match result {
-            CheckResult::Failed { .. } => (RULE_LINE_LIMIT_EXCEEDED, 0, "error"),
-            CheckResult::Warning { .. } => (RULE_LINE_LIMIT_WARNING, 1, "warning"),
-            CheckResult::Grandfathered { .. } => (RULE_LINE_LIMIT_EXCEEDED, 0, "note"),
-            CheckResult::Passed { .. } => unreachable!(),
-        };
+        let (rule_id, rule_index, level) = Self::get_rule_info(result);
+        let message_text = Self::get_message_text(result);
 
         let suppressions = if result.is_grandfathered() {
             Some(vec![Suppression {
@@ -218,27 +446,6 @@ impl SarifFormatter {
             }])
         } else {
             None
-        };
-
-        let message_text = match result {
-            CheckResult::Failed { .. } => format!(
-                "File has {} SLOC, exceeding limit of {} by {} lines",
-                result.stats().sloc(),
-                result.limit(),
-                result.stats().sloc() - result.limit()
-            ),
-            CheckResult::Warning { .. } => format!(
-                "File has {} SLOC ({:.1}% of {} limit)",
-                result.stats().sloc(),
-                result.usage_percent(),
-                result.limit()
-            ),
-            CheckResult::Grandfathered { .. } => format!(
-                "File has {} SLOC, exceeding limit of {} (grandfathered)",
-                result.stats().sloc(),
-                result.limit()
-            ),
-            CheckResult::Passed { .. } => unreachable!(),
         };
 
         // Convert path to URI format (already uses forward slashes from display_path)
