@@ -342,11 +342,11 @@ runs:
 
         # Create temp file for JSON output (always needed for statistics)
         JSON_FILE="$RUNNER_TEMP/sloc-guard-output.json"
-        CMD+=(--write-json "$JSON_FILE")
+        CMD+=(--report-json "$JSON_FILE")
         
         # Add SARIF output if requested
         if [ -n "$SARIF_FILE" ]; then
-          CMD+=(--write-sarif "$SARIF_FILE")
+          CMD+=(--report-sarif "$SARIF_FILE")
         fi
         
         # Force text output for problem matcher, disable color

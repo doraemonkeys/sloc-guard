@@ -393,7 +393,7 @@ The hook uses `--staged` mode for fast incremental checks.
 
 ## Advanced Usage
 
-### GitHub Actions (Coming Soon 🚧)
+### GitHub Actions
 
 ```yaml
 name: Code Quality
@@ -402,27 +402,28 @@ on: [push, pull_request]
 jobs:
   sloc-guard:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write  # Required for SARIF upload
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # For --diff mode
-      
-      - name: Install sloc-guard
-        run: |
-          gh release download --repo doraemonkeys/sloc-guard --pattern '*linux-x64.tar.gz'
-          tar xzf sloc-guard-*-linux-x64.tar.gz --strip-components=1
-          sudo mv sloc-guard /usr/local/bin/
-        env:
-          GH_TOKEN: ${{ github.token }}
-      
-      - name: Check SLOC limits
-        run: sloc-guard check --diff origin/main --format sarif --output results.sarif
-      
+          fetch-depth: 0  # Required for --diff mode
+
+      - name: Run sloc-guard
+        uses: doraemonkeys/sloc-guard/.github/action@master
+        with:
+          sarif-output: results.sarif
+          # Only diff on PRs, check all files on push
+          diff: ${{ github.event.pull_request.base.ref && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
+
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
 ```
+
+See [Action README](.github/action/README.md) for all available inputs and outputs.
 
 ### Docker
 
