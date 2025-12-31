@@ -23,7 +23,7 @@ inputs:
     required: false
     default: 'latest'
   cache:
-    description: 'Enable caching of sloc-guard results (.sloc-guard-cache.json)'
+    description: 'Enable caching of sloc-guard results (.git/sloc-guard/ or .sloc-guard/)'
     required: false
     default: 'true'
   sarif-output:
@@ -65,6 +65,9 @@ runs:
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
 
+    # Note: Cargo registry cache is only needed when falling back to `cargo install`.
+    # When using pre-built binaries, this cache is not populated.
+    # We keep it for the fallback case but use save-always: false to avoid warnings.
     - name: Cache cargo registry
       uses: actions/cache@v4
       with:
@@ -74,6 +77,7 @@ runs:
         key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-cargo-registry-
+        save-always: false
 
     - name: Detect platform and resolve version
       id: detect-platform
@@ -286,14 +290,18 @@ runs:
         fi
         echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT
 
+    # sloc-guard stores cache in .git/sloc-guard/ (git repos) or .sloc-guard/ (non-git)
     - name: Cache sloc-guard results
       if: inputs.cache == 'true'
       uses: actions/cache@v4
       with:
-        path: .sloc-guard-cache.json
+        path: |
+          .git/sloc-guard/cache.json
+          .sloc-guard/cache.json
         key: sloc-guard-cache-${{ steps.cache-key.outputs.hash }}-${{ inputs.version }}-${{ github.sha }}
         restore-keys: |
           sloc-guard-cache-${{ steps.cache-key.outputs.hash }}-${{ inputs.version }}-
+        save-always: false
 
     - name: Register problem matcher
       shell: bash
