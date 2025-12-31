@@ -65,10 +65,10 @@ jobs:
           fetch-depth: 0 # For --diff mode
 
       - name: Run sloc-guard
-        uses: doraemonkeys/sloc-guard/.github/action@v0.2
+        uses: doraemonkeys/sloc-guard/.github/action@master
         with:
           sarif-output: results.sarif
-          diff: origin/master
+          diff: ${{ github.event.pull_request.base.ref && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v4

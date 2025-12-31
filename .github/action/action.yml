@@ -319,9 +319,9 @@ runs:
           CMD+=(--config "$INPUT_CONFIG_PATH")
         fi
 
-        # Fail on warning
+        # Fail on warning (--strict treats warnings as errors)
         if [ "$INPUT_FAIL_ON_WARNING" = "true" ]; then
-          CMD+=(--fail-on-warning)
+          CMD+=(--strict)
         fi
 
         # SARIF output (stored for --write-sarif, no --format sarif needed)
