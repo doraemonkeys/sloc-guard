@@ -382,7 +382,7 @@ Add to `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/doraemonkeys/sloc-guard
-    rev: v0.1.0
+    rev: master
     hooks:
       - id: sloc-guard
 ```

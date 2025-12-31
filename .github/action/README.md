@@ -5,7 +5,7 @@ Enforce source lines of code limits and directory structure constraints in your 
 ## Usage
 
 ```yaml
-- uses: <owner>/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@master
   with:
     paths: 'src'
 ```
