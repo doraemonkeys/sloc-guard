@@ -341,12 +341,13 @@ runs:
         fi
 
         # Create temp file for JSON output (always needed for statistics)
+        # Use --write-json for check results (has passed/failed/warnings/grandfathered)
         JSON_FILE="$RUNNER_TEMP/sloc-guard-output.json"
-        CMD+=(--report-json "$JSON_FILE")
+        CMD+=(--write-json "$JSON_FILE")
         
         # Add SARIF output if requested
         if [ -n "$SARIF_FILE" ]; then
-          CMD+=(--report-sarif "$SARIF_FILE")
+          CMD+=(--write-sarif "$SARIF_FILE")
         fi
         
         # Force text output for problem matcher, disable color

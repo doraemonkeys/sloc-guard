@@ -53,7 +53,7 @@ The action downloads pre-built binaries from GitHub Releases when available, sig
 
 ### Efficient Multi-Format Output
 
-When SARIF output is enabled, the action uses single-run multi-format output (`--write-sarif`, `--write-json` flags) to generate all formats in one execution. This eliminates the need to run sloc-guard multiple times, significantly improving CI performance.
+When SARIF output is enabled, the action uses single-run multi-format output (`--write-sarif` and `--write-json` flags) to generate all formats in one execution. This eliminates the need to run sloc-guard multiple times, significantly improving CI performance.
 
 ### Job Summary
 
