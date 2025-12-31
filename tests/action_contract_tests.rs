@@ -495,4 +495,3 @@ fn action_contract_full_workflow_with_sarif() {
         "SARIF must have $schema field"
     );
 }
-
