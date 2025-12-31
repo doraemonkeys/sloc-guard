@@ -5,7 +5,7 @@
 //!
 //! Action dependencies:
 //! - CLI options: --config, --strict, --baseline, --diff, --write-json, --write-sarif, --format, --color
-//! - JSON output: .summary.{total_files, passed, failed, warnings, grandfathered}
+//! - JSON output: `.summary.{total_files, passed, failed, warnings, grandfathered}`
 //! - Exit codes: 0 = success, 1 = violations found, 2 = config error
 
 mod common;
