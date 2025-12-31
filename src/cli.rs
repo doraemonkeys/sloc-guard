@@ -252,6 +252,16 @@ pub struct CheckArgs {
     #[arg(long, value_name = "PATH")]
     pub report_json: Option<PathBuf>,
 
+    /// Write check results in SARIF format to file (in addition to primary output).
+    /// Enables single-run multi-format output for CI pipelines.
+    #[arg(long, value_name = "PATH")]
+    pub write_sarif: Option<PathBuf>,
+
+    /// Write check results in JSON format to file (in addition to primary output).
+    /// Enables single-run multi-format output for CI pipelines.
+    #[arg(long, value_name = "PATH")]
+    pub write_json: Option<PathBuf>,
+
     /// Explicit file list for pre-commit hooks. When provided, skips directory
     /// scanning and processes only the specified files. Structure checks are
     /// disabled in this mode. Files are separated by commas or spaces.

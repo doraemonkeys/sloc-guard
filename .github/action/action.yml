@@ -320,22 +320,36 @@ runs:
           ARGS="$ARGS --diff ${{ inputs.diff }}"
         fi
 
-        # Run check and capture output
+        # Run check with single-run multi-format output for efficiency
         PATHS="${{ inputs.paths }}"
-        set +e
+        
+        # Create temp file for JSON output (always needed for statistics)
+        JSON_FILE="${{ runner.temp }}/sloc-guard-output.json"
+        ARGS="$ARGS --write-json $JSON_FILE"
+        
+        # Add SARIF output if requested
         if [ -n "$SARIF_FILE" ]; then
-          OUTPUT=$(sloc-guard check $PATHS $ARGS 2>&1)
-          echo "$OUTPUT" > "$SARIF_FILE"
-          # Run again for JSON and text output
-          JSON_OUTPUT=$(sloc-guard check $PATHS $ARGS --format json 2>&1)
-          TEXT_OUTPUT=$(sloc-guard check $PATHS $ARGS --format text --color never 2>&1)
-          EXIT_CODE=$?
-        else
-          JSON_OUTPUT=$(sloc-guard check $PATHS $ARGS --format json 2>&1)
-          TEXT_OUTPUT=$(sloc-guard check $PATHS $ARGS --format text --color never 2>&1)
-          EXIT_CODE=$?
+          ARGS="$ARGS --write-sarif $SARIF_FILE"
         fi
+        
+        # Force text output for problem matcher, disable color
+        ARGS="$ARGS --format text --color never"
+        
+        set +e
+        TEXT_OUTPUT=$(sloc-guard check $PATHS $ARGS 2>&1)
+        EXIT_CODE=$?
         set -e
+        
+        # Read JSON output from file
+        if [ -f "$JSON_FILE" ]; then
+          JSON_OUTPUT=$(cat "$JSON_FILE")
+        else
+          # JSON file missing - this may indicate a sloc-guard failure before output was written
+          if [ "$EXIT_CODE" -ne 0 ] && [ "$EXIT_CODE" -ne 1 ]; then
+            echo "::warning::JSON output file not created (exit code: $EXIT_CODE)"
+          fi
+          JSON_OUTPUT="{}"
+        fi
 
         # Parse statistics from JSON output
         if command -v jq &> /dev/null; then

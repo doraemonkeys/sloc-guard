@@ -49,6 +49,10 @@ The action downloads pre-built binaries from GitHub Releases when available, sig
 
 **Fallback:** If pre-built binaries are unavailable or checksum verification fails, the action automatically falls back to `cargo install`.
 
+### Efficient Multi-Format Output
+
+When SARIF output is enabled, the action uses single-run multi-format output (`--write-sarif`, `--write-json` flags) to generate all formats in one execution. This eliminates the need to run sloc-guard multiple times, significantly improving CI performance.
+
 ### Job Summary
 
 The action automatically generates a Job Summary with check results that appears in the GitHub Actions workflow run page. The summary includes:

@@ -631,3 +631,52 @@ fn cli_check_with_diff_trailing_dots() {
         _ => panic!("Expected Check command"),
     }
 }
+
+// ============================================================================
+// Multi-Format Output Tests
+// ============================================================================
+
+#[test]
+fn cli_check_write_sarif() {
+    let cli = Cli::parse_from(["sloc-guard", "check", "--write-sarif", "output.sarif"]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.write_sarif, Some(PathBuf::from("output.sarif")));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
+fn cli_check_write_json() {
+    let cli = Cli::parse_from(["sloc-guard", "check", "--write-json", "output.json"]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.write_json, Some(PathBuf::from("output.json")));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
+fn cli_check_multi_format_output() {
+    // Test combining primary format with additional output files
+    let cli = Cli::parse_from([
+        "sloc-guard",
+        "check",
+        "--format",
+        "text",
+        "--write-sarif",
+        "results.sarif",
+        "--write-json",
+        "results.json",
+    ]);
+    match cli.command {
+        Commands::Check(args) => {
+            assert_eq!(args.format, OutputFormat::Text);
+            assert_eq!(args.write_sarif, Some(PathBuf::from("results.sarif")));
+            assert_eq!(args.write_json, Some(PathBuf::from("results.json")));
+        }
+        _ => panic!("Expected Check command"),
+    }
+}

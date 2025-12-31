@@ -96,12 +96,23 @@ pub(crate) fn resolve_scan_paths(paths: &[PathBuf], include: &[String]) -> Vec<P
     paths.to_vec()
 }
 
+/// Write output to a file or stdout.
+///
+/// When `output_path` is `Some`, the content is written to the file (creating parent
+/// directories if needed). The `quiet` flag only affects stdout output—file writes
+/// always proceed regardless of this flag.
 pub(crate) fn write_output(
     output_path: Option<&Path>,
     content: &str,
     quiet: bool,
 ) -> crate::Result<()> {
     if let Some(path) = output_path {
+        // Create parent directories if needed (consistent with save_cache behavior)
+        if let Some(parent) = path.parent()
+            && !parent.as_os_str().is_empty()
+        {
+            fs::create_dir_all(parent)?;
+        }
         fs::write(path, content)?;
     } else if !quiet {
         print!("{content}");

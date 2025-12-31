@@ -52,6 +52,23 @@ fn write_output_to_file() {
 }
 
 #[test]
+fn write_output_creates_parent_directories() {
+    let temp_dir = TempDir::new().unwrap();
+    // Use nested directories that don't exist yet
+    let output_path = temp_dir.path().join("nested/deep/dir/output.txt");
+
+    // Parent directory should not exist yet
+    assert!(!output_path.parent().unwrap().exists());
+
+    let result = write_output(Some(&output_path), "test content", false);
+    assert!(result.is_ok());
+    assert!(output_path.exists());
+
+    let content = std::fs::read_to_string(&output_path).unwrap();
+    assert_eq!(content, "test content");
+}
+
+#[test]
 fn write_output_quiet_mode() {
     let result = write_output(None, "test content", true);
     assert!(result.is_ok());

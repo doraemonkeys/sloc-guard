@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`, `--write-sarif`, `--write-json`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
 | `config/*` | `Config` (scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |

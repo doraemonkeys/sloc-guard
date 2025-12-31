@@ -318,22 +318,19 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     // 9. Write output
     write_output(args.output.as_deref(), &output, cli.quiet)?;
 
-    // 10. Determine exit code
-    let has_failures = results.iter().any(CheckResult::is_failed);
-    let has_warnings = results.iter().any(CheckResult::is_warning);
+    // 9.1 Write additional format outputs (single-run multi-format for CI efficiency)
+    write_additional_formats(
+        args,
+        &results,
+        color_mode,
+        project_stats.clone(),
+        project_root,
+        cli,
+    )?;
 
-    if args.warn_only {
-        return Ok(EXIT_SUCCESS);
-    }
-
-    // Strict mode: CLI flag takes precedence, otherwise use config
+    // 10. Determine exit code (strict: CLI flag takes precedence, otherwise use config)
     let strict = args.strict || config.content.strict;
-
-    let exit_code = if has_failures || (strict && has_warnings) || ratchet_failed {
-        EXIT_THRESHOLD_EXCEEDED
-    } else {
-        EXIT_SUCCESS
-    };
+    let exit_code = determine_exit_code(&results, args.warn_only, strict, ratchet_failed);
 
     // 11. Auto-snapshot on successful check if enabled
     if exit_code == EXIT_SUCCESS
@@ -344,6 +341,25 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     }
 
     Ok(exit_code)
+}
+
+/// Determine exit code based on results and mode flags.
+fn determine_exit_code(
+    results: &[CheckResult],
+    warn_only: bool,
+    strict: bool,
+    ratchet_failed: bool,
+) -> i32 {
+    if warn_only {
+        return EXIT_SUCCESS;
+    }
+    let has_failures = results.iter().any(CheckResult::is_failed);
+    let has_warnings = results.iter().any(CheckResult::is_warning);
+    if has_failures || (strict && has_warnings) || ratchet_failed {
+        EXIT_THRESHOLD_EXCEEDED
+    } else {
+        EXIT_SUCCESS
+    }
 }
 
 /// Handle baseline ratchet enforcement.
@@ -557,4 +573,45 @@ fn perform_auto_snapshot(
     if !quiet {
         eprintln!("Auto-snapshot recorded to {}", history_path.display());
     }
+}
+
+/// Write additional format outputs for single-run multi-format CI efficiency.
+///
+/// Supports `--write-sarif` and `--write-json` flags that write extra output files
+/// while the primary `--format` output goes to stdout.
+fn write_additional_formats(
+    args: &CheckArgs,
+    results: &[CheckResult],
+    color_mode: crate::output::ColorMode,
+    project_stats: Option<ProjectStatistics>,
+    project_root: &Path,
+    cli: &Cli,
+) -> crate::Result<()> {
+    if let Some(ref sarif_path) = args.write_sarif {
+        let sarif_output = format_output(
+            OutputFormat::Sarif,
+            results,
+            color_mode,
+            cli.verbose,
+            args.suggest,
+            project_stats.clone(),
+            Some(project_root.to_path_buf()),
+        )?;
+        write_output(Some(sarif_path), &sarif_output, cli.quiet)?;
+    }
+
+    if let Some(ref json_path) = args.write_json {
+        let json_output = format_output(
+            OutputFormat::Json,
+            results,
+            color_mode,
+            cli.verbose,
+            args.suggest,
+            project_stats,
+            Some(project_root.to_path_buf()),
+        )?;
+        write_output(Some(json_path), &json_output, cli.quiet)?;
+    }
+
+    Ok(())
 }

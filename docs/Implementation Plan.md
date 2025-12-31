@@ -134,13 +134,14 @@ Fix message text for Structure violations. Currently shows "File has N SLOC" for
 - Match on `ViolationType` to generate contextually correct messages via `format_structure_message()`
 - Content messages via `format_content_message()` for SLOC violations
 
-### Task 22.3: GitHub Action Multi-Format Efficiency
+### Task 22.3: GitHub Action Multi-Format Efficiency ✅
 
-Fix SARIF mode running sloc-guard 3 times (SARIF, JSON, Text). Consider single-run multi-output or result caching.
+Add `--write-sarif` and `--write-json` flags for single-run multi-format output:
 
-- Option A: Add `--format multi` or comma-separated format support to CLI
-- Option B: Refactor action to reuse SARIF content for summary extraction
-- Ensure EXIT_CODE captured consistently
+- `--write-sarif <path>`: Write SARIF output to file in addition to primary format
+- `--write-json <path>`: Write JSON output to file in addition to primary format
+- Action updated to use single run: `sloc-guard check --format text --write-sarif <path> --write-json <path>`
+- EXIT_CODE captured from single run
 
 ### Task 22.4: GitHub Action Reliability Fixes
 
@@ -167,6 +168,6 @@ Align `action.yml` binary download with `release.yml` naming convention:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, 22.3 Multi-Format, 22.4 Action Fixes, ~~22.5 Binary Format~~ ✅ |
+| **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, ~~22.3 Multi-Format~~ ✅, 22.4 Action Fixes, ~~22.5 Binary Format~~ ✅ |
 | **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
 

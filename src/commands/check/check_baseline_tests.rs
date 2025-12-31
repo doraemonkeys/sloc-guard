@@ -92,6 +92,8 @@ impl CheckArgsBuilder {
             max_dirs: None,
             max_depth: None,
             report_json: None,
+            write_sarif: None,
+            write_json: None,
             files: vec![],
         }
     }

@@ -35,6 +35,16 @@ mod check_output_tests;
 #[cfg(test)]
 mod check_processing_tests;
 #[cfg(test)]
-mod check_run_tests;
+mod check_run_auto_snapshot_tests;
+#[cfg(test)]
+mod check_run_exit_code_tests;
+#[cfg(test)]
+mod check_run_filter_tests;
+#[cfg(test)]
+mod check_run_output_format_tests;
+#[cfg(test)]
+mod check_run_sidecar_output_tests;
+#[cfg(test)]
+mod check_run_strict_warn_tests;
 #[cfg(test)]
 mod check_tests;
