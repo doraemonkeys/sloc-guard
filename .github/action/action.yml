@@ -75,9 +75,12 @@ runs:
         restore-keys: |
           ${{ runner.os }}-cargo-registry-
 
-    - name: Detect platform and architecture
+    - name: Detect platform and resolve version
       id: detect-platform
       shell: bash
+      env:
+        ACTION_REPO: ${{ github.action_repository }}
+        VERSION: ${{ inputs.version }}
       run: |
         # Map runner OS to release platform name
         case "${{ runner.os }}" in
@@ -94,15 +97,35 @@ runs:
           *)     ARCH="" ;;
         esac
 
+        # Resolve version for "latest" to enable proper cache invalidation
+        # Note: GitHub API has rate limits for unauthenticated requests (60/hour).
+        # In high-traffic scenarios, this may fail and fall back to cargo install.
+        RESOLVED_VERSION="$VERSION"
+        if [ "$VERSION" = "latest" ]; then
+          echo "Resolving latest version..."
+          LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${ACTION_REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' || echo "")
+          if [ -n "$LATEST_TAG" ]; then
+            RESOLVED_VERSION="$LATEST_TAG"
+            echo "Latest version: $RESOLVED_VERSION"
+          else
+            echo "Could not determine latest version from GitHub API, will fall back to cargo install"
+            RESOLVED_VERSION="latest-fallback"
+          fi
+        elif [[ "$VERSION" != v* ]]; then
+          # Ensure version has 'v' prefix for consistency
+          RESOLVED_VERSION="v$VERSION"
+        fi
+
         echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
         echo "arch=$ARCH" >> $GITHUB_OUTPUT
+        echo "resolved_version=$RESOLVED_VERSION" >> $GITHUB_OUTPUT
 
     - name: Cache sloc-guard binary
       id: cache-binary
       uses: actions/cache@v4
       with:
         path: ~/.cargo/bin/sloc-guard*
-        key: sloc-guard-${{ steps.detect-platform.outputs.platform }}-${{ steps.detect-platform.outputs.arch }}-${{ inputs.version }}
+        key: sloc-guard-${{ steps.detect-platform.outputs.platform }}-${{ steps.detect-platform.outputs.arch }}-${{ steps.detect-platform.outputs.resolved_version }}
 
     - name: Install sloc-guard
       if: steps.cache-binary.outputs.cache-hit != 'true'
@@ -112,6 +135,7 @@ runs:
         PLATFORM: ${{ steps.detect-platform.outputs.platform }}
         ARCH: ${{ steps.detect-platform.outputs.arch }}
         VERSION: ${{ inputs.version }}
+        RESOLVED_VERSION: ${{ steps.detect-platform.outputs.resolved_version }}
       run: |
         REPO_URL="https://github.com/${ACTION_REPO}"
         INSTALL_DIR="$HOME/.cargo/bin"
@@ -167,30 +191,18 @@ runs:
           fi
         }
 
-        # Skip binary download if platform/arch is unknown
+        # Skip binary download if platform/arch is unknown or version resolution failed
         if [ -z "$PLATFORM" ] || [ -z "$ARCH" ]; then
           echo "Unknown platform/arch: ${{ runner.os }}-${{ runner.arch }}"
           fallback_cargo_install
           exit 0
         fi
 
-        # Resolve version for "latest"
-        RESOLVED_VERSION="$VERSION"
-        if [ "$VERSION" = "latest" ]; then
-          echo "Resolving latest version..."
-          LATEST_TAG=$(curl -fsSL "https://api.github.com/repos/${ACTION_REPO}/releases/latest" 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' || echo "")
-          if [ -z "$LATEST_TAG" ]; then
-            echo "Could not determine latest version"
-            fallback_cargo_install
-            exit 0
-          fi
-          RESOLVED_VERSION="$LATEST_TAG"
-          echo "Latest version: $RESOLVED_VERSION"
-        else
-          # Ensure version has 'v' prefix for URL construction
-          if [[ "$VERSION" != v* ]]; then
-            RESOLVED_VERSION="v$VERSION"
-          fi
+        # Use pre-resolved version from detect-platform step
+        if [ "$RESOLVED_VERSION" = "latest-fallback" ]; then
+          echo "Version resolution failed earlier"
+          fallback_cargo_install
+          exit 0
         fi
 
         # Determine archive extension
@@ -290,53 +302,62 @@ runs:
     - name: Run sloc-guard check
       id: run-check
       shell: bash
+      env:
+        INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+        INPUT_FAIL_ON_WARNING: ${{ inputs.fail-on-warning }}
+        INPUT_SARIF_OUTPUT: ${{ inputs.sarif-output }}
+        INPUT_BASELINE: ${{ inputs.baseline }}
+        INPUT_DIFF: ${{ inputs.diff }}
+        INPUT_PATHS: ${{ inputs.paths }}
+        RUNNER_TEMP: ${{ runner.temp }}
       run: |
-        ARGS=""
+        # Build command as array for proper quoting and shell safety
+        CMD=(sloc-guard check)
 
         # Config path
-        if [ -n "${{ inputs.config-path }}" ]; then
-          ARGS="$ARGS --config ${{ inputs.config-path }}"
+        if [ -n "$INPUT_CONFIG_PATH" ]; then
+          CMD+=(--config "$INPUT_CONFIG_PATH")
         fi
 
         # Fail on warning
-        if [ "${{ inputs.fail-on-warning }}" = "true" ]; then
-          ARGS="$ARGS --fail-on-warning"
+        if [ "$INPUT_FAIL_ON_WARNING" = "true" ]; then
+          CMD+=(--fail-on-warning)
         fi
 
-        # SARIF output
+        # SARIF output (stored for --write-sarif, no --format sarif needed)
         SARIF_FILE=""
-        if [ -n "${{ inputs.sarif-output }}" ]; then
-          SARIF_FILE="${{ inputs.sarif-output }}"
-          ARGS="$ARGS --format sarif"
+        if [ -n "$INPUT_SARIF_OUTPUT" ]; then
+          SARIF_FILE="$INPUT_SARIF_OUTPUT"
         fi
 
         # Baseline
-        if [ -n "${{ inputs.baseline }}" ]; then
-          ARGS="$ARGS --baseline ${{ inputs.baseline }}"
+        if [ -n "$INPUT_BASELINE" ]; then
+          CMD+=(--baseline "$INPUT_BASELINE")
         fi
 
         # Diff mode
-        if [ -n "${{ inputs.diff }}" ]; then
-          ARGS="$ARGS --diff ${{ inputs.diff }}"
+        if [ -n "$INPUT_DIFF" ]; then
+          CMD+=(--diff "$INPUT_DIFF")
         fi
 
-        # Run check with single-run multi-format output for efficiency
-        PATHS="${{ inputs.paths }}"
-        
         # Create temp file for JSON output (always needed for statistics)
-        JSON_FILE="${{ runner.temp }}/sloc-guard-output.json"
-        ARGS="$ARGS --write-json $JSON_FILE"
+        JSON_FILE="$RUNNER_TEMP/sloc-guard-output.json"
+        CMD+=(--write-json "$JSON_FILE")
         
         # Add SARIF output if requested
         if [ -n "$SARIF_FILE" ]; then
-          ARGS="$ARGS --write-sarif $SARIF_FILE"
+          CMD+=(--write-sarif "$SARIF_FILE")
         fi
         
         # Force text output for problem matcher, disable color
-        ARGS="$ARGS --format text --color never"
+        CMD+=(--format text --color never)
+        
+        # Add paths at the end (intentional word splitting for space-separated paths)
+        # shellcheck disable=SC2206
+        CMD+=($INPUT_PATHS)
         
         set +e
-        TEXT_OUTPUT=$(sloc-guard check $PATHS $ARGS 2>&1)
+        TEXT_OUTPUT=$("${CMD[@]}" 2>&1)
         EXIT_CODE=$?
         set -e
         
@@ -429,4 +450,6 @@ runs:
       shell: bash
       run: |
         echo "::remove-matcher owner=sloc-guard-error::"
+        echo "::remove-matcher owner=sloc-guard-error-reason::"
         echo "::remove-matcher owner=sloc-guard-warning::"
+        echo "::remove-matcher owner=sloc-guard-warning-reason::"

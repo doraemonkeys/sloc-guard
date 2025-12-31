@@ -9,8 +9,22 @@
           "file": 1
         },
         {
-          "regexp": "^\\s+(Lines|Files|Directories): (\\d+) \\(limit: (\\d+)\\)$",
+          "regexp": "^\\s+(Lines|Files|Directories|Depth): (\\d+) \\(limit: (\\d+)\\)$",
           "message": 0
+        }
+      ]
+    },
+    {
+      "owner": "sloc-guard-error-reason",
+      "severity": "error",
+      "pattern": [
+        {
+          "regexp": "^. FAILED: (.+)$",
+          "file": 1
+        },
+        {
+          "regexp": "^\\s+Reason: (.+)$",
+          "message": 1
         }
       ]
     },
@@ -23,8 +37,22 @@
           "file": 1
         },
         {
-          "regexp": "^\\s+(Lines|Files|Directories): (\\d+) \\(limit: (\\d+)\\)$",
+          "regexp": "^\\s+(Lines|Files|Directories|Depth): (\\d+) \\(limit: (\\d+)\\)$",
           "message": 0
+        }
+      ]
+    },
+    {
+      "owner": "sloc-guard-warning-reason",
+      "severity": "warning",
+      "pattern": [
+        {
+          "regexp": "^. WARNING: (.+)$",
+          "file": 1
+        },
+        {
+          "regexp": "^\\s+Reason: (.+)$",
+          "message": 1
         }
       ]
     }

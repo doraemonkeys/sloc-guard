@@ -115,7 +115,7 @@ Clean up DRY violations and implicit state detection:
 
 ---
 
-## Phase 22: SARIF & GitHub Action Fixes (Pending)
+## Phase 22: SARIF & GitHub Action Fixes (Complete)
 
 Fix semantic issues in SARIF output and improve GitHub Action reliability.
 
@@ -143,14 +143,14 @@ Add `--write-sarif` and `--write-json` flags for single-run multi-format output:
 - Action updated to use single run: `sloc-guard check --format text --write-sarif <path> --write-json <path>`
 - EXIT_CODE captured from single run
 
-### Task 22.4: GitHub Action Reliability Fixes
+### Task 22.4: GitHub Action Reliability Fixes ✅
 
 Address shell and caching issues in `.github/action/action.yml`:
 
 - Fix `latest` version cache: include resolved actual version in cache key
-- Fix shell quoting: wrap `${{ inputs.paths }}` in quotes (lines 281, 298, 303, 310, 311, 317, 318)
-- Fix SARIF `--format` argument construction (may conflict when JSON/Text added)
-- Verify Problem Matcher regex matches actual `--format text --color never` output
+- Fix shell quoting: use env vars for inputs, proper quoting in command construction
+- Fix SARIF `--format` argument construction (removed duplicate --format sarif, now uses --write-sarif)
+- Fix Problem Matcher regex: add Depth, add reason patterns for file-level violations
 
 ### Task 22.5: Action Binary Download Format Alignment ✅
 
@@ -168,6 +168,6 @@ Align `action.yml` binary download with `release.yml` naming convention:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, ~~22.3 Multi-Format~~ ✅, 22.4 Action Fixes, ~~22.5 Binary Format~~ ✅ |
+| **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, ~~22.3 Multi-Format~~ ✅, ~~22.4 Action Fixes~~ ✅, ~~22.5 Binary Format~~ ✅ |
 | **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
 

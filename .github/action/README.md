@@ -14,7 +14,7 @@ Enforce source lines of code limits and directory structure constraints in your 
 
 | Input | Description | Default |
 |-------|-------------|---------|
-| `paths` | Paths to check (space-separated) | `.` |
+| `paths` | Paths to check (space-separated, see note below) | `.` |
 | `config-path` | Path to sloc-guard.toml | Auto-detected |
 | `fail-on-warning` | Treat warnings as failures | `false` |
 | `version` | sloc-guard version to install | `latest` |
@@ -22,6 +22,8 @@ Enforce source lines of code limits and directory structure constraints in your 
 | `sarif-output` | Path for SARIF output file | (disabled) |
 | `baseline` | Path to baseline file | (disabled) |
 | `diff` | Only check files changed since ref | (disabled) |
+
+**Note on `paths`:** Paths containing spaces are not supported. If you need to check directories with spaces in their names, use glob patterns in your `sloc-guard.toml` configuration instead.
 
 ## Outputs
 
