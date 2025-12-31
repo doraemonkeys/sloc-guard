@@ -421,22 +421,20 @@ jobs:
           sarif_file: results.sarif
 ```
 
-### Docker (Coming Soon 🚧)
+### Docker
 
 ```bash
-# Run directly
+# Linux/macOS/WSL
 docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/doraemonkeys/sloc-guard check
 
-# With custom config
-docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/doraemonkeys/sloc-guard check --config .sloc-guard.toml
+# PowerShell
+docker run --rm -v "${PWD}:/workspace" -w /workspace ghcr.io/doraemonkeys/sloc-guard check
 ```
 
 Build locally:
 ```bash
 docker build -t sloc-guard .
 ```
-
-The Docker image is Alpine-based (~10MB) and runs as a non-root user.
 
 ### Monorepo Setup
 
