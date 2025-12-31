@@ -2,7 +2,7 @@
 # Users add this to their .pre-commit-config.yaml:
 #   repos:
 #     - repo: https://github.com/doraemonkeys/sloc-guard
-#       rev: v0.1.0  # Pin to specific version
+#       rev: v0.2.3  # Pin to specific version
 #       hooks:
 #         - id: sloc-guard
 

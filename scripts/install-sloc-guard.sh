@@ -125,7 +125,7 @@ install_binary() {
     local binary_name="${TOOL_NAME}-${target}.${archive_ext}"
     local base_url="https://github.com/${REPO}/releases/download/v${version}"
     local binary_url="${base_url}/${binary_name}"
-    local sums_url="${base_url}/SHA256SUMS"
+    local sums_url="${base_url}/checksums-sha256.txt"
 
     # Create temp directory
     local temp_dir
@@ -141,11 +141,11 @@ install_binary() {
     fi
 
     # Download checksums
-    if ! download_with_retry "$sums_url" "$temp_dir/SHA256SUMS"; then
+    if ! download_with_retry "$sums_url" "$temp_dir/checksums-sha256.txt"; then
         echo "Failed to download checksums, skipping verification" >&2
     else
         # Verify checksum
-        if ! verify_checksum "$temp_dir/$binary_name" "$temp_dir/SHA256SUMS"; then
+        if ! verify_checksum "$temp_dir/$binary_name" "$temp_dir/checksums-sha256.txt"; then
             return 1
         fi
     fi

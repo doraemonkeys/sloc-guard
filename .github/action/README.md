@@ -83,13 +83,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: <owner>/sloc-guard/.github/action@main
+      - uses: doraemonkeys/sloc-guard/.github/action@main
 ```
 
 ### PR Checks with Diff Mode
 
 ```yaml
-- uses: <owner>/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@main
   with:
     diff: 'origin/main'
     fail-on-warning: 'true'
@@ -98,7 +98,7 @@ jobs:
 ### SARIF Upload to GitHub Security
 
 ```yaml
-- uses: <owner>/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@main
   id: sloc-guard
   with:
     sarif-output: 'sloc-guard.sarif'
@@ -112,7 +112,7 @@ jobs:
 ### Using Outputs
 
 ```yaml
-- uses: <owner>/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@main
   id: sloc-guard
 
 - run: |
@@ -126,7 +126,7 @@ jobs:
 A lightweight Docker image (~10MB) is available for use in any CI/CD platform.
 
 ```bash
-docker pull ghcr.io/<owner>/sloc-guard:latest
+docker pull ghcr.io/doraemonkeys/sloc-guard:latest
 ```
 
 **Supported platforms:** linux/amd64, linux/arm64
@@ -135,23 +135,23 @@ docker pull ghcr.io/<owner>/sloc-guard:latest
 
 ```bash
 # Check current directory
-docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard check .
+docker run --rm -v "$(pwd):/workspace" ghcr.io/doraemonkeys/sloc-guard check .
 
 # With custom config
-docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard check --config sloc-guard.toml src
+docker run --rm -v "$(pwd):/workspace" ghcr.io/doraemonkeys/sloc-guard check --config sloc-guard.toml src
 
 # Generate SARIF output
-docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard check --format sarif src > sloc-guard.sarif
+docker run --rm -v "$(pwd):/workspace" ghcr.io/doraemonkeys/sloc-guard check --format sarif src > sloc-guard.sarif
 
 # Get statistics
-docker run --rm -v "$(pwd):/workspace" ghcr.io/<owner>/sloc-guard stats src
+docker run --rm -v "$(pwd):/workspace" ghcr.io/doraemonkeys/sloc-guard stats src
 ```
 
 ### GitLab CI
 
 ```yaml
 sloc-guard:
-  image: ghcr.io/<owner>/sloc-guard:latest
+  image: ghcr.io/doraemonkeys/sloc-guard:latest
   stage: lint
   script:
     - sloc-guard check src
@@ -164,7 +164,7 @@ sloc-guard:
 
 ```yaml
 sloc-guard:
-  image: ghcr.io/<owner>/sloc-guard:latest
+  image: ghcr.io/doraemonkeys/sloc-guard:latest
   stage: lint
   script:
     - sloc-guard check --format sarif src > sloc-guard.sarif
@@ -181,7 +181,7 @@ sloc-guard:
 pipeline {
     agent {
         docker {
-            image 'ghcr.io/<owner>/sloc-guard:latest'
+            image 'ghcr.io/doraemonkeys/sloc-guard:latest'
         }
     }
     stages {
@@ -199,7 +199,7 @@ pipeline {
 ```groovy
 node {
     stage('SLOC Check') {
-        docker.image('ghcr.io/<owner>/sloc-guard:latest').inside {
+        docker.image('ghcr.io/doraemonkeys/sloc-guard:latest').inside {
             sh 'sloc-guard check src'
         }
     }
@@ -215,7 +215,7 @@ trigger:
 pool:
   vmImage: 'ubuntu-latest'
 
-container: ghcr.io/<owner>/sloc-guard:latest
+container: ghcr.io/doraemonkeys/sloc-guard:latest
 
 steps:
   - checkout: self
@@ -247,7 +247,7 @@ version: 2.1
 jobs:
   sloc-guard:
     docker:
-      - image: ghcr.io/<owner>/sloc-guard:latest
+      - image: ghcr.io/doraemonkeys/sloc-guard:latest
     steps:
       - checkout
       - run:
