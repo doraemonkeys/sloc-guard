@@ -409,8 +409,11 @@ jobs:
       
       - name: Install sloc-guard
         run: |
-          curl -sSL https://github.com/doraemonkeys/sloc-guard/releases/latest/download/sloc-guard-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          gh release download --repo doraemonkeys/sloc-guard --pattern '*linux-x64.tar.gz'
+          tar xzf sloc-guard-*-linux-x64.tar.gz --strip-components=1
           sudo mv sloc-guard /usr/local/bin/
+        env:
+          GH_TOKEN: ${{ github.token }}
       
       - name: Check SLOC limits
         run: sloc-guard check --diff origin/main --format sarif --output results.sarif
