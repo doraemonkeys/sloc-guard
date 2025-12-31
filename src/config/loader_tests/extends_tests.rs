@@ -200,7 +200,7 @@ max_lines = 100
     assert!(result.is_err());
     assert!(matches!(
         result.unwrap_err(),
-        SlocGuardError::FileRead { .. }
+        SlocGuardError::FileAccess { .. }
     ));
 }
 

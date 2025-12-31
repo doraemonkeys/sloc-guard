@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
-use std::io::{BufReader, Write};
+use std::io::BufReader;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -8,10 +8,7 @@ use sha2::{Digest, Sha256};
 
 use crate::config::Config;
 use crate::counter::LineStats;
-use crate::state::{
-    DEFAULT_LOCK_TIMEOUT_MS, try_lock_exclusive_with_timeout, try_lock_shared_with_timeout,
-    unlock_file,
-};
+use crate::state::{DEFAULT_LOCK_TIMEOUT_MS, SaveOutcome, SharedLockGuard, atomic_write_with_lock};
 use crate::{Result, SlocGuardError};
 
 const CACHE_VERSION: u32 = 3;
@@ -124,60 +121,37 @@ impl Cache {
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     pub fn load(path: &Path) -> Result<Self> {
-        let file = fs::File::open(path).map_err(|e| SlocGuardError::FileRead {
+        let file = fs::File::open(path).map_err(|e| SlocGuardError::FileAccess {
             path: path.to_path_buf(),
             source: e,
         })?;
 
         // Acquire shared lock for reading (allows multiple readers)
-        if let Err(e) = try_lock_shared_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            crate::output::print_warning_full(
-                "Failed to acquire read lock on cache file",
-                Some(&format!("{}: {e}", path.display())),
-                None,
-            );
-            // Continue without lock - better than failing
-        }
+        // Guard automatically unlocks on drop
+        let _lock_guard =
+            SharedLockGuard::try_acquire(&file, DEFAULT_LOCK_TIMEOUT_MS, "cache file", path);
 
         let reader = BufReader::new(&file);
-        let result = serde_json::from_reader(reader);
-
-        unlock_file(&file);
-
-        Ok(result?)
+        Ok(serde_json::from_reader(reader)?)
     }
 
-    /// Save cache to a JSON file.
+    /// Save cache to a JSON file using atomic write pattern.
     ///
-    /// Acquires an exclusive lock on the file before writing.
-    /// If lock acquisition times out, logs a warning and skips the save.
+    /// Uses atomic write (temp file + rename) to prevent data loss:
+    /// 1. Serialize JSON to memory
+    /// 2. Write to temporary file
+    /// 3. Acquire exclusive lock
+    /// 4. Atomically rename temp → target
+    ///
+    /// Returns `SaveOutcome::Saved` on success, `SaveOutcome::Skipped` if lock times out.
+    /// The original file is preserved on any failure.
     ///
     /// # Errors
-    /// Returns an error if the file cannot be written.
-    pub fn save(&self, path: &Path) -> Result<()> {
+    /// Returns an error if the file cannot be written (except lock timeout → `Skipped`).
+    #[must_use = "check if save was skipped due to lock timeout"]
+    pub fn save(&self, path: &Path) -> Result<SaveOutcome> {
         let json = serde_json::to_string_pretty(self)?;
-        let file = fs::File::create(path).map_err(|e| SlocGuardError::FileRead {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
-
-        // Acquire exclusive lock for writing
-        if let Err(e) = try_lock_exclusive_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            crate::output::print_warning_full(
-                "Failed to acquire write lock on cache file",
-                Some(&format!("{}: {e}", path.display())),
-                Some("Cache save skipped"),
-            );
-            // Drop file without writing to avoid corruption
-            return Ok(());
-        }
-
-        let mut writer = std::io::BufWriter::new(&file);
-        writer.write_all(json.as_bytes())?;
-        writer.flush()?;
-
-        unlock_file(&file);
-        Ok(())
+        atomic_write_with_lock(path, json.as_bytes(), "cache file")
     }
 
     /// Check if the cache is valid for the given config hash.

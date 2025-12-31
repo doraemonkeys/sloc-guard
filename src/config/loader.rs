@@ -204,13 +204,13 @@ impl<F: FileSystem> FileConfigLoader<F> {
             )));
         }
 
-        let content = self
-            .fs
-            .read_to_string(path)
-            .map_err(|source| SlocGuardError::FileRead {
-                path: path.to_path_buf(),
-                source,
-            })?;
+        let content =
+            self.fs
+                .read_to_string(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
 
         self.process_config_content(&content, Some(path), visited)
     }
@@ -370,13 +370,13 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_from_path_without_extends(&self, path: &Path) -> Result<LoadResult> {
-        let content = self
-            .fs
-            .read_to_string(path)
-            .map_err(|source| SlocGuardError::FileRead {
-                path: path.to_path_buf(),
-                source,
-            })?;
+        let content =
+            self.fs
+                .read_to_string(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
         let config = Self::parse_config(&content)?;
         Ok(LoadResult {
             config,

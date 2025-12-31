@@ -131,15 +131,15 @@ fn error_with_colors_full_message() {
     let mut buf = Vec::new();
     out.write_error(
         &mut buf,
-        "FileRead",
-        "failed to read",
+        "FileAccess",
+        "failed to access",
         Some("permission denied"),
         Some("Check file permissions"),
     );
     let result = String::from_utf8(buf).unwrap();
     // Verify structure
-    assert!(result.contains("✖ FileRead:"));
-    assert!(result.contains("failed to read"));
+    assert!(result.contains("✖ FileAccess:"));
+    assert!(result.contains("failed to access"));
     assert!(result.contains("× permission denied"));
     assert!(result.contains("help:"));
     assert!(result.contains("Check file permissions"));

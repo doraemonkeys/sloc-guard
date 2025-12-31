@@ -4,6 +4,7 @@
 
 use super::ColorMode;
 use super::ansi;
+use crate::state::try_current_unix_timestamp;
 use crate::stats::TrendDelta;
 
 // Time thresholds in seconds for relative time formatting
@@ -17,10 +18,7 @@ const MONTH: u64 = 30 * DAY;
 ///
 /// Returns `None` if the timestamp is in the future or current time cannot be determined.
 pub fn format_relative_time(timestamp: u64) -> Option<String> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()?
-        .as_secs();
+    let now = try_current_unix_timestamp()?;
 
     if timestamp > now {
         return None;

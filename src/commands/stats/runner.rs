@@ -130,10 +130,7 @@ fn run_trend(args: &TrendArgs, cli: &Cli) -> crate::Result<i32> {
     let history = TrendHistory::load_or_default(history_path);
 
     // Get current time for delta computation
-    let current_time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time before UNIX_EPOCH")
-        .as_secs();
+    let current_time = state::current_unix_timestamp();
 
     // Compute trend: either from --since duration or from latest entry
     let trend = args.since.as_ref().map_or_else(

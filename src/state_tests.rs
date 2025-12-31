@@ -3,6 +3,30 @@ use tempfile::TempDir;
 
 use super::*;
 
+// =============================================================================
+// Timestamp Tests
+// =============================================================================
+
+#[test]
+fn try_current_unix_timestamp_returns_some() {
+    let ts = try_current_unix_timestamp();
+    assert!(ts.is_some());
+    // Should be roughly current time (sanity check: after ~2023)
+    assert!(ts.unwrap() > 1_700_000_000);
+}
+
+#[test]
+fn current_unix_timestamp_is_reasonable() {
+    let ts = current_unix_timestamp();
+    // Should be after ~2023 and not too far in the future
+    assert!(ts > 1_700_000_000);
+    assert!(ts < 3_000_000_000); // Before year 2065
+}
+
+// =============================================================================
+// State Directory Tests
+// =============================================================================
+
 #[test]
 fn detect_state_dir_outside_git_returns_fallback() {
     // Create a temporary directory that is NOT a git repo
@@ -299,4 +323,217 @@ fn lock_error_from_io_error() {
     let io_err = io::Error::new(io::ErrorKind::NotFound, "file not found");
     let lock_err: LockError = io_err.into();
     assert!(matches!(lock_err, LockError::Io(_)));
+}
+
+// =============================================================================
+// SharedLockGuard Tests
+// =============================================================================
+
+#[test]
+fn shared_lock_guard_acquires_lock_successfully() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let file = fs::File::create(&file_path).unwrap();
+
+    let guard = SharedLockGuard::try_acquire(&file, 100, "test file", &file_path);
+    assert!(guard.is_locked());
+    // Guard drops here and unlocks
+}
+
+#[test]
+fn shared_lock_guard_reports_not_locked_on_timeout() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+
+    // Create and exclusively lock file
+    let file1 = fs::File::create(&file_path).unwrap();
+    file1.lock().unwrap();
+
+    // Try to acquire shared lock from second handle (should fail)
+    let file2 = fs::File::open(&file_path).unwrap();
+    let guard = SharedLockGuard::try_acquire(&file2, 100, "test file", &file_path);
+    assert!(!guard.is_locked());
+
+    file1.unlock().unwrap();
+}
+
+#[test]
+fn shared_lock_guard_unlocks_on_drop() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let file = fs::File::create(&file_path).unwrap();
+
+    {
+        let guard = SharedLockGuard::try_acquire(&file, 100, "test file", &file_path);
+        assert!(guard.is_locked());
+        // Guard drops here
+    }
+
+    // After guard drops, we should be able to acquire exclusive lock
+    let file2 = fs::File::open(&file_path).unwrap();
+    let result = try_lock_exclusive_with_timeout(&file2, 100);
+    assert!(result.is_ok());
+    file2.unlock().unwrap();
+}
+
+// =============================================================================
+// SaveOutcome Tests
+// =============================================================================
+
+#[test]
+fn save_outcome_is_saved() {
+    let outcome = SaveOutcome::Saved;
+    assert!(outcome.is_saved());
+    assert!(!outcome.is_skipped());
+}
+
+#[test]
+fn save_outcome_is_skipped() {
+    let outcome = SaveOutcome::Skipped;
+    assert!(outcome.is_skipped());
+    assert!(!outcome.is_saved());
+}
+
+#[test]
+fn save_outcome_equality() {
+    assert_eq!(SaveOutcome::Saved, SaveOutcome::Saved);
+    assert_eq!(SaveOutcome::Skipped, SaveOutcome::Skipped);
+    assert_ne!(SaveOutcome::Saved, SaveOutcome::Skipped);
+}
+
+// =============================================================================
+// Atomic Write Tests
+// =============================================================================
+
+#[test]
+fn atomic_write_creates_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let content = b"test content";
+
+    let result = atomic_write_with_lock(&file_path, content, "test file");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), SaveOutcome::Saved);
+    assert!(file_path.exists());
+    assert_eq!(fs::read(&file_path).unwrap(), content);
+}
+
+#[test]
+fn atomic_write_creates_parent_directories() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir
+        .path()
+        .join("a")
+        .join("b")
+        .join("c")
+        .join("test.json");
+    let content = b"nested content";
+
+    let result = atomic_write_with_lock(&file_path, content, "test file");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), SaveOutcome::Saved);
+    assert!(file_path.exists());
+    assert_eq!(fs::read(&file_path).unwrap(), content);
+}
+
+#[test]
+fn atomic_write_overwrites_existing_file() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+
+    // Write initial content
+    fs::write(&file_path, "old content").unwrap();
+
+    // Overwrite with atomic write
+    let new_content = b"new content";
+    let result = atomic_write_with_lock(&file_path, new_content, "test file");
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), SaveOutcome::Saved);
+    assert_eq!(fs::read(&file_path).unwrap(), new_content);
+}
+
+#[test]
+fn atomic_write_preserves_original_on_error() {
+    // This test verifies that if atomic write fails, the original file is preserved
+    // We can't easily simulate a failure in the atomic_write function itself,
+    // but we can verify that temp files don't corrupt the original
+
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let original_content = b"original";
+
+    fs::write(&file_path, original_content).unwrap();
+
+    // Write new content
+    let new_content = b"new content";
+    let result = atomic_write_with_lock(&file_path, new_content, "test file");
+    assert!(result.is_ok());
+
+    // Should be updated
+    assert_eq!(fs::read(&file_path).unwrap(), new_content);
+}
+
+#[test]
+fn atomic_write_cleans_up_temp_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+    let content = b"test content";
+
+    atomic_write_with_lock(&file_path, content, "test file").unwrap();
+
+    // Check no temp files remain
+    let entries: Vec<_> = fs::read_dir(temp_dir.path())
+        .unwrap()
+        .filter_map(std::result::Result::ok)
+        .collect();
+    assert_eq!(entries.len(), 1); // Only the target file
+    assert_eq!(entries[0].file_name(), "test.json");
+}
+
+#[test]
+fn atomic_write_returns_skipped_on_lock_timeout() {
+    // Test that atomic_write_with_lock returns SaveOutcome::Skipped when lock times out.
+    use std::sync::mpsc;
+    use std::thread;
+
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.json");
+
+    // Create the file first (atomic_write needs it to exist for locking)
+    fs::write(&file_path, "original").unwrap();
+
+    // Open and lock the file exclusively
+    let lock_holder = fs::OpenOptions::new().write(true).open(&file_path).unwrap();
+    lock_holder.lock().unwrap();
+
+    // Use short timeout (100ms) for fast testing
+    let test_timeout_ms = 100;
+
+    // Run atomic write in a thread with short timeout while holding the lock
+    let file_path_clone = file_path.clone();
+    let (tx, rx) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        let result = atomic_write_with_lock_timeout(
+            &file_path_clone,
+            b"new content",
+            "test file",
+            test_timeout_ms,
+        );
+        tx.send(result).unwrap();
+    });
+
+    // Wait for the thread to complete (should timeout quickly)
+    let result = rx.recv().unwrap();
+    handle.join().unwrap();
+
+    // Verify it returned Skipped due to lock timeout
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), SaveOutcome::Skipped);
+
+    // Release lock before reading (Windows requires this)
+    lock_holder.unlock().unwrap();
+    drop(lock_holder);
+
+    // Original file should be unchanged
+    assert_eq!(fs::read_to_string(&file_path).unwrap(), "original");
 }

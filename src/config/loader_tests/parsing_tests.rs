@@ -52,7 +52,7 @@ fn returns_error_for_nonexistent_explicit_path() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, SlocGuardError::FileRead { .. }));
+    assert!(matches!(err, SlocGuardError::FileAccess { .. }));
 }
 
 #[test]

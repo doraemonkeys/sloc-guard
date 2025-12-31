@@ -1,4 +1,7 @@
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
+use std::thread;
+use std::time::Duration;
 
 use tempfile::TempDir;
 
@@ -271,4 +274,117 @@ fn set_generic_entry() {
     assert_eq!(baseline.len(), 2);
     assert!(baseline.get("src/file.rs").unwrap().is_content());
     assert!(baseline.get("src/dir").unwrap().is_structure());
+}
+
+// =============================================================================
+// Lock Behavior Tests
+// =============================================================================
+
+#[test]
+fn load_succeeds_with_shared_lock_held() {
+    // Test that load works when file is already read-locked (shared lock should succeed)
+    let temp = TempDir::new().unwrap();
+    let path = temp.path().join("baseline.json");
+
+    // Create baseline file
+    let mut baseline = Baseline::new();
+    baseline.set_content("src/main.rs", 100, "hash".to_string());
+    let _ = baseline.save(&path);
+
+    // Hold a shared lock on the file
+    let file = File::open(&path).unwrap();
+    file.try_lock_shared().unwrap();
+
+    // Load should still succeed (shared locks are compatible)
+    let loaded = Baseline::load(&path).unwrap();
+    assert_eq!(loaded.len(), 1);
+
+    file.unlock().unwrap();
+}
+
+#[test]
+fn load_succeeds_with_warning_when_exclusive_lock_held() {
+    // Test that load still works (with warning) when lock acquisition fails
+    // because another process holds an exclusive lock
+    use std::sync::mpsc;
+
+    let temp = TempDir::new().unwrap();
+    let path = temp.path().join("baseline.json");
+
+    // Create baseline file
+    let mut baseline = Baseline::new();
+    baseline.set_content("src/main.rs", 100, "hash".to_string());
+    let _ = baseline.save(&path);
+
+    // Use channel to synchronize lock acquisition
+    let (tx, rx) = mpsc::channel();
+
+    // Hold an exclusive lock on the file in another thread
+    let path_clone = path.clone();
+    let handle = thread::spawn(move || {
+        let file = File::open(&path_clone).unwrap();
+        file.try_lock().unwrap(); // Exclusive lock
+        tx.send(()).unwrap(); // Signal that lock is acquired
+        // Hold the lock for a bit
+        thread::sleep(Duration::from_millis(200));
+        file.unlock().unwrap();
+    });
+
+    // Wait for the lock to be acquired (no race condition)
+    rx.recv().unwrap();
+
+    // Load should still succeed (continues without lock after timeout)
+    // Note: On some platforms this might succeed if the lock times out quickly
+    let loaded = Baseline::load(&path);
+    assert!(loaded.is_ok());
+
+    handle.join().unwrap();
+}
+
+#[test]
+fn save_returns_skipped_when_lock_unavailable() {
+    use crate::state::SaveOutcome;
+    use std::sync::mpsc;
+
+    // Test that save returns SaveOutcome::Skipped when lock cannot be acquired
+    let temp = TempDir::new().unwrap();
+    let path = temp.path().join("baseline.json");
+
+    // Create initial baseline file
+    {
+        let mut file = File::create(&path).unwrap();
+        file.write_all(b"{}").unwrap();
+    }
+
+    // Hold an exclusive lock on the file (blocking lock, guaranteed to acquire)
+    let lock_file = File::open(&path).unwrap();
+    lock_file.lock().unwrap();
+
+    // Try to save from another baseline instance with a short timeout
+    let mut baseline = Baseline::new();
+    baseline.set_content("src/main.rs", 100, "hash".to_string());
+
+    // Use a thread to avoid any timing issues with the lock
+    let path_clone = path.clone();
+    let (tx, rx) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        // Use short timeout (100ms) for deterministic test behavior
+        let result = baseline.save_with_timeout(&path_clone, 100);
+        tx.send(result).unwrap();
+    });
+
+    // Wait for the thread to complete (should timeout quickly)
+    let result = rx.recv().unwrap();
+    handle.join().unwrap();
+
+    // Verify it returned Skipped due to lock timeout
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), SaveOutcome::Skipped);
+
+    // Release lock before cleanup (Windows requires this)
+    lock_file.unlock().unwrap();
+    drop(lock_file);
+
+    // Original file should be unchanged
+    assert_eq!(fs::read_to_string(&path).unwrap(), "{}");
 }

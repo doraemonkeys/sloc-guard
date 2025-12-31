@@ -10,7 +10,7 @@ fn error_display_config() {
 
 #[test]
 fn error_display_file_read() {
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("test.rs"),
         source: std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
     };
@@ -39,12 +39,12 @@ fn error_type_returns_correct_type() {
         "Config"
     );
     assert_eq!(
-        SlocGuardError::FileRead {
+        SlocGuardError::FileAccess {
             path: PathBuf::from("test.rs"),
             source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
         }
         .error_type(),
-        "FileRead"
+        "FileAccess"
     );
     assert_eq!(SlocGuardError::Git("test".to_string()).error_type(), "Git");
     assert_eq!(
@@ -68,7 +68,7 @@ fn error_message_extracts_message() {
 
 #[test]
 fn error_message_file_read_includes_error_kind() {
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("test.rs"),
         source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
     };
@@ -97,7 +97,7 @@ fn error_detail_returns_source_info() {
     let err = SlocGuardError::Config("test".to_string());
     assert!(err.detail().is_none());
 
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("test.rs"),
         source: std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
     };
@@ -125,7 +125,7 @@ fn suggestion_config_error() {
 
 #[test]
 fn suggestion_file_read_not_found() {
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("missing.rs"),
         source: std::io::Error::new(std::io::ErrorKind::NotFound, "not found"),
     };
@@ -135,7 +135,7 @@ fn suggestion_file_read_not_found() {
 
 #[test]
 fn suggestion_file_read_permission_denied() {
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("protected.rs"),
         source: std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied"),
     };
@@ -145,7 +145,7 @@ fn suggestion_file_read_permission_denied() {
 
 #[test]
 fn suggestion_file_read_other_error_has_none() {
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("unknown.rs"),
         source: std::io::Error::other("unknown error"),
     };
@@ -274,7 +274,7 @@ fn suggestion_io_invalid_data() {
 
 #[test]
 fn suggestion_file_read_invalid_data() {
-    let err = SlocGuardError::FileRead {
+    let err = SlocGuardError::FileAccess {
         path: PathBuf::from("corrupted.rs"),
         source: std::io::Error::new(std::io::ErrorKind::InvalidData, "corrupted"),
     };

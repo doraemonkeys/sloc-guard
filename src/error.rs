@@ -7,8 +7,8 @@ pub enum SlocGuardError {
     #[error("Configuration error: {0}")]
     Config(String),
 
-    #[error("Failed to read file: {path}")]
-    FileRead {
+    #[error("Failed to access file: {path}")]
+    FileAccess {
         path: PathBuf,
         #[source]
         source: std::io::Error,
@@ -105,7 +105,7 @@ impl SlocGuardError {
     pub const fn error_type(&self) -> &'static str {
         match self {
             Self::Config(_) => "Config",
-            Self::FileRead { .. } => "FileRead",
+            Self::FileAccess { .. } => "FileAccess",
             Self::InvalidPattern { .. } => "InvalidPattern",
             Self::Io { .. } => "IO",
             Self::TomlParse(_) => "TOML",
@@ -116,11 +116,11 @@ impl SlocGuardError {
     }
 
     /// Returns the error message without the type prefix.
-    /// Includes error kind for `FileRead` and glob error for `InvalidPattern`.
+    /// Includes error kind for `FileAccess` and glob error for `InvalidPattern`.
     #[must_use]
     pub fn message(&self) -> String {
         match self {
-            Self::FileRead { path, source } => {
+            Self::FileAccess { path, source } => {
                 format!("{} ({})", path.display(), source.kind())
             }
             Self::InvalidPattern { pattern, source } => {
@@ -147,7 +147,7 @@ impl SlocGuardError {
     #[must_use]
     pub fn detail(&self) -> Option<String> {
         match self {
-            Self::FileRead { source, .. } => Some(format!("{source} ({})", source.kind())),
+            Self::FileAccess { source, .. } => Some(format!("{source} ({})", source.kind())),
             Self::InvalidPattern { source, .. } => Some(source.to_string()),
             Self::Io {
                 source,
@@ -178,7 +178,7 @@ impl SlocGuardError {
             Self::Config(_) => {
                 Some("Check the config file format and value ranges in .sloc-guard.toml")
             }
-            Self::FileRead { source, .. } | Self::Io { source, .. } => {
+            Self::FileAccess { source, .. } | Self::Io { source, .. } => {
                 Self::io_suggestion(source.kind())
             }
             Self::InvalidPattern { .. } => Some(

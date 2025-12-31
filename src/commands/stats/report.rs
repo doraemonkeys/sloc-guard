@@ -100,10 +100,7 @@ pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
 
     // Trend section
     if !exclude_sections.contains("trend") {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX_EPOCH")
-            .as_secs();
+        let current_time = state::current_unix_timestamp();
 
         let trend = trend_since.as_ref().map_or_else(
             || history.compute_delta(&project_stats),

@@ -133,10 +133,7 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
     let trend_config = config.trend.clone();
 
     // Check if we should add (respects min_interval_secs unless --force)
-    let current_time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time before UNIX_EPOCH")
-        .as_secs();
+    let current_time = state::current_unix_timestamp();
 
     let should_add = args.force || history.should_add(&trend_config, current_time);
 

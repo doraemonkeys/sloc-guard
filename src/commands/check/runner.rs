@@ -432,12 +432,12 @@ fn handle_baseline_ratchet(
             Ok(false)
         }
         RatchetMode::Auto => {
-            tighten_baseline(
+            let outcome = tighten_baseline(
                 current_baseline,
                 &ratchet_result.stale_paths,
                 &baseline_path,
             )?;
-            if !quiet {
+            if !quiet && outcome.is_saved() {
                 eprintln!(
                     "Baseline tightened: {} stale entry/entries removed.",
                     ratchet_result.stale_entries
@@ -539,10 +539,7 @@ fn perform_auto_snapshot(
     let mut history = TrendHistory::load_or_default(&history_path);
 
     // Check if we should add (respects min_interval_secs)
-    let current_time = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("system time before UNIX_EPOCH")
-        .as_secs();
+    let current_time = state::current_unix_timestamp();
 
     if !history.should_add(&config.trend, current_time) {
         if verbose > 0 && !quiet {

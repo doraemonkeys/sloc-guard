@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{BufReader, Write};
+use std::io::BufReader;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
@@ -8,8 +8,8 @@ use crate::config::TrendConfig;
 use crate::git::GitContext;
 use crate::output::ProjectStatistics;
 use crate::state::{
-    DEFAULT_LOCK_TIMEOUT_MS, try_lock_exclusive_with_timeout, try_lock_shared_with_timeout,
-    unlock_file,
+    DEFAULT_LOCK_TIMEOUT_MS, SaveOutcome, SharedLockGuard, atomic_write_with_lock,
+    current_unix_timestamp,
 };
 use crate::{Result, SlocGuardError};
 
@@ -48,13 +48,8 @@ impl TrendEntry {
     /// Panics if the system clock is set to a time before the UNIX epoch.
     #[must_use]
     pub fn new(stats: &ProjectStatistics) -> Self {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX_EPOCH")
-            .as_secs();
-
         Self {
-            timestamp,
+            timestamp: current_unix_timestamp(),
             total_files: stats.total_files,
             total_lines: stats.total_lines,
             code: stats.total_code,
@@ -189,27 +184,18 @@ impl TrendHistory {
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     pub fn load(path: &Path) -> Result<Self> {
-        let file = fs::File::open(path).map_err(|e| SlocGuardError::FileRead {
+        let file = fs::File::open(path).map_err(|e| SlocGuardError::FileAccess {
             path: path.to_path_buf(),
             source: e,
         })?;
 
         // Acquire shared lock for reading (allows multiple readers)
-        if let Err(e) = try_lock_shared_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            crate::output::print_warning_full(
-                "Failed to acquire read lock on history file",
-                Some(&format!("{}: {e}", path.display())),
-                None,
-            );
-            // Continue without lock - better than failing
-        }
+        // Guard automatically unlocks on drop
+        let _lock_guard =
+            SharedLockGuard::try_acquire(&file, DEFAULT_LOCK_TIMEOUT_MS, "history file", path);
 
         let reader = BufReader::new(&file);
-        let result = serde_json::from_reader(reader);
-
-        unlock_file(&file);
-
-        Ok(result?)
+        Ok(serde_json::from_reader(reader)?)
     }
 
     /// Load history if file exists, otherwise return empty history.
@@ -222,37 +208,23 @@ impl TrendHistory {
         }
     }
 
-    /// Save history to a JSON file.
+    /// Save history to a JSON file using atomic write pattern.
     ///
-    /// Acquires an exclusive lock on the file before writing.
-    /// If lock acquisition times out, logs a warning and skips the save.
+    /// Uses atomic write (temp file + rename) to prevent data loss:
+    /// 1. Serialize JSON to memory
+    /// 2. Write to temporary file
+    /// 3. Acquire exclusive lock
+    /// 4. Atomically rename temp → target
+    ///
+    /// Returns `SaveOutcome::Saved` on success, `SaveOutcome::Skipped` if lock times out.
+    /// The original file is preserved on any failure.
     ///
     /// # Errors
-    /// Returns an error if the file cannot be written.
-    pub fn save(&self, path: &Path) -> Result<()> {
+    /// Returns an error if the file cannot be written (except lock timeout → `Skipped`).
+    #[must_use = "check if save was skipped due to lock timeout"]
+    pub fn save(&self, path: &Path) -> Result<SaveOutcome> {
         let json = serde_json::to_string_pretty(self)?;
-        let file = fs::File::create(path).map_err(|e| SlocGuardError::FileRead {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
-
-        // Acquire exclusive lock for writing
-        if let Err(e) = try_lock_exclusive_with_timeout(&file, DEFAULT_LOCK_TIMEOUT_MS) {
-            crate::output::print_warning_full(
-                "Failed to acquire write lock on history file",
-                Some(&format!("{}: {e}", path.display())),
-                Some("History save skipped"),
-            );
-            // Drop file without writing to avoid corruption
-            return Ok(());
-        }
-
-        let mut writer = std::io::BufWriter::new(&file);
-        writer.write_all(json.as_bytes())?;
-        writer.flush()?;
-
-        unlock_file(&file);
-        Ok(())
+        atomic_write_with_lock(path, json.as_bytes(), "history file")
     }
 
     /// Get the most recent entry.
@@ -438,10 +410,7 @@ impl TrendHistory {
         config: &TrendConfig,
         git_context: Option<&GitContext>,
     ) -> bool {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX_EPOCH")
-            .as_secs();
+        let current_time = current_unix_timestamp();
 
         if !self.should_add(config, current_time) {
             return false;
@@ -466,13 +435,13 @@ impl TrendHistory {
     ///
     /// # Errors
     /// Returns an error if the file cannot be written.
-    pub fn save_with_retention(&mut self, path: &Path, config: &TrendConfig) -> Result<()> {
-        let current_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("system time before UNIX_EPOCH")
-            .as_secs();
-
-        self.apply_retention(config, current_time);
+    #[must_use = "check if save was skipped due to lock timeout"]
+    pub fn save_with_retention(
+        &mut self,
+        path: &Path,
+        config: &TrendConfig,
+    ) -> Result<SaveOutcome> {
+        self.apply_retention(config, current_unix_timestamp());
         self.save(path)
     }
 }

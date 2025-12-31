@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+#[cfg(test)]
+use crate::state::atomic_write_with_lock_timeout;
+use crate::state::{DEFAULT_LOCK_TIMEOUT_MS, SaveOutcome, SharedLockGuard, atomic_write_with_lock};
 use crate::{Result, SlocGuardError};
 
 const BASELINE_VERSION: u32 = 2;
@@ -82,30 +85,50 @@ impl Baseline {
 
     /// Load baseline from a JSON file.
     ///
+    /// Acquires a shared lock on the file before reading.
+    ///
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     pub fn load(path: &Path) -> Result<Self> {
-        let content = fs::read_to_string(path).map_err(|e| SlocGuardError::FileRead {
+        let file = fs::File::open(path).map_err(|e| SlocGuardError::FileAccess {
             path: path.to_path_buf(),
             source: e,
         })?;
 
-        let baseline: Self = serde_json::from_str(&content)?;
-        Ok(baseline)
+        // Acquire shared lock for reading (allows multiple readers)
+        // Guard automatically unlocks on drop
+        let _lock_guard =
+            SharedLockGuard::try_acquire(&file, DEFAULT_LOCK_TIMEOUT_MS, "baseline file", path);
+
+        let reader = BufReader::new(&file);
+        Ok(serde_json::from_reader(reader)?)
     }
 
-    /// Save baseline to a JSON file.
+    /// Save baseline to a JSON file using atomic write pattern.
+    ///
+    /// Uses atomic write (temp file + rename) to prevent data loss:
+    /// 1. Serialize JSON to memory
+    /// 2. Write to temporary file
+    /// 3. Acquire exclusive lock
+    /// 4. Atomically rename temp → target
+    ///
+    /// Returns `SaveOutcome::Saved` on success, `SaveOutcome::Skipped` if lock times out.
+    /// The original file is preserved on any failure.
     ///
     /// # Errors
-    /// Returns an error if the file cannot be written.
-    pub fn save(&self, path: &Path) -> Result<()> {
+    /// Returns an error if the file cannot be written (except lock timeout → `Skipped`).
+    #[must_use = "check if save was skipped due to lock timeout"]
+    pub fn save(&self, path: &Path) -> Result<SaveOutcome> {
         let json = serde_json::to_string_pretty(self)?;
-        let mut file = fs::File::create(path).map_err(|e| SlocGuardError::FileRead {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
-        file.write_all(json.as_bytes())?;
-        Ok(())
+        atomic_write_with_lock(path, json.as_bytes(), "baseline file")
+    }
+
+    /// Save baseline with a custom timeout (for testing).
+    #[cfg(test)]
+    #[must_use = "check if save was skipped due to lock timeout"]
+    pub(crate) fn save_with_timeout(&self, path: &Path, timeout_ms: u64) -> Result<SaveOutcome> {
+        let json = serde_json::to_string_pretty(self)?;
+        atomic_write_with_lock_timeout(path, json.as_bytes(), "baseline file", timeout_ms)
     }
 
     /// Add or update a content entry in the baseline.
@@ -179,7 +202,7 @@ impl Baseline {
 /// # Errors
 /// Returns an error if the file cannot be read.
 pub fn compute_file_hash(path: &Path) -> Result<String> {
-    let mut file = fs::File::open(path).map_err(|e| SlocGuardError::FileRead {
+    let mut file = fs::File::open(path).map_err(|e| SlocGuardError::FileAccess {
         path: path.to_path_buf(),
         source: e,
     })?;
@@ -201,7 +224,7 @@ pub fn compute_file_hash(path: &Path) -> Result<String> {
 /// # Errors
 /// Returns an error if the file cannot be read.
 pub fn read_file_with_hash(path: &Path) -> Result<(String, Vec<u8>)> {
-    let content = fs::read(path).map_err(|e| SlocGuardError::FileRead {
+    let content = fs::read(path).map_err(|e| SlocGuardError::FileAccess {
         path: path.to_path_buf(),
         source: e,
     })?;

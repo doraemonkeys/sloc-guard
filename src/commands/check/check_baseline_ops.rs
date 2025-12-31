@@ -5,6 +5,7 @@ use crate::baseline::{Baseline, StructureViolationType, compute_file_hash};
 use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::cli::BaselineUpdateMode;
 use crate::counter::LineStats;
+use crate::state::SaveOutcome;
 
 /// Result of baseline ratchet check.
 #[derive(Debug, Clone)]
@@ -77,12 +78,14 @@ pub fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baselin
 }
 
 /// Update baseline file from check results based on the specified mode.
+///
+/// Returns `SaveOutcome::Saved` on success, `SaveOutcome::Skipped` if lock times out.
 pub fn update_baseline_from_results(
     results: &[CheckResult],
     mode: BaselineUpdateMode,
     baseline_path: &Path,
     existing_baseline: Option<&Baseline>,
-) -> crate::Result<()> {
+) -> crate::Result<SaveOutcome> {
     let mut new_baseline = match mode {
         BaselineUpdateMode::New => {
             // Start with existing baseline for add-only mode
@@ -218,11 +221,13 @@ pub fn check_baseline_ratchet(results: &[CheckResult], baseline: &Baseline) -> R
 }
 
 /// Remove stale entries from baseline and save (for `--ratchet=auto` mode).
+///
+/// Returns `SaveOutcome::Saved` on success, `SaveOutcome::Skipped` if lock times out.
 pub fn tighten_baseline(
     baseline: &mut Baseline,
     stale_paths: &[String],
     path: &Path,
-) -> crate::Result<()> {
+) -> crate::Result<SaveOutcome> {
     for stale_path in stale_paths {
         baseline.remove(stale_path);
     }
