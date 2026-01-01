@@ -12,8 +12,7 @@ pub use model::{
     StatsConfig, StatsReportConfig, StructureConfig, StructureRule, TrendConfig, UNLIMITED,
 };
 pub use remote::{
-    clear_cache as clear_remote_cache, fetch_remote_config, fetch_remote_config_offline,
-    is_remote_url,
+    FetchPolicy, clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url,
 };
 
 #[cfg(test)]

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::cli::{Cli, ConfigAction, ConfigOutputFormat};
-use crate::config::{Config, ConfigLoader, FileConfigLoader};
+use crate::config::{Config, ConfigLoader, FetchPolicy, FileConfigLoader};
 use crate::stats::parse_duration;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
@@ -187,7 +187,8 @@ fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
     // Determine project root from config path or current directory
     let project_root = super::context::resolve_project_root(config_path)?;
 
-    let loader = FileConfigLoader::with_options(cli.offline, project_root);
+    let loader =
+        FileConfigLoader::with_options(FetchPolicy::from_offline(cli.offline), project_root);
     let load_result =
         config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))?;
 

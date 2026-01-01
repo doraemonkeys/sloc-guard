@@ -10,7 +10,7 @@ use sha2::{Digest, Sha256};
 use crate::cache::Cache;
 use crate::checker::{StructureChecker, ThresholdChecker};
 use crate::cli::ColorChoice;
-use crate::config::{Config, ConfigLoader, FileConfigLoader, LoadResult};
+use crate::config::{Config, ConfigLoader, FetchPolicy, FileConfigLoader, LoadResult};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
@@ -137,7 +137,7 @@ pub(crate) fn load_config(
     // Determine project root from config path or current directory
     let project_root = resolve_project_root(config_path)?;
 
-    let loader = FileConfigLoader::with_options(offline, project_root);
+    let loader = FileConfigLoader::with_options(FetchPolicy::from_offline(offline), project_root);
     if no_extends {
         config_path.map_or_else(
             || loader.load_without_extends(),

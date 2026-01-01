@@ -6,7 +6,7 @@ use crate::error::{Result, SlocGuardError};
 use super::Config;
 use super::model::CONFIG_VERSION;
 use super::presets;
-use super::remote::{fetch_remote_config, fetch_remote_config_offline, is_remote_url};
+use super::remote::{FetchPolicy, fetch_remote_config, is_remote_url};
 
 /// Result of loading a configuration, containing both the config and metadata.
 ///
@@ -133,7 +133,7 @@ impl FileSystem for RealFileSystem {
 #[derive(Debug)]
 pub struct FileConfigLoader<F: FileSystem = RealFileSystem> {
     fs: F,
-    offline: bool,
+    fetch_policy: FetchPolicy,
     project_root: Option<PathBuf>,
 }
 
@@ -148,17 +148,17 @@ impl FileConfigLoader<RealFileSystem> {
     pub const fn new() -> Self {
         Self {
             fs: RealFileSystem,
-            offline: false,
+            fetch_policy: FetchPolicy::Normal,
             project_root: None,
         }
     }
 
-    /// Create a loader with offline mode and project root options.
+    /// Create a loader with fetch policy and project root options.
     #[must_use]
-    pub const fn with_options(offline: bool, project_root: Option<PathBuf>) -> Self {
+    pub const fn with_options(fetch_policy: FetchPolicy, project_root: Option<PathBuf>) -> Self {
         Self {
             fs: RealFileSystem,
-            offline,
+            fetch_policy,
             project_root,
         }
     }
@@ -169,7 +169,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
     pub const fn with_fs(fs: F) -> Self {
         Self {
             fs,
-            offline: false,
+            fetch_policy: FetchPolicy::Normal,
             project_root: None,
         }
     }
@@ -237,11 +237,12 @@ impl<F: FileSystem> FileConfigLoader<F> {
             )));
         }
 
-        let content = if self.offline {
-            fetch_remote_config_offline(url, self.project_root.as_deref(), expected_hash)?
-        } else {
-            fetch_remote_config(url, self.project_root.as_deref(), expected_hash)?
-        };
+        let content = fetch_remote_config(
+            url,
+            self.project_root.as_deref(),
+            expected_hash,
+            self.fetch_policy,
+        )?;
         self.process_config_content(&content, None, visited)
     }
 

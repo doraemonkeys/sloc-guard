@@ -39,11 +39,11 @@ Addresses counter-intuitive behaviors in config inheritance and ambiguous semant
 - `validate_reset_positions()` errors if `$reset` is not first
 - `strip_reset_markers()` removes markers from final config (handles no-extends case)
 
-**24.2 Offline Cache Strategy Separation**
-- Add `FetchPolicy` enum: `Normal` (TTL-controlled), `Offline` (ignore TTL), `ForceRefresh` (skip cache)
+**24.2 Offline Cache Strategy Separation** ✅
+- `FetchPolicy` enum: `Normal` (TTL-controlled), `Offline` (ignore TTL), `ForceRefresh` (skip cache)
 - `--offline` mode ignores TTL, uses any existing cache
-- Move remote cache to state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`)
-- SHA256 hash lock: if set, validate content regardless of TTL
+- Remote cache moved to state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`)
+- SHA256 hash lock validates content regardless of TTL
 
 **24.3 Check Behavior Configuration**
 - Remove ambiguous `strict` field
@@ -57,5 +57,5 @@ Addresses counter-intuitive behaviors in config inheritance and ambiguous semant
 
 | Priority               | Tasks                                                         |
 | ---------------------- | ------------------------------------------------------------- |
-| **19. Config Design**  | ~~24.1 Array Merge~~ ✅, 24.2 Offline Cache, 24.3 Check Behavior |
+| **19. Config Design**  | ~~24.1 Array Merge~~ ✅, ~~24.2 Offline Cache~~ ✅, 24.3 Check Behavior |
 

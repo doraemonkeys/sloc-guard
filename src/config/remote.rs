@@ -7,10 +7,38 @@ use std::time::{Duration, SystemTime};
 use sha2::{Digest, Sha256};
 
 use crate::error::{Result, SlocGuardError};
+use crate::state::detect_state_dir;
 
-const LOCAL_CACHE_DIR: &str = ".sloc-guard/remote-cache";
+const REMOTE_CACHE_SUBDIR: &str = "remote-configs";
 const CACHE_TTL_SECS: u64 = 3600; // 1 hour
 const REQUEST_TIMEOUT_SECS: u64 = 30;
+
+/// Policy for fetching remote configurations.
+///
+/// Controls how the cache is used when resolving remote config URLs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FetchPolicy {
+    /// Normal mode: use cache if valid (within TTL), otherwise fetch.
+    /// This is the default behavior.
+    #[default]
+    Normal,
+    /// Offline mode: ignore TTL, use any existing cached content.
+    /// Errors if cache is missing. Does not make network requests.
+    Offline,
+    /// Force refresh: skip cache entirely, always fetch from network.
+    /// Updates cache with fresh content after successful fetch.
+    ForceRefresh,
+}
+
+impl FetchPolicy {
+    /// Create a `FetchPolicy` from an offline flag.
+    ///
+    /// Returns `Offline` if `offline` is `true`, otherwise `Normal`.
+    #[must_use]
+    pub const fn from_offline(offline: bool) -> Self {
+        if offline { Self::Offline } else { Self::Normal }
+    }
+}
 
 /// Flag to track whether the remote config fetch warning has been shown this session.
 static WARNING_SHOWN: AtomicBool = AtomicBool::new(false);
@@ -93,9 +121,11 @@ fn verify_content_hash(content: &str, expected: &str, url: &str) -> Result<()> {
     Ok(())
 }
 
-/// Get the cache directory path (project-local).
+/// Get the cache directory path.
+///
+/// Uses the state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`).
 fn cache_dir(project_root: &Path) -> PathBuf {
-    project_root.join(LOCAL_CACHE_DIR)
+    detect_state_dir(project_root).join(REMOTE_CACHE_SUBDIR)
 }
 
 /// Get the cache file path for a given URL.
@@ -103,8 +133,13 @@ fn cache_file_path(url: &str, project_root: &Path) -> PathBuf {
     cache_dir(project_root).join(format!("{}.toml", hash_url(url)))
 }
 
-/// Check if cache file is still valid (within TTL).
-fn is_cache_valid(cache_path: &PathBuf) -> bool {
+/// Check if cache file exists.
+fn cache_exists(cache_path: &Path) -> bool {
+    cache_path.exists()
+}
+
+/// Check if cache file is within TTL.
+fn is_cache_within_ttl(cache_path: &Path) -> bool {
     if !cache_path.exists() {
         return false;
     }
@@ -124,14 +159,33 @@ fn is_cache_valid(cache_path: &PathBuf) -> bool {
     elapsed.as_secs() < CACHE_TTL_SECS
 }
 
-/// Try to read config from cache.
-fn read_from_cache(url: &str, project_root: Option<&Path>) -> Option<String> {
+/// Try to read config from cache based on fetch policy.
+///
+/// - `Normal`: only read if within TTL
+/// - `Offline`: read any existing cache (ignores TTL)
+/// - `ForceRefresh`: never read from cache
+fn read_from_cache(url: &str, project_root: Option<&Path>, policy: FetchPolicy) -> Option<String> {
     let root = project_root?;
     let cache_path = cache_file_path(url, root);
-    if is_cache_valid(&cache_path) {
-        fs::read_to_string(&cache_path).ok()
-    } else {
-        None
+
+    match policy {
+        FetchPolicy::ForceRefresh => None,
+        FetchPolicy::Offline => {
+            // Offline: use any existing cache, ignore TTL
+            if cache_exists(&cache_path) {
+                fs::read_to_string(&cache_path).ok()
+            } else {
+                None
+            }
+        }
+        FetchPolicy::Normal => {
+            // Normal: only use cache if within TTL
+            if is_cache_within_ttl(&cache_path) {
+                fs::read_to_string(&cache_path).ok()
+            } else {
+                None
+            }
+        }
     }
 }
 
@@ -155,9 +209,12 @@ fn write_to_cache(url: &str, content: &str, project_root: Option<&Path>) -> Opti
 /// Fetch remote configuration from URL using the provided HTTP client.
 ///
 /// This function:
-/// 1. Checks the local cache first (1 hour TTL)
-/// 2. If `expected_hash` is provided, verifies cached content matches
-/// 3. If cache miss or hash mismatch, fetches from remote
+/// 1. Checks the local cache based on `policy`:
+///    - `Normal`: use cache if within TTL
+///    - `Offline`: use any existing cache (ignores TTL)
+///    - `ForceRefresh`: skip cache entirely
+/// 2. If `expected_hash` is provided, verifies content matches
+/// 3. If cache miss (or `ForceRefresh`), fetches from remote (unless `Offline`)
 /// 4. Caches the result for future use (only after verification passes)
 ///
 /// # Errors
@@ -168,11 +225,13 @@ fn write_to_cache(url: &str, content: &str, project_root: Option<&Path>) -> Opti
 /// - The server returns a non-2xx status code
 /// - Network errors occur
 /// - Hash verification fails (if `expected_hash` is provided)
+/// - Offline mode with cache miss
 pub fn fetch_remote_config_with_client(
     url: &str,
     client: &impl HttpClient,
     project_root: Option<&Path>,
     expected_hash: Option<&str>,
+    policy: FetchPolicy,
 ) -> Result<String> {
     // Validate URL
     if !is_remote_url(url) {
@@ -181,18 +240,33 @@ pub fn fetch_remote_config_with_client(
         )));
     }
 
-    // Try cache first
-    if let Some(cached) = read_from_cache(url, project_root) {
+    // Try cache based on policy
+    if let Some(cached) = read_from_cache(url, project_root, policy) {
         // If hash is specified, verify cached content matches
         if let Some(hash) = expected_hash {
-            if compute_content_hash(&cached) == hash {
+            let actual = compute_content_hash(&cached);
+            if actual == hash {
                 return Ok(cached);
             }
-            // Hash mismatch - cache is stale, fall through to fetch fresh content
+            // Hash mismatch - cache is stale
+            // In offline mode, this is an error (can't fetch fresh content)
+            if policy == FetchPolicy::Offline {
+                return Err(SlocGuardError::RemoteConfigHashMismatch {
+                    url: url.to_string(),
+                    expected: hash.to_string(),
+                    actual,
+                });
+            }
+            // Fall through to fetch fresh content
         } else {
             // No hash specified - use cache as-is
             return Ok(cached);
         }
+    } else if policy == FetchPolicy::Offline {
+        // Offline mode with cache miss
+        return Err(SlocGuardError::Config(format!(
+            "Remote config cache miss in offline mode. Run without --offline first to cache: {url}"
+        )));
     }
 
     // Emit warning on first remote fetch per session
@@ -230,48 +304,14 @@ pub fn fetch_remote_config_with_client(
 /// - The server returns a non-2xx status code
 /// - Network errors occur
 /// - Hash verification fails (if `expected_hash` is provided)
+/// - Offline mode with cache miss
 pub fn fetch_remote_config(
     url: &str,
     project_root: Option<&Path>,
     expected_hash: Option<&str>,
+    policy: FetchPolicy,
 ) -> Result<String> {
-    fetch_remote_config_with_client(url, &ReqwestClient, project_root, expected_hash)
-}
-
-/// Fetch remote configuration from cache only (offline mode).
-///
-/// Returns cached content if available and valid (within TTL).
-/// Does NOT fetch from the network.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - The URL is invalid
-/// - The cache is missing or expired
-/// - Hash verification fails (if `expected_hash` is provided)
-pub fn fetch_remote_config_offline(
-    url: &str,
-    project_root: Option<&Path>,
-    expected_hash: Option<&str>,
-) -> Result<String> {
-    if !is_remote_url(url) {
-        return Err(SlocGuardError::Config(format!(
-            "Invalid remote config URL (must start with http:// or https://): {url}"
-        )));
-    }
-
-    let content = read_from_cache(url, project_root).ok_or_else(|| {
-        SlocGuardError::Config(format!(
-            "Remote config cache miss in offline mode. Run without --offline first to cache: {url}"
-        ))
-    })?;
-
-    // Verify cached content if hash is specified
-    if let Some(hash) = expected_hash {
-        verify_content_hash(&content, hash, url)?;
-    }
-
-    Ok(content)
+    fetch_remote_config_with_client(url, &ReqwestClient, project_root, expected_hash, policy)
 }
 
 /// Clear the remote config cache.

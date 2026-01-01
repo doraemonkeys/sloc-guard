@@ -16,7 +16,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | Module | Purpose |
 |--------|---------|
 | `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`, `--write-sarif`, `--write-json`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
-| `config/*` | `Config` (scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching (1h TTL cache in `.sloc-guard/remote-cache/`, `--offline` mode, `extends_sha256` hash verification); `expires.rs`: date parsing/validation |
+| `config/*` | `Config` (scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching with `FetchPolicy` (Normal: 1h TTL, Offline: ignore TTL, ForceRefresh: skip cache), cache in state directory, `extends_sha256` hash verification; `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `composite.rs`: `CompositeScanner` (gitignore-aware/regular fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
@@ -34,11 +34,12 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 ## Key Types
 
 ```rust
-// Config (priority: CLI > file > defaults; extends: local/remote/preset with 1h TTL cache for remote)
-// Schema separates scanner/content/structure concerns
+// Config (priority: CLI > file > defaults; extends: local/remote/preset)
+// Remote cache: state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`)
 // Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
 // Array Merge: arrays append (parent + child); use "$reset" as first element to clear parent
+FetchPolicy::Normal | Offline | ForceRefresh
 Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict

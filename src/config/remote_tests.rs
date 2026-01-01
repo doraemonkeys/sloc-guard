@@ -137,7 +137,12 @@ fn hash_url_handles_special_characters() {
 #[test]
 fn fetch_remote_config_rejects_invalid_url() {
     let temp_dir = create_temp_project();
-    let result = fetch_remote_config("/local/path", Some(temp_dir.path()), None);
+    let result = fetch_remote_config(
+        "/local/path",
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("Invalid remote config URL"));
@@ -146,7 +151,12 @@ fn fetch_remote_config_rejects_invalid_url() {
 #[test]
 fn fetch_remote_config_rejects_non_http_scheme() {
     let temp_dir = create_temp_project();
-    let result = fetch_remote_config("ftp://example.com/config.toml", Some(temp_dir.path()), None);
+    let result = fetch_remote_config(
+        "ftp://example.com/config.toml",
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("Invalid remote config URL"));
@@ -163,7 +173,13 @@ fn cache_dir_returns_path_with_project_root() {
 fn cache_dir_structure_matches_expected() {
     let temp_dir = create_temp_project();
     let result = cache_dir(temp_dir.path());
-    assert!(result.ends_with(".sloc-guard/remote-cache"));
+    // Cache is now in the state directory (.sloc-guard/remote-configs or .git/sloc-guard/remote-configs)
+    // Use to_string_lossy for platform-independent comparison
+    let result_str = result.to_string_lossy();
+    assert!(
+        result_str.contains("sloc-guard") && result_str.ends_with("remote-configs"),
+        "Expected path to contain 'sloc-guard' and end with 'remote-configs', got: {result_str}"
+    );
 }
 
 #[test]
@@ -223,13 +239,13 @@ fn clear_cache_removes_cached_files() {
 }
 
 #[test]
-fn is_cache_valid_returns_false_for_nonexistent_file() {
+fn cache_exists_returns_false_for_nonexistent_file() {
     let path = PathBuf::from("/nonexistent/path/to/cache.toml");
-    assert!(!is_cache_valid(&path));
+    assert!(!cache_exists(&path));
 }
 
 #[test]
-fn is_cache_valid_returns_true_for_fresh_file() {
+fn is_cache_within_ttl_returns_true_for_fresh_file() {
     let Ok(temp_dir) = tempfile::tempdir() else {
         // Skip test if tempdir creation fails (e.g., in restricted environments)
         return;
@@ -237,13 +253,23 @@ fn is_cache_valid_returns_true_for_fresh_file() {
     let cache_path = temp_dir.path().join("test.toml");
     fs::write(&cache_path, "test").unwrap();
 
-    // File was just created, should be valid
-    assert!(is_cache_valid(&cache_path));
+    // File was just created, should be within TTL
+    assert!(is_cache_within_ttl(&cache_path));
+}
+
+#[test]
+fn is_cache_within_ttl_returns_false_for_nonexistent_file() {
+    let path = PathBuf::from("/nonexistent/path/to/cache.toml");
+    assert!(!is_cache_within_ttl(&path));
 }
 
 #[test]
 fn read_from_cache_returns_none_when_no_project_root() {
-    let result = read_from_cache("https://test-url-no-cache.com/config.toml", None);
+    let result = read_from_cache(
+        "https://test-url-no-cache.com/config.toml",
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_none());
 }
 
@@ -260,8 +286,8 @@ fn write_to_cache_and_read_back() {
         return;
     }
 
-    // Read back from cache
-    let read_result = read_from_cache(test_url, Some(temp_dir.path()));
+    // Read back from cache (using Normal policy for TTL check)
+    let read_result = read_from_cache(test_url, Some(temp_dir.path()), FetchPolicy::Normal);
     assert!(read_result.is_some());
     assert_eq!(read_result.unwrap(), test_content);
 }
@@ -285,7 +311,13 @@ fn fetch_with_mock_client_success() {
 
     let url = "https://mock-test-success.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
     assert_eq!(client.call_count(), 1);
@@ -298,7 +330,13 @@ fn fetch_with_mock_client_error() {
 
     let url = "https://mock-test-error.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(
         result
@@ -318,18 +356,30 @@ fn fetch_with_mock_client_uses_cache_on_second_call() {
     let url = "https://mock-test-cache.example.com/config.toml";
 
     // First call should hit the client
-    let result1 = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result1 = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result1.is_ok());
     assert_eq!(client.call_count(), 1);
 
     // Check if cache was written successfully
-    let cache_exists = cache_file_path(url, temp_dir.path()).exists();
-    if !cache_exists {
+    let cache_file_exists = cache_file_path(url, temp_dir.path()).exists();
+    if !cache_file_exists {
         return;
     }
 
     // Second call should use cache, not hit client
-    let result2 = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result2 = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result2.is_ok());
     assert_eq!(result2.unwrap(), content);
     assert_eq!(client.call_count(), 1); // Still 1, cache was used
@@ -340,8 +390,13 @@ fn fetch_with_mock_client_invalid_url_never_calls_client() {
     let temp_dir = create_temp_project();
     let client = MockHttpClient::success("should not be called");
 
-    let result =
-        fetch_remote_config_with_client("/local/path", &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        "/local/path",
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(
         result
@@ -362,6 +417,7 @@ fn fetch_with_mock_client_ftp_url_never_calls_client() {
         &client,
         Some(temp_dir.path()),
         None,
+        FetchPolicy::Normal,
     );
     assert!(result.is_err());
     assert_eq!(client.call_count(), 0);
@@ -375,7 +431,13 @@ fn fetch_with_mock_client_http_url_accepted() {
 
     let url = "http://mock-test-http.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
 }
@@ -387,7 +449,13 @@ fn fetch_with_mock_client_timeout_error() {
 
     let url = "https://mock-test-timeout.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("timeout"));
 }
@@ -399,7 +467,13 @@ fn fetch_with_mock_client_http_404_error() {
 
     let url = "https://mock-test-404.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("404"));
 }
@@ -412,7 +486,13 @@ fn fetch_with_mock_client_http_500_error() {
 
     let url = "https://mock-test-500.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("500"));
 }
@@ -424,7 +504,13 @@ fn fetch_with_mock_client_network_error() {
 
     let url = "https://mock-test-network.example.com/config.toml";
 
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("connect"));
 }
@@ -466,7 +552,13 @@ fn warning_shown_on_first_remote_fetch() {
     let url = "https://mock-test-warning.example.com/config.toml";
 
     assert!(!was_warning_shown());
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert!(was_warning_shown());
 }
@@ -485,11 +577,23 @@ fn warning_shown_only_once_per_session() {
 
     // First fetch - warning shown
     assert!(!was_warning_shown());
-    let _ = fetch_remote_config_with_client(url1, &client, Some(temp_dir.path()), None);
+    let _ = fetch_remote_config_with_client(
+        url1,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(was_warning_shown());
 
     // Second fetch - warning already shown, flag still true
-    let _ = fetch_remote_config_with_client(url2, &client, Some(temp_dir.path()), None);
+    let _ = fetch_remote_config_with_client(
+        url2,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(was_warning_shown());
 }
 
@@ -505,11 +609,17 @@ fn warning_not_shown_when_cache_hit() {
     let url = "https://mock-test-warning-cache.example.com/config.toml";
 
     // First fetch - populates cache, shows warning
-    let _ = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let _ = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
 
     // Check if cache was created
-    let cache_exists = cache_file_path(url, temp_dir.path()).exists();
-    if !cache_exists {
+    let cache_file_exists = cache_file_path(url, temp_dir.path()).exists();
+    if !cache_file_exists {
         return;
     }
 
@@ -518,7 +628,13 @@ fn warning_not_shown_when_cache_hit() {
     assert!(!was_warning_shown());
 
     // Second fetch - should use cache, no warning
-    let _ = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let _ = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(!was_warning_shown()); // Warning not shown because cache was used
 }
 
@@ -528,6 +644,7 @@ fn warning_not_shown_when_cache_hit() {
 fn offline_mode_returns_cached_content() {
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 800\n";
+    let client = MockHttpClient::error("Should not be called in offline mode");
 
     let url = "https://mock-test-offline-cached.example.com/config.toml";
 
@@ -535,31 +652,79 @@ fn offline_mode_returns_cached_content() {
     let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
-    // Fetch in offline mode should succeed
-    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), None);
+    // Fetch in offline mode should succeed using cached content
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Offline,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
+    assert_eq!(client.call_count(), 0); // Client should not be called
+}
+
+#[test]
+fn offline_mode_ignores_ttl() {
+    let temp_dir = create_temp_project();
+    let content = "version = \"2\"\n\n[content]\nmax_lines = 850\n";
+    let client = MockHttpClient::error("Should not be called in offline mode");
+
+    let url = "https://mock-test-offline-ignores-ttl.example.com/config.toml";
+
+    // Populate cache (content exists regardless of TTL check)
+    let write_result = write_to_cache(url, content, Some(temp_dir.path()));
+    assert!(write_result.is_some());
+
+    // Offline mode should use cache even if we can't verify TTL freshness
+    // (main point: it doesn't require cache to be "fresh", just to exist)
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Offline,
+    );
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), content);
+    assert_eq!(client.call_count(), 0);
 }
 
 #[test]
 fn offline_mode_returns_error_on_cache_miss() {
     let temp_dir = create_temp_project();
+    let client = MockHttpClient::error("Should not be called");
 
     let url = "https://mock-test-offline-miss.example.com/config.toml";
 
     // No cache populated, should error
-    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Offline,
+    );
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("cache miss"));
     assert!(err_msg.contains("offline"));
+    assert_eq!(client.call_count(), 0);
 }
 
 #[test]
 fn offline_mode_rejects_invalid_url() {
     let temp_dir = create_temp_project();
+    let client = MockHttpClient::error("Should not be called");
 
-    let result = fetch_remote_config_offline("/local/path", Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        "/local/path",
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Offline,
+    );
     assert!(result.is_err());
     assert!(
         result
@@ -570,8 +735,15 @@ fn offline_mode_rejects_invalid_url() {
 }
 
 #[test]
-fn offline_mode_returns_none_without_project_root() {
-    let result = fetch_remote_config_offline("https://example.com/config.toml", None, None);
+fn offline_mode_returns_error_without_project_root() {
+    let client = MockHttpClient::error("Should not be called");
+    let result = fetch_remote_config_with_client(
+        "https://example.com/config.toml",
+        &client,
+        None,
+        None,
+        FetchPolicy::Offline,
+    );
     assert!(result.is_err());
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("cache miss"));
@@ -611,8 +783,13 @@ fn hash_verification_success_on_match() {
 
     let url = "https://mock-test-hash-success.example.com/config.toml";
 
-    let result =
-        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&expected_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&expected_hash),
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
 }
@@ -626,8 +803,13 @@ fn hash_verification_fails_on_mismatch() {
 
     let url = "https://mock-test-hash-fail.example.com/config.toml";
 
-    let result =
-        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&wrong_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&wrong_hash),
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
 
     let err = result.unwrap_err();
@@ -662,8 +844,13 @@ fn hash_verification_with_cached_content_success() {
     // Create a client that should NOT be called (cache hit)
     let client = MockHttpClient::error("Should not be called");
 
-    let result =
-        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&expected_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&expected_hash),
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
     assert_eq!(client.call_count(), 0); // Cache was used
@@ -686,8 +873,13 @@ fn hash_verification_with_cached_content_fails_on_mismatch() {
     let client = MockHttpClient::success(fresh_content);
 
     // Should skip stale cache and fetch fresh content
-    let result =
-        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&expected_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&expected_hash),
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), fresh_content);
     assert_eq!(client.call_count(), 1); // Fetched fresh content
@@ -710,8 +902,13 @@ fn hash_mismatch_on_both_cache_and_remote_fails() {
     let client = MockHttpClient::success(remote_content);
 
     // Should skip cache, fetch remote, and fail on hash verification
-    let result =
-        fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), Some(&wrong_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&wrong_hash),
+        FetchPolicy::Normal,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("hash mismatch"));
     assert_eq!(client.call_count(), 1); // Tried to fetch
@@ -722,6 +919,7 @@ fn hash_verification_offline_mode_success() {
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 1300\n";
     let expected_hash = compute_content_hash(content);
+    let client = MockHttpClient::error("Should not be called in offline mode");
 
     let url = "https://mock-test-hash-offline-success.example.com/config.toml";
 
@@ -729,9 +927,16 @@ fn hash_verification_offline_mode_success() {
     let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
-    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), Some(&expected_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&expected_hash),
+        FetchPolicy::Offline,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
+    assert_eq!(client.call_count(), 0);
 }
 
 #[test]
@@ -739,6 +944,7 @@ fn hash_verification_offline_mode_fails_on_mismatch() {
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 1400\n";
     let wrong_hash = "a".repeat(64);
+    let client = MockHttpClient::error("Should not be called in offline mode");
 
     let url = "https://mock-test-hash-offline-fail.example.com/config.toml";
 
@@ -746,9 +952,16 @@ fn hash_verification_offline_mode_fails_on_mismatch() {
     let write_result = write_to_cache(url, content, Some(temp_dir.path()));
     assert!(write_result.is_some());
 
-    let result = fetch_remote_config_offline(url, Some(temp_dir.path()), Some(&wrong_hash));
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        Some(&wrong_hash),
+        FetchPolicy::Offline,
+    );
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("hash mismatch"));
+    assert_eq!(client.call_count(), 0);
 }
 
 #[test]
@@ -760,7 +973,67 @@ fn hash_not_required_when_none() {
     let url = "https://mock-test-no-hash.example.com/config.toml";
 
     // No hash provided - should succeed
-    let result = fetch_remote_config_with_client(url, &client, Some(temp_dir.path()), None);
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::Normal,
+    );
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), content);
+}
+
+// ForceRefresh mode tests
+
+#[test]
+fn force_refresh_skips_cache() {
+    let temp_dir = create_temp_project();
+    let cached_content = "version = \"2\"\n\n[content]\nmax_lines = 1600\n";
+    let fresh_content = "version = \"2\"\n\n[content]\nmax_lines = 1601\n";
+    let client = MockHttpClient::success(fresh_content);
+
+    let url = "https://mock-test-force-refresh.example.com/config.toml";
+
+    // Populate cache first
+    let write_result = write_to_cache(url, cached_content, Some(temp_dir.path()));
+    assert!(write_result.is_some());
+
+    // ForceRefresh should skip cache and fetch fresh content
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::ForceRefresh,
+    );
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), fresh_content);
+    assert_eq!(client.call_count(), 1); // Always fetches
+}
+
+#[test]
+fn force_refresh_updates_cache() {
+    let temp_dir = create_temp_project();
+    let fresh_content = "version = \"2\"\n\n[content]\nmax_lines = 1700\n";
+    let client = MockHttpClient::success(fresh_content);
+
+    let url = "https://mock-test-force-refresh-updates.example.com/config.toml";
+
+    // ForceRefresh should fetch and update cache
+    let result = fetch_remote_config_with_client(
+        url,
+        &client,
+        Some(temp_dir.path()),
+        None,
+        FetchPolicy::ForceRefresh,
+    );
+    assert!(result.is_ok());
+
+    // Verify cache was updated
+    let cache_path = cache_file_path(url, temp_dir.path());
+    if cache_path.exists() {
+        let cached = fs::read_to_string(&cache_path).unwrap();
+        assert_eq!(cached, fresh_content);
+    }
 }
