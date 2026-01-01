@@ -12,16 +12,17 @@ use rayon::prelude::*;
 use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{Cli, SnapshotArgs};
 use crate::git::GitContext;
-use crate::output::{FileStatistics, ProjectStatistics, ScanProgress};
+use crate::output::{ProjectStatistics, ScanProgress};
 use crate::scanner::scan_files;
 use crate::state;
 use crate::stats::TrendHistory;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::context::{
-    FileReader, RealFileReader, StatsContext, load_cache, load_config, print_preset_info,
-    process_file_with_cache, resolve_scan_paths, save_cache,
+    RealFileReader, StatsContext, load_cache, load_config, print_preset_info, resolve_scan_paths,
+    save_cache,
 };
+use super::stats::collect_file_stats;
 
 /// Run the snapshot command.
 ///
@@ -104,7 +105,7 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
                 .is_some_and(|ext| ctx.allowed_extensions.contains(ext))
         })
         .filter_map(|file_path| {
-            let result = collect_file_stats(file_path, &ctx, &cache, &reader);
+            let result = collect_file_stats(file_path, &ctx.registry, &cache, &reader);
             progress.inc();
             result
         })
@@ -164,20 +165,6 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
     }
 
     Ok(EXIT_SUCCESS)
-}
-
-fn collect_file_stats(
-    file_path: &Path,
-    ctx: &StatsContext,
-    cache: &Mutex<Cache>,
-    reader: &dyn FileReader,
-) -> Option<FileStatistics> {
-    let (stats, language) = process_file_with_cache(file_path, &ctx.registry, cache, reader)?;
-    Some(FileStatistics {
-        path: file_path.to_path_buf(),
-        stats,
-        language,
-    })
 }
 
 fn print_dry_run_output(

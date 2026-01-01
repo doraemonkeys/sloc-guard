@@ -49,9 +49,10 @@ impl ThresholdChecker {
         let allowed_extensions: HashSet<String> =
             config.content.extensions.iter().cloned().collect();
         let content_exclude = Self::build_content_exclude(&config)?;
+        let warning_threshold = config.content.warn_threshold;
         Ok(Self {
             config,
-            warning_threshold: 0.9,
+            warning_threshold,
             path_rules,
             path_rules_set,
             allowed_extensions,

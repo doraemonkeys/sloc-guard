@@ -38,6 +38,23 @@ pub fn collect_stats_with_config(
     cli: &Cli,
     load_result: LoadResult,
 ) -> crate::Result<(ProjectStatistics, std::path::PathBuf, Mutex<Cache>)> {
+    collect_stats_with_config_and_reader(common, cli, load_result, &RealFileReader)
+}
+
+/// Collect file statistics with injectable file reader for testability.
+///
+/// This variant accepts a `FileReader` implementation, enabling unit tests
+/// to inject mock readers without filesystem access.
+///
+/// # Errors
+///
+/// Returns an error if directory scanning fails or file I/O errors occur.
+pub fn collect_stats_with_config_and_reader(
+    common: &CommonStatsArgs,
+    cli: &Cli,
+    load_result: LoadResult,
+    reader: &dyn FileReader,
+) -> crate::Result<(ProjectStatistics, std::path::PathBuf, Mutex<Cache>)> {
     let mut config = load_result.config;
 
     // Print preset info if a preset was used
@@ -78,7 +95,6 @@ pub fn collect_stats_with_config(
     let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
 
     // Process files in parallel
-    let reader = RealFileReader;
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_stats: Vec<_> = all_files
         .par_iter()
@@ -92,7 +108,7 @@ pub fn collect_stats_with_config(
                 .is_some_and(|ext| ctx.allowed_extensions.contains(ext))
         })
         .filter_map(|file_path| {
-            let result = collect_file_stats(file_path, &ctx.registry, &cache, &reader);
+            let result = collect_file_stats(file_path, &ctx.registry, &cache, reader);
             progress.inc();
             result
         })

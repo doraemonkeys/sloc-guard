@@ -4,7 +4,9 @@
 // tests in the runner and other subcommand test modules. This module is reserved
 // for unit tests specific to collection internals if needed.
 
-use super::collection::{collect_file_stats, collect_stats, save_cache_if_enabled};
+use super::collection::{
+    collect_file_stats, collect_stats, collect_stats_with_config_and_reader, save_cache_if_enabled,
+};
 
 // Verify collection module exports are accessible
 #[test]
@@ -24,4 +26,11 @@ fn collection_module_exports_are_accessible() {
         &std::sync::Mutex<crate::cache::Cache>,
         &std::path::Path,
     ) = save_cache_if_enabled;
+    // Testable variant with injectable FileReader
+    let _: fn(
+        &crate::cli::CommonStatsArgs,
+        &crate::cli::Cli,
+        crate::config::LoadResult,
+        &dyn crate::commands::context::FileReader,
+    ) -> crate::Result<_> = collect_stats_with_config_and_reader;
 }

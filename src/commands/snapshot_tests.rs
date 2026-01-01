@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::counter::LineStats;
+use crate::output::FileStatistics;
 use tempfile::TempDir;
 
 fn create_test_stats() -> ProjectStatistics {
