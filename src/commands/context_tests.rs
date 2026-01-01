@@ -1,5 +1,5 @@
 use crate::cli::ColorChoice;
-use crate::config::Config;
+use crate::config::{Config, StructureConfig, StructureRule};
 use crate::output::ColorMode;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 use std::path::PathBuf;
@@ -221,4 +221,39 @@ fn read_file_with_hash_returns_none_for_nonexistent() {
     let result = read_file_with_hash(&reader, std::path::Path::new("nonexistent.txt"));
 
     assert!(result.is_none());
+}
+
+// =============================================================================
+// Error Propagation Tests (Phase 23.2)
+// =============================================================================
+
+#[test]
+fn check_context_from_config_propagates_invalid_structure_pattern() {
+    // Invalid glob pattern in structure rules should propagate error
+    let config = Config {
+        structure: StructureConfig {
+            max_files: Some(10),
+            rules: vec![StructureRule {
+                scope: "[invalid".to_string(), // Unclosed bracket is invalid glob
+                max_files: Some(20),
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = CheckContext::from_config(&config, 0.9, Vec::new(), false);
+
+    match result {
+        Err(err) => {
+            let msg = err.to_string();
+            assert!(
+                msg.contains("Invalid glob pattern"),
+                "Expected 'Invalid glob pattern' in: {msg}"
+            );
+            assert!(msg.contains("[invalid"), "Expected '[invalid' in: {msg}");
+        }
+        Ok(_) => panic!("Expected error for invalid structure pattern, but got Ok"),
+    }
 }
