@@ -38,6 +38,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Schema separates scanner/content/structure concerns
 // Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
+// Array Merge: arrays append (parent + child); use "$reset" as first element to clear parent
 Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict

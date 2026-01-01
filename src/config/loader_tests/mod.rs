@@ -1,5 +1,6 @@
 mod mock_fs;
 
+mod array_merge_tests;
 mod discovery_tests;
 mod extends_tests;
 mod parsing_tests;
