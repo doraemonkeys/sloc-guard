@@ -62,6 +62,16 @@ impl FileSystem for MockFileSystem {
     fn home_dir(&self) -> Option<PathBuf> {
         self.home_dir.clone()
     }
+
+    fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf> {
+        let normalized = normalize_path(path);
+        // In mock, return error if file doesn't exist (like real canonicalize)
+        if self.files.lock().unwrap().contains_key(&normalized) {
+            Ok(normalized)
+        } else {
+            Err(Error::new(ErrorKind::NotFound, "file not found"))
+        }
+    }
 }
 
 pub fn normalize_path(path: &Path) -> PathBuf {

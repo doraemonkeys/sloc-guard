@@ -82,6 +82,12 @@ pub trait FileSystem {
 
     /// Get the user's home directory.
     fn home_dir(&self) -> Option<PathBuf>;
+
+    /// Canonicalize a path to its absolute, normalized form.
+    ///
+    /// # Errors
+    /// Returns an error if the path cannot be canonicalized (e.g., file doesn't exist).
+    fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf>;
 }
 
 /// Real filesystem implementation.
@@ -103,6 +109,10 @@ impl FileSystem for RealFileSystem {
 
     fn home_dir(&self) -> Option<PathBuf> {
         dirs_home()
+    }
+
+    fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf> {
+        path.canonicalize()
     }
 }
 
@@ -194,7 +204,13 @@ impl<F: FileSystem> FileConfigLoader<F> {
         path: &Path,
         visited: &mut HashSet<String>,
     ) -> Result<(toml::Value, Option<String>)> {
-        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let canonical =
+            self.fs
+                .canonicalize(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
         let key = canonical.to_string_lossy().to_string();
 
         if !visited.insert(key) {
