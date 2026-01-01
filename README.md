@@ -4,9 +4,13 @@
 
 `sloc-guard` is a high-performance command-line tool that enforces limits on **Source Lines of Code (SLOC)** and **Directory Structure**. Unlike passive counters that just tell you how big your project is, `sloc-guard` actively prevents code bloat and architectural decay by failing your build when thresholds are exceeded.
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Test Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen.svg)]()
-[![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)]()
+[![Crates.io](https://img.shields.io/crates/v/sloc-guard.svg)](https://crates.io/crates/sloc-guard)
+[![Downloads](https://img.shields.io/crates/d/sloc-guard.svg)](https://crates.io/crates/sloc-guard)
+[![License](https://img.shields.io/crates/l/sloc-guard.svg)](LICENSE)
+[![CI](https://github.com/doraemonkeys/sloc-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/doraemonkeys/sloc-guard/actions/workflows/ci.yml)
+[![Test Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen.svg)](.github/workflows/ci.yml)
+[![Rust](https://img.shields.io/badge/rust-2024%20edition-orange.svg)](https://www.rust-lang.org/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/doraemonkeys/sloc-guard/pulls)
 
 ---
 
