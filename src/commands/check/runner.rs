@@ -6,27 +6,29 @@ use rayon::prelude::*;
 use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
-use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
 use crate::config::collect_expired_rules;
-use crate::git::GitContext;
 use crate::output::{
     OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter,
 };
 use crate::state;
-use crate::stats::TrendHistory;
-use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
+use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
+use super::check_args::{apply_cli_overrides, validate_and_resolve_paths};
 use super::check_baseline_ops::{
-    apply_baseline_comparison, check_baseline_ratchet, load_baseline, load_baseline_optional,
-    tighten_baseline, update_baseline_from_results,
+    apply_baseline_comparison, handle_baseline_ratchet, load_baseline, load_baseline_optional,
+    update_baseline_from_results,
 };
-use super::check_git_diff::filter_by_git_diff;
-use super::check_output::{format_output, structure_violation_to_check_result};
-use super::check_processing::{CheckFileResult, process_file_for_check};
+use super::check_exit::determine_exit_code;
+use super::check_output::{
+    format_output, structure_violation_to_check_result, write_additional_formats,
+};
+use super::check_processing::process_file_for_check;
+use super::check_scan::{partition_file_results, scan_or_filter_files};
+use super::check_snapshot::perform_auto_snapshot;
 use crate::commands::context::{
-    CheckContext, FileProcessError, color_choice_to_mode, load_cache, load_config,
-    print_preset_info, resolve_scan_paths, save_cache, write_output,
+    CheckContext, color_choice_to_mode, load_cache, load_config, print_preset_info, save_cache,
+    write_output,
 };
 
 /// Options for running a check with injected context.
@@ -184,8 +186,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     progress.finish();
 
     // Separate successful results from errors
-    let (mut results, file_stats, file_errors): (Vec<_>, Vec<_>, Vec<_>) =
-        partition_file_results(file_results);
+    let (mut results, file_stats, file_errors) = partition_file_results(file_results);
 
     // Report file processing errors (IO failures, lock errors) as warnings
     // These are critical path errors that could cause "missing files" in reports
@@ -330,361 +331,4 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     }
 
     Ok(exit_code)
-}
-
-/// Determine exit code based on results and mode flags.
-fn determine_exit_code(
-    results: &[CheckResult],
-    warn_only: bool,
-    strict: bool,
-    ratchet_failed: bool,
-) -> i32 {
-    if warn_only {
-        return EXIT_SUCCESS;
-    }
-    let has_failures = results.iter().any(CheckResult::is_failed);
-    let has_warnings = results.iter().any(CheckResult::is_warning);
-    if has_failures || (strict && has_warnings) || ratchet_failed {
-        EXIT_THRESHOLD_EXCEEDED
-    } else {
-        EXIT_SUCCESS
-    }
-}
-
-/// Handle baseline ratchet enforcement.
-///
-/// Returns `true` if ratchet check failed (for strict mode exit code).
-fn handle_baseline_ratchet(
-    args: &CheckArgs,
-    config: &crate::config::Config,
-    results: &[CheckResult],
-    baseline: &mut Option<Baseline>,
-    project_root: &Path,
-    quiet: bool,
-) -> crate::Result<bool> {
-    use crate::config::RatchetMode;
-
-    // Determine effective ratchet mode: CLI takes precedence over config
-    let ratchet_mode: Option<RatchetMode> = match (&args.ratchet, &config.baseline.ratchet) {
-        (Some(cli_mode), _) => Some((*cli_mode).into()),
-        (None, config_mode) => *config_mode,
-    };
-
-    // If no ratchet mode is set, skip ratchet check
-    let Some(mode) = ratchet_mode else {
-        return Ok(false);
-    };
-
-    // Ratchet requires a baseline
-    let Some(current_baseline) = baseline else {
-        // If ratchet is enabled but no baseline exists, emit warning
-        if !quiet {
-            crate::output::print_warning_full(
-                "--ratchet specified but no baseline found",
-                None,
-                Some("Use --baseline to specify a baseline file"),
-            );
-        }
-        return Ok(false);
-    };
-
-    // Check for stale entries
-    let ratchet_result = check_baseline_ratchet(results, current_baseline);
-
-    if !ratchet_result.is_outdated() {
-        return Ok(false);
-    }
-
-    let baseline_path = args
-        .baseline
-        .clone()
-        .unwrap_or_else(|| state::baseline_path(project_root));
-
-    match mode {
-        RatchetMode::Warn => {
-            if !quiet {
-                let paths_str = ratchet_result
-                    .stale_paths
-                    .iter()
-                    .map(String::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                crate::output::print_warning_full(
-                    &format!(
-                        "Baseline can be tightened - {} violation(s) resolved",
-                        ratchet_result.stale_entries
-                    ),
-                    Some(&paths_str),
-                    Some("Run with --ratchet=auto to auto-update, or --update-baseline to replace"),
-                );
-            }
-            Ok(false)
-        }
-        RatchetMode::Auto => {
-            let outcome = tighten_baseline(
-                current_baseline,
-                &ratchet_result.stale_paths,
-                &baseline_path,
-            )?;
-            if !quiet && outcome.is_saved() {
-                eprintln!(
-                    "Baseline tightened: {} stale entry/entries removed.",
-                    ratchet_result.stale_entries
-                );
-            }
-            Ok(false)
-        }
-        RatchetMode::Strict => {
-            let paths_str = ratchet_result
-                .stale_paths
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>()
-                .join(", ");
-            crate::output::print_error_full(
-                "Baseline",
-                &format!(
-                    "outdated - {} violation(s) resolved but not removed",
-                    ratchet_result.stale_entries
-                ),
-                Some(&paths_str),
-                Some("Update the baseline with --update-baseline or use --ratchet=auto"),
-            );
-            Ok(true) // Signal failure
-        }
-    }
-}
-
-/// Validate structure params require explicit path and return resolved paths.
-///
-/// - If `--max-files`, `--max-dirs`, or `--max-depth` is specified, paths must be explicitly provided
-/// - If no paths are provided and no structure params, defaults to current directory
-pub fn validate_and_resolve_paths(args: &CheckArgs) -> crate::Result<Vec<PathBuf>> {
-    let has_structure_params =
-        args.max_files.is_some() || args.max_dirs.is_some() || args.max_depth.is_some();
-
-    if args.paths.is_empty() {
-        if has_structure_params {
-            return Err(crate::SlocGuardError::Config(
-                "--max-files/--max-dirs/--max-depth require a target <PATH>".to_string(),
-            ));
-        }
-        // Default to current directory when no paths and no structure params
-        Ok(vec![PathBuf::from(".")])
-    } else {
-        Ok(args.paths.clone())
-    }
-}
-
-pub const fn apply_cli_overrides(config: &mut crate::config::Config, args: &CheckArgs) {
-    if let Some(max_lines) = args.max_lines {
-        config.content.max_lines = max_lines;
-    }
-
-    if args.count_comments {
-        config.content.skip_comments = false;
-    }
-
-    if args.count_blank {
-        config.content.skip_blank = false;
-    }
-
-    if let Some(warn_threshold) = args.warn_threshold {
-        config.content.warn_threshold = warn_threshold;
-    }
-
-    // Apply CLI structure overrides (override defaults, not rules)
-    if let Some(max_files) = args.max_files {
-        config.structure.max_files = Some(max_files);
-    }
-
-    if let Some(max_dirs) = args.max_dirs {
-        config.structure.max_dirs = Some(max_dirs);
-    }
-
-    if let Some(max_depth) = args.max_depth {
-        config.structure.max_depth = Some(max_depth);
-    }
-}
-
-/// Perform auto-snapshot after a successful check.
-///
-/// Records current statistics to trend history, respecting retention policies.
-/// Skips (with verbose log) if:
-/// - `min_interval_secs` hasn't elapsed since last entry
-/// - History file cannot be written (logs warning instead of failing)
-fn perform_auto_snapshot(
-    project_stats: &ProjectStatistics,
-    config: &crate::config::Config,
-    project_root: &Path,
-    quiet: bool,
-    verbose: u8,
-) {
-    // Get git context for the snapshot
-    let git_context = GitContext::from_path(project_root);
-
-    // Load history
-    let history_path = state::history_path(project_root);
-    let mut history = TrendHistory::load_or_default(&history_path);
-
-    // Check if we should add (respects min_interval_secs)
-    let current_time = state::current_unix_timestamp();
-
-    if !history.should_add(&config.trend, current_time) {
-        if verbose > 0 && !quiet {
-            eprintln!(
-                "Skipping auto-snapshot: min_interval_secs ({}) not elapsed since last entry",
-                config.trend.min_interval_secs.unwrap_or(0)
-            );
-        }
-        return;
-    }
-
-    // Add entry with git context
-    history.add_with_context(project_stats, git_context.as_ref());
-
-    // Save with retention policy applied
-    if let Err(e) = history.save_with_retention(&history_path, &config.trend) {
-        // Log warning but don't fail the check
-        if !quiet {
-            crate::output::print_warning_full(
-                "Auto-snapshot failed to save",
-                Some(&format!("{}: {e}", history_path.display())),
-                None,
-            );
-        }
-        return;
-    }
-
-    if !quiet {
-        eprintln!("Auto-snapshot recorded to {}", history_path.display());
-    }
-}
-
-/// Scan directories or filter provided files based on mode.
-///
-/// Returns:
-/// - List of files to process
-/// - Optional scan result with directory stats (None in --files mode)
-/// - Whether to skip structure checks (true in --files mode)
-fn scan_or_filter_files(
-    args: &CheckArgs,
-    cli: &Cli,
-    paths: &[PathBuf],
-    ctx: &CheckContext,
-    project_root: &Path,
-) -> crate::Result<(Vec<PathBuf>, Option<crate::scanner::ScanResult>, bool)> {
-    if args.files.is_empty() {
-        // Normal mode: scan directories
-        // 1. Determine paths to scan
-        let paths_to_scan = resolve_scan_paths(paths, &args.include);
-
-        // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
-        let scan_result = ctx
-            .scanner
-            .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
-
-        // 2.1 Filter by git diff if --diff or --staged is specified
-        let files = filter_by_git_diff(
-            scan_result.files.clone(),
-            args.diff.as_deref(),
-            args.staged,
-            project_root,
-        )?;
-        Ok((files, Some(scan_result), false))
-    } else {
-        // Pure incremental mode: process only listed files, skip structure checks
-        // Warn about non-existent files before filtering them out
-        let mut existing_files = Vec::with_capacity(args.files.len());
-        for file in &args.files {
-            if file.exists() {
-                existing_files.push(file.clone());
-            } else if !cli.quiet {
-                crate::output::print_warning(&format!("file not found: {}", file.display()));
-            }
-        }
-        Ok((existing_files, None, true))
-    }
-}
-
-/// Partition file processing results into successes, stats, and errors.
-///
-/// Returns three vectors:
-/// - Check results from successfully processed files
-/// - File statistics from successfully processed files
-/// - Errors that occurred during file processing (IO failures, lock errors)
-///
-/// Skipped files (no extension, unrecognized extension, ignored by directive) are
-/// silently filtered out as they are legitimate non-errors.
-fn partition_file_results(
-    results: Vec<CheckFileResult>,
-) -> (
-    Vec<CheckResult>,
-    Vec<crate::output::FileStatistics>,
-    Vec<FileProcessError>,
-) {
-    let mut check_results = Vec::new();
-    let mut file_stats = Vec::new();
-    let mut errors = Vec::new();
-
-    for result in results {
-        match result {
-            CheckFileResult::Success {
-                check_result,
-                file_stats: stats,
-            } => {
-                check_results.push(*check_result);
-                file_stats.push(stats);
-            }
-            CheckFileResult::Skipped(_) => {
-                // Legitimately skipped files are not errors, just ignored
-            }
-            CheckFileResult::Error(error) => {
-                errors.push(error);
-            }
-        }
-    }
-
-    (check_results, file_stats, errors)
-}
-
-/// Write additional format outputs for single-run multi-format CI efficiency.
-///
-/// Supports `--write-sarif` and `--write-json` flags that write extra output files
-/// while the primary `--format` output goes to stdout.
-fn write_additional_formats(
-    args: &CheckArgs,
-    results: &[CheckResult],
-    color_mode: crate::output::ColorMode,
-    project_stats: Option<ProjectStatistics>,
-    project_root: &Path,
-    cli: &Cli,
-) -> crate::Result<()> {
-    if let Some(ref sarif_path) = args.write_sarif {
-        let sarif_output = format_output(
-            OutputFormat::Sarif,
-            results,
-            color_mode,
-            cli.verbose,
-            args.suggest,
-            project_stats.clone(),
-            Some(project_root.to_path_buf()),
-        )?;
-        write_output(Some(sarif_path), &sarif_output, cli.quiet)?;
-    }
-
-    if let Some(ref json_path) = args.write_json {
-        let json_output = format_output(
-            OutputFormat::Json,
-            results,
-            color_mode,
-            cli.verbose,
-            args.suggest,
-            project_stats,
-            Some(project_root.to_path_buf()),
-        )?;
-        write_output(Some(json_path), &json_output, cli.quiet)?;
-    }
-
-    Ok(())
 }

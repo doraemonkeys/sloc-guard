@@ -1,12 +1,18 @@
+mod check_args;
 mod check_baseline_ops;
+mod check_exit;
 mod check_git_diff;
 mod check_output;
 mod check_processing;
+mod check_scan;
+mod check_snapshot;
 mod runner;
 
 pub use runner::run_check;
 
 // Re-export internal items for tests
+#[cfg(test)]
+pub(crate) use check_args::{apply_cli_overrides, validate_and_resolve_paths};
 #[cfg(test)]
 pub(crate) use check_baseline_ops::{
     apply_baseline_comparison, check_baseline_ratchet, is_structure_violation, load_baseline,
@@ -21,10 +27,7 @@ pub(crate) use check_processing::{
     CheckFileResult, compute_effective_stats, process_file_for_check,
 };
 #[cfg(test)]
-pub(crate) use runner::{
-    CheckOptions, apply_cli_overrides, run_check_impl, run_check_with_context,
-    validate_and_resolve_paths,
-};
+pub(crate) use runner::{CheckOptions, run_check_impl, run_check_with_context};
 
 #[cfg(test)]
 mod check_baseline_tests;

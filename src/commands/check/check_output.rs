@@ -1,9 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::checker::{CheckResult, StructureViolation, ViolationCategory, ViolationType};
+use crate::cli::{CheckArgs, Cli};
+use crate::commands::context::write_output;
 use crate::counter::LineStats;
 use crate::output::{
-    HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
+    ColorMode, HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
     ProjectStatistics, SarifFormatter, TextFormatter,
 };
 
@@ -157,4 +159,45 @@ pub fn structure_violation_to_check_result(violation: &StructureViolation) -> Ch
             violation_category,
         }
     }
+}
+
+/// Write additional format outputs for single-run multi-format CI efficiency.
+///
+/// Supports `--write-sarif` and `--write-json` flags that write extra output files
+/// while the primary `--format` output goes to stdout.
+pub fn write_additional_formats(
+    args: &CheckArgs,
+    results: &[CheckResult],
+    color_mode: ColorMode,
+    project_stats: Option<ProjectStatistics>,
+    project_root: &Path,
+    cli: &Cli,
+) -> crate::Result<()> {
+    if let Some(ref sarif_path) = args.write_sarif {
+        let sarif_output = format_output(
+            OutputFormat::Sarif,
+            results,
+            color_mode,
+            cli.verbose,
+            args.suggest,
+            project_stats.clone(),
+            Some(project_root.to_path_buf()),
+        )?;
+        write_output(Some(sarif_path), &sarif_output, cli.quiet)?;
+    }
+
+    if let Some(ref json_path) = args.write_json {
+        let json_output = format_output(
+            OutputFormat::Json,
+            results,
+            color_mode,
+            cli.verbose,
+            args.suggest,
+            project_stats,
+            Some(project_root.to_path_buf()),
+        )?;
+        write_output(Some(json_path), &json_output, cli.quiet)?;
+    }
+
+    Ok(())
 }
