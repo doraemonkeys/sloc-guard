@@ -378,15 +378,12 @@ impl ThresholdChecker {
     }
 
     /// Find the first matching content.exclude pattern for a path.
+    /// Uses pre-compiled `GlobSet` for O(1) lookup.
     fn find_matching_exclude_pattern(&self, path: &Path) -> Option<String> {
-        for pattern in &self.config.content.exclude {
-            if let Ok(glob) = Glob::new(pattern)
-                && glob.compile_matcher().is_match(path)
-            {
-                return Some(pattern.clone());
-            }
-        }
-        None
+        let matches = self.content_exclude.matches(path);
+        matches
+            .first()
+            .map(|&idx| self.config.content.exclude[idx].clone())
     }
 }
 

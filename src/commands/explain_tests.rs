@@ -311,7 +311,7 @@ fn format_content_text_output_contains_expected_sections() {
 
     let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Text);
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Path:"));
     assert!(output.contains("Content Rules (SLOC Limits):"));
@@ -334,7 +334,7 @@ fn format_content_json_output_is_valid() {
 
     let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Json);
+    let output = format_content_explanation(&explanation, ExplainFormat::Json).unwrap();
 
     // Verify it's valid JSON
     let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
@@ -353,7 +353,7 @@ fn format_structure_text_output_contains_expected_sections() {
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src"));
-    let output = format_structure_explanation(&explanation, ExplainFormat::Text);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Path:"));
     assert!(output.contains("Structure Rules (Directory Limits):"));
@@ -373,7 +373,7 @@ fn format_structure_json_output_is_valid() {
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src"));
-    let output = format_structure_explanation(&explanation, ExplainFormat::Json);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
 
     // Verify it's valid JSON
     let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
@@ -398,7 +398,7 @@ fn format_structure_with_rule_reason_shows_reason() {
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
     let explanation = checker.explain(&PathBuf::from("legacy/module"));
-    let output = format_structure_explanation(&explanation, ExplainFormat::Text);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Reason:"));
     assert!(output.contains("Legacy directory needs more files"));
@@ -414,7 +414,7 @@ fn format_structure_with_unlimited_shows_unlimited() {
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src"));
-    let output = format_structure_explanation(&explanation, ExplainFormat::Text);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("max_files=unlimited"));
 }
@@ -441,7 +441,7 @@ fn format_content_with_rule_shows_pattern() {
 
     let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Text);
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("[[content.rules]]"));
     assert!(output.contains("**/*.rs"));
@@ -469,7 +469,7 @@ fn format_content_with_rule_reason_shows_reason() {
 
     let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("legacy/old.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Text);
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("[[content.rules]]"));
     assert!(output.contains("Legacy code"));
@@ -598,7 +598,7 @@ fn format_content_text_shows_percentage_for_percentage_source() {
         .unwrap()
         .with_warning_threshold(0.9);
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Text);
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     // Should show percentage
     assert!(output.contains("(90%)"));
@@ -617,7 +617,7 @@ fn format_content_text_shows_absolute_for_absolute_source() {
 
     let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
-    let output = format_content_explanation(&explanation, ExplainFormat::Text);
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     // Should show (absolute)
     assert!(output.contains("(absolute)"));

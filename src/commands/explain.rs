@@ -43,14 +43,14 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
     if path.is_file() {
         let checker = ThresholdChecker::new(config)?;
         let explanation = checker.explain(path);
-        println!("{}", format_content_explanation(&explanation, args.format));
+        println!("{}", format_content_explanation(&explanation, args.format)?);
     } else if path.is_dir() {
         match StructureChecker::new(&config.structure) {
             Ok(checker) if checker.is_enabled() => {
                 let explanation = checker.explain(path);
                 println!(
                     "{}",
-                    format_structure_explanation(&explanation, args.format)
+                    format_structure_explanation(&explanation, args.format)?
                 );
             }
             Ok(_) => {
@@ -73,16 +73,22 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
     Ok(())
 }
 
-fn format_content_explanation(exp: &ContentExplanation, format: ExplainFormat) -> String {
+fn format_content_explanation(
+    exp: &ContentExplanation,
+    format: ExplainFormat,
+) -> crate::Result<String> {
     match format {
-        ExplainFormat::Text => format_content_text(exp),
+        ExplainFormat::Text => Ok(format_content_text(exp)),
         ExplainFormat::Json => format_json(exp),
     }
 }
 
-fn format_structure_explanation(exp: &StructureExplanation, format: ExplainFormat) -> String {
+fn format_structure_explanation(
+    exp: &StructureExplanation,
+    format: ExplainFormat,
+) -> crate::Result<String> {
     match format {
-        ExplainFormat::Text => format_structure_text(exp),
+        ExplainFormat::Text => Ok(format_structure_text(exp)),
         ExplainFormat::Json => format_json(exp),
     }
 }
@@ -201,36 +207,9 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
         }
     }
 
-    let max_files_str = exp.effective_max_files.map_or_else(
-        || "none".to_string(),
-        |v| {
-            if v == -1 {
-                "unlimited".to_string()
-            } else {
-                v.to_string()
-            }
-        },
-    );
-    let max_dirs_str = exp.effective_max_dirs.map_or_else(
-        || "none".to_string(),
-        |v| {
-            if v == -1 {
-                "unlimited".to_string()
-            } else {
-                v.to_string()
-            }
-        },
-    );
-    let max_depth_str = exp.effective_max_depth.map_or_else(
-        || "none".to_string(),
-        |v| {
-            if v == -1 {
-                "unlimited".to_string()
-            } else {
-                v.to_string()
-            }
-        },
-    );
+    let max_files_str = format_limit(exp.effective_max_files);
+    let max_dirs_str = format_limit(exp.effective_max_dirs);
+    let max_depth_str = format_limit(exp.effective_max_depth);
 
     output.push_str(&format!(
         "  Limits:  max_files={max_files_str}, max_dirs={max_dirs_str}, max_depth={max_depth_str}\n"
@@ -276,8 +255,20 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
     output
 }
 
-fn format_json<T: serde::Serialize>(exp: &T) -> String {
-    serde_json::to_string_pretty(exp).unwrap_or_else(|e| format!("Error serializing to JSON: {e}"))
+/// Format an optional limit value for display.
+/// - `None` → "none" (no limit configured)
+/// - `Some(-1)` → "unlimited" (explicitly unlimited)
+/// - `Some(n)` → numeric string
+fn format_limit(value: Option<i64>) -> String {
+    match value {
+        None => "none".to_string(),
+        Some(-1) => "unlimited".to_string(),
+        Some(v) => v.to_string(),
+    }
+}
+
+fn format_json<T: serde::Serialize>(exp: &T) -> crate::Result<String> {
+    Ok(serde_json::to_string_pretty(exp)?)
 }
 
 #[cfg(test)]

@@ -569,6 +569,23 @@ pub struct StructureConfig {
     pub rules: Vec<StructureRule>,
 }
 
+impl StructureConfig {
+    /// Check if any structure checking is configured.
+    ///
+    /// Returns `true` if any limits, rules, or denylists are defined.
+    #[must_use]
+    pub const fn is_enabled(&self) -> bool {
+        self.max_files.is_some()
+            || self.max_dirs.is_some()
+            || self.max_depth.is_some()
+            || !self.rules.is_empty()
+            || !self.deny_extensions.is_empty()
+            || !self.deny_patterns.is_empty()
+            || !self.deny_files.is_empty()
+            || !self.deny_dirs.is_empty()
+    }
+}
+
 /// Rule for overriding structure limits on specific directories.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct StructureRule {

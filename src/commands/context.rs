@@ -288,16 +288,7 @@ impl CheckContext {
         exclude_patterns: &[String],
     ) -> crate::Result<Option<StructureScanConfig>> {
         // Only build if structure checking is enabled
-        let has_structure_config = config.structure.max_files.is_some()
-            || config.structure.max_dirs.is_some()
-            || config.structure.max_depth.is_some()
-            || !config.structure.rules.is_empty()
-            || !config.structure.deny_extensions.is_empty()
-            || !config.structure.deny_patterns.is_empty()
-            || !config.structure.deny_files.is_empty()
-            || !config.structure.deny_dirs.is_empty();
-
-        if !has_structure_config {
+        if !config.structure.is_enabled() {
             return Ok(None);
         }
 
