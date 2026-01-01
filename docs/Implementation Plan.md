@@ -23,144 +23,38 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 12**: Rule Priority, State Consolidation, .gitignore, Remote Config (Offline/Hash Lock), --diff A..B Range
 - **Phase 13-15**: Project Root Discovery, Cache Optimization, File Locking, Path Matching, CheckOptions, Scanner Split, Colored Error Output
 - **Phase 16-20**: Trend History Command, Relative Path Output, Unified Siblings Config, HTML Stats Format
+- **Phase 21**: Stats Command Restructure (subcommands: summary, files, breakdown, trend, report, snapshot), Trend Config, Report Config, Output Refactoring
+- **Phase 22**: SARIF & GitHub Action Fixes
 
 ---
 
-## Phase 21: Stats Command Restructure (Pending)
+## Phase 23: Error Propagation & Fail-Fast
 
-Refactor `stats` into explicit subcommands following design principles:
-- Subcommand = data scope (noun)
-- Flag = modifier/filter (verb/adjective)
-- Read/write separation
-- Bare `stats` requires subcommand
+Silent failures mask configuration/environment issues. This phase surfaces errors early.
 
-### Task 21.1: CLI Subcommand Structure ✅
+**23.1 ThresholdChecker::new() returns Result**
+- `build_content_exclude()` and `build_path_rules()` return `Result<_, SlocGuardError::InvalidPattern>`
+- First invalid glob pattern fails immediately (no batch collection - matches Rust conventions)
 
-Restructure CLI to enforce subcommand requirement:
-- `stats summary` - project-level totals only
-- `stats files` - file list with `--top`, `--sort`, `--ext`
-- `stats breakdown` - grouped stats with `--by lang|dir`, `--depth`
-- `stats trend` - delta comparison with `--since`
-- `stats history` - list entries with `--limit` (existing, verify compatibility)
-- `stats report` - comprehensive output with `-o` for file output
-- Bare `stats` → error with subcommand list
+**23.2 StructureChecker propagation**
+- `CheckContext::from_config()` propagates `StructureChecker::new()` errors instead of `.ok()`
+- Invalid regex in structure rules surfaces immediately
 
-### Task 21.2: Stats Summary Subcommand ✅
+**23.3 Cycle detection canonicalize must fail**
+- `loader.rs` cycle detection: `canonicalize()` returns `Result`, propagates error
+- Fallback to original path could cause infinite recursion
 
-Implement `stats summary`:
-- Output: Files, Code, Comments, Blank, Average metrics
-- Flags: `--format text|json|md`
-- No file list, no breakdown—summary only
+**23.4 current_dir() propagation**
+- `commands/context.rs` and `commands/config.rs`: return `SlocGuardError::Io` on failure
+- Silently setting `project_root = None` breaks downstream features
 
-### Task 21.3: Stats Files Subcommand ✅
+**23.5 save_cache returns Result**
+- `save_cache()` returns `io::Result<()>`, caller uses `let _ =` for explicit ignore
+- No behavioral change, just explicit intent in code
 
-Implement `stats files` (migrate `--top N` functionality):
-- Default: all files sorted by code descending
-- Flags: `--top N`, `--sort code|total|comment|blank|name`, `--ext rs,go`, `--format`
-- No summary section appended
-- Fix: `JsonStatsOutput.files` should use `Option<Vec>` + `skip_serializing_if` (avoid empty `"files": []` in summary-only JSON)
-
-### Task 21.4: Stats Breakdown Subcommand ✅
-
-Implement `stats breakdown` (migrate `--group-by` functionality):
-- Default: by language
-- Flags: `--by lang|dir`, `--depth N` (for dir mode), `--format`
-- Visual progress bars in text output
-
-### Task 21.5: Stats Trend Subcommand ✅
-
-Convert `--trend` flag to `stats trend` subcommand:
-- Read-only comparison with history
-- Flags: `--since <duration>` (7d, 1w, 12h), `--format`
-- Output: delta values with arrows, previous/current commit info
-
-### Task 21.6: Stats Report Subcommand ✅
-
-Implement `stats report` for comprehensive output:
-- Combines summary + files + breakdown + trend
-- Flags: `--format text|json|md|html`, `-o <path>`, `--exclude-section`, `--top`, `--breakdown-by`, `--since`
-- Content controlled by `[stats.report]` config (exclude, top_count, breakdown_by, trend_since)
-
-### Task 21.7: Snapshot Command ✅
-
-Create standalone `snapshot` command (read/write separation):
-- Records current stats to trend history
-- Respects `min_interval_secs` from config (--force to override)
-- Flags: `--history-file`, `--force`, `--dry-run`
-- Separate from stats viewing commands
-
-### Task 21.8: Trend Config Enhancement ✅
-
-Extend `[trend]` config:
-- `auto_snapshot_on_check`: auto-record after successful `check`
-- Retention: `max_entries`, `max_age_days`, `min_interval_secs`
-- Significance: `min_code_delta` threshold
-
-### Task 21.9: Stats Report Config ✅
-
-Add `[stats.report]` config section:
-- `exclude = []` - sections to omit (summary, files, breakdown, trend)
-- `top_count` - files section count
-- `breakdown_by` - default grouping
-- `trend_since` - default comparison period
-- Validation for exclude values, breakdown_by values, and trend_since format
-
-### Task 21.10: Stats Output Refactoring ✅
-
-Clean up DRY violations and implicit state detection:
-- Unify `FileSortOrder` enum: re-export `output::stats::FileSortOrder` from CLI, remove duplicate
-- Add `StatsOutputMode` enum (`Full`, `SummaryOnly`, `FilesOnly`) to `ProjectStatistics`
-- Replace fragile `files.is_empty() && top_files.is_some()` detection with explicit `output_mode` field
-- Use `std::mem::take` in `with_sorted_files` instead of `.clone()` + clear
-
----
-
-## Phase 22: SARIF & GitHub Action Fixes (Complete)
-
-Fix semantic issues in SARIF output and improve GitHub Action reliability.
-
-### Task 22.1: SARIF Structure Violation Rule IDs ✅
-
-Add proper SARIF rules for Structure violations. Currently only 2 rules defined (`sloc-guard/line-limit-exceeded`, `sloc-guard/line-limit-warning`) but Structure violations (file count, dir count, max depth, naming, etc.) incorrectly use these SLOC rules.
-
-- Add rule IDs per `ViolationType`: `sloc-guard/structure-file-count`, `sloc-guard/structure-dir-count`, `sloc-guard/structure-max-depth`, `sloc-guard/structure-disallowed-file`, `sloc-guard/structure-disallowed-dir`, `sloc-guard/structure-denied`, `sloc-guard/structure-naming`, `sloc-guard/structure-sibling`
-- Use `violation_category()` to branch Content vs Structure in `convert_result()`
-- Update `rules` array in `build_rules()` (10 rules total: 2 content + 8 structure)
-
-### Task 22.2: SARIF Structure Violation Messages ✅
-
-Fix message text for Structure violations. Currently shows "File has N SLOC" for all violations including structure (e.g., "Directory has 15 files" should not show as "File has 15 SLOC").
-
-- Match on `ViolationType` to generate contextually correct messages via `format_structure_message()`
-- Content messages via `format_content_message()` for SLOC violations
-
-### Task 22.3: GitHub Action Multi-Format Efficiency ✅
-
-Add `--write-sarif` and `--write-json` flags for single-run multi-format output:
-
-- `--write-sarif <path>`: Write SARIF output to file in addition to primary format
-- `--write-json <path>`: Write JSON output to file in addition to primary format
-- Action updated to use single run: `sloc-guard check --format text --write-sarif <path> --write-json <path>`
-- EXIT_CODE captured from single run
-
-### Task 22.4: GitHub Action Reliability Fixes ✅
-
-Address shell and caching issues in `.github/action/action.yml`:
-
-- Fix `latest` version cache: include resolved actual version in cache key
-- Fix shell quoting: use env vars for inputs, proper quoting in command construction
-- Fix SARIF `--format` argument construction (removed duplicate --format sarif, now uses --write-sarif)
-- Fix Problem Matcher regex: add Depth, add reason patterns for file-level violations
-
-### Task 22.5: Action Binary Download Format Alignment ✅
-
-Align `action.yml` binary download with `release.yml` naming convention:
-
-- Map runner OS/arch to platform (linux/macos/windows) and arch (x64/arm64) instead of target triples
-- Archive naming: `sloc-guard-${VERSION}-${PLATFORM}-${ARCH}.${EXT}` (e.g., `sloc-guard-v0.2.1-linux-x64.tar.gz`)
-- Checksum file: `checksums-sha256.txt` (was `SHA256SUMS`)
-- Version handling: preserve `v` prefix consistently (e.g., `v0.2.1` not `0.2.1`)
-- Update cache key to use platform/arch format
+**23.6 GlobSet build propagation**
+- `builder.build()` errors propagate instead of returning `GlobSet::empty()`
+- Empty set means all user rules silently fail
 
 ---
 
@@ -168,6 +62,7 @@ Align `action.yml` binary download with `release.yml` naming convention:
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
+| **18. Error Handling** | 23.1 ThresholdChecker, 23.2 StructureChecker, 23.3 Canonicalize, 23.4 current_dir, 23.5 save_cache, 23.6 GlobSet |
 | **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, ~~22.3 Multi-Format~~ ✅, ~~22.4 Action Fixes~~ ✅, ~~22.5 Binary Format~~ ✅ |
 | **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
 
