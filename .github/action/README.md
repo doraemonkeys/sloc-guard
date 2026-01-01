@@ -83,22 +83,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: doraemonkeys/sloc-guard/.github/action@main
+      - uses: doraemonkeys/sloc-guard/.github/action@master
 ```
 
 ### PR Checks with Diff Mode
 
 ```yaml
-- uses: doraemonkeys/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@master
   with:
-    diff: 'origin/main'
+    diff: 'origin/master'
     fail-on-warning: 'true'
 ```
 
 ### SARIF Upload to GitHub Security
 
 ```yaml
-- uses: doraemonkeys/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@master
   id: sloc-guard
   with:
     sarif-output: 'sloc-guard.sarif'
@@ -112,7 +112,7 @@ jobs:
 ### Using Outputs
 
 ```yaml
-- uses: doraemonkeys/sloc-guard/.github/action@main
+- uses: doraemonkeys/sloc-guard/.github/action@master
   id: sloc-guard
 
 - run: |

@@ -2,10 +2,131 @@ use std::collections::HashMap;
 
 use crate::config::CustomLanguageConfig;
 
+/// Pattern kind for dynamic comment/string markers
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum PatternKind {
+    /// Static start/end markers (e.g., `/*` and `*/`)
+    #[default]
+    Static,
+    /// Lua long brackets: `--[=*[` with matching `]=*]`
+    /// The level (number of `=` signs) is captured dynamically.
+    LuaLongBracket,
+    /// Rust raw strings: `r#*"` with matching `"#*`
+    /// The level (number of `#` signs) is captured dynamically.
+    /// This is used to skip raw strings when searching for comment markers.
+    RustRawString,
+}
+
+/// Metadata for a multi-line comment style
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiLineComment {
+    pub start: String,
+    pub end: String,
+    /// Whether this comment style supports nesting (e.g., Rust `/* /* */ */`)
+    pub supports_nesting: bool,
+    /// Whether the start marker must appear at line start (column 0) after trimming
+    /// (e.g., Ruby `=begin`)
+    pub must_be_at_line_start: bool,
+    /// Pattern kind for dynamic matching
+    pub pattern_kind: PatternKind,
+}
+
+impl MultiLineComment {
+    #[must_use]
+    pub fn new(start: &str, end: &str) -> Self {
+        Self {
+            start: start.to_string(),
+            end: end.to_string(),
+            supports_nesting: false,
+            must_be_at_line_start: false,
+            pattern_kind: PatternKind::Static,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_nesting(mut self) -> Self {
+        self.supports_nesting = true;
+        self
+    }
+
+    #[must_use]
+    pub const fn at_line_start(mut self) -> Self {
+        self.must_be_at_line_start = true;
+        self
+    }
+
+    #[must_use]
+    pub const fn with_pattern_kind(mut self, kind: PatternKind) -> Self {
+        self.pattern_kind = kind;
+        self
+    }
+}
+
+/// Helper to create Lua long bracket comment pattern
+/// Matches `--[=*[` and dynamically computes `]=*]` end marker
+#[derive(Debug, Clone)]
+pub struct LuaLongBracket {
+    /// If true, requires `--` prefix (comment). If false, matches raw `[=*[` (string).
+    pub is_comment: bool,
+}
+
+impl LuaLongBracket {
+    /// Create a Lua long bracket comment pattern (--[=*[ ... ]=*])
+    #[must_use]
+    pub const fn comment() -> Self {
+        Self { is_comment: true }
+    }
+}
+
+impl From<LuaLongBracket> for MultiLineComment {
+    fn from(lua: LuaLongBracket) -> Self {
+        // Use placeholder markers; actual matching is done via PatternKind
+        let start = if lua.is_comment { "--[[" } else { "[[" };
+        Self {
+            start: start.to_string(),
+            end: "]]".to_string(),
+            supports_nesting: false,
+            must_be_at_line_start: false,
+            pattern_kind: PatternKind::LuaLongBracket,
+        }
+    }
+}
+
+/// Helper to create Rust raw string pattern
+/// Matches `r#*"` and dynamically computes `"#*` end marker
+#[derive(Debug, Clone)]
+pub struct RustRawString;
+
+impl RustRawString {
+    #[must_use]
+    pub const fn new() -> Self {
+        Self
+    }
+}
+
+impl Default for RustRawString {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<RustRawString> for MultiLineComment {
+    fn from(_: RustRawString) -> Self {
+        // Use placeholder markers; actual matching is done via PatternKind
+        Self {
+            start: "r\"".to_string(),
+            end: "\"".to_string(),
+            supports_nesting: false,
+            must_be_at_line_start: false,
+            pattern_kind: PatternKind::RustRawString,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommentSyntax {
     pub single_line: Vec<String>,
-    pub multi_line: Vec<(String, String)>,
+    pub multi_line: Vec<MultiLineComment>,
 }
 
 impl CommentSyntax {
@@ -15,8 +136,17 @@ impl CommentSyntax {
             single_line: single_line.into_iter().map(String::from).collect(),
             multi_line: multi_line
                 .into_iter()
-                .map(|(s, e)| (s.to_string(), e.to_string()))
+                .map(|(s, e)| MultiLineComment::new(s, e))
                 .collect(),
+        }
+    }
+
+    /// Create with detailed multi-line comment configuration
+    #[must_use]
+    pub fn with_multi_line(single_line: Vec<&str>, multi_line: Vec<MultiLineComment>) -> Self {
+        Self {
+            single_line: single_line.into_iter().map(String::from).collect(),
+            multi_line,
         }
     }
 }
@@ -57,6 +187,13 @@ impl LanguageRegistry {
     pub fn register(&mut self, language: Language) {
         let idx = self.languages.len();
         for ext in &language.extensions {
+            // Warn in debug builds if the same extension appears multiple times
+            // within a single language definition (likely a typo)
+            debug_assert!(
+                !language.extensions.iter().filter(|e| *e == ext).count() > 1,
+                "Duplicate extension '{ext}' within language '{}'",
+                language.name
+            );
             self.extension_map.insert(ext.clone(), idx);
         }
         self.languages.push(language);
@@ -72,14 +209,49 @@ impl LanguageRegistry {
         &self.languages
     }
 
+    /// Create a registry with built-in languages plus custom language definitions.
+    ///
+    /// # Extension Override Behavior
+    /// Custom languages are registered **after** built-ins. If a custom language uses
+    /// an extension already registered by a built-in (e.g., `.rs` for Rust), the custom
+    /// definition **silently overrides** the built-in. This is intentional—it allows users
+    /// to customize comment syntax for specific extensions when needed.
+    ///
+    /// Use [`with_custom_languages_checked`] if you need to detect overrides.
     #[must_use]
     pub fn with_custom_languages(custom: &HashMap<String, CustomLanguageConfig>) -> Self {
+        Self::with_custom_languages_checked(custom).0
+    }
+
+    /// Create a registry with built-in languages plus custom language definitions,
+    /// returning a list of extensions that were overridden.
+    ///
+    /// # Returns
+    /// A tuple of `(registry, overridden_extensions)` where `overridden_extensions`
+    /// contains `(extension, original_language_name, new_language_name)` for each
+    /// extension that was remapped from a built-in to a custom language.
+    #[must_use]
+    pub fn with_custom_languages_checked(
+        custom: &HashMap<String, CustomLanguageConfig>,
+    ) -> (Self, Vec<(String, String, String)>) {
         let mut registry = Self::default();
+        let mut overrides = Vec::new();
 
         for (name, config) in custom {
+            // Track which extensions will be overridden
+            for ext in &config.extensions {
+                if let Some(existing_lang) = registry.get_by_extension(ext) {
+                    overrides.push((ext.clone(), existing_lang.name.clone(), name.clone()));
+                }
+            }
+
             let syntax = CommentSyntax {
                 single_line: config.single_line_comments.clone(),
-                multi_line: config.multi_line_comments.clone(),
+                multi_line: config
+                    .multi_line_comments
+                    .iter()
+                    .map(|(s, e)| MultiLineComment::new(s, e))
+                    .collect(),
             };
             let language = Language {
                 name: name.clone(),
@@ -89,7 +261,7 @@ impl LanguageRegistry {
             registry.register(language);
         }
 
-        registry
+        (registry, overrides)
     }
 }
 
@@ -97,10 +269,17 @@ impl Default for LanguageRegistry {
     fn default() -> Self {
         let mut registry = Self::new();
 
+        // Rust supports nested block comments and raw strings
         registry.register(Language::new(
             "Rust",
             vec!["rs"],
-            CommentSyntax::new(vec!["//", "///", "//!"], vec![("/*", "*/")]),
+            CommentSyntax::with_multi_line(
+                vec!["//", "///", "//!"],
+                vec![
+                    MultiLineComment::new("/*", "*/").with_nesting(),
+                    RustRawString::new().into(),
+                ],
+            ),
         ));
 
         registry.register(Language::new(
@@ -151,10 +330,14 @@ impl Default for LanguageRegistry {
             CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
         ));
 
+        // Swift supports nested block comments
         registry.register(Language::new(
             "Swift",
             vec!["swift"],
-            CommentSyntax::new(vec!["//", "///"], vec![("/*", "*/")]),
+            CommentSyntax::with_multi_line(
+                vec!["//", "///"],
+                vec![MultiLineComment::new("/*", "*/").with_nesting()],
+            ),
         ));
 
         registry.register(Language::new(
@@ -175,10 +358,14 @@ impl Default for LanguageRegistry {
             CommentSyntax::new(vec!["//", "#"], vec![("/*", "*/")]),
         ));
 
+        // Ruby =begin/=end must be at line start (column 0)
         registry.register(Language::new(
             "Ruby",
             vec!["rb", "rake"],
-            CommentSyntax::new(vec!["#"], vec![("=begin", "=end")]),
+            CommentSyntax::with_multi_line(
+                vec!["#"],
+                vec![MultiLineComment::new("=begin", "=end").at_line_start()],
+            ),
         ));
 
         registry.register(Language::new(
@@ -193,10 +380,11 @@ impl Default for LanguageRegistry {
             CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
         ));
 
+        // Lua supports long brackets with varying levels: --[[ ]], --[=[ ]=], --[==[ ]==], etc.
         registry.register(Language::new(
             "Lua",
             vec!["lua"],
-            CommentSyntax::new(vec!["--"], vec![("--[[", "]]")]),
+            CommentSyntax::with_multi_line(vec!["--"], vec![LuaLongBracket::comment().into()]),
         ));
 
         registry.register(Language::new(

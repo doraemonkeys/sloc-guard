@@ -1,4 +1,5 @@
 use std::io::BufRead;
+use std::num::NonZeroUsize;
 
 use crate::language::CommentSyntax;
 
@@ -43,6 +44,84 @@ pub enum CountResult {
     IgnoredFile,
 }
 
+/// Tracks multi-line comment state, including nesting depth.
+///
+/// Uses an enum to make illegal states unrepresentable: when inside a comment,
+/// all required fields (markers, nesting info) are guaranteed to exist.
+#[derive(Debug, Clone, Default)]
+enum MultiLineState {
+    /// Not currently inside any multi-line comment
+    #[default]
+    NotInComment,
+    /// Inside a multi-line comment with all required context
+    InComment {
+        /// Current nesting depth (guaranteed >= 1)
+        depth: NonZeroUsize,
+        /// Start marker for the current comment style
+        start_marker: String,
+        /// End marker for the current comment style
+        end_marker: String,
+        /// Whether current comment style supports nesting
+        supports_nesting: bool,
+    },
+}
+
+impl MultiLineState {
+    const fn is_in_comment(&self) -> bool {
+        matches!(self, Self::InComment { .. })
+    }
+
+    fn enter(&mut self, start: &str, end: &str, supports_nesting: bool) {
+        match self {
+            Self::NotInComment => {
+                *self = Self::InComment {
+                    depth: NonZeroUsize::MIN, // 1
+                    start_marker: start.to_string(),
+                    end_marker: end.to_string(),
+                    supports_nesting,
+                };
+            }
+            Self::InComment { depth, .. } => {
+                // Increment depth, saturating to avoid overflow
+                *depth = depth.saturating_add(1);
+            }
+        }
+    }
+
+    fn exit(&mut self) {
+        if let Self::InComment { depth, .. } = self {
+            if let Some(new_depth) = NonZeroUsize::new(depth.get() - 1) {
+                *depth = new_depth;
+            } else {
+                // depth was 1, now 0 → exit comment
+                *self = Self::NotInComment;
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        *self = Self::NotInComment;
+    }
+
+    /// Extract markers and nesting info when inside a comment.
+    /// Returns None if not in a comment (caller should handle appropriately).
+    ///
+    /// Returns owned Strings to avoid borrow conflicts when caller needs to mutate state
+    /// after extracting marker info. The clone cost is acceptable since this is only
+    /// called once per line (not in an inner loop).
+    fn comment_info_owned(&self) -> Option<(String, String, bool)> {
+        match self {
+            Self::NotInComment => None,
+            Self::InComment {
+                start_marker,
+                end_marker,
+                supports_nesting,
+                ..
+            } => Some((start_marker.clone(), end_marker.clone(), *supports_nesting)),
+        }
+    }
+}
+
 pub struct SlocCounter<'a> {
     detector: CommentDetector<'a>,
 }
@@ -58,8 +137,7 @@ impl<'a> SlocCounter<'a> {
     #[must_use]
     pub fn count(&self, source: &str) -> CountResult {
         let mut stats = LineStats::new();
-        let mut in_multi_line_comment = false;
-        let mut multi_line_end_marker: Option<&'a str> = None;
+        let mut multi_line_state = MultiLineState::default();
         let mut ignore_remaining: usize = 0;
         let mut in_ignore_block = false;
 
@@ -72,8 +150,7 @@ impl<'a> SlocCounter<'a> {
             self.process_line(
                 line,
                 &mut stats,
-                &mut in_multi_line_comment,
-                &mut multi_line_end_marker,
+                &mut multi_line_state,
                 &mut ignore_remaining,
                 &mut in_ignore_block,
             );
@@ -95,8 +172,7 @@ impl<'a> SlocCounter<'a> {
     /// Returns an I/O error if reading from the reader fails.
     pub fn count_reader<R: BufRead>(&self, reader: R) -> std::io::Result<CountResult> {
         let mut stats = LineStats::new();
-        let mut in_multi_line_comment = false;
-        let mut multi_line_end_marker: Option<&'a str> = None;
+        let mut multi_line_state = MultiLineState::default();
         let mut ignore_remaining: usize = 0;
         let mut in_ignore_block = false;
 
@@ -111,8 +187,7 @@ impl<'a> SlocCounter<'a> {
             self.process_line(
                 &line,
                 &mut stats,
-                &mut in_multi_line_comment,
-                &mut multi_line_end_marker,
+                &mut multi_line_state,
                 &mut ignore_remaining,
                 &mut in_ignore_block,
             );
@@ -156,8 +231,7 @@ impl<'a> SlocCounter<'a> {
         &self,
         line: &str,
         stats: &mut LineStats,
-        in_multi_line_comment: &mut bool,
-        multi_line_end_marker: &mut Option<&'a str>,
+        multi_line_state: &mut MultiLineState,
         ignore_remaining: &mut usize,
         in_ignore_block: &mut bool,
     ) {
@@ -190,7 +264,7 @@ impl<'a> SlocCounter<'a> {
         if *in_ignore_block {
             stats.ignored += 1;
             // Still need to track multi-line comment state for proper parsing after ignore block
-            self.track_multi_line_comment_state(line, in_multi_line_comment, multi_line_end_marker);
+            self.track_multi_line_comment_state(line, multi_line_state);
             return;
         }
 
@@ -198,19 +272,14 @@ impl<'a> SlocCounter<'a> {
             *ignore_remaining -= 1;
             stats.ignored += 1;
             // Still need to track multi-line comment state
-            self.track_multi_line_comment_state(line, in_multi_line_comment, multi_line_end_marker);
+            self.track_multi_line_comment_state(line, multi_line_state);
             return;
         }
 
         // Normal line classification
-        if *in_multi_line_comment {
+        if multi_line_state.is_in_comment() {
             stats.comment += 1;
-            if let Some(end_marker) = *multi_line_end_marker
-                && self.detector.contains_multi_line_end(line, end_marker)
-            {
-                *in_multi_line_comment = false;
-                *multi_line_end_marker = None;
-            }
+            self.update_multi_line_state_inside_comment(line, multi_line_state);
             return;
         }
 
@@ -219,16 +288,40 @@ impl<'a> SlocCounter<'a> {
             return;
         }
 
-        if self.detector.is_single_line_comment(trimmed) {
+        // Check multi-line comment BEFORE single-line comment.
+        // This is crucial for languages like Lua where `--[[` (multi-line) starts
+        // with `--` (single-line prefix). Without this order, `--[[...` would be
+        // incorrectly classified as a single-line comment.
+        if let Some(matched) = self.detector.find_multi_line_start(line) {
+            let comment = matched.comment;
+            let start = &comment.start;
+            // Use dynamic end marker for patterns like Lua long brackets (--[=[...]=])
+            let end = matched.end_marker();
+
+            if comment.supports_nesting {
+                // For nested comments, count all starts and ends in the line
+                let (open_count, close_count) =
+                    self.detector.count_nesting_changes(line, start, end);
+                // Apply nesting changes: first starts increase depth, then ends decrease
+                for _ in 0..open_count {
+                    multi_line_state.enter(start, end, true);
+                }
+                for _ in 0..close_count {
+                    multi_line_state.exit();
+                }
+            } else {
+                // Non-nested: simple check if line ends the comment
+                if !self.detector.contains_multi_line_end(line, end) {
+                    multi_line_state.enter(start, end, false);
+                }
+            }
             stats.comment += 1;
             return;
         }
 
-        if let Some((_, end)) = self.detector.find_multi_line_start(line) {
-            if !self.detector.contains_multi_line_end(line, end) {
-                *in_multi_line_comment = true;
-                *multi_line_end_marker = Some(end);
-            }
+        // Check single-line comment AFTER multi-line to handle overlapping prefixes
+        // (e.g., Lua's `--` vs `--[[`)
+        if self.detector.is_single_line_comment(trimmed) {
             stats.comment += 1;
             return;
         }
@@ -236,24 +329,57 @@ impl<'a> SlocCounter<'a> {
         stats.code += 1;
     }
 
-    fn track_multi_line_comment_state(
-        &self,
-        line: &str,
-        in_multi_line_comment: &mut bool,
-        multi_line_end_marker: &mut Option<&'a str>,
-    ) {
-        if *in_multi_line_comment {
-            if let Some(end_marker) = *multi_line_end_marker
-                && self.detector.contains_multi_line_end(line, end_marker)
-            {
-                *in_multi_line_comment = false;
-                *multi_line_end_marker = None;
+    /// Update multi-line state when already inside a comment.
+    ///
+    /// The enum-based `MultiLineState` guarantees that when we're in a comment,
+    /// all markers are available—no need for `debug_assert` or error handling.
+    fn update_multi_line_state_inside_comment(&self, line: &str, state: &mut MultiLineState) {
+        // Extract marker info (owned) before mutating state to avoid borrow conflicts.
+        // With the enum-based MultiLineState, this is guaranteed to succeed
+        // when is_in_comment() is true.
+        let Some((start, end, supports_nesting)) = state.comment_info_owned() else {
+            // Caller should only invoke this when is_in_comment() is true.
+            // If we reach here, it's a logic error in the caller.
+            return;
+        };
+
+        if supports_nesting {
+            // Count nested starts and ends
+            let (starts, ends) = self.detector.count_nesting_changes(line, &start, &end);
+            for _ in 0..starts {
+                state.enter(&start, &end, true);
             }
-        } else if let Some((_, end)) = self.detector.find_multi_line_start(line)
-            && !self.detector.contains_multi_line_end(line, end)
-        {
-            *in_multi_line_comment = true;
-            *multi_line_end_marker = Some(end);
+            for _ in 0..ends {
+                state.exit();
+            }
+        } else {
+            // Simple: check if line contains end marker
+            if self.detector.contains_multi_line_end(line, &end) {
+                state.reset();
+            }
+        }
+    }
+
+    fn track_multi_line_comment_state(&self, line: &str, state: &mut MultiLineState) {
+        if state.is_in_comment() {
+            self.update_multi_line_state_inside_comment(line, state);
+        } else if let Some(matched) = self.detector.find_multi_line_start(line) {
+            let comment = matched.comment;
+            let start = &comment.start;
+            // Use dynamic end marker for patterns like Lua long brackets (--[=[...]=])
+            let end = matched.end_marker();
+
+            if comment.supports_nesting {
+                let (starts, ends) = self.detector.count_nesting_changes(line, start, end);
+                for _ in 0..starts {
+                    state.enter(start, end, true);
+                }
+                for _ in 0..ends {
+                    state.exit();
+                }
+            } else if !self.detector.contains_multi_line_end(line, end) {
+                state.enter(start, end, false);
+            }
         }
     }
 }

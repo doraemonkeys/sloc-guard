@@ -5,6 +5,9 @@ pub use comment::CommentDetector;
 pub use sloc::{CountResult, LineStats, SlocCounter};
 
 #[cfg(test)]
+mod test_fixtures;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::language::LanguageRegistry;
