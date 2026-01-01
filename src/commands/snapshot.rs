@@ -111,11 +111,11 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
         .collect();
     progress.finish();
 
-    // 7. Save cache if enabled
+    // 7. Save cache if enabled (errors are non-critical)
     if !args.common.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
-        save_cache(&cache_path, &cache_guard);
+        let _ = save_cache(&cache_path, &cache_guard);
     }
 
     // 8. Build project statistics

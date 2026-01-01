@@ -102,13 +102,13 @@ pub fn collect_stats_with_config(
     Ok((ProjectStatistics::new(file_stats), project_root, cache))
 }
 
-/// Save cache if caching is enabled.
+/// Save cache if caching is enabled (errors are non-critical).
 pub fn save_cache_if_enabled(common: &CommonStatsArgs, cache: &Mutex<Cache>, project_root: &Path) {
     if !common.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
         let cache_path = state::cache_path(project_root);
-        save_cache(&cache_path, &cache_guard);
+        let _ = save_cache(&cache_path, &cache_guard);
     }
 }
 

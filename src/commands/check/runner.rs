@@ -238,12 +238,12 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         results.extend(sibling_results);
     }
 
-    // 6. Save cache if not disabled
+    // 6. Save cache if not disabled (errors are non-critical)
     if !args.no_cache
         && let Ok(cache_guard) = cache.lock()
     {
         let cache_path = state::cache_path(project_root);
-        save_cache(&cache_path, &cache_guard);
+        let _ = save_cache(&cache_path, &cache_guard);
     }
 
     // 7. Apply baseline comparison: mark failures as grandfathered if in baseline

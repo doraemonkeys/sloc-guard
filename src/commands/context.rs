@@ -101,13 +101,21 @@ pub fn load_cache(cache_path: &Path, config_hash: &str) -> Option<Cache> {
         .filter(|cache| cache.is_valid(config_hash))
 }
 
-pub fn save_cache(cache_path: &Path, cache: &Cache) {
+/// Save cache to disk.
+///
+/// Callers typically ignore errors with `let _ =` since cache is non-critical.
+///
+/// # Errors
+/// Returns an error if the parent directory cannot be created or the cache cannot be written.
+pub fn save_cache(cache_path: &Path, cache: &Cache) -> std::io::Result<()> {
     // Create parent directory if needed
     if let Some(parent) = cache_path.parent() {
-        let _ = fs::create_dir_all(parent);
+        fs::create_dir_all(parent)?;
     }
-    // Silently ignore errors when saving cache
-    let _ = cache.save(cache_path);
+    cache
+        .save(cache_path)
+        .map_err(|e| std::io::Error::other(e.to_string()))?;
+    Ok(())
 }
 
 pub(crate) fn resolve_scan_paths(paths: &[PathBuf], include: &[String]) -> Vec<PathBuf> {
