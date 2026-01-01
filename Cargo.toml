@@ -24,6 +24,7 @@ walkdir = "2"
 globset = "0.4"
 ignore = "0.4"
 dunce = "1"
+directories = "6"
 
 # Parallel processing
 rayon = "1.10"

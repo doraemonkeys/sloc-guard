@@ -48,7 +48,6 @@ pub trait ConfigLoader {
 }
 
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
-const USER_CONFIG_DIR: &str = "sloc-guard";
 const USER_CONFIG_NAME: &str = "config.toml";
 
 /// Validate config version. Returns an error if version is unsupported.
@@ -80,8 +79,13 @@ pub trait FileSystem {
     /// Returns an error if the current directory cannot be determined.
     fn current_dir(&self) -> std::io::Result<PathBuf>;
 
-    /// Get the user's home directory.
-    fn home_dir(&self) -> Option<PathBuf>;
+    /// Get the platform-specific configuration directory for sloc-guard.
+    ///
+    /// Returns the appropriate config directory based on platform conventions:
+    /// - Windows: `%APPDATA%\sloc-guard` (e.g., `C:\Users\xxx\AppData\Roaming\sloc-guard`)
+    /// - macOS: `~/Library/Application Support/sloc-guard`
+    /// - Linux: `~/.config/sloc-guard` (XDG)
+    fn config_dir(&self) -> Option<PathBuf>;
 
     /// Canonicalize a path to its absolute, normalized form.
     ///
@@ -107,8 +111,9 @@ impl FileSystem for RealFileSystem {
         std::env::current_dir()
     }
 
-    fn home_dir(&self) -> Option<PathBuf> {
-        dirs_home()
+    fn config_dir(&self) -> Option<PathBuf> {
+        directories::ProjectDirs::from("", "", "sloc-guard")
+            .map(|dirs| dirs.config_dir().to_path_buf())
     }
 
     fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf> {
@@ -116,22 +121,14 @@ impl FileSystem for RealFileSystem {
     }
 }
 
-fn dirs_home() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        std::env::var_os("USERPROFILE").map(PathBuf::from)
-    }
-    #[cfg(not(windows))]
-    {
-        std::env::var_os("HOME").map(PathBuf::from)
-    }
-}
-
 /// Loads configuration from the filesystem.
 ///
 /// Search order:
 /// 1. `.sloc-guard.toml` in current directory
-/// 2. `$HOME/.config/sloc-guard/config.toml`
+/// 2. Platform-specific user config directory:
+///    - Windows: `%APPDATA%\sloc-guard\config.toml`
+///    - macOS: `~/Library/Application Support/sloc-guard/config.toml`
+///    - Linux: `~/.config/sloc-guard/config.toml` (XDG)
 /// 3. Returns `Config::default()` if no config found
 #[derive(Debug)]
 pub struct FileConfigLoader<F: FileSystem = RealFileSystem> {
@@ -185,11 +182,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
     }
 
     fn user_config_path(&self) -> Option<PathBuf> {
-        self.fs.home_dir().map(|home| {
-            home.join(".config")
-                .join(USER_CONFIG_DIR)
-                .join(USER_CONFIG_NAME)
-        })
+        self.fs.config_dir().map(|dir| dir.join(USER_CONFIG_NAME))
     }
 
     fn parse_config(content: &str) -> Result<Config> {

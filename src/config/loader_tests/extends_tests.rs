@@ -284,7 +284,7 @@ max_lines = 400
 "#;
 
     let fs = MockFileSystem::new()
-        .with_home_dir(Some(PathBuf::from("/home/user")))
+        .with_config_dir(Some(PathBuf::from("/home/user/.config/sloc-guard")))
         .with_file("/home/user/.config/sloc-guard/config.toml", user_content);
 
     let loader = FileConfigLoader::with_fs(fs);

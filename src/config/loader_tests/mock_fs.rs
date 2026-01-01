@@ -8,7 +8,7 @@ use crate::config::FileSystem;
 pub struct MockFileSystem {
     files: Mutex<HashMap<PathBuf, String>>,
     current_dir: PathBuf,
-    home_dir: Option<PathBuf>,
+    config_dir: Option<PathBuf>,
 }
 
 impl MockFileSystem {
@@ -16,7 +16,7 @@ impl MockFileSystem {
         Self {
             files: Mutex::new(HashMap::new()),
             current_dir: PathBuf::from("/project"),
-            home_dir: Some(PathBuf::from("/home/user")),
+            config_dir: Some(PathBuf::from("/home/user/.config/sloc-guard")),
         }
     }
 
@@ -33,8 +33,8 @@ impl MockFileSystem {
         self
     }
 
-    pub fn with_home_dir(mut self, path: Option<PathBuf>) -> Self {
-        self.home_dir = path;
+    pub fn with_config_dir(mut self, path: Option<PathBuf>) -> Self {
+        self.config_dir = path;
         self
     }
 }
@@ -59,8 +59,8 @@ impl FileSystem for MockFileSystem {
         Ok(self.current_dir.clone())
     }
 
-    fn home_dir(&self) -> Option<PathBuf> {
-        self.home_dir.clone()
+    fn config_dir(&self) -> Option<PathBuf> {
+        self.config_dir.clone()
     }
 
     fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf> {

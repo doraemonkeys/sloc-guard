@@ -49,7 +49,7 @@ max_lines = 400
 "#;
 
     let fs = MockFileSystem::new()
-        .with_home_dir(Some(PathBuf::from("/home/testuser")))
+        .with_config_dir(Some(PathBuf::from("/home/testuser/.config/sloc-guard")))
         .with_file(
             "/home/testuser/.config/sloc-guard/config.toml",
             config_content,
@@ -78,7 +78,7 @@ max_lines = 600
 
     let fs = MockFileSystem::new()
         .with_current_dir("/project")
-        .with_home_dir(Some(PathBuf::from("/home/user")))
+        .with_config_dir(Some(PathBuf::from("/home/user/.config/sloc-guard")))
         .with_file("/project/.sloc-guard.toml", local_content)
         .with_file("/home/user/.config/sloc-guard/config.toml", user_content);
 
@@ -89,8 +89,8 @@ max_lines = 600
 }
 
 #[test]
-fn handles_missing_home_dir() {
-    let fs = MockFileSystem::new().with_home_dir(None);
+fn handles_missing_config_dir() {
+    let fs = MockFileSystem::new().with_config_dir(None);
 
     let loader = FileConfigLoader::with_fs(fs);
     let result = loader.load().unwrap();
