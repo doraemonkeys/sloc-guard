@@ -39,30 +39,46 @@ pub struct ThresholdChecker {
 }
 
 impl ThresholdChecker {
-    #[must_use]
-    pub fn new(config: Config) -> Self {
-        let (path_rules, path_rules_set) = Self::build_path_rules(&config);
+    /// Creates a new `ThresholdChecker` from configuration.
+    ///
+    /// # Errors
+    /// Returns `SlocGuardError::InvalidPattern` if any glob pattern in
+    /// `content.exclude` or `content.rules[].pattern` is invalid.
+    pub fn new(config: Config) -> crate::Result<Self> {
+        let (path_rules, path_rules_set) = Self::build_path_rules(&config)?;
         let allowed_extensions: HashSet<String> =
             config.content.extensions.iter().cloned().collect();
-        let content_exclude = Self::build_content_exclude(&config);
-        Self {
+        let content_exclude = Self::build_content_exclude(&config)?;
+        Ok(Self {
             config,
             warning_threshold: 0.9,
             path_rules,
             path_rules_set,
             allowed_extensions,
             content_exclude,
-        }
+        })
     }
 
-    fn build_content_exclude(config: &Config) -> GlobSet {
+    /// Build glob set for content exclusion patterns.
+    /// First invalid pattern fails immediately (fail-fast).
+    fn build_content_exclude(config: &Config) -> crate::Result<GlobSet> {
         let mut builder = GlobSetBuilder::new();
         for pattern in &config.content.exclude {
-            if let Ok(glob) = Glob::new(pattern) {
-                builder.add(glob);
-            }
+            let glob = Glob::new(pattern).map_err(|source| {
+                crate::error::SlocGuardError::InvalidPattern {
+                    pattern: pattern.clone(),
+                    source,
+                }
+            })?;
+            builder.add(glob);
         }
-        builder.build().unwrap_or_else(|_| GlobSet::empty())
+        builder.build().map_err(|source| {
+            // GlobSet build error includes pattern info in its message
+            crate::error::SlocGuardError::InvalidPattern {
+                pattern: "<combined globset>".to_string(),
+                source,
+            }
+        })
     }
 
     #[must_use]
@@ -113,27 +129,38 @@ impl ThresholdChecker {
 
     /// Build path rules and a combined `GlobSet` for efficient matching.
     /// Returns `(rules_data, globset)` where `GlobSet` indices correspond to `rules_data` positions.
-    fn build_path_rules(config: &Config) -> (Vec<CompiledPathRule>, GlobSet) {
+    /// First invalid pattern fails immediately (fail-fast).
+    fn build_path_rules(config: &Config) -> crate::Result<(Vec<CompiledPathRule>, GlobSet)> {
         let mut rules = Vec::new();
         let mut builder = GlobSetBuilder::new();
 
         // Process content.rules (V2 format)
         for rule in &config.content.rules {
-            if let Ok(glob) = Glob::new(&rule.pattern) {
-                builder.add(glob);
-                rules.push(CompiledPathRule {
-                    max_lines: rule.max_lines,
-                    warn_threshold: rule.warn_threshold,
-                    warn_at: rule.warn_at,
-                    skip_comments: rule.skip_comments,
-                    skip_blank: rule.skip_blank,
-                    reason: rule.reason.clone(),
-                });
-            }
+            let glob = Glob::new(&rule.pattern).map_err(|source| {
+                crate::error::SlocGuardError::InvalidPattern {
+                    pattern: rule.pattern.clone(),
+                    source,
+                }
+            })?;
+            builder.add(glob);
+            rules.push(CompiledPathRule {
+                max_lines: rule.max_lines,
+                warn_threshold: rule.warn_threshold,
+                warn_at: rule.warn_at,
+                skip_comments: rule.skip_comments,
+                skip_blank: rule.skip_blank,
+                reason: rule.reason.clone(),
+            });
         }
 
-        let globset = builder.build().unwrap_or_else(|_| GlobSet::empty());
-        (rules, globset)
+        let globset =
+            builder
+                .build()
+                .map_err(|source| crate::error::SlocGuardError::InvalidPattern {
+                    pattern: "<combined globset>".to_string(),
+                    source,
+                })?;
+        Ok((rules, globset))
     }
 
     /// Returns (`max_lines`, `override_reason`) for a path.

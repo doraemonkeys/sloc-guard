@@ -41,7 +41,7 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
     let path = &args.path;
 
     if path.is_file() {
-        let checker = ThresholdChecker::new(config);
+        let checker = ThresholdChecker::new(config)?;
         let explanation = checker.explain(path);
         println!("{}", format_content_explanation(&explanation, args.format));
     } else if path.is_dir() {

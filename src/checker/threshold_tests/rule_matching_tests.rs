@@ -18,7 +18,7 @@ fn path_rule_matches_glob_pattern() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(800);
 
     // File matching the glob pattern should use content.rules max_lines
@@ -41,7 +41,7 @@ fn path_rule_does_not_match_unrelated_path() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(700);
 
     // File not matching the pattern should use default
@@ -75,7 +75,7 @@ fn later_rule_overrides_earlier_rule() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(1500);
 
     // Later rule should take priority (last match wins)
@@ -110,7 +110,7 @@ fn path_rule_has_higher_priority_than_extension_rule() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(400);
 
     // path_rule should override extension rule (last match wins)
@@ -148,7 +148,7 @@ fn multiple_path_rules_last_match_wins() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(700);
 
     // Last matching rule should be used (1000 limit)

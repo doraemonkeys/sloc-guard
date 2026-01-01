@@ -26,7 +26,7 @@ fn explain_content_rule_matches() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     assert!(matches!(
@@ -56,7 +56,7 @@ fn explain_content_rule_with_reason() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/legacy/parser.rs"));
 
     assert!(matches!(
@@ -76,7 +76,7 @@ fn explain_content_default_matches() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     assert!(matches!(
@@ -118,7 +118,7 @@ fn explain_content_last_rule_wins() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/generated/types.rs"));
 
     // Both rules match, but the last one (index 1) should win
@@ -172,7 +172,7 @@ fn explain_content_specific_rule_beats_general() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     // Last matching rule should win
@@ -309,7 +309,7 @@ fn format_content_text_output_contains_expected_sections() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text);
 
@@ -332,7 +332,7 @@ fn format_content_json_output_is_valid() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Json);
 
@@ -439,7 +439,7 @@ fn format_content_with_rule_shows_pattern() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text);
 
@@ -467,7 +467,7 @@ fn format_content_with_rule_reason_shows_reason() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("legacy/old.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text);
 
@@ -486,7 +486,9 @@ fn explain_content_warn_at_source_global_percentage() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config).with_warning_threshold(0.9);
+    let checker = crate::checker::ThresholdChecker::new(config)
+        .unwrap()
+        .with_warning_threshold(0.9);
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     // Default case: warn_at derived from global percentage threshold
@@ -507,7 +509,7 @@ fn explain_content_warn_at_source_global_absolute() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     // Global absolute warn_at
@@ -538,7 +540,7 @@ fn explain_content_warn_at_source_rule_absolute() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     // Rule absolute warn_at
@@ -569,7 +571,7 @@ fn explain_content_warn_at_source_rule_percentage() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
 
     // Rule percentage threshold
@@ -592,7 +594,9 @@ fn format_content_text_shows_percentage_for_percentage_source() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config).with_warning_threshold(0.9);
+    let checker = crate::checker::ThresholdChecker::new(config)
+        .unwrap()
+        .with_warning_threshold(0.9);
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text);
 
@@ -611,7 +615,7 @@ fn format_content_text_shows_absolute_for_absolute_source() {
         ..Default::default()
     };
 
-    let checker = crate::checker::ThresholdChecker::new(config);
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text);
 

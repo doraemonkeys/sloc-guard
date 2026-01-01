@@ -18,7 +18,7 @@ fn path_rule_warn_threshold_overrides_default() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(999); // 99.9% of limit
 
     // With warn_threshold=1.0, should not warn
@@ -40,7 +40,9 @@ fn path_rule_without_warn_threshold_uses_default() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
+    let checker = ThresholdChecker::new(config)
+        .unwrap()
+        .with_warning_threshold(0.9);
     let stats = stats_with_code(950); // 95% of limit, above 90%
 
     // Without custom warn_threshold, should use default (0.9)
@@ -63,7 +65,9 @@ fn rule_warn_threshold_overrides_default() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
+    let checker = ThresholdChecker::new(config)
+        .unwrap()
+        .with_warning_threshold(0.9);
     let stats = stats_with_code(410); // 82% of 500 limit
 
     // With rule warn_threshold=0.8, should warn at 82%
@@ -86,7 +90,9 @@ fn rule_without_warn_threshold_uses_default() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config).with_warning_threshold(0.9);
+    let checker = ThresholdChecker::new(config)
+        .unwrap()
+        .with_warning_threshold(0.9);
     let stats = stats_with_code(410); // 82% of 500 limit
 
     // Without rule warn_threshold, should use default 0.9 (no warning at 82%)
@@ -119,7 +125,7 @@ fn path_rule_warn_threshold_overrides_extension_rule() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(450); // 90% of limit
 
     // path_rule warn_threshold=1.0 should override extension rule's 0.8 (last match wins)
@@ -160,7 +166,7 @@ fn multiple_rules_winner_takes_all_warn_threshold() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(600); // 60% of limit.
     // If inherit 0.5 -> Warn.
     // If winner takes all 0.9 -> Pass.
@@ -190,7 +196,7 @@ fn rule_warn_at_takes_precedence_over_percentage_threshold() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // 360 lines: above 350 (absolute), below 400 (percentage) → should warn
     let result = checker.check(Path::new("test.rs"), &stats_with_code(360), None);
@@ -214,7 +220,7 @@ fn global_warn_at_takes_precedence_over_global_percentage() {
     config.content.warn_threshold = 0.9; // Would warn at 450
     config.content.warn_at = Some(400); // Absolute: warn at 400 (takes precedence)
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // 420 lines: above 400 (absolute), below 450 (percentage) → should warn
     let result = checker.check(Path::new("test.rs"), &stats_with_code(420), None);
@@ -248,7 +254,7 @@ fn rule_warn_at_overrides_global_warn_at() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Matching file: should use rule's warn_at (350)
     let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(360), None);
@@ -294,7 +300,7 @@ fn rule_warn_threshold_used_when_no_warn_at() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Rule file: should use rule's warn_threshold (800)
     let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(810), None);
@@ -321,7 +327,7 @@ fn warn_at_explain_shows_effective_warn_at() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Matching file: effective_warn_at should be 750
     let exp = checker.explain(Path::new("src/lib.rs"));

@@ -6,7 +6,7 @@ use super::*;
 
 #[test]
 fn check_passes_under_threshold() {
-    let checker = ThresholdChecker::new(default_config());
+    let checker = ThresholdChecker::new(default_config()).unwrap();
     let stats = stats_with_code(100);
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
@@ -17,7 +17,7 @@ fn check_passes_under_threshold() {
 
 #[test]
 fn check_fails_over_threshold() {
-    let checker = ThresholdChecker::new(default_config());
+    let checker = ThresholdChecker::new(default_config()).unwrap();
     let stats = stats_with_code(700);
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
@@ -27,7 +27,7 @@ fn check_fails_over_threshold() {
 
 #[test]
 fn check_warns_near_threshold() {
-    let checker = ThresholdChecker::new(default_config());
+    let checker = ThresholdChecker::new(default_config()).unwrap();
     let stats = stats_with_code(550); // 90% of 600 = 540
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
@@ -50,7 +50,7 @@ fn check_uses_rule_specific_limit() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(350);
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
@@ -73,7 +73,7 @@ fn check_uses_rule_with_reason() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(700);
 
     let result = checker.check(Path::new("src/legacy.rs"), &stats, None);
@@ -97,7 +97,7 @@ fn check_rule_without_reason() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let stats = stats_with_code(700);
 
     let result = checker.check(Path::new("src/special.rs"), &stats, None);
@@ -109,7 +109,7 @@ fn check_rule_without_reason() {
 
 #[test]
 fn check_no_override_reason_when_using_default() {
-    let checker = ThresholdChecker::new(default_config());
+    let checker = ThresholdChecker::new(default_config()).unwrap();
     let stats = stats_with_code(100);
 
     let result = checker.check(Path::new("test.rs"), &stats, None);
@@ -140,7 +140,9 @@ fn check_result_usage_percent() {
 
 #[test]
 fn custom_warning_threshold() {
-    let checker = ThresholdChecker::new(default_config()).with_warning_threshold(0.8);
+    let checker = ThresholdChecker::new(default_config())
+        .unwrap()
+        .with_warning_threshold(0.8);
     let stats = stats_with_code(490); // 80% of 600 = 480
 
     let result = checker.check(Path::new("test.rs"), &stats, None);

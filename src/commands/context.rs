@@ -263,7 +263,7 @@ impl CheckContext {
     ) -> crate::Result<Self> {
         let registry = LanguageRegistry::with_custom_languages(&config.languages);
         let threshold_checker =
-            ThresholdChecker::new(config.clone()).with_warning_threshold(warn_threshold);
+            ThresholdChecker::new(config.clone())?.with_warning_threshold(warn_threshold);
         let structure_checker = StructureChecker::new(&config.structure).ok();
 
         // Build structure scan config for unified traversal

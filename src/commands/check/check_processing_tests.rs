@@ -78,7 +78,7 @@ fn compute_effective_stats_include_both() {
 fn process_file_nonexistent_returns_none() {
     let registry = LanguageRegistry::default();
     let config = Config::default();
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let cache = Mutex::new(Cache::new(String::new()));
     let reader = RealFileReader;
     let path = PathBuf::from("nonexistent_file.rs");
@@ -91,7 +91,7 @@ fn process_file_nonexistent_returns_none() {
 fn process_file_unknown_extension_returns_none() {
     let registry = LanguageRegistry::default();
     let config = Config::default();
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let cache = Mutex::new(Cache::new(String::new()));
     let reader = RealFileReader;
     let path = PathBuf::from("Cargo.toml");
@@ -104,7 +104,7 @@ fn process_file_unknown_extension_returns_none() {
 fn process_file_valid_rust_file() {
     let registry = LanguageRegistry::default();
     let config = Config::default();
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
     let cache = Mutex::new(Cache::new(String::new()));
     let reader = RealFileReader;
     let path = PathBuf::from("src/lib.rs");

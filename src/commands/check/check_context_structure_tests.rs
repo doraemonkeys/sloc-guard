@@ -97,7 +97,9 @@ fn check_context_from_config_creates_valid_context() {
 fn check_context_new_allows_custom_injection() {
     let config = Config::default();
     let registry = LanguageRegistry::default();
-    let threshold_checker = ThresholdChecker::new(config).with_warning_threshold(0.5);
+    let threshold_checker = ThresholdChecker::new(config)
+        .unwrap()
+        .with_warning_threshold(0.5);
     let scanner: Box<dyn FileScanner> = Box::new(CompositeScanner::new(Vec::new(), false));
     let file_reader: Box<dyn FileReader> = Box::new(RealFileReader);
 

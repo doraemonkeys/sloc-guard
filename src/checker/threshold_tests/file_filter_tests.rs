@@ -9,7 +9,7 @@ fn should_process_allows_all_when_no_extensions_configured() {
     let mut config = default_config();
     config.content.extensions = vec![]; // Explicitly clear extensions
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     assert!(checker.should_process(Path::new("src/lib.rs")));
     assert!(checker.should_process(Path::new("Dockerfile")));
@@ -21,7 +21,7 @@ fn should_process_filters_by_extension() {
     let mut config = default_config();
     config.content.extensions = vec!["rs".to_string(), "ts".to_string()];
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     assert!(checker.should_process(Path::new("src/lib.rs")));
     assert!(checker.should_process(Path::new("app.ts")));
@@ -33,7 +33,7 @@ fn should_process_extension_less_file_skipped_without_rule() {
     let mut config = default_config();
     config.content.extensions = vec!["rs".to_string()];
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Extension-less files should be skipped when no rule matches
     assert!(!checker.should_process(Path::new("Dockerfile")));
@@ -56,7 +56,7 @@ fn should_process_extension_less_file_with_content_rule() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Dockerfile should be processed because it matches a rule
     assert!(checker.should_process(Path::new("Dockerfile")));
@@ -80,7 +80,7 @@ fn should_process_extension_less_file_with_rule_exact_path() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Jenkinsfile should be processed because it matches a rule
     assert!(checker.should_process(Path::new("Jenkinsfile")));
@@ -104,7 +104,7 @@ fn should_process_extension_less_file_with_content_rule_exact_match() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Makefile should be processed because it matches a content rule
     assert!(checker.should_process(Path::new("Makefile")));
@@ -128,7 +128,7 @@ fn should_process_extension_less_file_with_glob_rule() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Files in scripts/ should be processed regardless of extension
     assert!(checker.should_process(Path::new("scripts/setup")));

@@ -20,7 +20,7 @@ fn get_skip_settings_from_path_rule() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Matching path should use rule's skip settings
     let (skip_comments, skip_blank) =
@@ -45,7 +45,7 @@ fn get_skip_settings_falls_back_to_global() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Should use global defaults when rule doesn't specify
     let (skip_comments, skip_blank) =
@@ -60,7 +60,7 @@ fn get_skip_settings_uses_global_when_no_rule_matches() {
     config.content.skip_comments = false;
     config.content.skip_blank = true;
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Non-matching path should use global defaults
     let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(Path::new("src/lib.rs"));
@@ -94,7 +94,7 @@ fn get_skip_settings_last_match_wins() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     // Last matching rule should be used
     let (skip_comments, skip_blank) =
@@ -128,7 +128,7 @@ fn language_rule_expanded_skip_settings_work() {
         expires: None,
     });
 
-    let checker = ThresholdChecker::new(config);
+    let checker = ThresholdChecker::new(config).unwrap();
 
     let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(Path::new("src/lib.rs"));
     assert!(!skip_comments); // From rule
