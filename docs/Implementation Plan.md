@@ -58,10 +58,35 @@ Silent failures mask configuration/environment issues. This phase surfaces error
 
 ---
 
+## Phase 24: Config Design Improvements
+
+Addresses counter-intuitive behaviors in config inheritance and ambiguous semantics.
+
+**24.1 Array Merge with `$reset` Marker**
+- Change `merge_toml_values()`: arrays default to append (parent + child)
+- `$reset` as first element clears parent array, uses remaining child elements
+- Validate `$reset` position in `Config::validate()` (must be first or error)
+- Affects: `scanner.exclude`, `content.rules`, `structure.rules`
+
+**24.2 Offline Cache Strategy Separation**
+- Add `FetchPolicy` enum: `Normal` (TTL-controlled), `Offline` (ignore TTL), `ForceRefresh` (skip cache)
+- `--offline` mode ignores TTL, uses any existing cache
+- Move remote cache to state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`)
+- SHA256 hash lock: if set, validate content regardless of TTL
+
+**24.3 Check Behavior Configuration**
+- Remove ambiguous `strict` field
+- Add `[check]` section with `warnings_as_errors` (treat warnings as failures) and `fail_fast` (stop on first failure)
+- Add CLI flags `--warnings-as-errors` and `--fail-fast`
+- `fail_fast` implements short-circuit processing for performance
+
+---
+
 ## Priority Order
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
+| **19. Config Design**  | 24.1 Array Merge, 24.2 Offline Cache, 24.3 Check Behavior |
 | **18. Error Handling** | ~~23.1 ThresholdChecker~~ ✅, ~~23.2 StructureChecker~~ ✅, ~~23.3 Canonicalize~~ ✅, ~~23.4 current_dir~~ ✅, ~~23.5 save_cache~~ ✅, ~~23.6 GlobSet~~ ✅ |
 | **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, ~~22.3 Multi-Format~~ ✅, ~~22.4 Action Fixes~~ ✅, ~~22.5 Binary Format~~ ✅ |
 | **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
