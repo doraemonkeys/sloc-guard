@@ -257,3 +257,45 @@ fn check_context_from_config_propagates_invalid_structure_pattern() {
         Ok(_) => panic!("Expected error for invalid structure pattern, but got Ok"),
     }
 }
+
+// =============================================================================
+// resolve_project_root Tests (Phase 23.4)
+// =============================================================================
+
+#[test]
+fn resolve_project_root_uses_config_path_parent() {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("subdir").join("config.toml");
+
+    // Create the config file so parent exists
+    std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+    std::fs::write(&config_path, "").unwrap();
+
+    let result = resolve_project_root(Some(&config_path));
+    assert!(result.is_ok());
+    let project_root = result.unwrap();
+    assert!(project_root.is_some());
+    assert_eq!(project_root.unwrap(), config_path.parent().unwrap());
+}
+
+#[test]
+fn resolve_project_root_falls_back_to_current_dir_when_no_config() {
+    let result = resolve_project_root(None);
+    assert!(result.is_ok());
+    let project_root = result.unwrap();
+    assert!(project_root.is_some());
+    // Should match current directory
+    assert_eq!(project_root.unwrap(), std::env::current_dir().unwrap());
+}
+
+#[test]
+fn resolve_project_root_handles_root_level_config_path() {
+    // Config path at root level (parent is root or empty)
+    // This should still work without falling back to current_dir
+    let root_config = std::path::Path::new("/config.toml");
+    let result = resolve_project_root(Some(root_config));
+    assert!(result.is_ok());
+    let project_root = result.unwrap();
+    // Parent of "/config.toml" is "/"
+    assert!(project_root.is_some());
+}

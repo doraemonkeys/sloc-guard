@@ -44,7 +44,7 @@ Silent failures mask configuration/environment issues. This phase surfaces error
 - `loader.rs` cycle detection: `canonicalize()` returns `Result`, propagates error
 - Fallback to original path could cause infinite recursion
 
-**23.4 current_dir() propagation**
+**23.4 current_dir() propagation** ✅
 - `commands/context.rs` and `commands/config.rs`: return `SlocGuardError::Io` on failure
 - Silently setting `project_root = None` breaks downstream features
 
@@ -62,7 +62,7 @@ Silent failures mask configuration/environment issues. This phase surfaces error
 
 | Priority               | Tasks                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| **18. Error Handling** | ~~23.1 ThresholdChecker~~ ✅, ~~23.2 StructureChecker~~ ✅, ~~23.3 Canonicalize~~ ✅, 23.4 current_dir, 23.5 save_cache, 23.6 GlobSet |
+| **18. Error Handling** | ~~23.1 ThresholdChecker~~ ✅, ~~23.2 StructureChecker~~ ✅, ~~23.3 Canonicalize~~ ✅, ~~23.4 current_dir~~ ✅, 23.5 save_cache, 23.6 GlobSet |
 | **17. SARIF & Action** | ~~22.1 SARIF Rules~~ ✅, ~~22.2 SARIF Messages~~ ✅, ~~22.3 Multi-Format~~ ✅, ~~22.4 Action Fixes~~ ✅, ~~22.5 Binary Format~~ ✅ |
 | **16. Stats Restructure** | ~~21.1 CLI~~ ✅, ~~21.2 Summary~~ ✅, ~~21.3 Files~~ ✅, ~~21.4 Breakdown~~ ✅, ~~21.5 Trend~~ ✅, ~~21.6 Report~~ ✅, ~~21.7 Snapshot~~ ✅, ~~21.8~~ ✅, ~~21.9~~ ✅, ~~21.10~~ ✅ |
 

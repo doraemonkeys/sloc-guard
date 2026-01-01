@@ -185,10 +185,7 @@ pub(crate) fn run_config_show_impl(
 
 fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
     // Determine project root from config path or current directory
-    let project_root = config_path
-        .and_then(|p| p.parent())
-        .map(std::path::Path::to_path_buf)
-        .or_else(|| std::env::current_dir().ok());
+    let project_root = super::context::resolve_project_root(config_path)?;
 
     let loader = FileConfigLoader::with_options(cli.offline, project_root);
     let load_result =

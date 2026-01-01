@@ -27,6 +27,11 @@ pub(crate) const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
 /// Load configuration from the filesystem, returning both config and metadata.
 ///
 /// The caller is responsible for handling side-effects like printing preset info.
+///
+/// # Errors
+/// Returns an error if:
+/// - The current directory cannot be determined (when `config_path` is `None` or has no parent)
+/// - The configuration file cannot be loaded
 pub(crate) fn load_config(
     config_path: Option<&Path>,
     no_config: bool,
@@ -41,10 +46,7 @@ pub(crate) fn load_config(
     }
 
     // Determine project root from config path or current directory
-    let project_root = config_path
-        .and_then(|p| p.parent())
-        .map(Path::to_path_buf)
-        .or_else(|| std::env::current_dir().ok());
+    let project_root = resolve_project_root(config_path)?;
 
     let loader = FileConfigLoader::with_options(offline, project_root);
     if no_extends {
@@ -55,6 +57,28 @@ pub(crate) fn load_config(
     } else {
         config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
     }
+}
+
+/// Resolves the project root directory.
+///
+/// Uses the config path's parent directory if available, otherwise falls back
+/// to the current working directory.
+///
+/// # Errors
+/// Returns `SlocGuardError::Io` if `current_dir()` fails and no config path parent is available.
+pub(crate) fn resolve_project_root(config_path: Option<&Path>) -> crate::Result<Option<PathBuf>> {
+    // If config path has a parent, use that
+    if let Some(parent) = config_path.and_then(|p| p.parent()) {
+        return Ok(Some(parent.to_path_buf()));
+    }
+
+    // Fall back to current directory, propagating errors
+    let cwd = std::env::current_dir().map_err(|e| crate::SlocGuardError::Io {
+        source: e,
+        path: None,
+        operation: Some("get current directory"),
+    })?;
+    Ok(Some(cwd))
 }
 
 /// Print preset usage info to stderr (once per session managed by caller).
