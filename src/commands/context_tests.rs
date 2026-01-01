@@ -2,10 +2,14 @@ use crate::cli::ColorChoice;
 use crate::config::{Config, StructureConfig, StructureRule};
 use crate::output::ColorMode;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
+use std::io;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tempfile::TempDir;
 
 use super::*;
+use crate::cache::Cache;
+use crate::language::LanguageRegistry;
 
 #[test]
 fn exit_codes_documented() {
@@ -298,4 +302,190 @@ fn resolve_project_root_handles_root_level_config_path() {
     let project_root = result.unwrap();
     // Parent of "/config.toml" is "/"
     assert!(project_root.is_some());
+}
+
+// =============================================================================
+// FileProcessResult Tests
+// =============================================================================
+
+#[test]
+fn file_skip_reason_display_no_extension() {
+    let reason = FileSkipReason::NoExtension;
+    assert_eq!(reason.to_string(), "file has no extension");
+}
+
+#[test]
+fn file_skip_reason_display_unrecognized_extension() {
+    let reason = FileSkipReason::UnrecognizedExtension("xyz".to_string());
+    assert_eq!(reason.to_string(), "unrecognized extension: .xyz");
+}
+
+#[test]
+fn file_skip_reason_display_ignored_by_directive() {
+    let reason = FileSkipReason::IgnoredByDirective;
+    assert_eq!(reason.to_string(), "ignored by sloc-guard directive");
+}
+
+#[test]
+fn file_process_error_display_metadata() {
+    let error = FileProcessError::MetadataError {
+        path: PathBuf::from("test.rs"),
+        source: io::Error::new(io::ErrorKind::NotFound, "file not found"),
+    };
+    let msg = error.to_string();
+    assert!(msg.contains("test.rs"), "should contain path: {msg}");
+    assert!(msg.contains("metadata"), "should mention metadata: {msg}");
+}
+
+#[test]
+fn file_process_error_display_cache_lock() {
+    let error = FileProcessError::CacheLockError {
+        path: PathBuf::from("test.rs"),
+    };
+    let msg = error.to_string();
+    assert!(msg.contains("test.rs"), "should contain path: {msg}");
+    assert!(msg.contains("lock"), "should mention lock: {msg}");
+}
+
+#[test]
+fn file_process_error_display_read() {
+    let error = FileProcessError::ReadError {
+        path: PathBuf::from("test.rs"),
+        source: io::Error::new(io::ErrorKind::PermissionDenied, "access denied"),
+    };
+    let msg = error.to_string();
+    assert!(msg.contains("test.rs"), "should contain path: {msg}");
+    assert!(msg.contains("read"), "should mention read: {msg}");
+}
+
+#[test]
+fn file_process_error_path_accessor() {
+    let error = FileProcessError::MetadataError {
+        path: PathBuf::from("some/path.rs"),
+        source: io::Error::new(io::ErrorKind::NotFound, "not found"),
+    };
+    assert_eq!(error.path(), std::path::Path::new("some/path.rs"));
+}
+
+#[test]
+fn file_process_error_source_metadata() {
+    use std::error::Error;
+    let error = FileProcessError::MetadataError {
+        path: PathBuf::from("test.rs"),
+        source: io::Error::new(io::ErrorKind::NotFound, "file not found"),
+    };
+    let source = error.source();
+    assert!(source.is_some(), "MetadataError should have a source");
+    assert!(
+        source.unwrap().to_string().contains("file not found"),
+        "source should contain the original error message"
+    );
+}
+
+#[test]
+fn file_process_error_source_read() {
+    use std::error::Error;
+    let error = FileProcessError::ReadError {
+        path: PathBuf::from("test.rs"),
+        source: io::Error::new(io::ErrorKind::PermissionDenied, "access denied"),
+    };
+    let source = error.source();
+    assert!(source.is_some(), "ReadError should have a source");
+    assert!(
+        source.unwrap().to_string().contains("access denied"),
+        "source should contain the original error message"
+    );
+}
+
+#[test]
+fn file_process_error_source_cache_lock() {
+    use std::error::Error;
+    let error = FileProcessError::CacheLockError {
+        path: PathBuf::from("test.rs"),
+    };
+    assert!(
+        error.source().is_none(),
+        "CacheLockError should have no source"
+    );
+}
+
+#[test]
+fn process_file_with_cache_returns_skipped_for_no_extension() {
+    let registry = LanguageRegistry::default();
+    let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
+
+    // Create a temp file without extension
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("noext");
+    std::fs::write(&file_path, "content").unwrap();
+
+    let result = process_file_with_cache(&file_path, &registry, &cache, &reader);
+    assert!(
+        matches!(
+            result,
+            FileProcessResult::Skipped(FileSkipReason::NoExtension)
+        ),
+        "expected Skipped(NoExtension), got {result:?}"
+    );
+}
+
+#[test]
+fn process_file_with_cache_returns_skipped_for_unrecognized_extension() {
+    let registry = LanguageRegistry::default();
+    let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
+
+    // Create a temp file with unrecognized extension
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.xyz123");
+    std::fs::write(&file_path, "content").unwrap();
+
+    let result = process_file_with_cache(&file_path, &registry, &cache, &reader);
+    assert!(
+        matches!(
+            result,
+            FileProcessResult::Skipped(FileSkipReason::UnrecognizedExtension(_))
+        ),
+        "expected Skipped(UnrecognizedExtension), got {result:?}"
+    );
+}
+
+#[test]
+fn process_file_with_cache_returns_error_for_nonexistent_file() {
+    let registry = LanguageRegistry::default();
+    let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
+
+    let result = process_file_with_cache(
+        std::path::Path::new("nonexistent_file.rs"),
+        &registry,
+        &cache,
+        &reader,
+    );
+    assert!(
+        matches!(
+            result,
+            FileProcessResult::Error(FileProcessError::MetadataError { .. })
+        ),
+        "expected Error(MetadataError), got {result:?}"
+    );
+}
+
+#[test]
+fn process_file_with_cache_returns_success_for_valid_file() {
+    let registry = LanguageRegistry::default();
+    let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
+
+    // Use an existing rust file from the project
+    let file_path = std::path::Path::new("src/lib.rs");
+    let result = process_file_with_cache(file_path, &registry, &cache, &reader);
+    match result {
+        FileProcessResult::Success { stats, language } => {
+            assert!(stats.code > 0, "should have some code lines");
+            assert_eq!(language, "Rust");
+        }
+        other => panic!("expected Success, got {other:?}"),
+    }
 }

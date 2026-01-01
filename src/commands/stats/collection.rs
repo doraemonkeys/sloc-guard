@@ -12,8 +12,8 @@ use crate::scanner::scan_files;
 use crate::state;
 
 use crate::commands::context::{
-    FileReader, RealFileReader, StatsContext, load_cache, load_config, print_preset_info,
-    process_file_with_cache, resolve_scan_paths, save_cache,
+    FileProcessResult, FileReader, RealFileReader, StatsContext, load_cache, load_config,
+    print_preset_info, process_file_with_cache, resolve_scan_paths, save_cache,
 };
 
 /// Collect file statistics using common scanning arguments.
@@ -129,16 +129,25 @@ pub fn save_cache_if_enabled(common: &CommonStatsArgs, cache: &Mutex<Cache>, pro
 }
 
 /// Collect statistics for a single file.
+///
+/// Returns `Some` only for successfully processed files. Skipped files (unknown
+/// extension, no extension, ignored by directive) and errors are silently filtered.
+/// For stats collection, this silent skip behavior is acceptable since we're just
+/// aggregating metrics, not enforcing compliance.
 pub fn collect_file_stats(
     file_path: &Path,
     registry: &LanguageRegistry,
     cache: &Mutex<Cache>,
     reader: &dyn FileReader,
 ) -> Option<FileStatistics> {
-    let (stats, language) = process_file_with_cache(file_path, registry, cache, reader)?;
-    Some(FileStatistics {
-        path: file_path.to_path_buf(),
-        stats,
-        language,
-    })
+    match process_file_with_cache(file_path, registry, cache, reader) {
+        FileProcessResult::Success { stats, language } => Some(FileStatistics {
+            path: file_path.to_path_buf(),
+            stats,
+            language,
+        }),
+        // Skipped files (unknown extension, no extension, ignored by directive)
+        // and errors are silently filtered for stats collection
+        FileProcessResult::Skipped(_) | FileProcessResult::Error(_) => None,
+    }
 }

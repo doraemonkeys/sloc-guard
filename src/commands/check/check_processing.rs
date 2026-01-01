@@ -7,7 +7,29 @@ use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 use crate::output::FileStatistics;
 
-use crate::commands::context::{FileReader, process_file_with_cache};
+use crate::commands::context::{
+    FileProcessError, FileProcessResult, FileReader, FileSkipReason, process_file_with_cache,
+};
+
+/// Result of processing a file for the check command.
+///
+/// Uses `Box` for the large `Success` variant to keep enum size small.
+#[derive(Debug)]
+pub enum CheckFileResult {
+    /// File was successfully processed.
+    /// Boxed to reduce enum size (`CheckResult` + `FileStatistics` is ~424 bytes).
+    Success {
+        check_result: Box<CheckResult>,
+        file_stats: FileStatistics,
+    },
+    /// File was legitimately skipped (not an error).
+    /// The inner reason is read in tests for verification, but discarded in production
+    /// (runner.rs matches with `_`). We preserve it for test assertions and future verbose logging.
+    #[allow(dead_code)]
+    Skipped(FileSkipReason),
+    /// An error occurred while processing the file.
+    Error(FileProcessError),
+}
 
 pub fn process_file_for_check(
     file_path: &Path,
@@ -15,17 +37,27 @@ pub fn process_file_for_check(
     checker: &ThresholdChecker,
     cache: &Mutex<Cache>,
     reader: &dyn FileReader,
-) -> Option<(CheckResult, FileStatistics)> {
-    let (stats, language) = process_file_with_cache(file_path, registry, cache, reader)?;
-    let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
-    let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
-    let check_result = checker.check(file_path, &effective_stats, Some(&stats));
-    let file_stats = FileStatistics {
-        path: file_path.to_path_buf(),
-        stats,
-        language,
-    };
-    Some((check_result, file_stats))
+) -> CheckFileResult {
+    let result = process_file_with_cache(file_path, registry, cache, reader);
+
+    match result {
+        FileProcessResult::Success { stats, language } => {
+            let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
+            let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
+            let check_result = checker.check(file_path, &effective_stats, Some(&stats));
+            let file_stats = FileStatistics {
+                path: file_path.to_path_buf(),
+                stats,
+                language,
+            };
+            CheckFileResult::Success {
+                check_result: Box::new(check_result),
+                file_stats,
+            }
+        }
+        FileProcessResult::Skipped(reason) => CheckFileResult::Skipped(reason),
+        FileProcessResult::Error(error) => CheckFileResult::Error(error),
+    }
 }
 
 #[must_use]

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -14,6 +15,94 @@ use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
 use crate::scanner::{AllowlistRuleBuilder, CompositeScanner, FileScanner, StructureScanConfig};
+
+// =============================================================================
+// File Processing Error Types
+// =============================================================================
+
+/// Reason a file was skipped during processing (not an error, just no stats produced).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileSkipReason {
+    /// File has no extension (cannot determine language).
+    NoExtension,
+    /// File extension is not recognized by the language registry.
+    UnrecognizedExtension(String),
+    /// File was explicitly ignored via inline directive (sloc-guard: ignore-file).
+    IgnoredByDirective,
+}
+
+impl fmt::Display for FileSkipReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NoExtension => write!(f, "file has no extension"),
+            Self::UnrecognizedExtension(ext) => write!(f, "unrecognized extension: .{ext}"),
+            Self::IgnoredByDirective => write!(f, "ignored by sloc-guard directive"),
+        }
+    }
+}
+
+/// Error that occurred while trying to process a file.
+#[derive(Debug)]
+pub enum FileProcessError {
+    /// Failed to read file metadata (mtime/size).
+    MetadataError { path: PathBuf, source: io::Error },
+    /// Failed to acquire cache lock.
+    CacheLockError { path: PathBuf },
+    /// Failed to read file contents.
+    ReadError { path: PathBuf, source: io::Error },
+}
+
+impl fmt::Display for FileProcessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MetadataError { path, source } => {
+                write!(
+                    f,
+                    "failed to read metadata for '{}': {source}",
+                    path.display()
+                )
+            }
+            Self::CacheLockError { path } => {
+                write!(f, "failed to acquire cache lock for '{}'", path.display())
+            }
+            Self::ReadError { path, source } => {
+                write!(f, "failed to read '{}': {source}", path.display())
+            }
+        }
+    }
+}
+
+impl std::error::Error for FileProcessError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::MetadataError { source, .. } | Self::ReadError { source, .. } => Some(source),
+            Self::CacheLockError { .. } => None,
+        }
+    }
+}
+
+impl FileProcessError {
+    /// Returns the path that caused the error.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        match self {
+            Self::MetadataError { path, .. }
+            | Self::CacheLockError { path }
+            | Self::ReadError { path, .. } => path,
+        }
+    }
+}
+
+/// Result of attempting to process a single file.
+#[derive(Debug)]
+pub enum FileProcessResult {
+    /// File was successfully processed and stats were computed.
+    Success { stats: LineStats, language: String },
+    /// File was legitimately skipped (not an error).
+    Skipped(FileSkipReason),
+    /// An error occurred while processing the file.
+    Error(FileProcessError),
+}
 
 #[must_use]
 pub(crate) const fn color_choice_to_mode(choice: ColorChoice) -> ColorMode {
@@ -162,23 +251,52 @@ pub fn count_lines_from_content(content: &[u8], counter: &SlocCounter) -> Option
 }
 
 /// Process file with cache support for stats collection.
+///
+/// Returns a `FileProcessResult` that distinguishes between:
+/// - `Success`: file was processed and stats computed
+/// - `Skipped`: file was legitimately skipped (no extension, unrecognized, or ignored by directive)
+/// - `Error`: an IO or lock error occurred
+///
+/// This explicit result type allows callers to report errors rather than silently ignoring them.
 pub fn process_file_with_cache(
     file_path: &Path,
     registry: &LanguageRegistry,
     cache: &Mutex<Cache>,
     reader: &dyn FileReader,
-) -> Option<(LineStats, String)> {
-    let ext = file_path.extension()?.to_str()?;
-    let language = registry.get_by_extension(ext)?;
+) -> FileProcessResult {
+    // Check for extension
+    let Some(ext_os) = file_path.extension() else {
+        return FileProcessResult::Skipped(FileSkipReason::NoExtension);
+    };
+    let Some(ext) = ext_os.to_str() else {
+        return FileProcessResult::Skipped(FileSkipReason::NoExtension);
+    };
+
+    // Check for recognized language
+    let Some(language) = registry.get_by_extension(ext) else {
+        return FileProcessResult::Skipped(FileSkipReason::UnrecognizedExtension(ext.to_string()));
+    };
 
     let path_key = file_path.to_string_lossy().replace('\\', "/");
 
     // Get file metadata for fast cache validation
-    let (mtime, size) = reader.metadata(file_path).ok()?;
+    let (mtime, size) = match reader.metadata(file_path) {
+        Ok(meta) => meta,
+        Err(source) => {
+            return FileProcessResult::Error(FileProcessError::MetadataError {
+                path: file_path.to_path_buf(),
+                source,
+            });
+        }
+    };
 
     // Try to get stats from cache using metadata (no file read needed)
     let cached_stats = {
-        let cache_guard = cache.lock().ok()?;
+        let Ok(cache_guard) = cache.lock() else {
+            return FileProcessResult::Error(FileProcessError::CacheLockError {
+                path: file_path.to_path_buf(),
+            });
+        };
         cache_guard
             .get_if_metadata_matches(&path_key, mtime, size)
             .map(|entry| LineStats::from(&entry.stats))
@@ -188,11 +306,23 @@ pub fn process_file_with_cache(
         stats
     } else {
         // Cache miss: read file, compute hash, and count lines
-        let (file_hash, content) = read_file_with_hash(reader, file_path)?;
-        let counter = SlocCounter::new(&language.comment_syntax);
-        let result = count_lines_from_content(&content, &counter)?;
+        let (file_hash, content) = match read_file_with_hash_result(reader, file_path) {
+            Ok(result) => result,
+            Err(source) => {
+                return FileProcessResult::Error(FileProcessError::ReadError {
+                    path: file_path.to_path_buf(),
+                    source,
+                });
+            }
+        };
 
-        // Update cache with metadata
+        let counter = SlocCounter::new(&language.comment_syntax);
+        let Some(result) = count_lines_from_content(&content, &counter) else {
+            // File was ignored by directive
+            return FileProcessResult::Skipped(FileSkipReason::IgnoredByDirective);
+        };
+
+        // Update cache with metadata (lock errors here are non-critical, just skip update)
         if let Ok(mut cache_guard) = cache.lock() {
             cache_guard.set(&path_key, file_hash, &result, mtime, size);
         }
@@ -200,7 +330,10 @@ pub fn process_file_with_cache(
         result
     };
 
-    Some((stats, language.name.clone()))
+    FileProcessResult::Success {
+        stats,
+        language: language.name.clone(),
+    }
 }
 
 // =============================================================================
@@ -247,11 +380,24 @@ impl FileReader for RealFileReader {
 }
 
 /// Read file contents and compute SHA-256 hash.
+///
+/// Returns `None` on read error. For explicit error handling, use `read_file_with_hash_result`.
 #[must_use]
 pub fn read_file_with_hash(reader: &dyn FileReader, path: &Path) -> Option<(String, Vec<u8>)> {
-    let content = reader.read(path).ok()?;
+    read_file_with_hash_result(reader, path).ok()
+}
+
+/// Read file contents and compute SHA-256 hash, returning explicit errors.
+///
+/// # Errors
+/// Returns an error if the file cannot be read.
+pub fn read_file_with_hash_result(
+    reader: &dyn FileReader,
+    path: &Path,
+) -> io::Result<(String, Vec<u8>)> {
+    let content = reader.read(path)?;
     let hash = compute_hash_from_bytes(&content);
-    Some((hash, content))
+    Ok((hash, content))
 }
 
 /// Compute SHA-256 hash from bytes.

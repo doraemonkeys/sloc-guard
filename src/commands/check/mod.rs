@@ -17,7 +17,9 @@ pub(crate) use check_git_diff::{DiffRange, parse_diff_range};
 #[cfg(test)]
 pub(crate) use check_output::{format_output, structure_violation_to_check_result};
 #[cfg(test)]
-pub(crate) use check_processing::{compute_effective_stats, process_file_for_check};
+pub(crate) use check_processing::{
+    CheckFileResult, compute_effective_stats, process_file_for_check,
+};
 #[cfg(test)]
 pub(crate) use runner::{
     CheckOptions, apply_cli_overrides, run_check_impl, run_check_with_context,

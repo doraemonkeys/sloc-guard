@@ -23,10 +23,10 @@ use super::check_baseline_ops::{
 };
 use super::check_git_diff::filter_by_git_diff;
 use super::check_output::{format_output, structure_violation_to_check_result};
-use super::check_processing::process_file_for_check;
+use super::check_processing::{CheckFileResult, process_file_for_check};
 use crate::commands::context::{
-    CheckContext, color_choice_to_mode, load_cache, load_config, print_preset_info,
-    resolve_scan_paths, save_cache, write_output,
+    CheckContext, FileProcessError, color_choice_to_mode, load_cache, load_config,
+    print_preset_info, resolve_scan_paths, save_cache, write_output,
 };
 
 /// Options for running a check with injected context.
@@ -159,37 +159,17 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     let cache = opts.cache;
     let baseline = opts.baseline;
     let project_root = opts.project_root;
-    // Check if pure incremental mode (--files provided)
-    let (all_files, scan_result, skip_structure_checks) = if args.files.is_empty() {
-        // Normal mode: scan directories
-        // 1. Determine paths to scan
-        let paths_to_scan = resolve_scan_paths(paths, &args.include);
 
-        // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
-        let scan_result = ctx
-            .scanner
-            .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
-
-        // 2.1 Filter by git diff if --diff or --staged is specified
-        let files = filter_by_git_diff(
-            scan_result.files.clone(),
-            args.diff.as_deref(),
-            args.staged,
-            project_root,
-        )?;
-        (files, Some(scan_result), false)
-    } else {
-        // Pure incremental mode: process only listed files, skip structure checks
-        let files: Vec<_> = args.files.iter().filter(|f| f.exists()).cloned().collect();
-        (files, None, true)
-    };
+    // Scan or filter files based on mode
+    let (all_files, scan_result, skip_structure_checks) =
+        scan_or_filter_files(args, cli, paths, ctx, project_root)?;
 
     // 3. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
-    let processed: Vec<_> = all_files
+    let file_results: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| ctx.threshold_checker.should_process(file_path)) // Filter by extension
-        .filter_map(|file_path| {
+        .map(|file_path| {
             let result = process_file_for_check(
                 file_path,
                 &ctx.registry,
@@ -203,8 +183,17 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         .collect();
     progress.finish();
 
-    // Separate check results and file statistics
-    let (mut results, file_stats): (Vec<_>, Vec<_>) = processed.into_iter().unzip();
+    // Separate successful results from errors
+    let (mut results, file_stats, file_errors): (Vec<_>, Vec<_>, Vec<_>) =
+        partition_file_results(file_results);
+
+    // Report file processing errors (IO failures, lock errors) as warnings
+    // These are critical path errors that could cause "missing files" in reports
+    if !cli.quiet {
+        for error in &file_errors {
+            crate::output::print_warning(&format!("failed to process file: {error}"));
+        }
+    }
 
     // 5. Run structure checks if enabled (using pre-collected dir_stats from unified scan)
     // Skip in pure incremental mode (--files) since no directory scan was performed
@@ -570,6 +559,93 @@ fn perform_auto_snapshot(
     if !quiet {
         eprintln!("Auto-snapshot recorded to {}", history_path.display());
     }
+}
+
+/// Scan directories or filter provided files based on mode.
+///
+/// Returns:
+/// - List of files to process
+/// - Optional scan result with directory stats (None in --files mode)
+/// - Whether to skip structure checks (true in --files mode)
+fn scan_or_filter_files(
+    args: &CheckArgs,
+    cli: &Cli,
+    paths: &[PathBuf],
+    ctx: &CheckContext,
+    project_root: &Path,
+) -> crate::Result<(Vec<PathBuf>, Option<crate::scanner::ScanResult>, bool)> {
+    if args.files.is_empty() {
+        // Normal mode: scan directories
+        // 1. Determine paths to scan
+        let paths_to_scan = resolve_scan_paths(paths, &args.include);
+
+        // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
+        let scan_result = ctx
+            .scanner
+            .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
+
+        // 2.1 Filter by git diff if --diff or --staged is specified
+        let files = filter_by_git_diff(
+            scan_result.files.clone(),
+            args.diff.as_deref(),
+            args.staged,
+            project_root,
+        )?;
+        Ok((files, Some(scan_result), false))
+    } else {
+        // Pure incremental mode: process only listed files, skip structure checks
+        // Warn about non-existent files before filtering them out
+        let mut existing_files = Vec::with_capacity(args.files.len());
+        for file in &args.files {
+            if file.exists() {
+                existing_files.push(file.clone());
+            } else if !cli.quiet {
+                crate::output::print_warning(&format!("file not found: {}", file.display()));
+            }
+        }
+        Ok((existing_files, None, true))
+    }
+}
+
+/// Partition file processing results into successes, stats, and errors.
+///
+/// Returns three vectors:
+/// - Check results from successfully processed files
+/// - File statistics from successfully processed files
+/// - Errors that occurred during file processing (IO failures, lock errors)
+///
+/// Skipped files (no extension, unrecognized extension, ignored by directive) are
+/// silently filtered out as they are legitimate non-errors.
+fn partition_file_results(
+    results: Vec<CheckFileResult>,
+) -> (
+    Vec<CheckResult>,
+    Vec<crate::output::FileStatistics>,
+    Vec<FileProcessError>,
+) {
+    let mut check_results = Vec::new();
+    let mut file_stats = Vec::new();
+    let mut errors = Vec::new();
+
+    for result in results {
+        match result {
+            CheckFileResult::Success {
+                check_result,
+                file_stats: stats,
+            } => {
+                check_results.push(*check_result);
+                file_stats.push(stats);
+            }
+            CheckFileResult::Skipped(_) => {
+                // Legitimately skipped files are not errors, just ignored
+            }
+            CheckFileResult::Error(error) => {
+                errors.push(error);
+            }
+        }
+    }
+
+    (check_results, file_stats, errors)
 }
 
 /// Write additional format outputs for single-run multi-format CI efficiency.
