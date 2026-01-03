@@ -134,6 +134,10 @@ max_age_days = 90                            # Delete older entries
 min_interval_secs = 3600                     # At most one entry per hour
 min_code_delta = 10                          # Ignore changes < N lines
 auto_snapshot_on_check = false               # Auto-record on successful check
+
+[check]
+warnings_as_errors = false                   # Treat warnings as errors
+fail_fast = false                            # Stop on first failure
 ```
 
 ---
@@ -326,6 +330,9 @@ extends_sha256 = "abc123..."
 # Local values override inherited ones
 [content]
 max_lines = 600
+
+# Arrays are merged (parent + child). Use "$reset" to start fresh:
+# exclude = ["$reset", "only-this/**"]
 ```
 
 ### Custom Languages
@@ -348,7 +355,7 @@ Usage: sloc-guard [OPTIONS] <COMMAND>
 
 Commands:
   check     Check files against line count thresholds
-  stats     Display statistics (subcommands: summary, files, breakdown, trend, history, report)
+  stats     Display statistics without checking thresholds
   snapshot  Record a statistics snapshot to trend history
   init      Generate a default configuration file
   config    Configuration file utilities
@@ -356,14 +363,22 @@ Commands:
   help      Print this message or the help of the given subcommand(s)
 
 Options:
-  -v, --verbose...     Increase output verbosity (-v, -vv for more)
-  -q, --quiet          Suppress non-essential output
-      --color <COLOR>  Control color output [default: auto] [possible values: auto, always, never]
-      --no-config                      Skip loading configuration file
-      --no-extends                     Skip resolving extends in configuration (ignore remote/local inheritance)
-      --extends-policy <MODE>          Remote config fetch policy [default: normal] [values: normal, offline, refresh]
-  -h, --help                           Print help (see more with '--help')
-  -V, --version        Print version
+  -v, --verbose...
+          Increase output verbosity (-v, -vv for more)
+  -q, --quiet
+          Suppress non-essential output
+      --color <COLOR>
+          Control color output [default: auto] [possible values: auto, always, never]
+      --no-config
+          Skip loading configuration file
+      --no-extends
+          Skip resolving extends in configuration (ignore remote/local inheritance)
+      --extends-policy <EXTENDS_POLICY>
+          Remote config fetch policy for `extends` URLs. - normal: use cache if within 1h TTL, otherwise fetch (default) - offline: use cached only, error on cache miss - refresh: skip cache, always fetch fresh [default: normal] [possible values: normal, offline, refresh]
+  -h, --help
+          Print help (see more with '--help')
+  -V, --version
+          Print version
 ```
 
 ### Stats Subcommands
