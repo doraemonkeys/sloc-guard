@@ -26,42 +26,59 @@ All modules in PROJECT_OVERVIEW.md Module Map are implemented.
 - **Phase 21**: Stats Command Restructure (subcommands: summary, files, breakdown, trend, report, snapshot), Trend Config, Report Config, Output Refactoring
 - **Phase 22**: SARIF & GitHub Action Fixes
 - **Phase 23**: Error Propagation
+- **Phase 24**: Array Merge (`$reset`), Offline Cache (FetchPolicy), Check Behavior (`warnings_as_errors`/`fail_fast`), Cache Flag Unification (`--extends-policy`)
 
 ---
 
-## Phase 24: Config Design Improvements
+## Phase 25: Config Loader Refactoring
 
-Addresses counter-intuitive behaviors in config inheritance and ambiguous semantics.
+Addresses line number precision loss during extends inheritance and improves config error context.
 
-**24.1 Array Merge with `$reset` Marker** ✅
-- Arrays default to append (parent + child) during `merge_toml_values()`
-- `$reset` as first element clears parent array, uses remaining child elements
-- `validate_reset_positions()` errors if `$reset` is not first
-- `strip_reset_markers()` removes markers from final config (handles no-extends case)
+**Dependency Graph:**
+```
+25.3 (Depth Limit) ─────────────────────────────┐
+                                                ↓
+25.1a/b/d (ConfigSource + Errors) ←──依赖──── 25.2 (Dual-Path Loading)
+                    ↓                              ↓
+               25.1c (Syntax Error)          depends on 25.2
+                    ↓
+               25.4 (Explain Source Chain)
+                    ↓
+               25.5 (Loader Split) ← optional
+```
 
-**24.2 Offline Cache Strategy Separation** ✅
-- `FetchPolicy` enum: `Normal` (TTL-controlled), `Offline` (ignore TTL), `ForceRefresh` (skip cache)
-- `--offline` mode ignores TTL, uses any existing cache
-- Remote cache moved to state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`)
-- SHA256 hash lock validates content regardless of TTL
+**25.3 Extends Chain Depth Limit** ✅
+- `MAX_EXTENDS_DEPTH` constant (10) in `loader.rs`
+- Depth tracked in `load_with_extends()` / `load_remote_with_extends()` / `process_config_content()`
+- Returns "Extends chain too deep" error when limit exceeded
 
-**24.3 Check Behavior Configuration** ✅
+**25.1 ConfigSource & Structured Config Errors** *(split into subtasks)*
 
-- Removed ambiguous `content.strict` field (deprecated)
-- Add `[check]` section with `warnings_as_errors` (treat warnings as failures) and `fail_fast` (stop on first failure)
-- Add CLI flags `--warnings-as-errors` and `--fail-fast` (`--strict` kept as hidden deprecated alias)
-- `fail_fast` implements short-circuit processing with `AtomicBool` for parallel file processing
+| Subtask | Content | Dependencies |
+|---------|---------|--------------|
+| 25.1a | `ConfigSource` enum (File/Remote/Preset) for origin tracking | None |
+| 25.1b | `CircularExtends { chain }`, `ExtendsTooDeep { depth, max, chain }`, `ExtendsResolution { path, base }` variants | 25.1a |
+| 25.1c | `Syntax { path, line, column, message }` variant - precise location for raw parse errors | 25.2 |
+| 25.1d | `TypeMismatch { field, expected, actual, origin }`, `Semantic { field, message, origin, suggestion }` variants | 25.1a |
 
-**24.4 Cache Flag Unification** ✅
+**25.2 Dual-Path Loading Strategy**
+- Single-file mode: when no `extends`, parse directly from raw content (preserves precise line numbers)
+- Inheritance mode: when `extends` present, use source chain tracking instead of line numbers
+- Error messages use appropriate context for each mode (line:column vs source chain)
 
-- Problem: Two separate cache mechanisms use confusingly similar flags (`--no-cache` for SLOC, `--offline` for remote config)
-- Remove: `--offline` (global), `--no-cache` (check/stats)
-- Add: `--no-sloc-cache` - disable SLOC counting cache (replaces `--no-cache`)
-- Add: `--extends-policy=<mode>` (global) - remote config fetch strategy
-  - `normal` (default): 1h TTL, fetch on miss/expire
-  - `offline`: use cached only, ignore TTL, error on miss
-  - `refresh`: skip cache, always fetch fresh
-- Maps to existing `FetchPolicy` enum: `Normal`, `Offline`, `ForceRefresh`
+**25.4 Explain Config Source Chain**
+- `explain --config` shows full configuration inheritance chain
+- Display field values with their origin sources (preset → remote → local)
+- Show which config contributed which settings
+
+**25.5 Loader Single Responsibility Split** *(optional)*
+- Split `FileConfigLoader` into focused components:
+  - `ConfigReader` trait - I/O abstraction (local/remote read)
+  - `ConfigParser` - pure parsing, returns syntax errors with precise line numbers
+  - `InheritanceResolver` - extends chain resolution with depth/cycle checks
+  - `ConfigValidator` - semantic validation (business rules)
+- `ConfigLoader` composes these components via DI
+- Enables independent testing and IDE integration (parser-only for syntax check)
 
 ---
 
@@ -70,4 +87,5 @@ Addresses counter-intuitive behaviors in config inheritance and ambiguous semant
 | Priority               | Tasks                                                         |
 | ---------------------- | ------------------------------------------------------------- |
 | **19. Config Design**  | ~~24.1 Array Merge~~ ✅, ~~24.2 Offline Cache~~ ✅, ~~24.3 Check Behavior~~ ✅, ~~24.4 Cache Flag Unification~~ ✅ |
+| **20. Config Loader**  | ~~25.3 Depth Limit~~ ✅ → 25.1a/b/d → 25.2 → 25.1c → 25.4 → 25.5 |
 

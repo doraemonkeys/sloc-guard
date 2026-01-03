@@ -50,6 +50,9 @@ pub trait ConfigLoader {
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
 const USER_CONFIG_NAME: &str = "config.toml";
 
+/// Maximum depth of extends chain to prevent stack overflow from deeply nested configs.
+pub const MAX_EXTENDS_DEPTH: usize = 10;
+
 /// Validate config version. Returns an error if version is unsupported.
 fn validate_config_version(config: &Config) -> Result<()> {
     match &config.version {
@@ -196,7 +199,14 @@ impl<F: FileSystem> FileConfigLoader<F> {
         &self,
         path: &Path,
         visited: &mut HashSet<String>,
+        depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
+        if depth > MAX_EXTENDS_DEPTH {
+            return Err(SlocGuardError::Config(format!(
+                "Extends chain too deep: maximum depth is {MAX_EXTENDS_DEPTH}"
+            )));
+        }
+
         let canonical =
             self.fs
                 .canonicalize(path)
@@ -221,7 +231,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
                     source,
                 })?;
 
-        self.process_config_content(&content, Some(path), visited)
+        self.process_config_content(&content, Some(path), visited, depth)
     }
 
     /// Load remote config with extends chain, returning (value, `preset_used`).
@@ -230,7 +240,14 @@ impl<F: FileSystem> FileConfigLoader<F> {
         url: &str,
         expected_hash: Option<&str>,
         visited: &mut HashSet<String>,
+        depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
+        if depth > MAX_EXTENDS_DEPTH {
+            return Err(SlocGuardError::Config(format!(
+                "Extends chain too deep: maximum depth is {MAX_EXTENDS_DEPTH}"
+            )));
+        }
+
         if !visited.insert(url.to_string()) {
             return Err(SlocGuardError::Config(format!(
                 "Circular extends detected: {url}"
@@ -243,7 +260,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
             expected_hash,
             self.fetch_policy,
         )?;
-        self.process_config_content(&content, None, visited)
+        self.process_config_content(&content, None, visited, depth)
     }
 
     /// Process config content and return (value, `preset_used`).
@@ -252,6 +269,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
         content: &str,
         base_path: Option<&Path>,
         visited: &mut HashSet<String>,
+        depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         let mut config_value: toml::Value =
             toml::from_str(content).map_err(SlocGuardError::from)?;
@@ -272,10 +290,16 @@ impl<F: FileSystem> FileConfigLoader<F> {
             let (base_value, child_preset) =
                 if let Some(preset_name) = extends.strip_prefix("preset:") {
                     // Track which preset was used (caller decides whether/how to notify user)
+                    // Presets are terminal - they don't count toward depth
                     preset_used = Some(preset_name.to_string());
                     (presets::load_preset(preset_name)?, None)
                 } else if is_remote_url(&extends) {
-                    self.load_remote_with_extends(&extends, extends_sha256.as_deref(), visited)?
+                    self.load_remote_with_extends(
+                        &extends,
+                        extends_sha256.as_deref(),
+                        visited,
+                        depth + 1,
+                    )?
                 } else {
                     let extends_path = Path::new(&extends);
                     let resolved_path = if extends_path.is_absolute() {
@@ -289,7 +313,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
                             "Cannot resolve relative path '{extends}' from remote config"
                         )));
                     };
-                    self.load_with_extends(&resolved_path, visited)?
+                    self.load_with_extends(&resolved_path, visited, depth + 1)?
                 };
             // Propagate preset from child if we didn't find one at this level
             if preset_used.is_none() {
@@ -462,7 +486,7 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
 
     fn load_from_path(&self, path: &Path) -> Result<LoadResult> {
         let mut visited = HashSet::new();
-        let (merged_value, preset_used) = self.load_with_extends(path, &mut visited)?;
+        let (merged_value, preset_used) = self.load_with_extends(path, &mut visited, 0)?;
         let config_str =
             toml::to_string(&merged_value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
         let config = Self::parse_config(&config_str)?;

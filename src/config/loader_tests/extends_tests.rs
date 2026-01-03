@@ -783,3 +783,165 @@ reason = "D"
     assert_eq!(result.config.content.rules[0].reason, Some("C".to_string()));
     assert_eq!(result.config.content.rules[1].reason, Some("D".to_string()));
 }
+
+// =============================================================================
+// Extends Depth Limit Tests
+// =============================================================================
+// These tests verify that deeply nested extends chains are rejected.
+
+use crate::config::loader::MAX_EXTENDS_DEPTH;
+
+#[test]
+fn extends_respects_max_depth_limit() {
+    // Create a chain of configs that exceeds MAX_EXTENDS_DEPTH
+    let mut fs = MockFileSystem::new();
+
+    // Build chain: 0 -> 1 -> 2 -> ... -> MAX_EXTENDS_DEPTH + 1
+    for i in 0..=MAX_EXTENDS_DEPTH + 1 {
+        let content = if i == MAX_EXTENDS_DEPTH + 1 {
+            // Terminal config (no extends)
+            r#"
+version = "2"
+
+[content]
+max_lines = 100
+"#
+            .to_string()
+        } else {
+            // Config that extends the next one
+            format!(
+                r#"
+version = "2"
+extends = "/config_{}.toml"
+
+[content]
+max_lines = {}
+"#,
+                i + 1,
+                (i + 1) * 100
+            )
+        };
+        fs = fs.with_file(format!("/config_{i}.toml"), &content);
+    }
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/config_0.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(
+        err,
+        SlocGuardError::Config(msg) if msg.contains("too deep") && msg.contains(&MAX_EXTENDS_DEPTH.to_string())
+    ));
+}
+
+#[test]
+fn extends_chain_at_max_depth_succeeds() {
+    // Create a chain of configs exactly at MAX_EXTENDS_DEPTH (should succeed)
+    let mut fs = MockFileSystem::new();
+
+    // Build chain: 0 -> 1 -> 2 -> ... -> MAX_EXTENDS_DEPTH
+    // Depth 0 (initial) extends depth 1, which extends depth 2, etc.
+    // Total chain length = MAX_EXTENDS_DEPTH levels (not exceeding limit)
+    for i in 0..=MAX_EXTENDS_DEPTH {
+        let content = if i == MAX_EXTENDS_DEPTH {
+            // Terminal config (no extends)
+            r#"
+version = "2"
+
+[content]
+max_lines = 100
+"#
+            .to_string()
+        } else {
+            // Config that extends the next one
+            format!(
+                r#"
+version = "2"
+extends = "/config_{}.toml"
+
+[content]
+max_lines = {}
+"#,
+                i + 1,
+                (i + 1) * 100
+            )
+        };
+        fs = fs.with_file(format!("/config_{i}.toml"), &content);
+    }
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/config_0.toml"));
+
+    // Should succeed - chain is exactly at limit, not exceeding
+    assert!(result.is_ok());
+    // The innermost config's max_lines should be overridden by outer configs
+    assert_eq!(result.unwrap().config.content.max_lines, 100);
+}
+
+#[test]
+fn extends_depth_limit_error_message_is_informative() {
+    // Verify error message contains useful information
+    let mut fs = MockFileSystem::new();
+
+    for i in 0..=MAX_EXTENDS_DEPTH + 1 {
+        let content = if i == MAX_EXTENDS_DEPTH + 1 {
+            "version = \"2\"\n".to_string()
+        } else {
+            format!("version = \"2\"\nextends = \"/config_{}.toml\"\n", i + 1)
+        };
+        fs = fs.with_file(format!("/config_{i}.toml"), &content);
+    }
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/config_0.toml"));
+
+    let err = result.unwrap_err();
+    let msg = format!("{err}");
+
+    // Should mention depth and the max value
+    assert!(msg.contains("too deep"), "Error should mention 'too deep'");
+    assert!(
+        msg.contains(&MAX_EXTENDS_DEPTH.to_string()),
+        "Error should mention max depth value"
+    );
+}
+
+#[test]
+fn extends_preset_does_not_count_toward_depth() {
+    // Presets are terminal - they don't have their own extends,
+    // so a chain ending in a preset should work even at the boundary
+    let mut fs = MockFileSystem::new();
+
+    // Build chain up to MAX_EXTENDS_DEPTH - 1, then the last one extends a preset
+    for i in 0..MAX_EXTENDS_DEPTH {
+        let content = if i == MAX_EXTENDS_DEPTH - 1 {
+            // Last config extends a preset (terminal)
+            r#"
+version = "2"
+extends = "preset:rust-strict"
+
+[content]
+max_lines = 600
+"#
+            .to_string()
+        } else {
+            format!(
+                r#"
+version = "2"
+extends = "/config_{}.toml"
+"#,
+                i + 1
+            )
+        };
+        fs = fs.with_file(format!("/config_{i}.toml"), &content);
+    }
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/config_0.toml"));
+
+    // Should succeed - preset is terminal
+    assert!(result.is_ok());
+    let load_result = result.unwrap();
+    assert_eq!(load_result.preset_used, Some("rust-strict".to_string()));
+}
