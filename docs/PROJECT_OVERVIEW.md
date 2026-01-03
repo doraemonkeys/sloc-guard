@@ -27,7 +27,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection; timestamp utilities (`current_unix_timestamp`, `try_current_unix_timestamp`) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter` (with `with_stats()` for project stats, `with_trend_history()` for trend chart, `with_project_root()` for relative paths); `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `StatsHtmlFormatter` (with `with_project_root()`, `with_trend_history()` for trend chart, use `output_mode` field); `ScanProgress` (progress bar); `ErrorOutput` (colored error/warning output); `path.rs`: `display_path()` for relative path output with forward-slash normalization; `trend_formatting.rs`: relative time, trend arrows/colors/percentages; `svg/`: chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart, FileSizeHistogram, LanguageBreakdownChart, TrendLineChart with delta indicators and smart X-axis labels, SvgBuilder) with viewBox scaling, CSS variables, hover effects, print styles, accessibility |
 | `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `message()` includes error kind for `FileAccess`/`Io` and glob details for `InvalidPattern` |
-| `commands/*` | `run_check`, `run_stats`, `run_snapshot`, `run_config`, `run_init`, `run_explain`; check split into: `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_validation.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
+| `commands/*` | `run_check`, `run_stats`, `run_snapshot`, `run_config`, `run_init`, `run_explain`; check split into: `runner.rs`, `check_args.rs`, `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_scan.rs`, `check_exit.rs`, `check_snapshot.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `TrendHistory` - historical stats with delta computation, file locking, retention policy (max_entries, max_age_days, min_interval_secs); `parse_duration` - human-readable duration parsing for `--since` |
 | `main` | CLI parsing, command dispatch to `commands/*` |
@@ -48,7 +48,7 @@ StatsConfig { report: StatsReportConfig }
 StatsReportConfig { exclude, top_count, breakdown_by, depth, trend_since }
 ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }
 ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }
-StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
+StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, deny_extensions, deny_patterns, deny_files, deny_dirs, allow_extensions, allow_files, allow_dirs, rules }
 StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, siblings, reason, expires }
 SiblingRule::Directed { match_pattern, require, severity } | Group { group, severity }
 SiblingSeverity::Error | Warn
@@ -60,7 +60,7 @@ CountResult::Stats(LineStats) | IgnoredFile
 CommentSyntax { single_line, multi_line }
 
 // Check results (enum with associated data)
-CheckResult::Passed { path, stats, limit, override_reason, violation_category }
+CheckResult::Passed { path, stats, raw_stats, limit, override_reason, violation_category }
           | Warning { ..., suggestions }
           | Failed { ..., suggestions }
           | Grandfathered { ... }
@@ -68,7 +68,7 @@ ViolationCategory::Content | Structure { violation_type, triggering_rule }
 
 // Structure checking
 DirStats { file_count, dir_count, depth }
-ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DisallowedDirectory | DeniedFile { pattern_or_extension } | DeniedDirectory { pattern } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern } | GroupIncomplete { group_patterns, missing_members }
+ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DisallowedDirectory | DeniedFile { pattern_or_extension } | DeniedDirectory { pattern } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern } | GroupIncomplete { group_patterns, missing_patterns }
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
 // Explain (rule chain debugging)
@@ -119,7 +119,7 @@ RealFileReader
 FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }
 ScanResult { files, dir_stats, allowlist_violations }
 StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules, global_allow_*, global_deny_* }
-AllowlistRule { scope, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, naming_pattern_str }
+AllowlistRule { scope, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, naming_pattern_str }
 CompositeScanner
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }
 CheckOptions { args, cli, paths, config, ctx, cache, baseline, project_root }
