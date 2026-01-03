@@ -41,6 +41,9 @@ pub struct StructureChecker {
     sibling_rules: Vec<CompiledSiblingRule>,
 }
 
+/// Default warn threshold when none specified.
+const DEFAULT_WARN_THRESHOLD: f64 = 0.8;
+
 impl StructureChecker {
     /// Create a new structure checker from config.
     ///
@@ -141,9 +144,6 @@ impl StructureChecker {
         clippy::cast_precision_loss
     )] // Limits are validated to be non-negative (if not UNLIMITED), so casting is safe.
     pub fn check(&self, dir_stats: &HashMap<PathBuf, DirStats>) -> Vec<StructureViolation> {
-        /// Default warn threshold when none specified.
-        const DEFAULT_WARN_THRESHOLD: f64 = 0.8;
-
         let mut violations = Vec::new();
 
         for (path, stats) in dir_stats {
@@ -563,7 +563,7 @@ impl StructureChecker {
             effective_max_files: limits.max_files,
             effective_max_dirs: limits.max_dirs,
             effective_max_depth: limits.max_depth,
-            warn_threshold: limits.warn_threshold.unwrap_or(1.0),
+            warn_threshold: limits.warn_threshold.unwrap_or(DEFAULT_WARN_THRESHOLD),
             override_reason,
             rule_chain,
         }
