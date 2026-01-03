@@ -164,6 +164,30 @@ fn depth_warn_threshold() {
 }
 
 #[test]
+fn depth_warn_threshold_does_not_warn_at_threshold_boundary() {
+    // Warning threshold is exclusive: only values strictly above the computed warn
+    // limit should warn (boundary itself is still OK).
+    let config = StructureConfig {
+        max_depth: Some(5),
+        warn_threshold: Some(0.6), // Warn at ceil(5 * 0.6) = 3
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("root/a/b"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 3, // Exactly at warn threshold
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert!(violations.is_empty());
+}
+
+#[test]
 fn invalid_max_depth_value_returns_error() {
     let config = StructureConfig {
         max_depth: Some(-5), // Invalid

@@ -594,6 +594,11 @@ impl StructureConfig {
             || self.max_dirs.is_some()
             || self.max_depth.is_some()
             || !self.rules.is_empty()
+            // Global allowlist mode should still enable structure scanning so that
+            // allowlist violations can be detected and reported even without limits.
+            || !self.allow_extensions.is_empty()
+            || !self.allow_files.is_empty()
+            || !self.allow_dirs.is_empty()
             || !self.deny_extensions.is_empty()
             || !self.deny_patterns.is_empty()
             || !self.deny_files.is_empty()

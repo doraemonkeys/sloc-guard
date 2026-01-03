@@ -213,6 +213,25 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         }
     }
 
+    // 4. Merge allowlist/denylist violations collected during scan
+    //
+    // These violations are produced by the structure-aware scanner based on:
+    // - global allow/deny settings in [structure]
+    // - per-rule allow/deny/naming settings in [[structure.rules]]
+    //
+    // They must be reported even when no directory count limits are configured.
+    if !skip_structure_checks
+        && let Some(ref scan_result) = scan_result
+        && !scan_result.allowlist_violations.is_empty()
+    {
+        let allowlist_results: Vec<_> = scan_result
+            .allowlist_violations
+            .iter()
+            .map(structure_violation_to_check_result)
+            .collect();
+        results.extend(allowlist_results);
+    }
+
     // 5. Run structure checks if enabled (using pre-collected dir_stats from unified scan)
     // Skip in pure incremental mode (--files) since no directory scan was performed
     if !skip_structure_checks
@@ -227,14 +246,6 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
             .map(structure_violation_to_check_result)
             .collect();
         results.extend(structure_results);
-
-        // Add allowlist violations collected during scan
-        let allowlist_results: Vec<_> = scan_result
-            .allowlist_violations
-            .iter()
-            .map(structure_violation_to_check_result)
-            .collect();
-        results.extend(allowlist_results);
 
         // Check for missing sibling files (co-location enforcement)
         let sibling_violations = structure_checker.check_siblings(&scan_result.files);

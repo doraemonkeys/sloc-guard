@@ -166,6 +166,30 @@ fn warn_threshold_triggers_warning_below_hard_limit() {
 }
 
 #[test]
+fn warn_threshold_does_not_warn_at_threshold_boundary() {
+    // Warning threshold is exclusive: only values strictly above the computed warn
+    // limit should warn (boundary itself is still OK).
+    let config = StructureConfig {
+        max_files: Some(50),
+        warn_threshold: Some(0.9), // Warn at ceil(50 * 0.9) = 45 files
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 45, // Exactly at warn threshold
+            dir_count: 0,
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert!(violations.is_empty());
+}
+
+#[test]
 fn warn_threshold_no_warning_below_threshold() {
     let config = StructureConfig {
         max_files: Some(50),
@@ -238,6 +262,30 @@ fn warn_threshold_dir_count() {
     assert_eq!(violations.len(), 1);
     assert!(violations[0].is_warning);
     assert_eq!(violations[0].violation_type, ViolationType::DirCount);
+}
+
+#[test]
+fn warn_threshold_dir_count_does_not_warn_at_threshold_boundary() {
+    // Warning threshold is exclusive: only values strictly above the computed warn
+    // limit should warn (boundary itself is still OK).
+    let config = StructureConfig {
+        max_dirs: Some(10),
+        warn_threshold: Some(0.8), // Warn at ceil(10 * 0.8) = 8 dirs
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src"),
+        DirStats {
+            file_count: 0,
+            dir_count: 8, // Exactly at warn threshold
+            depth: 0,
+        },
+    );
+
+    let violations = checker.check(&stats);
+    assert!(violations.is_empty());
 }
 
 #[test]

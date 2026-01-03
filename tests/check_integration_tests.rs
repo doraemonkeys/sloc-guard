@@ -383,6 +383,68 @@ allow_extensions = [".rs"]
         .stdout(predicate::str::contains("disallowed file"));
 }
 
+#[test]
+fn check_structure_global_allowlist_violation() {
+    let fixture = TestFixture::new();
+    // Global allowlist: only .rs files allowed anywhere
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
+[content]
+max_lines = 100
+extensions = ["rs"]
+
+[structure]
+allow_extensions = [".rs"]
+"#,
+    );
+    fixture.create_rust_file("src/main.rs", 5);
+    fixture.create_file("src/config.json", "{}");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "src", "--no-sloc-cache"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("disallowed file"));
+}
+
+#[test]
+fn check_structure_global_deny_extension_violation() {
+    let fixture = TestFixture::new();
+    // Global denylist: deny *.json anywhere
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
+[content]
+max_lines = 100
+extensions = ["rs"]
+
+[structure]
+deny_extensions = [".json"]
+"#,
+    );
+    fixture.create_rust_file("src/main.rs", 5);
+    fixture.create_file("src/config.json", "{}");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "src", "--no-sloc-cache"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("denied file"));
+}
+
 // =============================================================================
 // Comment/Blank Line Counting Tests
 // =============================================================================
