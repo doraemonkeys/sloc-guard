@@ -15,6 +15,7 @@ use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
 use crate::scanner::{AllowlistRuleBuilder, CompositeScanner, FileScanner, StructureScanConfig};
+use crate::state;
 
 // =============================================================================
 // File Processing Error Types
@@ -134,8 +135,8 @@ pub(crate) fn load_config(
         });
     }
 
-    // Determine project root from config path or current directory
-    let project_root = resolve_project_root(config_path)?;
+    // Determine project root for consistent state file resolution
+    let project_root = Some(resolve_project_root());
 
     let loader = FileConfigLoader::with_options(extends_policy, project_root);
     if no_extends {
@@ -150,24 +151,12 @@ pub(crate) fn load_config(
 
 /// Resolves the project root directory.
 ///
-/// Uses the config path's parent directory if available, otherwise falls back
-/// to the current working directory.
-///
-/// # Errors
-/// Returns `SlocGuardError::Io` if `current_dir()` fails and no config path parent is available.
-pub(crate) fn resolve_project_root(config_path: Option<&Path>) -> crate::Result<Option<PathBuf>> {
-    // If config path has a parent, use that
-    if let Some(parent) = config_path.and_then(|p| p.parent()) {
-        return Ok(Some(parent.to_path_buf()));
-    }
-
-    // Fall back to current directory, propagating errors
-    let cwd = std::env::current_dir().map_err(|e| crate::SlocGuardError::Io {
-        source: e,
-        path: None,
-        operation: Some("get current directory"),
-    })?;
-    Ok(Some(cwd))
+/// Always discovers the project root by walking up the directory tree to find
+/// `.git/` or `.sloc-guard.toml` markers. This ensures remote config cache is
+/// stored consistently with other state files (cache, history, baseline).
+#[must_use]
+pub(crate) fn resolve_project_root() -> PathBuf {
+    state::discover_project_root(Path::new("."))
 }
 
 /// Print preset usage info to stderr (once per session managed by caller).

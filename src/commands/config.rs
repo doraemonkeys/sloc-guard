@@ -184,8 +184,8 @@ pub(crate) fn run_config_show_impl(
 }
 
 fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
-    // Determine project root from config path or current directory
-    let project_root = super::context::resolve_project_root(config_path)?;
+    // Determine project root for consistent state file resolution
+    let project_root = Some(super::context::resolve_project_root());
 
     let loader =
         FileConfigLoader::with_options(FetchPolicy::from_cli(cli.extends_policy), project_root);
