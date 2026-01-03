@@ -306,130 +306,144 @@ impl StructureChecker {
         // Build a HashSet of all file paths for O(1) sibling lookup
         let file_set: HashSet<&PathBuf> = files.iter().collect();
 
+        // Group files by parent directory to optimize rule matching
+        // This reduces directory pattern matching from O(Files * Rules) to O(Dirs * Rules)
+        let mut files_by_parent: HashMap<&Path, Vec<&PathBuf>> = HashMap::new();
+        for file in files {
+            if let Some(parent) = file.parent() {
+                files_by_parent.entry(parent).or_default().push(file);
+            }
+        }
+
         let mut violations = Vec::new();
 
-        for file_path in files {
-            let Some(parent) = file_path.parent() else {
+        for (parent, dir_files) in files_by_parent {
+            // Find rules that apply to this directory
+            let applicable_rules: Vec<_> = self
+                .sibling_rules
+                .iter()
+                .filter(|rule| match rule {
+                    CompiledSiblingRule::Directed { dir_matcher, .. } => {
+                        dir_matcher.is_match(parent)
+                    }
+                    CompiledSiblingRule::Group { dir_matcher, .. } => dir_matcher.is_match(parent),
+                })
+                .collect();
+
+            if applicable_rules.is_empty() {
                 continue;
-            };
-            let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) else {
-                continue;
-            };
+            }
 
-            for rule in &self.sibling_rules {
-                match rule {
-                    CompiledSiblingRule::Directed {
-                        dir_scope,
-                        dir_matcher,
-                        file_matcher,
-                        sibling_templates,
-                        is_warning,
-                    } => {
-                        // Check if parent directory matches the rule's directory pattern
-                        if !dir_matcher.is_match(parent) {
-                            continue;
-                        }
+            for file_path in dir_files {
+                let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) else {
+                    continue;
+                };
 
-                        // Check if filename matches the rule's file pattern
-                        if !file_matcher.is_match(file_name) {
-                            continue;
-                        }
+                for rule in &applicable_rules {
+                    match rule {
+                        CompiledSiblingRule::Directed {
+                            dir_scope,
+                            file_matcher,
+                            sibling_templates,
+                            is_warning,
+                            ..
+                        } => {
+                            // Check if filename matches the rule's file pattern
+                            if !file_matcher.is_match(file_name) {
+                                continue;
+                            }
 
-                        // Check each required sibling
-                        for template in sibling_templates {
-                            if let Some(expected_sibling) =
-                                Self::derive_sibling_path(file_path, template)
-                                && !file_set.contains(&expected_sibling)
-                            {
-                                let violation = if *is_warning {
-                                    StructureViolation::missing_sibling_warning(
-                                        file_path.clone(),
-                                        dir_scope.clone(),
-                                        template.clone(),
-                                    )
-                                } else {
-                                    StructureViolation::missing_sibling(
-                                        file_path.clone(),
-                                        dir_scope.clone(),
-                                        template.clone(),
-                                    )
-                                };
-                                violations.push(violation);
+                            // Check each required sibling
+                            for template in sibling_templates {
+                                if let Some(expected_sibling) =
+                                    Self::derive_sibling_path(file_path, template)
+                                    && !file_set.contains(&expected_sibling)
+                                {
+                                    let violation = if *is_warning {
+                                        StructureViolation::missing_sibling_warning(
+                                            file_path.clone(),
+                                            dir_scope.clone(),
+                                            template.clone(),
+                                        )
+                                    } else {
+                                        StructureViolation::missing_sibling(
+                                            file_path.clone(),
+                                            dir_scope.clone(),
+                                            template.clone(),
+                                        )
+                                    };
+                                    violations.push(violation);
+                                }
                             }
                         }
-                    }
-                    #[allow(clippy::literal_string_with_formatting_args)]
-                    // {stem} is template syntax, not a format arg
-                    CompiledSiblingRule::Group {
-                        dir_scope,
-                        dir_matcher,
-                        group_patterns,
-                        is_warning,
-                    } => {
-                        // Check if parent directory matches the rule's directory pattern
-                        if !dir_matcher.is_match(parent) {
-                            continue;
-                        }
+                        #[allow(clippy::literal_string_with_formatting_args)]
+                        // {stem} is template syntax, not a format arg
+                        CompiledSiblingRule::Group {
+                            dir_scope,
+                            group_patterns,
+                            is_warning,
+                            ..
+                        } => {
+                            // Try ALL patterns to extract possible stems, then find the best one
+                            // (the one that results in the most complete group)
+                            let stems: Vec<String> = group_patterns
+                                .iter()
+                                .filter_map(|pattern| {
+                                    Self::extract_stem_from_pattern(file_name, pattern)
+                                })
+                                .collect();
 
-                        // Try ALL patterns to extract possible stems, then find the best one
-                        // (the one that results in the most complete group)
-                        let stems: Vec<String> = group_patterns
-                            .iter()
-                            .filter_map(|pattern| {
-                                Self::extract_stem_from_pattern(file_name, pattern)
-                            })
-                            .collect();
+                            if stems.is_empty() {
+                                // File doesn't match any pattern in the group
+                                continue;
+                            }
 
-                        if stems.is_empty() {
-                            // File doesn't match any pattern in the group
-                            continue;
-                        }
+                            // Find the stem that results in the most complete group
+                            // (fewest missing files, prefer complete groups)
+                            let best_stem = stems.iter().min_by_key(|stem| {
+                                group_patterns
+                                    .iter()
+                                    .filter(|pattern| {
+                                        let expected_name = pattern.replace("{stem}", stem);
+                                        let expected_path = parent.join(&expected_name);
+                                        !file_set.contains(&expected_path)
+                                    })
+                                    .count()
+                            });
 
-                        // Find the stem that results in the most complete group
-                        // (fewest missing files, prefer complete groups)
-                        let best_stem = stems.iter().min_by_key(|stem| {
-                            group_patterns
+                            let Some(stem) = best_stem else {
+                                continue;
+                            };
+
+                            // This file triggers the group check - find missing members using the best stem
+                            let missing: Vec<String> = group_patterns
                                 .iter()
                                 .filter(|pattern| {
                                     let expected_name = pattern.replace("{stem}", stem);
                                     let expected_path = parent.join(&expected_name);
                                     !file_set.contains(&expected_path)
                                 })
-                                .count()
-                        });
+                                .cloned()
+                                .collect();
 
-                        let Some(stem) = best_stem else {
-                            continue;
-                        };
-
-                        // This file triggers the group check - find missing members using the best stem
-                        let missing: Vec<String> = group_patterns
-                            .iter()
-                            .filter(|pattern| {
-                                let expected_name = pattern.replace("{stem}", stem);
-                                let expected_path = parent.join(&expected_name);
-                                !file_set.contains(&expected_path)
-                            })
-                            .cloned()
-                            .collect();
-
-                        if !missing.is_empty() {
-                            let violation = if *is_warning {
-                                StructureViolation::group_incomplete_warning(
-                                    file_path.clone(),
-                                    dir_scope.clone(),
-                                    group_patterns.clone(),
-                                    missing,
-                                )
-                            } else {
-                                StructureViolation::group_incomplete(
-                                    file_path.clone(),
-                                    dir_scope.clone(),
-                                    group_patterns.clone(),
-                                    missing,
-                                )
-                            };
-                            violations.push(violation);
+                            if !missing.is_empty() {
+                                let violation = if *is_warning {
+                                    StructureViolation::group_incomplete_warning(
+                                        file_path.clone(),
+                                        dir_scope.clone(),
+                                        group_patterns.clone(),
+                                        missing,
+                                    )
+                                } else {
+                                    StructureViolation::group_incomplete(
+                                        file_path.clone(),
+                                        dir_scope.clone(),
+                                        group_patterns.clone(),
+                                        missing,
+                                    )
+                                };
+                                violations.push(violation);
+                            }
                         }
                     }
                 }
