@@ -5,7 +5,7 @@ use super::super::{
     fetch_remote_config_with_client,
 };
 
-use super::{MockHttpClient, create_temp_project};
+use super::{MockHttpClient, acquire_warning_lock, create_temp_project};
 
 #[test]
 fn fetch_remote_config_rejects_invalid_url() {
@@ -37,6 +37,7 @@ fn fetch_remote_config_rejects_non_http_scheme() {
 
 #[test]
 fn fetch_with_mock_client_success() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 200\n";
     let client = MockHttpClient::success(content);
@@ -57,6 +58,7 @@ fn fetch_with_mock_client_success() {
 
 #[test]
 fn fetch_with_mock_client_error() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Connection refused");
 
@@ -81,6 +83,7 @@ fn fetch_with_mock_client_error() {
 
 #[test]
 fn fetch_with_mock_client_uses_cache_on_second_call() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 300\n";
     let client = MockHttpClient::success(content);
@@ -157,6 +160,7 @@ fn fetch_with_mock_client_ftp_url_never_calls_client() {
 
 #[test]
 fn fetch_with_mock_client_http_url_accepted() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 400\n";
     let client = MockHttpClient::success(content);
@@ -176,6 +180,7 @@ fn fetch_with_mock_client_http_url_accepted() {
 
 #[test]
 fn fetch_with_mock_client_timeout_error() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Request timeout fetching remote config");
 
@@ -194,6 +199,7 @@ fn fetch_with_mock_client_timeout_error() {
 
 #[test]
 fn fetch_with_mock_client_http_404_error() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Failed to fetch remote config: HTTP 404 Not Found");
 
@@ -212,6 +218,7 @@ fn fetch_with_mock_client_http_404_error() {
 
 #[test]
 fn fetch_with_mock_client_http_500_error() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let client =
         MockHttpClient::error("Failed to fetch remote config: HTTP 500 Internal Server Error");
@@ -231,6 +238,7 @@ fn fetch_with_mock_client_http_500_error() {
 
 #[test]
 fn fetch_with_mock_client_network_error() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let client = MockHttpClient::error("Failed to connect to remote config URL");
 

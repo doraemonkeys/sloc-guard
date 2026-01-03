@@ -4,7 +4,7 @@ use std::fs;
 
 use super::super::{FetchPolicy, cache_file_path, fetch_remote_config_with_client, write_to_cache};
 
-use super::{MockHttpClient, create_temp_project};
+use super::{MockHttpClient, acquire_warning_lock, create_temp_project};
 
 // ============================================================================
 // Offline mode tests
@@ -125,6 +125,7 @@ fn offline_mode_returns_error_without_project_root() {
 
 #[test]
 fn force_refresh_skips_cache() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let cached_content = "version = \"2\"\n\n[content]\nmax_lines = 1600\n";
     let fresh_content = "version = \"2\"\n\n[content]\nmax_lines = 1601\n";
@@ -151,6 +152,7 @@ fn force_refresh_skips_cache() {
 
 #[test]
 fn force_refresh_updates_cache() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let fresh_content = "version = \"2\"\n\n[content]\nmax_lines = 1700\n";
     let client = MockHttpClient::success(fresh_content);

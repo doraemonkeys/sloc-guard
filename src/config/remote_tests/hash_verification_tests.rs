@@ -5,7 +5,7 @@ use super::super::{
 };
 use crate::error::SlocGuardError;
 
-use super::{MockHttpClient, create_temp_project};
+use super::{MockHttpClient, acquire_warning_lock, create_temp_project};
 
 // ============================================================================
 // Hash computation tests
@@ -40,6 +40,7 @@ fn compute_content_hash_different_for_different_content() {
 
 #[test]
 fn hash_verification_success_on_match() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 900\n";
     let expected_hash = compute_content_hash(content);
@@ -60,6 +61,7 @@ fn hash_verification_success_on_match() {
 
 #[test]
 fn hash_verification_fails_on_mismatch() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 1000\n";
     let wrong_hash = "0".repeat(64); // Intentionally wrong hash
@@ -122,6 +124,7 @@ fn hash_verification_with_cached_content_success() {
 
 #[test]
 fn hash_verification_with_cached_content_fails_on_mismatch() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let cached_content = "version = \"2\"\n\n[content]\nmax_lines = 1200\n";
     let fresh_content = "version = \"2\"\n\n[content]\nmax_lines = 1201\n";
@@ -151,6 +154,7 @@ fn hash_verification_with_cached_content_fails_on_mismatch() {
 
 #[test]
 fn hash_mismatch_on_both_cache_and_remote_fails() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let cached_content = "version = \"2\"\n\n[content]\nmax_lines = 1200\n";
     let remote_content = "version = \"2\"\n\n[content]\nmax_lines = 1201\n";
@@ -230,6 +234,7 @@ fn hash_verification_offline_mode_fails_on_mismatch() {
 
 #[test]
 fn hash_not_required_when_none() {
+    let _lock = acquire_warning_lock();
     let temp_dir = create_temp_project();
     let content = "version = \"2\"\n\n[content]\nmax_lines = 1500\n";
     let client = MockHttpClient::success(content);
