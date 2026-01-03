@@ -353,5 +353,5 @@ pub fn was_warning_shown() -> bool {
 }
 
 #[cfg(test)]
-#[path = "remote_tests.rs"]
+#[path = "remote_tests/mod.rs"]
 mod tests;
