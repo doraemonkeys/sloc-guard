@@ -218,12 +218,23 @@ fn format_config_text_includes_all_sections() {
 }
 
 #[test]
-fn format_config_text_shows_strict() {
+fn format_config_text_shows_check_section() {
     let mut config = Config::default();
-    config.content.strict = true;
+    config.check.warnings_as_errors = true;
+    config.check.fail_fast = true;
 
     let output = format_config_text(&config);
-    assert!(output.contains("strict = true"));
+    assert!(output.contains("[check]"));
+    assert!(output.contains("warnings_as_errors = true"));
+    assert!(output.contains("fail_fast = true"));
+}
+
+#[test]
+fn format_config_text_hides_default_check_section() {
+    let config = Config::default();
+    let output = format_config_text(&config);
+    // Default check section (all false) should not be shown
+    assert!(!output.contains("[check]"));
 }
 
 #[test]

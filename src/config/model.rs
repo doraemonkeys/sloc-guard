@@ -83,6 +83,22 @@ pub struct TrendConfig {
     pub auto_snapshot_on_check: Option<bool>,
 }
 
+/// Check command behavior configuration.
+///
+/// Controls how the `check` command handles warnings and failures.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CheckConfig {
+    /// Treat warnings as errors (exit code 1).
+    /// Equivalent to `--warnings-as-errors` CLI flag.
+    #[serde(default)]
+    pub warnings_as_errors: bool,
+
+    /// Stop processing on first failure for faster feedback.
+    /// When enabled, short-circuits file processing after detecting a failure.
+    #[serde(default)]
+    pub fail_fast: bool,
+}
+
 /// Stats command configuration, specifically for report subcommand defaults.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StatsConfig {
@@ -186,10 +202,6 @@ pub struct ContentConfig {
     #[serde(default = "default_true")]
     pub skip_blank: bool,
 
-    /// Strict mode: exit with error on first violation.
-    #[serde(default)]
-    pub strict: bool,
-
     /// Glob patterns for files to exclude from content (SLOC) checks.
     /// These files are still visible for structure checks.
     #[serde(default)]
@@ -209,7 +221,6 @@ impl Default for ContentConfig {
             warn_at: None,
             skip_comments: true,
             skip_blank: true,
-            strict: false,
             exclude: Vec::new(),
             rules: Vec::new(),
         }
@@ -289,6 +300,10 @@ pub struct Config {
     /// Stats command configuration.
     #[serde(default)]
     pub stats: StatsConfig,
+
+    /// Check command behavior configuration.
+    #[serde(default)]
+    pub check: CheckConfig,
 
     /// Custom language definitions (comment syntax).
     #[serde(default)]

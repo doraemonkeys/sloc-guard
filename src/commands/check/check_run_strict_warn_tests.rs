@@ -40,6 +40,8 @@ fn default_check_args() -> CheckArgs {
         warn_only: false,
         diff: None,
         staged: false,
+        warnings_as_errors: false,
+        fail_fast: false,
         strict: false,
         baseline: None,
         update_baseline: None,

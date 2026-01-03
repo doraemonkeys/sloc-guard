@@ -85,23 +85,25 @@ fn write_output_normal_mode() {
 }
 
 #[test]
-fn config_strict_mode_from_file() {
+fn check_config_from_file() {
     let content = r#"
 version = "2"
 
-[content]
-max_lines = 500
-strict = true
+[check]
+warnings_as_errors = true
+fail_fast = true
 "#;
 
     let config: Config = toml::from_str(content).unwrap();
-    assert!(config.content.strict);
+    assert!(config.check.warnings_as_errors);
+    assert!(config.check.fail_fast);
 }
 
 #[test]
-fn config_strict_mode_default_false() {
+fn check_config_default_false() {
     let config = Config::default();
-    assert!(!config.content.strict);
+    assert!(!config.check.warnings_as_errors);
+    assert!(!config.check.fail_fast);
 }
 
 #[test]

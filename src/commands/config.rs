@@ -229,7 +229,6 @@ pub(crate) fn format_config_text(config: &Config) -> String {
     if let Some(warn_at) = config.content.warn_at {
         let _ = writeln!(output, "  warn_at = {warn_at}");
     }
-    let _ = writeln!(output, "  strict = {}", config.content.strict);
     if !config.content.exclude.is_empty() {
         let _ = writeln!(output, "  exclude = {:?}", config.content.exclude);
     }
@@ -302,6 +301,17 @@ pub(crate) fn format_config_text(config: &Config) -> String {
         }
         if let Some(trend_since) = &report.trend_since {
             let _ = writeln!(output, "  trend_since = \"{trend_since}\"");
+        }
+    }
+
+    // Check section (if non-default)
+    if config.check.warnings_as_errors || config.check.fail_fast {
+        output.push_str("\n[check]\n");
+        if config.check.warnings_as_errors {
+            let _ = writeln!(output, "  warnings_as_errors = true");
+        }
+        if config.check.fail_fast {
+            let _ = writeln!(output, "  fail_fast = true");
         }
     }
 

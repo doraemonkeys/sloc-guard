@@ -6,7 +6,6 @@ fn content_config_has_expected_defaults() {
     assert_eq!(config.max_lines, 600);
     assert!(config.skip_comments);
     assert!(config.skip_blank);
-    assert!(!config.strict);
 }
 
 #[test]
@@ -52,28 +51,51 @@ fn config_serialize_roundtrip() {
 }
 
 #[test]
-fn config_deserialize_strict_mode() {
-    let toml_str = r#"
-        version = "2"
-
-        [content]
-        max_lines = 500
-        strict = true
-    "#;
-
-    let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(config.content.strict);
+fn check_config_has_expected_defaults() {
+    let config = CheckConfig::default();
+    assert!(!config.warnings_as_errors);
+    assert!(!config.fail_fast);
 }
 
 #[test]
-fn config_deserialize_strict_mode_default_false() {
+fn config_deserialize_check_section() {
+    let toml_str = r#"
+        version = "2"
+
+        [check]
+        warnings_as_errors = true
+        fail_fast = true
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.check.warnings_as_errors);
+    assert!(config.check.fail_fast);
+}
+
+#[test]
+fn config_deserialize_check_section_partial() {
+    let toml_str = r#"
+        version = "2"
+
+        [check]
+        warnings_as_errors = true
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.check.warnings_as_errors);
+    assert!(!config.check.fail_fast);
+}
+
+#[test]
+fn config_deserialize_check_section_default() {
     let toml_str = r"
         [content]
         max_lines = 500
     ";
 
     let config: Config = toml::from_str(toml_str).unwrap();
-    assert!(!config.content.strict);
+    assert!(!config.check.warnings_as_errors);
+    assert!(!config.check.fail_fast);
 }
 
 #[test]

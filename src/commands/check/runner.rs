@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use rayon::prelude::*;
 
@@ -166,12 +167,22 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     let (all_files, scan_result, skip_structure_checks) =
         scan_or_filter_files(args, cli, paths, ctx, project_root)?;
 
+    // Determine fail_fast mode from CLI or config
+    let fail_fast = args.fail_fast || config.check.fail_fast;
+    let failure_detected = AtomicBool::new(false);
+
     // 3. Process each file (parallel with rayon) using injected context
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_results: Vec<_> = all_files
         .par_iter()
         .filter(|file_path| ctx.threshold_checker.should_process(file_path)) // Filter by extension
-        .map(|file_path| {
+        .filter_map(|file_path| {
+            // Early exit check for fail_fast mode
+            if fail_fast && failure_detected.load(Ordering::Relaxed) {
+                progress.inc();
+                return None;
+            }
+
             let result = process_file_for_check(
                 file_path,
                 &ctx.registry,
@@ -180,7 +191,13 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
                 ctx.file_reader.as_ref(),
             );
             progress.inc();
-            result
+
+            // Check if this result is a failure for fail_fast
+            if fail_fast && result.is_failure() {
+                failure_detected.store(true, Ordering::Relaxed);
+            }
+
+            Some(result)
         })
         .collect();
     progress.finish();
@@ -318,9 +335,11 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         cli,
     )?;
 
-    // 10. Determine exit code (strict: CLI flag takes precedence, otherwise use config)
-    let strict = args.strict || config.content.strict;
-    let exit_code = determine_exit_code(&results, args.warn_only, strict, ratchet_failed);
+    // 10. Determine exit code (CLI flags take precedence over config)
+    let warnings_as_errors =
+        args.warnings_as_errors || args.strict || config.check.warnings_as_errors;
+    let exit_code =
+        determine_exit_code(&results, args.warn_only, warnings_as_errors, ratchet_failed);
 
     // 11. Auto-snapshot on successful check if enabled
     if exit_code == EXIT_SUCCESS

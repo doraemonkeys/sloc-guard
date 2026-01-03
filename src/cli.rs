@@ -205,8 +205,19 @@ pub struct CheckArgs {
     #[arg(long, conflicts_with = "diff")]
     pub staged: bool,
 
-    /// Treat warnings as failures (exit code 1)
+    /// Treat warnings as failures (exit code 1).
+    /// Equivalent to `[check] warnings_as_errors = true` in config.
     #[arg(long)]
+    pub warnings_as_errors: bool,
+
+    /// Stop on first failure for faster feedback.
+    /// Equivalent to `[check] fail_fast = true` in config.
+    #[arg(long)]
+    pub fail_fast: bool,
+
+    /// DEPRECATED: Use --warnings-as-errors instead.
+    /// Treat warnings as failures (exit code 1).
+    #[arg(long, hide = true)]
     pub strict: bool,
 
     /// Path to baseline file for grandfathering violations

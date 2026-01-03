@@ -81,6 +81,8 @@ impl CheckArgsBuilder {
             warn_only: false,
             diff: None,
             staged: false,
+            warnings_as_errors: false,
+            fail_fast: false,
             strict: false,
             baseline: self.baseline,
             update_baseline: self.update_baseline,

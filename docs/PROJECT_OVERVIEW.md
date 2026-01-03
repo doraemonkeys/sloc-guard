@@ -15,8 +15,8 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`, `--write-sarif`, `--write-json`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
-| `config/*` | `Config` (scanner/content/structure separation), `ContentConfig`, `StructureConfig`, `TrendConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching with `FetchPolicy` (Normal: 1h TTL, Offline: ignore TTL, ForceRefresh: skip cache), cache in state directory, `extends_sha256` hash verification; `expires.rs`: date parsing/validation |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`, `--write-sarif`, `--write-json`, `--warnings-as-errors`, `--fail-fast`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `config/*` | `Config` (scanner/content/structure/check separation), `ContentConfig`, `StructureConfig`, `TrendConfig`, `CheckConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching with `FetchPolicy` (Normal: 1h TTL, Offline: ignore TTL, ForceRefresh: skip cache), cache in state directory, `extends_sha256` hash verification; `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
 | `scanner/*` | `FileScanner` trait (`scan()`, `scan_with_structure()`); `ScanResult`, `AllowlistRule`, `StructureScanConfig`; `directory.rs`: `DirectoryScanner` (walkdir + optional .gitignore via `ignore` crate); `composite.rs`: `CompositeScanner` (gitignore-aware/regular fallback), `scan_files()`; `filter.rs`: `GlobFilter` |
@@ -40,8 +40,9 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 // Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
 // Array Merge: arrays append (parent + child); use "$reset" as first element to clear parent
 FetchPolicy::Normal | Offline | ForceRefresh
-Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats }
+Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats, check }
 ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
+CheckConfig { warnings_as_errors, fail_fast }  // Check behavior: treat warnings as errors, stop on first failure
 BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
 TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta, auto_snapshot_on_check }  // Retention, significance, and auto-snapshot
 StatsConfig { report: StatsReportConfig }  // Stats command configuration

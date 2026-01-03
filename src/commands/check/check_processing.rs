@@ -31,6 +31,18 @@ pub enum CheckFileResult {
     Error(FileProcessError),
 }
 
+impl CheckFileResult {
+    /// Returns true if this result represents a check failure.
+    /// Used by `fail_fast` mode to detect when to stop processing.
+    #[must_use]
+    pub fn is_failure(&self) -> bool {
+        match self {
+            Self::Success { check_result, .. } => check_result.is_failed(),
+            Self::Skipped(_) | Self::Error(_) => false,
+        }
+    }
+}
+
 pub fn process_file_for_check(
     file_path: &Path,
     registry: &LanguageRegistry,
