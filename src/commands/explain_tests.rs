@@ -584,7 +584,7 @@ fn explain_content_warn_at_source_rule_percentage() {
 }
 
 #[test]
-fn format_content_text_shows_percentage_for_percentage_source() {
+fn format_content_text_shows_global_percentage_source() {
     let config = Config {
         content: ContentConfig {
             max_lines: 500,
@@ -600,12 +600,12 @@ fn format_content_text_shows_percentage_for_percentage_source() {
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
-    // Should show percentage
-    assert!(output.contains("(90%)"));
+    // Should show percentage and global source
+    assert!(output.contains("(from [content], 90%)"));
 }
 
 #[test]
-fn format_content_text_shows_absolute_for_absolute_source() {
+fn format_content_text_shows_global_absolute_source() {
     let config = Config {
         content: ContentConfig {
             max_lines: 500,
@@ -619,9 +619,67 @@ fn format_content_text_shows_absolute_for_absolute_source() {
     let explanation = checker.explain(&PathBuf::from("src/main.rs"));
     let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
 
-    // Should show (absolute)
-    assert!(output.contains("(absolute)"));
+    // Should show global source with absolute
+    assert!(output.contains("(from [content], absolute)"));
     assert!(output.contains("400 lines"));
+}
+
+#[test]
+fn format_content_text_shows_rule_absolute_source_with_index() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            rules: vec![ContentRule {
+                pattern: "**/*.rs".to_string(),
+                max_lines: 300,
+                warn_at: Some(250),
+                warn_threshold: None,
+                skip_comments: None,
+                skip_blank: None,
+                reason: None,
+                expires: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
+    let explanation = checker.explain(&PathBuf::from("src/main.rs"));
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
+
+    // Should show rule source with index and absolute
+    assert!(output.contains("(from content.rules[0], absolute)"));
+    assert!(output.contains("250 lines"));
+}
+
+#[test]
+fn format_content_text_shows_rule_percentage_source_with_index() {
+    let config = Config {
+        content: ContentConfig {
+            max_lines: 500,
+            rules: vec![ContentRule {
+                pattern: "**/*.rs".to_string(),
+                max_lines: 300,
+                warn_at: None,
+                warn_threshold: Some(0.8),
+                skip_comments: None,
+                skip_blank: None,
+                reason: None,
+                expires: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let checker = crate::checker::ThresholdChecker::new(config).unwrap();
+    let explanation = checker.explain(&PathBuf::from("src/main.rs"));
+    let output = format_content_explanation(&explanation, ExplainFormat::Text).unwrap();
+
+    // Should show rule source with index and percentage (300 * 0.8 = 240)
+    assert!(output.contains("(from content.rules[0], 80%)"));
+    assert!(output.contains("240 lines"));
 }
 
 #[test]

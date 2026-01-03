@@ -133,15 +133,27 @@ fn format_content_text(exp: &ContentExplanation) -> String {
 
     output.push_str(&format!("  Limit:   {} lines\n", exp.effective_limit));
 
-    // Show warn_at with context based on source
+    // Show warn_at with context based on source (Rule vs Global, absolute vs percentage)
     let warn_at_str = match &exp.warn_at_source {
-        WarnAtSource::RuleAbsolute { .. } | WarnAtSource::GlobalAbsolute => {
-            format!("{} lines (absolute)", exp.effective_warn_at)
-        }
-        WarnAtSource::RulePercentage { threshold, .. }
-        | WarnAtSource::GlobalPercentage { threshold } => {
+        WarnAtSource::RuleAbsolute { index } => {
             format!(
-                "{} lines ({:.0}%)",
+                "{} lines (from content.rules[{index}], absolute)",
+                exp.effective_warn_at
+            )
+        }
+        WarnAtSource::RulePercentage { index, threshold } => {
+            format!(
+                "{} lines (from content.rules[{index}], {:.0}%)",
+                exp.effective_warn_at,
+                threshold * 100.0
+            )
+        }
+        WarnAtSource::GlobalAbsolute => {
+            format!("{} lines (from [content], absolute)", exp.effective_warn_at)
+        }
+        WarnAtSource::GlobalPercentage { threshold } => {
+            format!(
+                "{} lines (from [content], {:.0}%)",
                 exp.effective_warn_at,
                 threshold * 100.0
             )
