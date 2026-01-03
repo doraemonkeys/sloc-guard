@@ -125,7 +125,7 @@ pub(crate) fn load_config(
     config_path: Option<&Path>,
     no_config: bool,
     no_extends: bool,
-    offline: bool,
+    extends_policy: FetchPolicy,
 ) -> crate::Result<LoadResult> {
     if no_config {
         return Ok(LoadResult {
@@ -137,7 +137,7 @@ pub(crate) fn load_config(
     // Determine project root from config path or current directory
     let project_root = resolve_project_root(config_path)?;
 
-    let loader = FileConfigLoader::with_options(FetchPolicy::from_offline(offline), project_root);
+    let loader = FileConfigLoader::with_options(extends_policy, project_root);
     if no_extends {
         config_path.map_or_else(
             || loader.load_without_extends(),

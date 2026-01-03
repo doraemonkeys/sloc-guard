@@ -15,7 +15,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 | Module | Purpose |
 |--------|---------|
-| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`, `--write-sarif`, `--write-json`, `--warnings-as-errors`, `--fail-fast`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--offline`, `--no-config`, `--no-extends` |
+| `cli` | Clap CLI: `check` (with `--files`, `--diff`, `--staged`, `--ratchet`, `--write-sarif`, `--write-json`, `--warnings-as-errors`, `--fail-fast`, `--no-sloc-cache`), `stats` (subcommands: `summary`, `files`, `breakdown`, `trend`, `history`, `report`; `breakdown`/`report` support `--depth` for directory grouping), `snapshot` (record history entry), `init` (with `--detect`), `config`, `explain` commands; global flags: `--extends-policy`, `--no-config`, `--no-extends` |
 | `config/*` | `Config` (scanner/content/structure/check separation), `ContentConfig`, `StructureConfig`, `TrendConfig`, `CheckConfig`; loader with `extends` inheritance (local/remote/preset); presets module (rust-strict, node-strict, python-strict, monorepo-base); remote fetching with `FetchPolicy` (Normal: 1h TTL, Offline: ignore TTL, ForceRefresh: skip cache), cache in state directory, `extends_sha256` hash verification; `expires.rs`: date parsing/validation |
 | `language/registry` | `LanguageRegistry`, `Language`, `CommentSyntax` - predefined + custom via [languages.<name>] config |
 | `counter/*` | `CommentDetector`, `SlocCounter` → `CountResult{Stats, IgnoredFile}`, inline ignore directives |
@@ -149,10 +149,10 @@ ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testabi
 ### Common Pipeline (check/stats/baseline)
 
 ```
-CLI args → load_config() → [if --offline] use cache only, error on miss
+CLI args → load_config() → [if --extends-policy=offline] use cache only, error on miss
          → [if extends] resolve chain (local/remote/preset:*, cycle detection)
          → [if extends_sha256] verify remote config hash, error on mismatch
-         → [if !--no-cache] load_cache(config_hash)
+         → [if !--no-sloc-cache] load_cache(config_hash)
          → LanguageRegistry
          → DirectoryScanner (with or without gitignore support)
             Scanner returns ALL files (exclude patterns only, no extension filter)

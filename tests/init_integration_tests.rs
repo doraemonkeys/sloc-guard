@@ -164,7 +164,7 @@ fn init_created_config_can_be_used_by_check() {
     // Check should work with the generated config
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 }

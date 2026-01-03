@@ -626,7 +626,7 @@ fn format_content_text_shows_absolute_for_absolute_source() {
 
 #[test]
 fn explain_non_existent_path_returns_error() {
-    use crate::cli::{Cli, ColorChoice, Commands};
+    use crate::cli::{Cli, ColorChoice, Commands, ExtendsPolicy};
 
     let args = crate::cli::ExplainArgs {
         path: PathBuf::from("non-existent-path-XYZ"),
@@ -640,7 +640,7 @@ fn explain_non_existent_path_returns_error() {
         color: ColorChoice::Auto,
         no_config: true,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
         command: Commands::Explain(crate::cli::ExplainArgs {
             path: PathBuf::from("non-existent-path-XYZ"),
             config: None,

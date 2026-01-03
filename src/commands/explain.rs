@@ -3,6 +3,7 @@ use crate::checker::{
     StructureRuleMatch, ThresholdChecker, WarnAtSource,
 };
 use crate::cli::{Cli, ExplainArgs, ExplainFormat};
+use crate::config::FetchPolicy;
 use crate::error::SlocGuardError;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
@@ -29,7 +30,7 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
         args.config.as_deref(),
         cli.no_config,
         cli.no_extends,
-        cli.offline,
+        FetchPolicy::from_cli(cli.extends_policy),
     )?;
     let config = load_result.config;
 

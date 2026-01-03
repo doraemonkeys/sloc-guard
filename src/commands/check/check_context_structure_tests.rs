@@ -7,7 +7,7 @@ use tempfile::TempDir;
 use crate::EXIT_THRESHOLD_EXCEEDED;
 use crate::cache::Cache;
 use crate::checker::ThresholdChecker;
-use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, InitArgs};
+use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, ExtendsPolicy, InitArgs};
 use crate::config::Config;
 use crate::language::LanguageRegistry;
 use crate::output::OutputFormat;
@@ -29,7 +29,7 @@ fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         color,
         no_config,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
     }
 }
 
@@ -55,7 +55,7 @@ fn make_check_args(paths: Vec<PathBuf>) -> CheckArgs {
         baseline: None,
         update_baseline: None,
         ratchet: None,
-        no_cache: true,
+        no_sloc_cache: true,
         no_gitignore: true,
         suggest: false,
         max_files: None,

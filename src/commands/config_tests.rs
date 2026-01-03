@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::cli::{Cli, ColorChoice, Commands, ConfigOutputFormat, InitArgs};
+use crate::cli::{Cli, ColorChoice, Commands, ConfigOutputFormat, ExtendsPolicy, InitArgs};
 use crate::config::{Config, ContentConfig, ContentRule};
 use tempfile::TempDir;
 
@@ -18,7 +18,7 @@ fn make_cli() -> Cli {
         color: ColorChoice::Never,
         no_config: false,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
     }
 }
 

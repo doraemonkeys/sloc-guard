@@ -18,7 +18,7 @@ fn stats_summary_basic_output() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache"])
+        .args(["stats", "summary", "--no-sloc-cache"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Files:"))
@@ -33,7 +33,7 @@ fn stats_summary_empty_directory() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache"])
+        .args(["stats", "summary", "--no-sloc-cache"])
         .assert()
         .success();
 }
@@ -47,7 +47,7 @@ fn stats_summary_with_specific_path() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache", "src"])
+        .args(["stats", "summary", "--no-sloc-cache", "src"])
         .assert()
         .success()
         .stdout(predicate::str::contains("1")); // Only 1 file in src
@@ -61,7 +61,7 @@ fn stats_summary_json_format() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache", "--format", "json"])
+        .args(["stats", "summary", "--no-sloc-cache", "--format", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"summary\""))
@@ -76,7 +76,7 @@ fn stats_summary_markdown_format() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache", "--format", "md"])
+        .args(["stats", "summary", "--no-sloc-cache", "--format", "md"])
         .assert()
         .success()
         .stdout(predicate::str::contains("# SLOC Statistics"));
@@ -95,7 +95,7 @@ fn stats_files_shows_all_files() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "files", "--no-cache"])
+        .args(["stats", "files", "--no-sloc-cache"])
         .assert()
         .success()
         .stdout(predicate::str::contains("main.rs"))
@@ -112,7 +112,7 @@ fn stats_files_top_largest_files() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "files", "--no-cache", "--top", "2"])
+        .args(["stats", "files", "--no-sloc-cache", "--top", "2"])
         .assert()
         .success()
         .stdout(predicate::str::contains("large.rs"))
@@ -128,7 +128,7 @@ fn stats_files_sort_by_code() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "files", "--no-cache", "--sort", "code"])
+        .args(["stats", "files", "--no-sloc-cache", "--sort", "code"])
         .assert()
         .success();
 }
@@ -161,7 +161,7 @@ max_dirs = 10
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "breakdown", "--no-cache", "--by", "lang"])
+        .args(["stats", "breakdown", "--no-sloc-cache", "--by", "lang"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Language"));
@@ -176,7 +176,7 @@ fn stats_breakdown_by_directory() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "breakdown", "--no-cache", "--by", "dir"])
+        .args(["stats", "breakdown", "--no-sloc-cache", "--by", "dir"])
         .assert()
         .success()
         .stdout(predicate::str::contains("Directory"));
@@ -204,7 +204,7 @@ fn stats_trend_basic() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--history-file",
             history_path.to_str().unwrap(),
         ])
@@ -229,7 +229,7 @@ fn stats_trend_with_since() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--since",
             "7d",
             "--history-file",
@@ -253,7 +253,7 @@ fn stats_trend_empty_history() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--history-file",
             history_path.to_str().unwrap(),
         ])
@@ -280,7 +280,7 @@ fn stats_trend_json_format() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "json",
             "--history-file",
@@ -309,7 +309,7 @@ fn stats_trend_markdown_format() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "md",
             "--history-file",
@@ -339,7 +339,7 @@ fn stats_trend_shows_delta_values() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--history-file",
             history_path.to_str().unwrap(),
         ])
@@ -368,7 +368,7 @@ fn stats_trend_with_git_context_display() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--history-file",
             history_path.to_str().unwrap(),
         ])
@@ -396,7 +396,7 @@ fn stats_trend_invalid_since_falls_back() {
         .args([
             "stats",
             "trend",
-            "--no-cache",
+            "--no-sloc-cache",
             "--since",
             "invalid_duration",
             "--history-file",
@@ -531,7 +531,7 @@ fn stats_report_to_file() {
         .args([
             "stats",
             "report",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "json",
             "--output",
@@ -558,7 +558,7 @@ fn stats_report_html_output() {
         .args([
             "stats",
             "report",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "html",
             "--output",
@@ -589,7 +589,7 @@ fn stats_summary_cli_ext_filter() {
         .args([
             "stats",
             "summary",
-            "--no-cache",
+            "--no-sloc-cache",
             "--ext",
             "py",
             "--format",
@@ -612,7 +612,7 @@ fn stats_summary_cli_exclude_pattern() {
         .args([
             "stats",
             "summary",
-            "--no-cache",
+            "--no-sloc-cache",
             "--exclude",
             "**/vendor/**",
             "--format",
@@ -635,7 +635,7 @@ fn stats_summary_cli_include_filter() {
         .args([
             "stats",
             "summary",
-            "--no-cache",
+            "--no-sloc-cache",
             "--include",
             "src",
             "--format",
@@ -661,7 +661,7 @@ fn stats_summary_no_config_mode() {
             "stats",
             "summary",
             "--no-config",
-            "--no-cache",
+            "--no-sloc-cache",
             "--ext",
             "rs",
         ])
@@ -690,7 +690,7 @@ fn stats_summary_handles_binary_files_gracefully() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache"])
+        .args(["stats", "summary", "--no-sloc-cache"])
         .assert()
         .success();
 }
@@ -704,7 +704,7 @@ fn stats_summary_handles_empty_files() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache", "--format", "json"])
+        .args(["stats", "summary", "--no-sloc-cache", "--format", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"total_files\": 2"));
@@ -721,7 +721,7 @@ fn stats_summary_handles_files_with_only_comments() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["stats", "summary", "--no-cache"])
+        .args(["stats", "summary", "--no-sloc-cache"])
         .assert()
         .success();
 }

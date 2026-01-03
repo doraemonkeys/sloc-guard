@@ -77,6 +77,18 @@ pub enum RatchetMode {
     Strict,
 }
 
+/// Remote config fetch policy for `--extends-policy`
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub enum ExtendsPolicy {
+    /// Normal mode: use cache if valid (within 1h TTL), otherwise fetch (default)
+    #[default]
+    Normal,
+    /// Offline mode: use cached only, ignore TTL, error on cache miss
+    Offline,
+    /// Force refresh: skip cache entirely, always fetch fresh
+    Refresh,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "sloc-guard")]
 #[command(
@@ -108,9 +120,12 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_extends: bool,
 
-    /// Use cached remote configs only, error if cache miss
-    #[arg(long, global = true)]
-    pub offline: bool,
+    /// Remote config fetch policy for `extends` URLs.
+    /// - normal: use cache if within 1h TTL, otherwise fetch (default)
+    /// - offline: use cached only, error on cache miss
+    /// - refresh: skip cache, always fetch fresh
+    #[arg(long, value_enum, default_value = "normal", global = true)]
+    pub extends_policy: ExtendsPolicy,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -235,9 +250,9 @@ pub struct CheckArgs {
     #[arg(long, value_name = "MODE", num_args = 0..=1, default_missing_value = "warn")]
     pub ratchet: Option<RatchetMode>,
 
-    /// Disable file hash caching
+    /// Disable SLOC counting cache (forces re-counting all files)
     #[arg(long)]
-    pub no_cache: bool,
+    pub no_sloc_cache: bool,
 
     /// Disable .gitignore filtering (scan all files)
     #[arg(long)]
@@ -351,9 +366,9 @@ pub struct CommonStatsArgs {
     #[arg(long, short = 'I')]
     pub include: Vec<String>,
 
-    /// Disable file hash caching
+    /// Disable SLOC counting cache (forces re-counting all files)
     #[arg(long)]
-    pub no_cache: bool,
+    pub no_sloc_cache: bool,
 
     /// Disable .gitignore filtering (scan all files)
     #[arg(long)]

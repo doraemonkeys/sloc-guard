@@ -3,7 +3,7 @@ use tempfile::TempDir;
 
 use crate::EXIT_SUCCESS;
 use crate::cli::{
-    BreakdownBy, Cli, ColorChoice, Commands, CommonStatsArgs, InitArgs, ReportArgs,
+    BreakdownBy, Cli, ColorChoice, Commands, CommonStatsArgs, ExtendsPolicy, InitArgs, ReportArgs,
     ReportOutputFormat, StatsAction, StatsArgs,
 };
 
@@ -47,7 +47,7 @@ fn make_cli_for_stats(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         color,
         no_config,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
     }
 }
 
@@ -58,7 +58,7 @@ fn make_common_args(paths: Vec<PathBuf>, ext: Option<Vec<String>>) -> CommonStat
         ext,
         exclude: vec![],
         include: vec![],
-        no_cache: true,
+        no_sloc_cache: true,
         no_gitignore: false,
     }
 }
@@ -379,7 +379,7 @@ fn run_stats_report_uses_depth_from_config_without_cli_override() {
                 ext: Some(vec!["rs".to_string()]),
                 exclude: vec![],
                 include: vec![],
-                no_cache: true,
+                no_sloc_cache: true,
                 no_gitignore: true,
             },
             format: ReportOutputFormat::Text,

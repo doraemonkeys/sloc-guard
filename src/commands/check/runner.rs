@@ -8,7 +8,7 @@ use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{CheckArgs, Cli};
-use crate::config::collect_expired_rules;
+use crate::config::{FetchPolicy, collect_expired_rules};
 use crate::output::{
     OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter,
 };
@@ -75,7 +75,7 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
         args.config.as_deref(),
         cli.no_config,
         cli.no_extends,
-        cli.offline,
+        FetchPolicy::from_cli(cli.extends_policy),
     )?;
     let mut config = load_result.config;
 
@@ -115,7 +115,7 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
     // 3.1 Load cache if not disabled
     let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
-    let cache = if args.no_cache {
+    let cache = if args.no_sloc_cache {
         None
     } else {
         load_cache(&cache_path, &config_hash)
@@ -246,7 +246,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     }
 
     // 6. Save cache if not disabled (errors are non-critical)
-    if !args.no_cache
+    if !args.no_sloc_cache
         && let Ok(cache_guard) = cache.lock()
     {
         let cache_path = state::cache_path(project_root);

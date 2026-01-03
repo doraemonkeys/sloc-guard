@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use crate::EXIT_SUCCESS;
 use crate::cli::{BreakdownBy, Cli, ReportArgs};
+use crate::config::FetchPolicy;
 use crate::state;
 use crate::stats::{TrendHistory, parse_duration};
 
@@ -18,7 +19,7 @@ pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
         args.common.config.as_deref(),
         cli.no_config,
         cli.no_extends,
-        cli.offline,
+        FetchPolicy::from_cli(cli.extends_policy),
     )?;
     let report_config = &load_result.config.stats.report;
 

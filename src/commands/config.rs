@@ -188,7 +188,7 @@ fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
     let project_root = super::context::resolve_project_root(config_path)?;
 
     let loader =
-        FileConfigLoader::with_options(FetchPolicy::from_offline(cli.offline), project_root);
+        FileConfigLoader::with_options(FetchPolicy::from_cli(cli.extends_policy), project_root);
     let load_result =
         config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))?;
 

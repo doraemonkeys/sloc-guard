@@ -380,7 +380,7 @@ fn cli_stats_common_args() {
         "**/target/**",
         "-I",
         "src",
-        "--no-cache",
+        "--no-sloc-cache",
         "--no-gitignore",
     ]);
     match cli.command {
@@ -396,7 +396,7 @@ fn cli_stats_common_args() {
                 );
                 assert_eq!(summary_args.common.exclude, vec!["**/target/**"]);
                 assert_eq!(summary_args.common.include, vec!["src"]);
-                assert!(summary_args.common.no_cache);
+                assert!(summary_args.common.no_sloc_cache);
                 assert!(summary_args.common.no_gitignore);
             }
             _ => panic!("Expected Summary action"),

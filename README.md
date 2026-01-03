@@ -359,10 +359,10 @@ Options:
   -v, --verbose...     Increase output verbosity (-v, -vv for more)
   -q, --quiet          Suppress non-essential output
       --color <COLOR>  Control color output [default: auto] [possible values: auto, always, never]
-      --no-config      Skip loading configuration file
-      --no-extends     Skip resolving extends in configuration (ignore remote/local inheritance)
-      --offline        Use cached remote configs only, error if cache miss
-  -h, --help           Print help (see more with '--help')
+      --no-config                      Skip loading configuration file
+      --no-extends                     Skip resolving extends in configuration (ignore remote/local inheritance)
+      --extends-policy <MODE>          Remote config fetch policy [default: normal] [values: normal, offline, refresh]
+  -h, --help                           Print help (see more with '--help')
   -V, --version        Print version
 ```
 

@@ -2,8 +2,9 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 use crate::cli::{
-    BreakdownArgs, BreakdownBy, Cli, ColorChoice, Commands, CommonStatsArgs, FileSortOrder,
-    FilesArgs, InitArgs, StatsAction, StatsArgs, StatsOutputFormat, SummaryArgs, TrendArgs,
+    BreakdownArgs, BreakdownBy, Cli, ColorChoice, Commands, CommonStatsArgs, ExtendsPolicy,
+    FileSortOrder, FilesArgs, InitArgs, StatsAction, StatsArgs, StatsOutputFormat, SummaryArgs,
+    TrendArgs,
 };
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
@@ -25,7 +26,7 @@ fn make_cli_for_stats(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         color,
         no_config,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
     }
 }
 
@@ -36,7 +37,7 @@ fn make_common_args(paths: Vec<PathBuf>, ext: Option<Vec<String>>) -> CommonStat
         ext,
         exclude: vec![],
         include: vec![],
-        no_cache: true,
+        no_sloc_cache: true,
         no_gitignore: false,
     }
 }

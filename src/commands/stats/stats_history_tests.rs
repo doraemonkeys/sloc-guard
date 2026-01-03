@@ -3,7 +3,8 @@ use tempfile::TempDir;
 
 use crate::EXIT_SUCCESS;
 use crate::cli::{
-    Cli, ColorChoice, Commands, HistoryArgs, HistoryOutputFormat, InitArgs, StatsAction, StatsArgs,
+    Cli, ColorChoice, Commands, ExtendsPolicy, HistoryArgs, HistoryOutputFormat, InitArgs,
+    StatsAction, StatsArgs,
 };
 use crate::stats::TrendEntry;
 
@@ -25,7 +26,7 @@ fn make_cli_for_stats(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         color,
         no_config,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
     }
 }
 

@@ -5,7 +5,7 @@ use rayon::prelude::*;
 
 use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{Cli, CommonStatsArgs};
-use crate::config::LoadResult;
+use crate::config::{FetchPolicy, LoadResult};
 use crate::language::LanguageRegistry;
 use crate::output::{FileStatistics, ProjectStatistics, ScanProgress};
 use crate::scanner::scan_files;
@@ -25,7 +25,7 @@ pub fn collect_stats(
         common.config.as_deref(),
         cli.no_config,
         cli.no_extends,
-        cli.offline,
+        FetchPolicy::from_cli(cli.extends_policy),
     )?;
     collect_stats_with_config(common, cli, load_result)
 }
@@ -68,7 +68,7 @@ pub fn collect_stats_with_config_and_reader(
     // Load cache if not disabled
     let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
-    let cache = if common.no_cache {
+    let cache = if common.no_sloc_cache {
         None
     } else {
         load_cache(&cache_path, &config_hash)
@@ -120,7 +120,7 @@ pub fn collect_stats_with_config_and_reader(
 
 /// Save cache if caching is enabled (errors are non-critical).
 pub fn save_cache_if_enabled(common: &CommonStatsArgs, cache: &Mutex<Cache>, project_root: &Path) {
-    if !common.no_cache
+    if !common.no_sloc_cache
         && let Ok(cache_guard) = cache.lock()
     {
         let cache_path = state::cache_path(project_root);

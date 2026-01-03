@@ -11,6 +11,7 @@ use rayon::prelude::*;
 
 use crate::cache::{Cache, compute_config_hash};
 use crate::cli::{Cli, SnapshotArgs};
+use crate::config::FetchPolicy;
 use crate::git::GitContext;
 use crate::output::{ProjectStatistics, ScanProgress};
 use crate::scanner::scan_files;
@@ -49,7 +50,7 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
         args.common.config.as_deref(),
         cli.no_config,
         cli.no_extends,
-        cli.offline,
+        FetchPolicy::from_cli(cli.extends_policy),
     )?;
     let mut config = load_result.config;
 
@@ -64,7 +65,7 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
     // 1c. Load cache if not disabled
     let cache_path = state::cache_path(&project_root);
     let config_hash = compute_config_hash(&config);
-    let cache = if args.common.no_cache {
+    let cache = if args.common.no_sloc_cache {
         None
     } else {
         load_cache(&cache_path, &config_hash)
@@ -113,7 +114,7 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
     progress.finish();
 
     // 7. Save cache if enabled (errors are non-critical)
-    if !args.common.no_cache
+    if !args.common.no_sloc_cache
         && let Ok(cache_guard) = cache.lock()
     {
         let _ = save_cache(&cache_path, &cache_guard);

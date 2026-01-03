@@ -5,7 +5,7 @@ use tempfile::TempDir;
 
 use crate::baseline::Baseline;
 use crate::checker::CheckResult;
-use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, InitArgs};
+use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, ExtendsPolicy, InitArgs};
 use crate::counter::LineStats;
 use crate::output::OutputFormat;
 use crate::{EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
@@ -25,7 +25,7 @@ fn make_cli_for_check(color: ColorChoice, verbose: u8, quiet: bool, no_config: b
         color,
         no_config,
         no_extends: false,
-        offline: false,
+        extends_policy: ExtendsPolicy::Normal,
     }
 }
 
@@ -87,7 +87,7 @@ impl CheckArgsBuilder {
             baseline: self.baseline,
             update_baseline: self.update_baseline,
             ratchet: self.ratchet,
-            no_cache: true,
+            no_sloc_cache: true,
             no_gitignore: true,
             suggest: false,
             max_files: None,

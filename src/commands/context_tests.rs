@@ -1,5 +1,5 @@
 use crate::cli::ColorChoice;
-use crate::config::{Config, StructureConfig, StructureRule};
+use crate::config::{Config, FetchPolicy, StructureConfig, StructureRule};
 use crate::output::ColorMode;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 use std::io;
@@ -20,7 +20,7 @@ fn exit_codes_documented() {
 
 #[test]
 fn load_config_no_config_returns_default() {
-    let result = load_config(None, true, false, false).unwrap();
+    let result = load_config(None, true, false, FetchPolicy::Normal).unwrap();
     assert_eq!(result.config.content.max_lines, 600);
     assert!(result.preset_used.is_none());
 }
@@ -31,14 +31,14 @@ fn load_config_with_nonexistent_path_returns_error() {
         Some(std::path::Path::new("nonexistent.toml")),
         false,
         false,
-        false,
+        FetchPolicy::Normal,
     );
     assert!(result.is_err());
 }
 
 #[test]
 fn load_config_without_no_config_searches_defaults() {
-    let result = load_config(None, false, false, false).unwrap();
+    let result = load_config(None, false, false, FetchPolicy::Normal).unwrap();
     assert!(result.config.content.max_lines > 0);
 }
 
@@ -118,7 +118,7 @@ max_lines = 200
 "#;
     std::fs::write(&config_path, content).unwrap();
 
-    let result = load_config(Some(&config_path), false, true, false).unwrap();
+    let result = load_config(Some(&config_path), false, true, FetchPolicy::Normal).unwrap();
     assert_eq!(result.config.content.max_lines, 200);
     assert_eq!(
         result.config.extends,

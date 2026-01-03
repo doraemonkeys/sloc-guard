@@ -29,14 +29,14 @@ fn action_contract_strict_option_exists() {
     // Without --strict: exits 0 (warnings don't fail)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 
     // With --strict: exits 1 (warnings become failures)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--strict"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--strict"])
         .assert()
         .code(1);
 }
@@ -50,7 +50,13 @@ fn action_contract_config_option_exists() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--config", "custom.toml"])
+        .args([
+            "check",
+            "--no-sloc-cache",
+            "--quiet",
+            "--config",
+            "custom.toml",
+        ])
         .assert()
         .success();
 }
@@ -69,7 +75,7 @@ fn action_contract_baseline_option_exists() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--baseline",
             baseline_path.to_str().unwrap(),
             "--update-baseline",
@@ -82,7 +88,7 @@ fn action_contract_baseline_option_exists() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--baseline",
             baseline_path.to_str().unwrap(),
@@ -102,7 +108,7 @@ fn action_contract_diff_option_exists() {
     // --diff without git repo should not crash (graceful handling)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--diff", "HEAD"])
+        .args(["check", "--no-sloc-cache", "--diff", "HEAD"])
         .assert()
         // Either succeeds (no files changed) or exits 2 (git error)
         .code(predicate::in_iter([0, 2]));
@@ -121,7 +127,7 @@ fn action_contract_write_json_option_exists() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--write-json",
             json_path.to_str().unwrap(),
         ])
@@ -144,7 +150,7 @@ fn action_contract_write_sarif_option_exists() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--write-sarif",
             sarif_path.to_str().unwrap(),
         ])
@@ -165,7 +171,7 @@ fn action_contract_format_text_option_exists() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "text",
             "--color",
@@ -192,7 +198,7 @@ fn action_contract_json_has_summary_total_files() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--write-json",
             json_path.to_str().unwrap(),
         ])
@@ -228,7 +234,7 @@ fn action_contract_json_has_summary_passed() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--write-json",
             json_path.to_str().unwrap(),
         ])
@@ -260,7 +266,7 @@ fn action_contract_json_has_summary_failed() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--write-json",
             json_path.to_str().unwrap(),
         ])
@@ -297,7 +303,7 @@ fn action_contract_json_has_summary_warnings() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--write-json",
             json_path.to_str().unwrap(),
         ])
@@ -335,7 +341,7 @@ fn action_contract_json_has_summary_grandfathered() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--baseline",
             baseline_path.to_str().unwrap(),
             "--update-baseline",
@@ -347,7 +353,7 @@ fn action_contract_json_has_summary_grandfathered() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--baseline",
             baseline_path.to_str().unwrap(),
             "--write-json",
@@ -386,7 +392,7 @@ fn action_contract_exit_code_0_on_success() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(0);
 }
@@ -399,7 +405,7 @@ fn action_contract_exit_code_1_on_violation() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(1);
 }
@@ -412,7 +418,7 @@ fn action_contract_exit_code_2_on_config_error() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache"])
+        .args(["check", "--no-sloc-cache"])
         .assert()
         .code(2);
 }
@@ -436,7 +442,7 @@ fn action_contract_full_workflow_passing() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "text",
             "--color",
@@ -472,7 +478,7 @@ fn action_contract_full_workflow_with_sarif() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "text",
             "--write-json",

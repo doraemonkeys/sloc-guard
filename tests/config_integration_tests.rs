@@ -264,3 +264,124 @@ fn config_show_json_contains_expected_fields() {
     assert!(json["content"]["max_lines"].is_number());
     assert!(json["content"]["extensions"].is_array());
 }
+
+// =============================================================================
+// Extends Policy Tests
+// =============================================================================
+
+#[test]
+fn extends_policy_refresh_flag_is_recognized() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    // Test that --extends-policy=refresh is recognized and works with local config
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["config", "show", "--extends-policy=refresh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("max_lines"));
+}
+
+#[test]
+fn extends_policy_refresh_with_preset() {
+    let fixture = TestFixture::new();
+    fixture.create_file(
+        ".sloc-guard.toml",
+        r#"
+version = "2"
+extends = "preset:rust-strict"
+
+[content]
+max_lines = 600
+"#,
+    );
+
+    // ForceRefresh policy with a preset should work (presets don't use cache but share the code path)
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["config", "show", "--extends-policy=refresh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("max_lines"));
+}
+
+#[test]
+fn extends_policy_offline_with_local_extends() {
+    let fixture = TestFixture::new();
+
+    // Create a base config
+    fixture.create_file(
+        "base.toml",
+        r#"
+version = "2"
+
+[content]
+max_lines = 200
+extensions = ["rs"]
+"#,
+    );
+
+    // Create main config that extends from local file
+    fixture.create_file(
+        ".sloc-guard.toml",
+        r#"
+version = "2"
+extends = "base.toml"
+
+[content]
+max_lines = 400
+"#,
+    );
+
+    // Offline policy should work with local extends (no network needed)
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["config", "show", "--extends-policy=offline"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("max_lines"));
+}
+
+#[test]
+fn extends_policy_normal_is_default() {
+    let fixture = TestFixture::new();
+    fixture.create_file(
+        ".sloc-guard.toml",
+        r#"
+version = "2"
+extends = "preset:rust-strict"
+"#,
+    );
+
+    // Without --extends-policy flag, should use normal policy
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["config", "show"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("max_lines"));
+}
+
+#[test]
+fn extends_policy_refresh_with_check_command() {
+    let fixture = TestFixture::new();
+    fixture.create_file(
+        ".sloc-guard.toml",
+        r#"
+version = "2"
+extends = "preset:rust-strict"
+
+[content]
+max_lines = 1000
+"#,
+    );
+    fixture.create_rust_file("src/main.rs", 10);
+
+    // Check command with --extends-policy=refresh should work
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "--extends-policy=refresh"])
+        .assert()
+        .success();
+}

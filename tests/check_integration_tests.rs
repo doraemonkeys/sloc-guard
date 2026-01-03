@@ -18,7 +18,7 @@ fn check_passes_with_small_files() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 }
@@ -31,7 +31,7 @@ fn check_fails_when_file_exceeds_limit() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(1);
 }
@@ -45,7 +45,7 @@ fn check_warns_when_near_threshold() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache"])
+        .args(["check", "--no-sloc-cache"])
         .assert()
         .success()
         .stdout(predicate::str::contains("WARNING"));
@@ -60,7 +60,7 @@ fn check_strict_mode_fails_on_warnings() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--strict", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--strict", "--quiet"])
         .assert()
         .code(1);
 }
@@ -73,7 +73,7 @@ fn check_warn_only_mode_always_succeeds() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--warn-only", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--warn-only", "--quiet"])
         .assert()
         .success();
 }
@@ -91,14 +91,14 @@ fn check_cli_max_lines_override() {
     // Default config allows 100 lines, but CLI sets 30
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--max-lines", "30"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--max-lines", "30"])
         .assert()
         .code(1);
 
     // Now set higher limit - should pass
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--max-lines", "100"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--max-lines", "100"])
         .assert()
         .success();
 }
@@ -113,14 +113,14 @@ fn check_cli_ext_override() {
     // Only check .py files (not .rs), should pass
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--ext", "py"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--ext", "py"])
         .assert()
         .success();
 
     // Check .rs files, should fail
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--ext", "rs"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--ext", "rs"])
         .assert()
         .code(1);
 }
@@ -137,7 +137,7 @@ fn check_cli_exclude_pattern() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--exclude",
             "**/vendor/**",
@@ -148,7 +148,7 @@ fn check_cli_exclude_pattern() {
     // Without exclude, should fail
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(1);
 }
@@ -163,7 +163,7 @@ fn check_cli_include_filter() {
     // Only include src, should pass
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--include", "src"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--include", "src"])
         .assert()
         .success();
 }
@@ -180,7 +180,7 @@ fn check_json_output_format() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--format", "json"])
+        .args(["check", "--no-sloc-cache", "--format", "json"])
         .assert()
         .success()
         .stdout(predicate::str::contains("\"summary\""))
@@ -195,7 +195,7 @@ fn check_sarif_output_format() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--format", "sarif"])
+        .args(["check", "--no-sloc-cache", "--format", "sarif"])
         .assert()
         .success()
         .stdout(predicate::str::contains("$schema"))
@@ -210,7 +210,7 @@ fn check_markdown_output_format() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--format", "markdown"])
+        .args(["check", "--no-sloc-cache", "--format", "markdown"])
         .assert()
         .success()
         .stdout(predicate::str::contains("## SLOC Guard Results"));
@@ -224,7 +224,7 @@ fn check_html_output_format() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--format", "html"])
+        .args(["check", "--no-sloc-cache", "--format", "html"])
         .assert()
         .success()
         .stdout(predicate::str::contains("<!DOCTYPE html>"))
@@ -243,7 +243,7 @@ fn check_output_to_file() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--format",
             "json",
             "--output",
@@ -271,7 +271,7 @@ fn check_content_rules_apply_pattern_limits() {
     // Only check tests directory which has higher limit
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--include", "tests"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--include", "tests"])
         .assert()
         .success();
 
@@ -280,7 +280,7 @@ fn check_content_rules_apply_pattern_limits() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--include", "tests"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--include", "tests"])
         .assert()
         .code(1);
 }
@@ -299,7 +299,7 @@ fn check_structure_max_files_violation() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "src", "--no-cache", "--quiet"])
+        .args(["check", "src", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(1);
 }
@@ -314,7 +314,7 @@ fn check_structure_max_dirs_violation() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "src", "--no-cache", "--quiet"])
+        .args(["check", "src", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(1);
 }
@@ -331,14 +331,21 @@ fn check_structure_cli_override() {
     // Without override, should fail
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "src", "--no-cache", "--quiet"])
+        .args(["check", "src", "--no-sloc-cache", "--quiet"])
         .assert()
         .code(1);
 
     // With CLI override to allow more files
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "src", "--no-cache", "--quiet", "--max-files", "20"])
+        .args([
+            "check",
+            "src",
+            "--no-sloc-cache",
+            "--quiet",
+            "--max-files",
+            "20",
+        ])
         .assert()
         .success();
 }
@@ -370,7 +377,7 @@ allow_extensions = [".rs"]
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "src", "--no-cache"])
+        .args(["check", "src", "--no-sloc-cache"])
         .assert()
         .code(1)
         .stdout(predicate::str::contains("disallowed file"));
@@ -389,7 +396,7 @@ fn check_skip_comments_by_default() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 }
@@ -404,14 +411,14 @@ fn check_count_comments_flag() {
     // Without --count-comments: passes (only 50 code lines)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 
     // With --count-comments: fails (110 lines)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--count-comments"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--count-comments"])
         .assert()
         .code(1);
 }
@@ -426,14 +433,14 @@ fn check_count_blank_flag() {
     // Without --count-blank: passes (only 50 code lines)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 
     // With --count-blank: fails (110 lines)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet", "--count-blank"])
+        .args(["check", "--no-sloc-cache", "--quiet", "--count-blank"])
         .assert()
         .code(1);
 }
@@ -454,7 +461,7 @@ fn check_update_baseline_creates_file() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--baseline",
             baseline_path.to_str().unwrap(),
@@ -481,7 +488,7 @@ fn check_with_baseline_grandfathers_violations() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--baseline",
             baseline_path.to_str().unwrap(),
@@ -495,7 +502,7 @@ fn check_with_baseline_grandfathers_violations() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--baseline",
             baseline_path.to_str().unwrap(),
@@ -521,7 +528,7 @@ fn check_report_json_creates_stats_file() {
         .current_dir(fixture.path())
         .args([
             "check",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--report-json",
             stats_path.to_str().unwrap(),
@@ -546,7 +553,7 @@ fn check_no_config_uses_defaults() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-config", "--no-cache", "--quiet"])
+        .args(["check", "--no-config", "--no-sloc-cache", "--quiet"])
         .assert()
         .success();
 }
@@ -560,7 +567,7 @@ fn check_no_config_with_cli_args() {
             "check",
             "src",
             "--no-config",
-            "--no-cache",
+            "--no-sloc-cache",
             "--quiet",
             "--max-lines",
             "1", // Very low limit to guarantee failure
@@ -583,7 +590,7 @@ fn check_quiet_mode_suppresses_output() {
 
     let output = sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--quiet"])
+        .args(["check", "--no-sloc-cache", "--quiet"])
         .assert()
         .success()
         .get_output()
@@ -602,7 +609,7 @@ fn check_verbose_mode_shows_details() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "-v"])
+        .args(["check", "--no-sloc-cache", "-v"])
         .assert()
         .success()
         .stdout(predicate::str::contains("PASS"));
@@ -620,7 +627,7 @@ fn check_invalid_config_returns_error() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache"])
+        .args(["check", "--no-sloc-cache"])
         .assert()
         .code(2)
         .stderr(predicate::str::contains("TOML"));
@@ -633,7 +640,7 @@ fn check_nonexistent_path_handles_gracefully() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "nonexistent_directory"])
+        .args(["check", "--no-sloc-cache", "nonexistent_directory"])
         .assert()
         .success(); // Empty directory scan should pass
 }
@@ -650,7 +657,7 @@ fn check_color_never_disables_colors() {
 
     let output = sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "--color", "never"])
+        .args(["check", "--no-sloc-cache", "--color", "never"])
         .assert()
         .success()
         .get_output()
@@ -692,7 +699,7 @@ auto_snapshot_on_check = true
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache"])
+        .args(["check", "--no-sloc-cache"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Auto-snapshot recorded"));
@@ -717,7 +724,7 @@ fn check_auto_snapshot_disabled_by_default() {
 
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache"])
+        .args(["check", "--no-sloc-cache"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Auto-snapshot").not());
@@ -756,7 +763,7 @@ min_interval_secs = 3600
     // First run - should create snapshot
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache"])
+        .args(["check", "--no-sloc-cache"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Auto-snapshot recorded"));
@@ -764,7 +771,7 @@ min_interval_secs = 3600
     // Second run - should skip due to min_interval_secs (with verbose flag)
     sloc_guard!()
         .current_dir(fixture.path())
-        .args(["check", "--no-cache", "-v"])
+        .args(["check", "--no-sloc-cache", "-v"])
         .assert()
         .success()
         .stderr(predicate::str::contains("Skipping auto-snapshot"));

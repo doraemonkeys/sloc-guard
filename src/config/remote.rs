@@ -31,12 +31,14 @@ pub enum FetchPolicy {
 }
 
 impl FetchPolicy {
-    /// Create a `FetchPolicy` from an offline flag.
-    ///
-    /// Returns `Offline` if `offline` is `true`, otherwise `Normal`.
+    /// Create a `FetchPolicy` from the CLI `ExtendsPolicy` enum.
     #[must_use]
-    pub const fn from_offline(offline: bool) -> Self {
-        if offline { Self::Offline } else { Self::Normal }
+    pub const fn from_cli(cli_policy: crate::cli::ExtendsPolicy) -> Self {
+        match cli_policy {
+            crate::cli::ExtendsPolicy::Normal => Self::Normal,
+            crate::cli::ExtendsPolicy::Offline => Self::Offline,
+            crate::cli::ExtendsPolicy::Refresh => Self::ForceRefresh,
+        }
     }
 }
 
@@ -265,7 +267,7 @@ pub fn fetch_remote_config_with_client(
     } else if policy == FetchPolicy::Offline {
         // Offline mode with cache miss
         return Err(SlocGuardError::Config(format!(
-            "Remote config cache miss in offline mode. Run without --offline first to cache: {url}"
+            "Remote config cache miss in offline mode. Run without --extends-policy=offline first to cache the config: {url}"
         )));
     }
 
@@ -274,7 +276,9 @@ pub fn fetch_remote_config_with_client(
         crate::output::print_warning_full(
             &format!("Fetching remote config from {url}"),
             None,
-            Some("Consider using --offline or extends_sha256 for reproducible builds"),
+            Some(
+                "Consider using --extends-policy=offline or extends_sha256 for reproducible builds",
+            ),
         );
     }
 
