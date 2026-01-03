@@ -2,10 +2,107 @@ use std::path::PathBuf;
 
 use thiserror::Error;
 
+/// Represents the origin of a configuration value.
+///
+/// Used to track where configuration settings came from during extends resolution,
+/// enabling precise error messages that identify which config file caused an issue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfigSource {
+    /// Configuration from a local file.
+    File { path: PathBuf },
+    /// Configuration from a remote URL.
+    Remote { url: String },
+    /// Configuration from a built-in preset.
+    Preset { name: String },
+}
+
+impl std::fmt::Display for ConfigSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::File { path } => write!(f, "{}", path.display()),
+            Self::Remote { url } => write!(f, "{url}"),
+            Self::Preset { name } => write!(f, "preset:{name}"),
+        }
+    }
+}
+
+impl ConfigSource {
+    /// Create a file source.
+    #[must_use]
+    pub fn file(path: impl Into<PathBuf>) -> Self {
+        Self::File { path: path.into() }
+    }
+
+    /// Create a remote source.
+    #[must_use]
+    pub fn remote(url: impl Into<String>) -> Self {
+        Self::Remote { url: url.into() }
+    }
+
+    /// Create a preset source.
+    #[must_use]
+    pub fn preset(name: impl Into<String>) -> Self {
+        Self::Preset { name: name.into() }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum SlocGuardError {
     #[error("Configuration error: {0}")]
     Config(String),
+
+    /// Circular extends chain detected.
+    #[error("Circular extends detected: {}", format_chain(chain))]
+    CircularExtends {
+        /// The chain of configs that led to the cycle (e.g., `a.toml` → `b.toml` → `a.toml`).
+        chain: Vec<String>,
+    },
+
+    /// Extends chain exceeds maximum depth.
+    #[error("Extends chain too deep: depth {depth} exceeds maximum {max}")]
+    ExtendsTooDeep {
+        /// Current depth when the limit was hit.
+        depth: usize,
+        /// Maximum allowed depth.
+        max: usize,
+        /// The chain of configs up to the error point.
+        chain: Vec<String>,
+    },
+
+    /// Cannot resolve extends path relative to base.
+    #[error("Cannot resolve extends path '{path}' from {base}")]
+    ExtendsResolution {
+        /// The relative path that couldn't be resolved.
+        path: String,
+        /// Description of the base (e.g., "remote config" or source path).
+        base: String,
+    },
+
+    /// Config field has wrong type.
+    #[error("Type mismatch in '{field}': expected {expected}, got {actual}{}", format_origin(origin.as_ref()))]
+    TypeMismatch {
+        /// The field path (e.g., `content.max_lines`).
+        field: String,
+        /// Expected type description.
+        expected: String,
+        /// Actual type found.
+        actual: String,
+        /// Which config the error originated from.
+        origin: Option<ConfigSource>,
+    },
+
+    /// Semantic validation error (valid type but invalid value/constraint).
+    #[error("Invalid configuration for '{field}': {message}{}", format_origin(origin.as_ref()))]
+    Semantic {
+        /// The field path (e.g., `content.warn_threshold`).
+        field: String,
+        /// Description of the semantic error.
+        message: String,
+        /// Which config the error originated from.
+        origin: Option<ConfigSource>,
+        /// Actionable suggestion for fixing the error.
+        suggestion: Option<String>,
+    },
 
     #[error("Failed to access file: {path}")]
     FileAccess {
@@ -47,6 +144,16 @@ pub enum SlocGuardError {
         expected: String,
         actual: String,
     },
+}
+
+/// Format a chain of config sources for display.
+fn format_chain(chain: &[String]) -> String {
+    chain.join(" → ")
+}
+
+/// Format an optional origin source for error messages.
+fn format_origin(origin: Option<&ConfigSource>) -> String {
+    origin.map_or_else(String::new, |source| format!(" (in {source})"))
 }
 
 /// Formats IO error with optional context for display.
@@ -104,7 +211,12 @@ impl SlocGuardError {
     #[must_use]
     pub const fn error_type(&self) -> &'static str {
         match self {
-            Self::Config(_) => "Config",
+            Self::Config(_)
+            | Self::CircularExtends { .. }
+            | Self::ExtendsTooDeep { .. }
+            | Self::ExtendsResolution { .. }
+            | Self::TypeMismatch { .. }
+            | Self::Semantic { .. } => "Config",
             Self::FileAccess { .. } => "FileAccess",
             Self::InvalidPattern { .. } => "InvalidPattern",
             Self::Io { .. } => "IO",
@@ -140,6 +252,22 @@ impl SlocGuardError {
             Self::JsonSerialize(e) => e.to_string(),
             Self::Config(msg) | Self::Git(msg) | Self::GitRepoNotFound(msg) => msg.clone(),
             Self::RemoteConfigHashMismatch { url, .. } => format!("hash mismatch for {url}"),
+            Self::CircularExtends { chain } => format!("circular extends: {}", format_chain(chain)),
+            Self::ExtendsTooDeep { depth, max, .. } => {
+                format!("extends chain depth {depth} exceeds maximum {max}")
+            }
+            Self::ExtendsResolution { path, base } => {
+                format!("cannot resolve '{path}' from {base}")
+            }
+            Self::TypeMismatch {
+                field,
+                expected,
+                actual,
+                ..
+            } => {
+                format!("'{field}': expected {expected}, got {actual}")
+            }
+            Self::Semantic { field, message, .. } => format!("'{field}': {message}"),
         }
     }
 
@@ -167,13 +295,19 @@ impl SlocGuardError {
             Self::RemoteConfigHashMismatch {
                 expected, actual, ..
             } => Some(format!("expected {expected}, got {actual}")),
+            Self::CircularExtends { chain } | Self::ExtendsTooDeep { chain, .. } => {
+                Some(format!("chain: {}", format_chain(chain)))
+            }
+            Self::TypeMismatch { origin, .. } | Self::Semantic { origin, .. } => {
+                origin.as_ref().map(|o| format!("in {o}"))
+            }
             _ => None,
         }
     }
 
     /// Returns an actionable suggestion for resolving the error.
     #[must_use]
-    pub fn suggestion(&self) -> Option<&'static str> {
+    pub fn suggestion(&self) -> Option<&str> {
         match self {
             Self::Config(_) => {
                 Some("Check the config file format and value ranges in .sloc-guard.toml")
@@ -197,6 +331,19 @@ impl SlocGuardError {
             Self::RemoteConfigHashMismatch { .. } => {
                 Some("Update extends_sha256 in config, or verify the remote config URL is correct")
             }
+            Self::CircularExtends { .. } => {
+                Some("Review extends chain to remove the circular reference")
+            }
+            Self::ExtendsTooDeep { .. } => {
+                Some("Reduce inheritance depth by flattening config hierarchy or using presets")
+            }
+            Self::ExtendsResolution { .. } => Some(
+                "Use absolute path or ensure relative path is valid from the base config location",
+            ),
+            Self::TypeMismatch { .. } => {
+                Some("Check the expected type in the config documentation")
+            }
+            Self::Semantic { suggestion, .. } => suggestion.as_deref(),
         }
     }
 

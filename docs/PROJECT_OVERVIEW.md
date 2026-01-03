@@ -26,7 +26,7 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 | `baseline`/`cache` | `Baseline` (Content/Structure entries), `Cache` (mtime+size validation, file locking for concurrent access) |
 | `state` | State file path resolution: `discover_project_root()` (walks up to find `.git/` or `.sloc-guard.toml`), `cache_path()`, `history_path()`, `baseline_path()` → `.git/sloc-guard/` (git repo) or `.sloc-guard/` (fallback); file locking utilities (`try_lock_exclusive_with_timeout`, `try_lock_shared_with_timeout`) for concurrent access protection; timestamp utilities (`current_unix_timestamp`, `try_current_unix_timestamp`) |
 | `output/*` | `TextFormatter`, `JsonFormatter`, `SarifFormatter`, `MarkdownFormatter`, `HtmlFormatter` (with `with_stats()` for project stats, `with_trend_history()` for trend chart, `with_project_root()` for relative paths); `StatsTextFormatter`, `StatsJsonFormatter`, `StatsMarkdownFormatter`, `StatsHtmlFormatter` (with `with_project_root()`, `with_trend_history()` for trend chart, use `output_mode` field); `ScanProgress` (progress bar); `ErrorOutput` (colored error/warning output); `path.rs`: `display_path()` for relative path output with forward-slash normalization; `trend_formatting.rs`: relative time, trend arrows/colors/percentages; `svg/`: chart primitives (Axis, Bar, Line, BarChart, HorizontalBarChart, LineChart, FileSizeHistogram, LanguageBreakdownChart, TrendLineChart with delta indicators and smart X-axis labels, SvgBuilder) with viewBox scaling, CSS variables, hover effects, print styles, accessibility |
-| `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `message()` includes error kind for `FileAccess`/`Io` and glob details for `InvalidPattern` |
+| `error` | `SlocGuardError` with `error_type()`, `message()`, `detail()`, `suggestion()` methods; `io_with_path()`/`io_with_context()` constructors for contextual IO errors; `ConfigSource` enum (File/Remote/Preset) for origin tracking in structured errors (`CircularExtends`, `ExtendsTooDeep`, `ExtendsResolution`, `TypeMismatch`, `Semantic`) |
 | `commands/*` | `run_check`, `run_stats`, `run_snapshot`, `run_config`, `run_init`, `run_explain`; check split into: `runner.rs`, `check_args.rs`, `check_baseline_ops.rs`, `check_git_diff.rs`, `check_output.rs`, `check_processing.rs`, `check_scan.rs`, `check_exit.rs`, `check_snapshot.rs`; `context.rs`: `CheckContext`/`StatsContext` for DI; `detect.rs`: project type auto-detection |
 | `analyzer` | `FunctionParser` - multi-language split suggestions (--suggest) |
 | `stats` | `TrendHistory` - historical stats with delta computation, file locking, retention policy (max_entries, max_age_days, min_interval_secs); `parse_duration` - human-readable duration parsing for `--since` |
@@ -78,6 +78,14 @@ WarnAtSource::RuleAbsolute { index } | RulePercentage { index, threshold } | Glo
 ContentExplanation { path, is_excluded, matched_rule, effective_limit, effective_warn_at, warn_at_source, warn_threshold, skip_*, rule_chain }
 StructureRuleMatch::Rule { index, pattern, reason } | Default
 StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, rule_chain }
+
+// Config Error Types
+ConfigSource::File { path } | Remote { url } | Preset { name }
+SlocGuardError::CircularExtends { chain }
+             | ExtendsTooDeep { depth, max, chain }
+             | ExtendsResolution { path, base }
+             | TypeMismatch { field, expected, actual, origin }
+             | Semantic { field, message, origin, suggestion }
 
 // Output
 OutputFormat::Text | Json | Sarif | Markdown | Html

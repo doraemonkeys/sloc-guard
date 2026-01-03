@@ -56,10 +56,10 @@ Addresses line number precision loss during extends inheritance and improves con
 
 | Subtask | Content | Dependencies |
 |---------|---------|--------------|
-| 25.1a | `ConfigSource` enum (File/Remote/Preset) for origin tracking | None |
-| 25.1b | `CircularExtends { chain }`, `ExtendsTooDeep { depth, max, chain }`, `ExtendsResolution { path, base }` variants | 25.1a |
+| 25.1a ✅ | `ConfigSource` enum (File/Remote/Preset) for origin tracking | None |
+| 25.1b ✅ | `CircularExtends { chain }`, `ExtendsTooDeep { depth, max, chain }`, `ExtendsResolution { path, base }` variants | 25.1a |
 | 25.1c | `Syntax { path, line, column, message }` variant - precise location for raw parse errors | 25.2 |
-| 25.1d | `TypeMismatch { field, expected, actual, origin }`, `Semantic { field, message, origin, suggestion }` variants | 25.1a |
+| 25.1d ✅ | `TypeMismatch { field, expected, actual, origin }`, `Semantic { field, message, origin, suggestion }` variants | 25.1a |
 
 **25.2 Dual-Path Loading Strategy**
 - Single-file mode: when no `extends`, parse directly from raw content (preserves precise line numbers)
@@ -87,5 +87,5 @@ Addresses line number precision loss during extends inheritance and improves con
 | Priority               | Tasks                                                         |
 | ---------------------- | ------------------------------------------------------------- |
 | **19. Config Design**  | ~~24.1 Array Merge~~ ✅, ~~24.2 Offline Cache~~ ✅, ~~24.3 Check Behavior~~ ✅, ~~24.4 Cache Flag Unification~~ ✅ |
-| **20. Config Loader**  | ~~25.3 Depth Limit~~ ✅ → 25.1a/b/d → 25.2 → 25.1c → 25.4 → 25.5 |
+| **20. Config Loader**  | ~~25.3 Depth Limit~~ ✅, ~~25.1a/b/d~~ ✅ → 25.2 → 25.1c → 25.4 → 25.5 |
 

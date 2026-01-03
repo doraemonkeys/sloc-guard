@@ -2,6 +2,345 @@ use std::path::PathBuf;
 
 use super::*;
 
+// =============================================================================
+// ConfigSource Tests
+// =============================================================================
+
+#[test]
+fn config_source_file_display() {
+    let source = ConfigSource::file(PathBuf::from("config.toml"));
+    assert_eq!(source.to_string(), "config.toml");
+}
+
+#[test]
+fn config_source_remote_display() {
+    let source = ConfigSource::remote("https://example.com/config.toml");
+    assert_eq!(source.to_string(), "https://example.com/config.toml");
+}
+
+#[test]
+fn config_source_preset_display() {
+    let source = ConfigSource::preset("rust-strict");
+    assert_eq!(source.to_string(), "preset:rust-strict");
+}
+
+#[test]
+fn config_source_constructors() {
+    let file = ConfigSource::file("/path/to/config.toml");
+    let expected_path: &std::path::Path = std::path::Path::new("/path/to/config.toml");
+    assert!(matches!(&file, ConfigSource::File { path } if path == expected_path));
+
+    let remote = ConfigSource::remote("https://example.com");
+    assert!(matches!(&remote, ConfigSource::Remote { url } if url == "https://example.com"));
+
+    let preset = ConfigSource::preset("node-strict");
+    assert!(matches!(&preset, ConfigSource::Preset { name } if name == "node-strict"));
+}
+
+// =============================================================================
+// Structured Config Error Tests
+// =============================================================================
+
+#[test]
+fn circular_extends_error_display() {
+    let err = SlocGuardError::CircularExtends {
+        chain: vec![
+            "a.toml".to_string(),
+            "b.toml".to_string(),
+            "a.toml".to_string(),
+        ],
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("Circular extends"));
+    assert!(msg.contains("a.toml"));
+    assert!(msg.contains("b.toml"));
+}
+
+#[test]
+fn circular_extends_error_type() {
+    let err = SlocGuardError::CircularExtends {
+        chain: vec!["a.toml".to_string()],
+    };
+    assert_eq!(err.error_type(), "Config");
+}
+
+#[test]
+fn circular_extends_error_message() {
+    let err = SlocGuardError::CircularExtends {
+        chain: vec!["a.toml".to_string(), "b.toml".to_string()],
+    };
+    let msg = err.message();
+    assert!(msg.contains("circular extends"));
+    assert!(msg.contains("a.toml → b.toml"));
+}
+
+#[test]
+fn circular_extends_error_detail() {
+    let err = SlocGuardError::CircularExtends {
+        chain: vec!["a.toml".to_string(), "b.toml".to_string()],
+    };
+    let detail = err.detail().unwrap();
+    assert!(detail.contains("chain:"));
+}
+
+#[test]
+fn circular_extends_error_suggestion() {
+    let err = SlocGuardError::CircularExtends {
+        chain: vec!["a.toml".to_string()],
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("circular reference"));
+}
+
+#[test]
+fn extends_too_deep_error_display() {
+    let err = SlocGuardError::ExtendsTooDeep {
+        depth: 11,
+        max: 10,
+        chain: vec!["config_0.toml".to_string(), "config_1.toml".to_string()],
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("too deep"));
+    assert!(msg.contains("11"));
+    assert!(msg.contains("10"));
+}
+
+#[test]
+fn extends_too_deep_error_type() {
+    let err = SlocGuardError::ExtendsTooDeep {
+        depth: 11,
+        max: 10,
+        chain: vec![],
+    };
+    assert_eq!(err.error_type(), "Config");
+}
+
+#[test]
+fn extends_too_deep_error_message() {
+    let err = SlocGuardError::ExtendsTooDeep {
+        depth: 15,
+        max: 10,
+        chain: vec![],
+    };
+    let msg = err.message();
+    assert!(msg.contains("15"));
+    assert!(msg.contains("10"));
+}
+
+#[test]
+fn extends_too_deep_error_detail() {
+    let err = SlocGuardError::ExtendsTooDeep {
+        depth: 11,
+        max: 10,
+        chain: vec!["a.toml".to_string(), "b.toml".to_string()],
+    };
+    let detail = err.detail().unwrap();
+    assert!(detail.contains("chain:"));
+    assert!(detail.contains("a.toml"));
+}
+
+#[test]
+fn extends_too_deep_error_suggestion() {
+    let err = SlocGuardError::ExtendsTooDeep {
+        depth: 11,
+        max: 10,
+        chain: vec![],
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("flatten") || suggestion.contains("presets"));
+}
+
+#[test]
+fn extends_resolution_error_display() {
+    let err = SlocGuardError::ExtendsResolution {
+        path: "../base.toml".to_string(),
+        base: "remote config".to_string(),
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("../base.toml"));
+    assert!(msg.contains("remote config"));
+}
+
+#[test]
+fn extends_resolution_error_type() {
+    let err = SlocGuardError::ExtendsResolution {
+        path: "relative.toml".to_string(),
+        base: "https://example.com".to_string(),
+    };
+    assert_eq!(err.error_type(), "Config");
+}
+
+#[test]
+fn extends_resolution_error_message() {
+    let err = SlocGuardError::ExtendsResolution {
+        path: "../base.toml".to_string(),
+        base: "remote config".to_string(),
+    };
+    let msg = err.message();
+    assert!(msg.contains("../base.toml"));
+    assert!(msg.contains("remote config"));
+}
+
+#[test]
+fn extends_resolution_error_suggestion() {
+    let err = SlocGuardError::ExtendsResolution {
+        path: "../base.toml".to_string(),
+        base: "remote config".to_string(),
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("absolute path") || suggestion.contains("relative path"));
+}
+
+#[test]
+fn type_mismatch_error_display() {
+    let err = SlocGuardError::TypeMismatch {
+        field: "content.max_lines".to_string(),
+        expected: "integer".to_string(),
+        actual: "string".to_string(),
+        origin: Some(ConfigSource::file("config.toml")),
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("content.max_lines"));
+    assert!(msg.contains("integer"));
+    assert!(msg.contains("string"));
+    assert!(msg.contains("config.toml"));
+}
+
+#[test]
+fn type_mismatch_error_without_origin() {
+    let err = SlocGuardError::TypeMismatch {
+        field: "content.max_lines".to_string(),
+        expected: "integer".to_string(),
+        actual: "string".to_string(),
+        origin: None,
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("content.max_lines"));
+    assert!(!msg.contains("(in"));
+}
+
+#[test]
+fn type_mismatch_error_type() {
+    let err = SlocGuardError::TypeMismatch {
+        field: "field".to_string(),
+        expected: "type".to_string(),
+        actual: "other".to_string(),
+        origin: None,
+    };
+    assert_eq!(err.error_type(), "Config");
+}
+
+#[test]
+fn type_mismatch_error_message() {
+    let err = SlocGuardError::TypeMismatch {
+        field: "content.warn_threshold".to_string(),
+        expected: "float".to_string(),
+        actual: "boolean".to_string(),
+        origin: None,
+    };
+    let msg = err.message();
+    assert!(msg.contains("content.warn_threshold"));
+    assert!(msg.contains("float"));
+    assert!(msg.contains("boolean"));
+}
+
+#[test]
+fn type_mismatch_error_detail_with_origin() {
+    let err = SlocGuardError::TypeMismatch {
+        field: "field".to_string(),
+        expected: "type".to_string(),
+        actual: "other".to_string(),
+        origin: Some(ConfigSource::preset("rust-strict")),
+    };
+    let detail = err.detail().unwrap();
+    assert!(detail.contains("preset:rust-strict"));
+}
+
+#[test]
+fn type_mismatch_error_suggestion() {
+    let err = SlocGuardError::TypeMismatch {
+        field: "field".to_string(),
+        expected: "type".to_string(),
+        actual: "other".to_string(),
+        origin: None,
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert!(suggestion.contains("type") || suggestion.contains("documentation"));
+}
+
+#[test]
+fn semantic_error_display() {
+    let err = SlocGuardError::Semantic {
+        field: "content.warn_threshold".to_string(),
+        message: "must be between 0.0 and 1.0".to_string(),
+        origin: Some(ConfigSource::remote("https://example.com/config.toml")),
+        suggestion: Some("Use a value like 0.8 for 80% warning threshold".to_string()),
+    };
+    let msg = err.to_string();
+    assert!(msg.contains("content.warn_threshold"));
+    assert!(msg.contains("must be between 0.0 and 1.0"));
+    assert!(msg.contains("https://example.com/config.toml"));
+}
+
+#[test]
+fn semantic_error_without_origin() {
+    let err = SlocGuardError::Semantic {
+        field: "field".to_string(),
+        message: "invalid value".to_string(),
+        origin: None,
+        suggestion: None,
+    };
+    let msg = err.to_string();
+    assert!(!msg.contains("(in"));
+}
+
+#[test]
+fn semantic_error_type() {
+    let err = SlocGuardError::Semantic {
+        field: "field".to_string(),
+        message: "error".to_string(),
+        origin: None,
+        suggestion: None,
+    };
+    assert_eq!(err.error_type(), "Config");
+}
+
+#[test]
+fn semantic_error_message() {
+    let err = SlocGuardError::Semantic {
+        field: "structure.max_depth".to_string(),
+        message: "cannot be negative".to_string(),
+        origin: None,
+        suggestion: None,
+    };
+    let msg = err.message();
+    assert!(msg.contains("structure.max_depth"));
+    assert!(msg.contains("cannot be negative"));
+}
+
+#[test]
+fn semantic_error_suggestion_from_field() {
+    let err = SlocGuardError::Semantic {
+        field: "field".to_string(),
+        message: "error".to_string(),
+        origin: None,
+        suggestion: Some("Try this instead".to_string()),
+    };
+    let suggestion = err.suggestion().unwrap();
+    assert_eq!(suggestion, "Try this instead");
+}
+
+#[test]
+fn semantic_error_suggestion_none() {
+    let err = SlocGuardError::Semantic {
+        field: "field".to_string(),
+        message: "error".to_string(),
+        origin: None,
+        suggestion: None,
+    };
+    assert!(err.suggestion().is_none());
+}
+
 #[test]
 fn error_display_config() {
     let err = SlocGuardError::Config("invalid threshold".to_string());

@@ -126,7 +126,19 @@ extends = "/configs/a.toml"
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, SlocGuardError::Config(msg) if msg.contains("Circular")));
+    // Verify chain has correct order: a.toml was visited first, then b.toml, then a.toml again
+    match &err {
+        SlocGuardError::CircularExtends { chain } => {
+            assert_eq!(chain.len(), 3, "Expected chain of length 3: [a, b, a]");
+            assert!(chain[0].contains("a.toml"), "First should be a.toml");
+            assert!(chain[1].contains("b.toml"), "Second should be b.toml");
+            assert!(
+                chain[2].contains("a.toml"),
+                "Third (cycle) should be a.toml"
+            );
+        }
+        other => panic!("Expected CircularExtends error, got: {other:?}"),
+    }
 }
 
 #[test]
@@ -145,7 +157,18 @@ max_lines = 100
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, SlocGuardError::Config(msg) if msg.contains("Circular")));
+    // Verify chain has correct order: self.toml visited, then self.toml again
+    match &err {
+        SlocGuardError::CircularExtends { chain } => {
+            assert_eq!(chain.len(), 2, "Expected chain of length 2: [self, self]");
+            assert!(chain[0].contains("self.toml"), "First should be self.toml");
+            assert!(
+                chain[1].contains("self.toml"),
+                "Second (cycle) should be self.toml"
+            );
+        }
+        other => panic!("Expected CircularExtends error, got: {other:?}"),
+    }
 }
 
 #[test]
@@ -829,10 +852,22 @@ max_lines = {}
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(
-        err,
-        SlocGuardError::Config(msg) if msg.contains("too deep") && msg.contains(&MAX_EXTENDS_DEPTH.to_string())
-    ));
+    // Verify chain preserves traversal order: config_0 -> config_1 -> ... -> config_N
+    match &err {
+        SlocGuardError::ExtendsTooDeep { max, chain, .. } => {
+            assert_eq!(*max, MAX_EXTENDS_DEPTH);
+            // Chain should contain configs in order of traversal
+            for (i, entry) in chain.iter().enumerate() {
+                assert!(
+                    entry.contains(&format!("config_{i}.toml")),
+                    "Chain entry {i} should be config_{i}.toml, got: {entry}"
+                );
+            }
+        }
+        other => {
+            panic!("Expected ExtendsTooDeep error with max={MAX_EXTENDS_DEPTH}, got: {other:?}")
+        }
+    }
 }
 
 #[test]
@@ -900,10 +935,13 @@ fn extends_depth_limit_error_message_is_informative() {
     let msg = format!("{err}");
 
     // Should mention depth and the max value
-    assert!(msg.contains("too deep"), "Error should mention 'too deep'");
+    assert!(
+        msg.contains("too deep") || msg.contains("exceeds maximum"),
+        "Error should mention depth limit: {msg}"
+    );
     assert!(
         msg.contains(&MAX_EXTENDS_DEPTH.to_string()),
-        "Error should mention max depth value"
+        "Error should mention max depth value: {msg}"
     );
 }
 

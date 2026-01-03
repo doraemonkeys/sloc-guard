@@ -47,6 +47,9 @@ sha2 = "0.10"
 # Regex for function parsing
 regex = "1"
 
+# Ordered set for deterministic iteration
+indexmap = "2.12.1"
+
 # HTTP client for remote config
 reqwest = { version = "0.12", default-features = false, features = [
     "blocking",

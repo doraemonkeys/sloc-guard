@@ -1,5 +1,6 @@
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+
+use indexmap::IndexSet;
 
 use crate::error::{Result, SlocGuardError};
 
@@ -198,13 +199,15 @@ impl<F: FileSystem> FileConfigLoader<F> {
     fn load_with_extends(
         &self,
         path: &Path,
-        visited: &mut HashSet<String>,
+        visited: &mut IndexSet<String>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         if depth > MAX_EXTENDS_DEPTH {
-            return Err(SlocGuardError::Config(format!(
-                "Extends chain too deep: maximum depth is {MAX_EXTENDS_DEPTH}"
-            )));
+            return Err(SlocGuardError::ExtendsTooDeep {
+                depth,
+                max: MAX_EXTENDS_DEPTH,
+                chain: visited.iter().cloned().collect(),
+            });
         }
 
         let canonical =
@@ -216,11 +219,11 @@ impl<F: FileSystem> FileConfigLoader<F> {
                 })?;
         let key = canonical.to_string_lossy().to_string();
 
-        if !visited.insert(key) {
-            return Err(SlocGuardError::Config(format!(
-                "Circular extends detected: {}",
-                canonical.display()
-            )));
+        if !visited.insert(key.clone()) {
+            // IndexSet preserves insertion order, so chain shows the actual traversal sequence
+            let mut chain: Vec<String> = visited.iter().cloned().collect();
+            chain.push(key);
+            return Err(SlocGuardError::CircularExtends { chain });
         }
 
         let content =
@@ -239,19 +242,23 @@ impl<F: FileSystem> FileConfigLoader<F> {
         &self,
         url: &str,
         expected_hash: Option<&str>,
-        visited: &mut HashSet<String>,
+        visited: &mut IndexSet<String>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         if depth > MAX_EXTENDS_DEPTH {
-            return Err(SlocGuardError::Config(format!(
-                "Extends chain too deep: maximum depth is {MAX_EXTENDS_DEPTH}"
-            )));
+            return Err(SlocGuardError::ExtendsTooDeep {
+                depth,
+                max: MAX_EXTENDS_DEPTH,
+                chain: visited.iter().cloned().collect(),
+            });
         }
 
-        if !visited.insert(url.to_string()) {
-            return Err(SlocGuardError::Config(format!(
-                "Circular extends detected: {url}"
-            )));
+        let url_key = url.to_string();
+        if !visited.insert(url_key.clone()) {
+            // IndexSet preserves insertion order, so chain shows the actual traversal sequence
+            let mut chain: Vec<String> = visited.iter().cloned().collect();
+            chain.push(url_key);
+            return Err(SlocGuardError::CircularExtends { chain });
         }
 
         let content = fetch_remote_config(
@@ -268,7 +275,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
         &self,
         content: &str,
         base_path: Option<&Path>,
-        visited: &mut HashSet<String>,
+        visited: &mut IndexSet<String>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         let mut config_value: toml::Value =
@@ -309,9 +316,10 @@ impl<F: FileSystem> FileConfigLoader<F> {
                             .unwrap_or_else(|| Path::new("."))
                             .join(extends_path)
                     } else {
-                        return Err(SlocGuardError::Config(format!(
-                            "Cannot resolve relative path '{extends}' from remote config"
-                        )));
+                        return Err(SlocGuardError::ExtendsResolution {
+                            path: extends,
+                            base: "remote config".to_string(),
+                        });
                     };
                     self.load_with_extends(&resolved_path, visited, depth + 1)?
                 };
@@ -485,7 +493,7 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_from_path(&self, path: &Path) -> Result<LoadResult> {
-        let mut visited = HashSet::new();
+        let mut visited = IndexSet::new();
         let (merged_value, preset_used) = self.load_with_extends(path, &mut visited, 0)?;
         let config_str =
             toml::to_string(&merged_value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
