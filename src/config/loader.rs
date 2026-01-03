@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use indexmap::IndexSet;
 
-use crate::error::{Result, SlocGuardError};
+use crate::error::{ConfigSource, Result, SlocGuardError};
 
 use super::Config;
 use super::model::CONFIG_VERSION;
@@ -198,10 +198,61 @@ impl<F: FileSystem> FileConfigLoader<F> {
         Ok(config)
     }
 
+    /// Finalize a parsed TOML value into a Config.
+    ///
+    /// Validates `$reset` marker positions, strips markers, and parses to Config.
+    fn finalize_value_to_config(mut value: toml::Value) -> Result<Config> {
+        validate_reset_positions(&value, "")?;
+        strip_reset_markers(&mut value);
+        let config_str =
+            toml::to_string(&value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
+        Self::parse_config(&config_str)
+    }
+
+    /// Parse content to `toml::Value` with precise syntax error reporting.
+    fn parse_value_with_location(
+        content: &str,
+        source: Option<ConfigSource>,
+    ) -> Result<toml::Value> {
+        toml::from_str(content).map_err(|e| SlocGuardError::syntax_from_toml(&e, content, source))
+    }
+
     /// Load config with extends chain, returning (value, `preset_used`).
     fn load_with_extends(
         &self,
         path: &Path,
+        visited: &mut IndexSet<String>,
+        depth: usize,
+    ) -> Result<(toml::Value, Option<String>)> {
+        let content =
+            self.fs
+                .read_to_string(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+
+        self.load_with_extends_from_content(path, &content, visited, depth)
+    }
+
+    /// Continue extends chain with pre-read content (avoids re-reading the file).
+    fn load_with_extends_from_content(
+        &self,
+        path: &Path,
+        content: &str,
+        visited: &mut IndexSet<String>,
+        depth: usize,
+    ) -> Result<(toml::Value, Option<String>)> {
+        let source = ConfigSource::file(path);
+        let config_value = Self::parse_value_with_location(content, Some(source))?;
+        self.load_with_extends_from_value(path, config_value, visited, depth)
+    }
+
+    /// Continue extends chain with pre-parsed value (avoids re-parsing).
+    fn load_with_extends_from_value(
+        &self,
+        path: &Path,
+        config_value: toml::Value,
         visited: &mut IndexSet<String>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
@@ -229,15 +280,7 @@ impl<F: FileSystem> FileConfigLoader<F> {
             return Err(SlocGuardError::CircularExtends { chain });
         }
 
-        let content =
-            self.fs
-                .read_to_string(path)
-                .map_err(|source| SlocGuardError::FileAccess {
-                    path: path.to_path_buf(),
-                    source,
-                })?;
-
-        self.process_config_content(&content, Some(path), visited, depth)
+        self.process_config_value(config_value, Some(path), visited, depth)
     }
 
     /// Load remote config with extends chain, returning (value, `preset_used`).
@@ -270,20 +313,44 @@ impl<F: FileSystem> FileConfigLoader<F> {
             expected_hash,
             self.fetch_policy,
         )?;
-        self.process_config_content(&content, None, visited, depth)
+        let source = ConfigSource::remote(url);
+        self.process_config_content(&content, Some(source), None, visited, depth)
     }
 
     /// Process config content and return (value, `preset_used`).
+    ///
+    /// # Arguments
+    /// - `content`: Raw TOML content
+    /// - `source`: Config source for error reporting (file/remote/preset)
+    /// - `base_path`: Optional file path for resolving relative extends
+    /// - `visited`: Set of visited configs for cycle detection
+    /// - `depth`: Current depth in extends chain
     fn process_config_content(
         &self,
         content: &str,
+        source: Option<ConfigSource>,
         base_path: Option<&Path>,
         visited: &mut IndexSet<String>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
-        let mut config_value: toml::Value =
-            toml::from_str(content).map_err(SlocGuardError::from)?;
+        let config_value = Self::parse_value_with_location(content, source)?;
+        self.process_config_value(config_value, base_path, visited, depth)
+    }
 
+    /// Process pre-parsed config value and return (value, `preset_used`).
+    ///
+    /// # Arguments
+    /// - `config_value`: Pre-parsed TOML value
+    /// - `base_path`: Optional file path for resolving relative extends
+    /// - `visited`: Set of visited configs for cycle detection
+    /// - `depth`: Current depth in extends chain
+    fn process_config_value(
+        &self,
+        mut config_value: toml::Value,
+        base_path: Option<&Path>,
+        visited: &mut IndexSet<String>,
+        depth: usize,
+    ) -> Result<(toml::Value, Option<String>)> {
         let extends_value = config_value
             .get("extends")
             .and_then(toml::Value::as_str)
@@ -496,15 +563,41 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_from_path(&self, path: &Path) -> Result<LoadResult> {
-        let mut visited = IndexSet::new();
-        let (merged_value, preset_used) = self.load_with_extends(path, &mut visited, 0)?;
-        let config_str =
-            toml::to_string(&merged_value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
-        let config = Self::parse_config(&config_str)?;
-        Ok(LoadResult {
-            config,
-            preset_used,
-        })
+        // Dual-path loading: use precise line numbers for single-file,
+        // source chain tracking for inheritance mode
+        let content =
+            self.fs
+                .read_to_string(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+
+        let source = ConfigSource::file(path);
+
+        // Parse once and check for extends
+        let value = Self::parse_value_with_location(&content, Some(source))?;
+        let has_extends = value.get("extends").is_some();
+
+        if has_extends {
+            // Inheritance mode: pass pre-parsed value to avoid re-parsing
+            // Line numbers after merge are meaningless, use source chain tracking
+            let mut visited = IndexSet::new();
+            let (merged_value, preset_used) =
+                self.load_with_extends_from_value(path, value, &mut visited, 0)?;
+            let config = Self::finalize_value_to_config(merged_value)?;
+            Ok(LoadResult {
+                config,
+                preset_used,
+            })
+        } else {
+            // Single-file mode: finalize and parse
+            let config = Self::finalize_value_to_config(value)?;
+            Ok(LoadResult {
+                config,
+                preset_used: None,
+            })
+        }
     }
 
     fn load_without_extends(&self) -> Result<LoadResult> {
@@ -534,7 +627,10 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                     path: path.to_path_buf(),
                     source,
                 })?;
-        let config = Self::parse_config(&content)?;
+        // Single-file mode: use precise syntax error reporting
+        let source = ConfigSource::file(path);
+        let value = Self::parse_value_with_location(&content, Some(source))?;
+        let config = Self::finalize_value_to_config(value)?;
         Ok(LoadResult {
             config,
             preset_used: None,

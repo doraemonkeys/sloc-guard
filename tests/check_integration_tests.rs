@@ -692,7 +692,9 @@ fn check_invalid_config_returns_error() {
         .args(["check", "--no-sloc-cache"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("TOML"));
+        // Syntax errors show line/column and "Config" error type
+        .stderr(predicate::str::contains("Config"))
+        .stderr(predicate::str::contains("line"));
 }
 
 #[test]

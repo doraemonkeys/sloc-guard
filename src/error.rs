@@ -104,6 +104,22 @@ pub enum SlocGuardError {
         suggestion: Option<String>,
     },
 
+    /// TOML syntax error with precise location.
+    ///
+    /// Used when parsing a single config file without extends inheritance,
+    /// where line/column information is meaningful and accurate.
+    #[error("Syntax error at line {line}, column {column}{}: {message}", format_origin(origin.as_ref()))]
+    Syntax {
+        /// The config origin that contains the syntax error.
+        origin: Option<ConfigSource>,
+        /// 1-based line number where the error occurred.
+        line: usize,
+        /// 1-based column number where the error occurred.
+        column: usize,
+        /// The error message describing what went wrong.
+        message: String,
+    },
+
     #[error("Failed to access file: {path}")]
     FileAccess {
         path: PathBuf,
@@ -207,6 +223,27 @@ impl SlocGuardError {
         }
     }
 
+    /// Creates a Syntax error from a TOML parse error and the original content.
+    ///
+    /// Extracts precise line/column information from the error's byte span.
+    #[must_use]
+    pub fn syntax_from_toml(
+        error: &toml::de::Error,
+        content: &str,
+        origin: Option<ConfigSource>,
+    ) -> Self {
+        let (line, column) = error
+            .span()
+            .map_or((1, 1), |span| span_to_line_col(content, span.start));
+
+        Self::Syntax {
+            origin,
+            line,
+            column,
+            message: error.message().to_string(),
+        }
+    }
+
     /// Returns the error type as a short string identifier.
     #[must_use]
     pub const fn error_type(&self) -> &'static str {
@@ -216,7 +253,8 @@ impl SlocGuardError {
             | Self::ExtendsTooDeep { .. }
             | Self::ExtendsResolution { .. }
             | Self::TypeMismatch { .. }
-            | Self::Semantic { .. } => "Config",
+            | Self::Semantic { .. }
+            | Self::Syntax { .. } => "Config",
             Self::FileAccess { .. } => "FileAccess",
             Self::InvalidPattern { .. } => "InvalidPattern",
             Self::Io { .. } => "IO",
@@ -268,6 +306,12 @@ impl SlocGuardError {
                 format!("'{field}': expected {expected}, got {actual}")
             }
             Self::Semantic { field, message, .. } => format!("'{field}': {message}"),
+            Self::Syntax {
+                line,
+                column,
+                message,
+                ..
+            } => format!("line {line}, column {column}: {message}"),
         }
     }
 
@@ -298,9 +342,9 @@ impl SlocGuardError {
             Self::CircularExtends { chain } | Self::ExtendsTooDeep { chain, .. } => {
                 Some(format!("chain: {}", format_chain(chain)))
             }
-            Self::TypeMismatch { origin, .. } | Self::Semantic { origin, .. } => {
-                origin.as_ref().map(|o| format!("in {o}"))
-            }
+            Self::TypeMismatch { origin, .. }
+            | Self::Semantic { origin, .. }
+            | Self::Syntax { origin, .. } => origin.as_ref().map(|o| format!("in {o}")),
             _ => None,
         }
     }
@@ -318,7 +362,7 @@ impl SlocGuardError {
             Self::InvalidPattern { .. } => Some(
                 "Check glob pattern syntax: use '*' for wildcards, '**' for recursive matching",
             ),
-            Self::TomlParse(_) => {
+            Self::TomlParse(_) | Self::Syntax { .. } => {
                 Some("Check TOML syntax: ensure proper quoting and bracket matching")
             }
             Self::JsonSerialize(_) => {
@@ -367,6 +411,20 @@ impl SlocGuardError {
 }
 
 pub type Result<T> = std::result::Result<T, SlocGuardError>;
+
+/// Convert a byte position to 1-based line and column numbers.
+///
+/// Used to extract precise error locations from TOML parse errors.
+/// Clamps the byte position to content length for safety.
+#[must_use]
+pub fn span_to_line_col(content: &str, byte_pos: usize) -> (usize, usize) {
+    let clamped_pos = byte_pos.min(content.len());
+    let prefix = &content[..clamped_pos];
+    let line = prefix.matches('\n').count() + 1; // 1-based
+    let last_newline = prefix.rfind('\n').map_or(0, |pos| pos + 1);
+    let column = clamped_pos.saturating_sub(last_newline) + 1; // 1-based
+    (line, column)
+}
 
 #[cfg(test)]
 #[path = "error_tests.rs"]

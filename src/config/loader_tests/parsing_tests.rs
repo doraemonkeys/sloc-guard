@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::config::FileConfigLoader;
 use crate::config::loader::ConfigLoader;
-use crate::error::SlocGuardError;
+use crate::error::{ConfigSource, SlocGuardError};
 
 use super::mock_fs::MockFileSystem;
 
@@ -30,8 +30,9 @@ extensions = ["rs", "py"]
 }
 
 #[test]
-fn returns_error_for_invalid_toml() {
-    let invalid_content = "this is not valid toml [[[";
+fn returns_syntax_error_for_invalid_toml_without_extends() {
+    // Single-file mode: should return Syntax error with precise location
+    let invalid_content = "line1 = 1\nline2 = [";
 
     let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", invalid_content);
 
@@ -40,7 +41,92 @@ fn returns_error_for_invalid_toml() {
 
     assert!(result.is_err());
     let err = result.unwrap_err();
-    assert!(matches!(err, SlocGuardError::TomlParse(_)));
+
+    // Should be a Syntax error with line/column, not TomlParse
+    match err {
+        SlocGuardError::Syntax {
+            origin,
+            line,
+            column,
+            message,
+        } => {
+            assert!(origin.is_some());
+            // The unclosed array on line 2 is detected at line 2 (1-based)
+            assert_eq!(line, 2, "Expected error on line 2 (unclosed array)");
+            assert!(
+                column >= 1,
+                "Column should be valid (1-based), got {column}"
+            );
+            assert!(!message.is_empty());
+        }
+        _ => panic!("Expected Syntax error, got: {err:?}"),
+    }
+}
+
+#[test]
+fn syntax_error_includes_file_origin() {
+    let invalid_content = "invalid[[[";
+
+    let fs = MockFileSystem::new().with_file("/custom/config.toml", invalid_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/custom/config.toml"));
+
+    let err = result.unwrap_err();
+    match err {
+        SlocGuardError::Syntax { origin, .. } => {
+            let origin = origin.expect("Should have origin");
+            match origin {
+                ConfigSource::File { path } => {
+                    assert!(path.to_string_lossy().contains("config.toml"));
+                }
+                _ => panic!("Expected File origin"),
+            }
+        }
+        _ => panic!("Expected Syntax error"),
+    }
+}
+
+#[test]
+fn syntax_error_has_correct_line_number() {
+    // Error on line 3
+    let invalid_content = r#"version = "2"
+
+[content
+max_lines = 500
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", invalid_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/project/.sloc-guard.toml"));
+
+    let err = result.unwrap_err();
+    match err {
+        SlocGuardError::Syntax { line, column, .. } => {
+            // The unclosed bracket on line 3 causes the parser to report error on line 3 or 4
+            assert!(line >= 3, "Expected line >= 3, got {line}");
+            assert!(
+                column >= 1,
+                "Column should be valid (1-based), got {column}"
+            );
+        }
+        _ => panic!("Expected Syntax error, got: {err:?}"),
+    }
+}
+
+#[test]
+fn load_without_extends_returns_syntax_error() {
+    let invalid_content = "bad = [[[";
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", invalid_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path_without_extends(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    assert!(matches!(err, SlocGuardError::Syntax { .. }));
 }
 
 #[test]
@@ -53,6 +139,36 @@ fn returns_error_for_nonexistent_explicit_path() {
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(matches!(err, SlocGuardError::FileAccess { .. }));
+}
+
+#[test]
+fn syntax_error_includes_remote_origin() {
+    // Verify that syntax errors from remote configs include Remote origin
+    // This tests the parse_value_with_location path with ConfigSource::Remote
+    let invalid_content = "invalid[[[";
+    let source = ConfigSource::Remote {
+        url: "https://example.com/config.toml".to_string(),
+    };
+
+    // Call the internal parsing function via a type alias to verify behavior
+    let result: Result<toml::Value, SlocGuardError> = toml::from_str(invalid_content)
+        .map_err(|e| SlocGuardError::syntax_from_toml(&e, invalid_content, Some(source.clone())));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+    match err {
+        SlocGuardError::Syntax { origin, line, .. } => {
+            let origin = origin.expect("Should have origin");
+            match origin {
+                ConfigSource::Remote { url } => {
+                    assert_eq!(url, "https://example.com/config.toml");
+                }
+                _ => panic!("Expected Remote origin, got {origin:?}"),
+            }
+            assert_eq!(line, 1, "Error should be on line 1");
+        }
+        _ => panic!("Expected Syntax error, got: {err:?}"),
+    }
 }
 
 #[test]

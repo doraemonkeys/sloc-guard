@@ -58,13 +58,13 @@ Addresses line number precision loss during extends inheritance and improves con
 |---------|---------|--------------|
 | 25.1a ✅ | `ConfigSource` enum (File/Remote/Preset) for origin tracking | None |
 | 25.1b ✅ | `CircularExtends { chain }`, `ExtendsTooDeep { depth, max, chain }`, `ExtendsResolution { path, base }` variants | 25.1a |
-| 25.1c | `Syntax { path, line, column, message }` variant - precise location for raw parse errors | 25.2 |
+| 25.1c ✅ | `Syntax { origin, line, column, message }` variant - precise location for raw parse errors | 25.2 |
 | 25.1d ✅ | `TypeMismatch { field, expected, actual, origin }`, `Semantic { field, message, origin, suggestion }` variants | 25.1a |
 
-**25.2 Dual-Path Loading Strategy**
-- Single-file mode: when no `extends`, parse directly from raw content (preserves precise line numbers)
+**25.2 Dual-Path Loading Strategy** ✅
+- Single-file mode: when no `extends`, parse directly from raw content (preserves precise line numbers via `Syntax` error)
 - Inheritance mode: when `extends` present, use source chain tracking instead of line numbers
-- Error messages use appropriate context for each mode (line:column vs source chain)
+- `span_to_line_col()` helper converts byte offset to 1-based line/column
 
 **25.4 Explain Config Source Chain**
 - `explain --config` shows full configuration inheritance chain
@@ -87,5 +87,5 @@ Addresses line number precision loss during extends inheritance and improves con
 | Priority               | Tasks                                                         |
 | ---------------------- | ------------------------------------------------------------- |
 | **19. Config Design**  | ~~24.1 Array Merge~~ ✅, ~~24.2 Offline Cache~~ ✅, ~~24.3 Check Behavior~~ ✅, ~~24.4 Cache Flag Unification~~ ✅ |
-| **20. Config Loader**  | ~~25.3 Depth Limit~~ ✅, ~~25.1a/b/d~~ ✅ → 25.2 → 25.1c → 25.4 → 25.5 |
+| **20. Config Loader**  | ~~25.3 Depth Limit~~ ✅, ~~25.1a/b/c/d~~ ✅, ~~25.2 Dual-Path~~ ✅ → 25.4 → 25.5 |
 
