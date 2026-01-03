@@ -66,12 +66,12 @@ max_lines = {}
 
 #[test]
 fn extends_chain_at_max_depth_succeeds() {
-    // Create a chain of configs exactly at MAX_EXTENDS_DEPTH (should succeed)
+    // Create a chain of configs where the deepest config reaches depth = MAX_EXTENDS_DEPTH.
+    // Since the check is `depth > MAX_EXTENDS_DEPTH`, depth 10 is allowed (passes).
     let mut fs = MockFileSystem::new();
 
-    // Build chain: 0 -> 1 -> 2 -> ... -> MAX_EXTENDS_DEPTH
-    // Depth 0 (initial) extends depth 1, which extends depth 2, etc.
-    // Total chain length = MAX_EXTENDS_DEPTH levels (not exceeding limit)
+    // Build chain: config_0 (depth 0) -> config_1 (depth 1) -> ... -> config_10 (depth 10)
+    // This creates 11 config files, with the terminal config at depth = MAX_EXTENDS_DEPTH.
     for i in 0..=MAX_EXTENDS_DEPTH {
         let content = if i == MAX_EXTENDS_DEPTH {
             // Terminal config (no extends)
@@ -102,7 +102,8 @@ max_lines = {}
     let loader = FileConfigLoader::with_fs(fs);
     let result = loader.load_from_path(Path::new("/config_0.toml"));
 
-    // Should succeed - chain is exactly at limit, not exceeding
+    // Should succeed - the deepest config is at depth 10, which equals MAX_EXTENDS_DEPTH.
+    // The check `depth > MAX_EXTENDS_DEPTH` passes because 10 > 10 is false.
     assert!(result.is_ok());
     // The innermost config's max_lines should be overridden by outer configs
     assert_eq!(result.unwrap().config.content.max_lines, 100);

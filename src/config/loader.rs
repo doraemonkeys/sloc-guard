@@ -52,6 +52,9 @@ const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
 const USER_CONFIG_NAME: &str = "config.toml";
 
 /// Maximum depth of extends chain to prevent stack overflow from deeply nested configs.
+///
+/// Depth starts at 0 (the initial config) and increments with each `extends` resolution.
+/// A value of 10 allows depths 0..=10 inclusive, meaning a chain of up to 11 config files.
 pub const MAX_EXTENDS_DEPTH: usize = 10;
 
 /// Validate config version. Returns an error if version is unsupported.
