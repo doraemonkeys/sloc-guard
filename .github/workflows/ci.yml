@@ -52,7 +52,31 @@ jobs:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
 
-  # Self-check with sloc-guard
+  # Self-check with freshly compiled sloc-guard (debug build for speed)
+  sloc-guard-dev:
+    name: SLOC Guard (Dev Build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # For --diff mode
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build sloc-guard (debug)
+        run: cargo build
+
+      - name: Run sloc-guard check
+        run: |
+          if [ -n "${{ github.event.pull_request.base.ref }}" ]; then
+            ./target/debug/sloc-guard check --diff "origin/${{ github.event.pull_request.base.ref }}"
+          else
+            ./target/debug/sloc-guard check
+          fi
+
+  # Self-check with sloc-guard action (for SARIF upload)
   sloc-guard:
     name: SLOC Guard
     runs-on: ubuntu-latest
