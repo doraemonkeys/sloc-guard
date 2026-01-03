@@ -637,3 +637,248 @@ fn derive_sibling_path_different_template() {
     let violations = checker.check_siblings(&files);
     assert!(violations.is_empty());
 }
+
+// ============================================================================
+// Empty Stem Edge Case Tests
+// ============================================================================
+// These tests verify behavior when files have empty stems (e.g., ".ts").
+// Directed rules still match via glob; Group rules reject empty stems.
+
+#[test]
+fn directed_rule_matches_empty_stem_file_and_expects_sibling() {
+    // Directed rules use glob matching (*.ts matches .ts), then derive sibling.
+    // File ".ts" matched → sibling "{stem}.spec" becomes ".spec".
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let files = vec![PathBuf::from("src/lib/.ts")];
+    let violations = checker.check_siblings(&files);
+
+    // Directed pattern "*.ts" matches ".ts", expects sibling ".spec" (missing)
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/lib/.ts"));
+}
+
+#[test]
+fn empty_stem_in_group_pattern_does_not_match() {
+    // When a file like ".ts" tries to match group pattern "{stem}.ts",
+    // extracting the stem would result in an empty string.
+    // With the fix, such files should NOT match the group pattern.
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.ts".to_string(), "{stem}.test.ts".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Only ".ts" has empty stem for pattern "{stem}.ts" AND doesn't match
+    // "{stem}.test.ts" (suffix mismatch). This file should not trigger
+    // any group checking because no pattern can extract a valid stem.
+    let files = vec![
+        PathBuf::from("src/lib/.ts"), // Empty stem for {stem}.ts, suffix mismatch for {stem}.test.ts
+    ];
+
+    let violations = checker.check_siblings(&files);
+    // Empty-stem file should be ignored (no violations because no valid stem match)
+    assert!(
+        violations.is_empty(),
+        "Expected no violations for empty-stem file, got {violations:?}"
+    );
+}
+
+#[test]
+fn file_matching_one_pattern_in_group_still_works() {
+    // ".test.ts" matches "{stem}.ts" with stem=".test" (not empty!), but
+    // returns None for "{stem}.test.ts" (empty stem). The file should still
+    // be considered part of the group via the first pattern.
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.ts".to_string(), "{stem}.test.ts".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // ".test.ts" matches "{stem}.ts" with stem=".test"
+    // It expects sibling ".test.test.ts" which is missing
+    let files = vec![PathBuf::from("src/lib/.test.ts")];
+
+    let violations = checker.check_siblings(&files);
+    // Should detect incomplete group because ".test.test.ts" is missing
+    assert_eq!(violations.len(), 1);
+    assert!(matches!(
+        &violations[0].violation_type,
+        ViolationType::GroupIncomplete { missing_patterns, .. }
+        if missing_patterns.contains(&"{stem}.test.ts".to_string())
+    ));
+}
+
+#[test]
+fn group_with_normal_files_still_works_after_empty_stem_fix() {
+    // Ensure the fix doesn't break normal group matching
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.ts".to_string(), "{stem}.test.ts".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Normal files with non-empty stems
+    let files = vec![
+        PathBuf::from("src/lib/Button.ts"),
+        PathBuf::from("src/lib/Button.test.ts"),
+    ];
+
+    let violations = checker.check_siblings(&files);
+    assert!(
+        violations.is_empty(),
+        "Complete group should have no violations"
+    );
+}
+
+#[test]
+fn group_missing_member_still_detected_after_empty_stem_fix() {
+    // Ensure the fix doesn't break detection of missing group members
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.ts".to_string(), "{stem}.test.ts".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Button.ts exists but Button.test.ts is missing
+    let files = vec![PathBuf::from("src/lib/Button.ts")];
+
+    let violations = checker.check_siblings(&files);
+    assert_eq!(violations.len(), 1);
+    assert!(matches!(
+        &violations[0].violation_type,
+        ViolationType::GroupIncomplete { missing_patterns, .. }
+        if missing_patterns.contains(&"{stem}.test.ts".to_string())
+    ));
+}
+
+#[test]
+fn single_char_stem_is_valid() {
+    // A single character stem like "a.ts" should be valid (not empty)
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec!["{stem}.ts".to_string(), "{stem}.test.ts".to_string()],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Single character stem - should still work
+    let files = vec![PathBuf::from("src/lib/a.ts")];
+
+    let violations = checker.check_siblings(&files);
+    // Should detect missing sibling "a.test.ts"
+    assert_eq!(violations.len(), 1);
+    assert!(matches!(
+        &violations[0].violation_type,
+        ViolationType::GroupIncomplete { missing_patterns, .. }
+        if missing_patterns.contains(&"{stem}.test.ts".to_string())
+    ));
+}
+
+#[test]
+fn prefix_pattern_with_empty_stem_not_matched() {
+    // Pattern like "test_{stem}.js" with file "test_.js" should not match
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec![
+                    "test_{stem}.js".to_string(),
+                    "test_{stem}.spec.js".to_string(),
+                ],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // "test_.js" would have empty stem with pattern "test_{stem}.js"
+    let files = vec![PathBuf::from("src/lib/test_.js")];
+
+    let violations = checker.check_siblings(&files);
+    // Empty stem file should not match the group pattern
+    assert!(
+        violations.is_empty(),
+        "Expected no violations for empty-stem file, got {violations:?}"
+    );
+}
+
+#[test]
+fn normal_prefixed_pattern_still_works() {
+    // Ensure prefix patterns work with normal (non-empty) stems
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            siblings: vec![SiblingRule::Group {
+                group: vec![
+                    "test_{stem}.js".to_string(),
+                    "test_{stem}.spec.js".to_string(),
+                ],
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    // Normal file with prefix pattern
+    let files = vec![PathBuf::from("src/lib/test_utils.js")];
+
+    let violations = checker.check_siblings(&files);
+    // Should detect missing sibling "test_utils.spec.js"
+    assert_eq!(violations.len(), 1);
+    assert!(matches!(
+        &violations[0].violation_type,
+        ViolationType::GroupIncomplete { missing_patterns, .. }
+        if missing_patterns.contains(&"test_{stem}.spec.js".to_string())
+    ));
+}

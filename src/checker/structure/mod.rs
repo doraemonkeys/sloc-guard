@@ -484,7 +484,8 @@ impl StructureChecker {
         let stem_start = prefix.len();
         let stem_end = file_name.len() - suffix.len();
 
-        if stem_start > stem_end {
+        // Reject both overlapping ranges AND empty stems (when stem_start == stem_end)
+        if stem_start >= stem_end {
             return None;
         }
 
