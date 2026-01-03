@@ -412,73 +412,24 @@ The hook uses `--staged` mode for fast incremental checks.
 
 ## Advanced Usage
 
-### GitHub Actions
+### CI Integration
 
-```yaml
-name: Code Quality
-on: [push, pull_request]
-
-jobs:
-  sloc-guard:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write  # Required for SARIF upload
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Required for --diff mode
-
-      - name: Run sloc-guard
-        uses: doraemonkeys/sloc-guard/.github/action@master
-        with:
-          sarif-output: results.sarif
-          # Only diff on PRs, check all files on push
-          diff: ${{ github.event.pull_request.base.ref && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
-
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: results.sarif
-```
-
-See [Action README](.github/action/README.md) for all available inputs and outputs.
+See [GitHub Action README](.github/action/README.md) for GitHub Actions, GitLab CI, Jenkins, Azure Pipelines, CircleCI examples.
 
 ### Docker
 
 ```bash
-# Linux/macOS/WSL
 docker run --rm -v $(pwd):/workspace -w /workspace ghcr.io/doraemonkeys/sloc-guard check
-
-# PowerShell
-docker run --rm -v "${PWD}:/workspace" -w /workspace ghcr.io/doraemonkeys/sloc-guard check
 ```
 
-Build locally:
-```bash
-docker build -t sloc-guard .
-```
+### Monorepo & More Examples
 
-### Monorepo Setup
-
-```toml
-version = "2"
-extends = "preset:monorepo-base"
-
-[scanner]
-exclude = [".git/**", "node_modules/**", "target/**", "dist/**"]
-
-[[structure.rules]]
-scope = "packages/*"
-max_files = 50
-max_dirs = 15
-
-[[structure.rules]]
-scope = "packages/*/src/**"
-siblings = [
-    { group = ["index.ts", "types.ts"] }  # If one exists, both must exist
-]
-```
+See [Recipes & Examples](docs/RECIPES.md) for configuration patterns including:
+- Monorepo setup
+- React/Next.js projects
+- Rust/Go/Python projects
+- Temporary exemptions
+- Remote config inheritance
 
 ---
 

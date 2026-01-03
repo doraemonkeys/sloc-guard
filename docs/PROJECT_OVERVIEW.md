@@ -2,6 +2,7 @@
 
 > **Doc Maintenance**: Keep concise, avoid redundancy, clean up outdated content promptly to reduce AI context usage.
 > **Scope**: This document reflects the current codebase state only and does not describe future plans.
+> **Goal**: Help AI quickly locate relevant code by module, type, and data flow.
 
 **SLOC (Source Lines of Code) enforcement tool** - enforces file size limits by counting code lines (excluding comments and blanks) and enforces directory structure limits (file/folder counts).
 
@@ -35,24 +36,22 @@ Rust CLI tool | Clap v4 | TOML config | Exit: 0=pass, 1=threshold exceeded, 2=co
 
 ```rust
 // Config (priority: CLI > file > defaults; extends: local/remote/preset)
-// Remote cache: state directory (`.git/sloc-guard/remote-configs/` or `.sloc-guard/remote-configs/`)
-// Presets: extends = "preset:rust-strict|node-strict|python-strict|monorepo-base"
-// Hash Lock: extends_sha256 = "<sha256>" verifies remote config integrity
-// Array Merge: arrays append (parent + child); use "$reset" as first element to clear parent
+// Presets: preset:rust-strict|node-strict|python-strict|monorepo-base
+// Array Merge: arrays append (parent + child); use "$reset" to clear parent
 FetchPolicy::Normal | Offline | ForceRefresh
 Config { version, extends, extends_sha256, scanner, content, structure, baseline, trend, stats, check }
-ScannerConfig { gitignore: true, exclude: Vec<glob> }  // Physical discovery, no extension filter
-CheckConfig { warnings_as_errors, fail_fast }  // Check behavior: treat warnings as errors, stop on first failure
-BaselineConfig { ratchet: Option<RatchetMode> }  // Ratchet enforcement: warn|auto|strict
-TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta, auto_snapshot_on_check }  // Retention, significance, and auto-snapshot
-StatsConfig { report: StatsReportConfig }  // Stats command configuration
-StatsReportConfig { exclude, top_count, breakdown_by, depth, trend_since }  // [stats.report] section for report defaults
-ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }  // exclude: glob patterns to skip SLOC but keep for structure, warn_at: absolute line threshold
-ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }  // [[content.rules]], warn_at takes precedence over warn_threshold
+ScannerConfig { gitignore, exclude }
+CheckConfig { warnings_as_errors, fail_fast }
+BaselineConfig { ratchet: Option<RatchetMode> }
+TrendConfig { max_entries, max_age_days, min_interval_secs, min_code_delta, auto_snapshot_on_check }
+StatsConfig { report: StatsReportConfig }
+StatsReportConfig { exclude, top_count, breakdown_by, depth, trend_since }
+ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }
+ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, rules }
-StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, siblings, reason, expires }  // [[structure.rules]]
-SiblingRule::Directed { match_pattern, require: Vec<String>, severity } | Group { group: Vec<String>, severity }  // Directed: match→require. Group: if any exists, all must exist
-SiblingSeverity::Error | Warn  // Sibling violation severity
+StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, siblings, reason, expires }
+SiblingRule::Directed { match_pattern, require, severity } | Group { group, severity }
+SiblingSeverity::Error | Warn
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
 
 // Line counting (ignore directives: ignore-file, ignore-next N, ignore-start/end)
@@ -65,12 +64,10 @@ CheckResult::Passed { path, stats, limit, override_reason, violation_category }
           | Warning { ..., suggestions }
           | Failed { ..., suggestions }
           | Grandfathered { ... }
-ViolationCategory::Content | Structure { violation_type, triggering_rule }  // distinguishes SLOC vs structure violations
-// Accessor methods: path(), stats(), limit(), override_reason(), suggestions(), violation_category()
-// Consuming: into_grandfathered(), with_suggestions()
+ViolationCategory::Content | Structure { violation_type, triggering_rule }
 
 // Structure checking
-DirStats { file_count, dir_count, depth }  // immediate children counts + depth from scan root
+DirStats { file_count, dir_count, depth }
 ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DisallowedDirectory | DeniedFile { pattern_or_extension } | DeniedDirectory { pattern } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern } | GroupIncomplete { group_patterns, missing_members }
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
@@ -89,36 +86,27 @@ ColorMode::Auto | Always | Never
 // Stats
 FileStatistics { path, stats, language }
 ProjectStatistics { files, total_*, by_language, by_directory, top_files, average_code_lines, trend, output_mode }
-FileSortOrder::Code | Total | Comment | Blank | Name  // --sort option for stats files (unified: output re-exported via cli)
-StatsOutputMode::Full | SummaryOnly | FilesOnly  // Explicit output mode for formatters
+FileSortOrder::Code | Total | Comment | Blank | Name
+StatsOutputMode::Full | SummaryOnly | FilesOnly
 GroupBy::None | Lang | Dir
 
-// Trend (state::history_path() → .git/sloc-guard/history.json or .sloc-guard/history.json)
+// Trend (state::history_path())
 TrendEntry { timestamp, total_files, total_lines, code, comment, blank, git_ref?, git_branch? }
 TrendDelta { *_delta, previous_timestamp, previous_git_ref?, previous_git_branch? }
-// Git context: TrendEntry stores optional git_ref (short commit hash) and git_branch at snapshot time
-// Retention: TrendHistory::apply_retention() removes old entries, should_add() respects min_interval_secs
-// Significance: TrendDelta::is_significant(config) → true if |code_delta| > min_code_delta OR files_delta != 0
-// Flexible comparison: --since <duration> (7d, 1w, 12h) → find_entry_at_or_before(), compute_delta_since()
-// History command: `stats history` subcommand lists recent entries (--limit N, --format text|json)
+// TrendHistory: apply_retention(), should_add(), find_entry_at_or_before(), compute_delta_since()
 
 // Git/Baseline/Cache
-GitContext { commit, branch? }  // Git repository state at a point in time
-GitContext::from_path(path) → Option<GitContext>  // Get current git context for a path
-GitDiff::get_changed_files(base_ref) → HashSet<PathBuf>  // --diff ref (compares to HEAD)
-GitDiff::get_changed_files_range(base, target) → HashSet<PathBuf>  // --diff base..target
-GitDiff::get_staged_files() → HashSet<PathBuf>  // --staged mode
-// Baseline (.sloc-guard-baseline.json in project root)
-Baseline { version: 2, files: HashMap<path, BaselineEntry> }
+GitContext { commit, branch? }
+GitContext::from_path(path) → Option<GitContext>
+GitDiff::get_changed_files(base_ref), get_changed_files_range(base, target), get_staged_files()
+Baseline { version, files: HashMap<path, BaselineEntry> }
 BaselineEntry::Content { lines, hash } | Structure { violation_type, count }
 StructureViolationType::Files | Dirs
-BaselineUpdateMode::All | Content | Structure | New  // --update-baseline mode
-RatchetMode::Warn | Auto | Strict  // --ratchet mode: enforce violation count can only decrease
-RatchetResult { stale_entries, stale_paths }  // Result of ratchet check
-// Cache (state::cache_path() → .git/sloc-guard/cache.json or .sloc-guard/cache.json)
+BaselineUpdateMode::All | Content | Structure | New
+RatchetMode::Warn | Auto | Strict
+RatchetResult { stale_entries, stale_paths }
 Cache { version, config_hash, files: HashMap<path, CacheEntry{hash, stats, mtime, size}> }
-// File locking (state module) - prevents concurrent access corruption
-LockError::Timeout | Io(io::Error)  // try_lock_*_with_timeout returns Result<(), LockError>
+LockError::Timeout | Io(io::Error)
 
 // Split suggestions (--suggest)
 FunctionInfo { name, start_line, end_line, line_count }
@@ -126,22 +114,22 @@ SplitSuggestion { original_path, total_lines, limit, functions, chunks }
 FunctionParser: Rust, Go, Python, JS/TS, C/C++
 
 // Context for DI (commands/context.rs)
-FileReader trait { read(), metadata() }  // IO abstraction for file reading
-RealFileReader  // Production impl using std::fs
-FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }  // IO abstraction for directory traversal
-ScanResult { files, dir_stats, allowlist_violations }  // Unified scan output
-StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules, global_allow_extensions, global_allow_files, global_allow_dirs, global_deny_extensions, global_deny_patterns, global_deny_files }  // Config for structure-aware scanning
-AllowlistRule { scope, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, naming_pattern_str }  // Directory allowlist matching
-CompositeScanner  // Production impl with git/non-git fallback
-CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }  // from_config() or new()
-CheckOptions { args, cli, paths, config, ctx, cache, baseline, project_root }  // Encapsulates run_check_with_context params
-StatsContext { registry, allowed_extensions }  // from_config() or new()
+FileReader trait { read(), metadata() }
+RealFileReader
+FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }
+ScanResult { files, dir_stats, allowlist_violations }
+StructureScanConfig { count_exclude, scanner_exclude, scanner_exclude_dir_names, allowlist_rules, global_allow_*, global_deny_* }
+AllowlistRule { scope, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, naming_pattern_str }
+CompositeScanner
+CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }
+CheckOptions { args, cli, paths, config, ctx, cache, baseline, project_root }
+StatsContext { registry, allowed_extensions }
 
 // Project Detection (init --detect)
-ProjectType::Rust | Node | Go | Python | Java | CSharp | Unknown  // auto-detected from marker files
-DetectedProject { path, project_type }  // subproject in monorepo
-DetectionResult { root, subprojects, is_monorepo }  // detection output
-ProjectDetector trait { exists(), list_subdirs(), list_files() }  // for testability
+ProjectType::Rust | Node | Go | Python | Java | CSharp | Unknown
+DetectedProject { path, project_type }
+DetectionResult { root, subprojects, is_monorepo }
+ProjectDetector trait { exists(), list_subdirs(), list_files() }
 ```
 
 ## Data Flow
