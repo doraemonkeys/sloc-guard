@@ -408,6 +408,72 @@ fn stats_trend_invalid_since_falls_back() {
         .stdout(predicate::str::contains("Summary"));
 }
 
+#[test]
+fn stats_trend_shows_summary_only_not_file_list() {
+    // Regression test: stats trend should only show summary + trend delta,
+    // not the full file list (which was the bug behavior)
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+    fixture.create_rust_file("src/lib.rs", 30);
+    fixture.create_rust_file("src/utils.rs", 20);
+
+    let history_path = fixture.path().join("history.json");
+    std::fs::write(
+        &history_path,
+        r#"{"version": 1, "entries": [{"timestamp": 1735000000, "total_files": 2, "total_lines": 70, "code": 60, "comment": 5, "blank": 5}]}"#,
+    ).unwrap();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-sloc-cache",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        // Should show summary
+        .stdout(predicate::str::contains("Summary"))
+        .stdout(predicate::str::contains("Files:"))
+        // Should show trend delta
+        .stdout(predicate::str::contains("Changes since"))
+        // Should NOT show file list (the bug was showing all files before summary)
+        .stdout(predicate::str::contains("Files (").not())
+        .stdout(predicate::str::contains("main.rs").not())
+        .stdout(predicate::str::contains("lib.rs").not())
+        .stdout(predicate::str::contains("utils.rs").not());
+}
+
+#[test]
+fn stats_trend_without_history_shows_summary_only() {
+    // Even without history (no trend delta), should show summary only
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 50);
+    fixture.create_rust_file("src/lib.rs", 30);
+
+    let history_path = fixture.path().join("empty-history.json");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "stats",
+            "trend",
+            "--no-sloc-cache",
+            "--history-file",
+            history_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Summary"))
+        // Should NOT show file list
+        .stdout(predicate::str::contains("Files (").not())
+        .stdout(predicate::str::contains("main.rs").not());
+}
+
 // =============================================================================
 // History Subcommand Tests
 // =============================================================================

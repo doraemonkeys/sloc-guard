@@ -150,11 +150,11 @@ fn run_trend(args: &TrendArgs, cli: &Cli) -> crate::Result<i32> {
         },
     );
 
-    // Apply trend to stats for display
+    // Apply trend to stats for display (trend subcommand shows summary only with trend delta)
     let project_stats = if let Some(delta) = trend {
-        project_stats.with_trend(delta)
+        project_stats.with_trend(delta).with_summary_only()
     } else {
-        project_stats
+        project_stats.with_summary_only()
     };
 
     let color_mode = color_choice_to_mode(cli.color);

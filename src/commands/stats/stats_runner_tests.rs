@@ -250,6 +250,37 @@ fn run_stats_trend_with_since() {
     assert_eq!(exit_code, EXIT_SUCCESS);
 }
 
+#[test]
+fn run_stats_trend_json_excludes_file_list() {
+    // Regression test: trend should use SummaryOnly mode, not output file list
+    let temp_dir = TempDir::new().unwrap();
+    let history_path = temp_dir.path().join("history.json");
+
+    // Create a history file with an entry
+    let history_content = r#"{
+        "version": 1,
+        "entries": [
+            {"timestamp": 1735048800, "total_files": 100, "total_lines": 5500, "code": 5000, "comment": 300, "blank": 200}
+        ]
+    }"#;
+    std::fs::write(&history_path, history_content).unwrap();
+
+    let args = StatsArgs {
+        action: StatsAction::Trend(TrendArgs {
+            common: make_common_args(vec![PathBuf::from("src")], Some(vec!["rs".to_string()])),
+            since: None,
+            history_file: Some(history_path),
+            format: StatsOutputFormat::Json,
+        }),
+    };
+
+    let cli = make_cli_for_stats(ColorChoice::Never, 0, true, true);
+    let exit_code = run_stats(&args, &cli);
+    assert_eq!(exit_code, EXIT_SUCCESS);
+    // Note: The actual output validation is done in integration tests.
+    // This unit test verifies the command runs successfully with JSON format.
+}
+
 // ============================================================================
 // Error Handling Tests
 // ============================================================================
