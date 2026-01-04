@@ -513,5 +513,5 @@ fn format_config_text(exp: &ConfigExplanation) -> String {
 }
 
 #[cfg(test)]
-#[path = "explain_tests.rs"]
+#[path = "explain_tests/mod.rs"]
 mod tests;
