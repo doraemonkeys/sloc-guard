@@ -62,30 +62,21 @@ Addresses line number precision loss during extends inheritance and improves con
 | 25.1d ✅ | `TypeMismatch { field, expected, actual, origin }`, `Semantic { field, message, origin, suggestion }` variants | 25.1a |
 
 **25.2 Dual-Path Loading Strategy** ✅
+
 - Single-file mode: when no `extends`, parse directly from raw content (preserves precise line numbers via `Syntax` error)
 - Inheritance mode: when `extends` present, use source chain tracking instead of line numbers
 - `span_to_line_col()` helper converts byte offset to 1-based line/column
 
-**25.4 Explain Config Source Chain**
+**25.4 Explain Config Source Chain** ✅
+
 - `explain --config` shows full configuration inheritance chain
 - Display field values with their origin sources (preset → remote → local)
 - Show which config contributed which settings
 
-**25.5 Loader Single Responsibility Split** *(optional)*
-- Split `FileConfigLoader` into focused components:
-  - `ConfigReader` trait - I/O abstraction (local/remote read)
-  - `ConfigParser` - pure parsing, returns syntax errors with precise line numbers
-  - `InheritanceResolver` - extends chain resolution with depth/cycle checks
-  - `ConfigValidator` - semantic validation (business rules)
-- `ConfigLoader` composes these components via DI
-- Enables independent testing and IDE integration (parser-only for syntax check)
-
----
-
 ## Priority Order
 
-| Priority               | Tasks                                                         |
-| ---------------------- | ------------------------------------------------------------- |
-| **19. Config Design**  | ~~24.1 Array Merge~~ ✅, ~~24.2 Offline Cache~~ ✅, ~~24.3 Check Behavior~~ ✅, ~~24.4 Cache Flag Unification~~ ✅ |
-| **20. Config Loader**  | ~~25.3 Depth Limit~~ ✅, ~~25.1a/b/c/d~~ ✅, ~~25.2 Dual-Path~~ ✅ → 25.4 → 25.5 |
+| Priority              | Tasks                                                        |
+| --------------------- | ------------------------------------------------------------ |
+| **19. Config Design** | ~~24.1 Array Merge~~ ✅, ~~24.2 Offline Cache~~ ✅, ~~24.3 Check Behavior~~ ✅, ~~24.4 Cache Flag Unification~~ ✅ |
+| **20. Config Loader** | ~~25.3 Depth Limit~~ ✅, ~~25.1a/b/c/d~~ ✅, ~~25.2 Dual-Path~~ ✅ → ~~25.4~~ ✅ |
 
