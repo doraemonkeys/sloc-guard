@@ -6,6 +6,7 @@ pub(crate) mod merge;
 mod model;
 pub mod presets;
 mod remote;
+mod validation;
 
 pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
 pub use extends::SourcedConfig;
@@ -21,6 +22,7 @@ pub use model::{
 pub use remote::{
     FetchPolicy, clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url,
 };
+pub(crate) use validation::validate_config_semantics;
 
 #[cfg(test)]
 mod tests {

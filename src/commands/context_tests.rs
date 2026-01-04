@@ -1,7 +1,7 @@
 use crate::cli::ColorChoice;
-use crate::config::{Config, FetchPolicy, StructureConfig, StructureRule};
+use crate::config::{Config, FetchPolicy, LoadResult, StructureConfig, StructureRule};
 use crate::output::ColorMode;
-use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
+use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED, Result, SlocGuardError};
 use std::io;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -10,6 +10,40 @@ use tempfile::TempDir;
 use super::*;
 use crate::cache::Cache;
 use crate::language::LanguageRegistry;
+
+// =============================================================================
+// Test Helpers
+// =============================================================================
+
+/// Helper to load config from inline content without manual `TempDir` boilerplate.
+///
+/// Returns the `TempDir` guard alongside the result to ensure the temp directory
+/// lives long enough for the test assertions.
+fn load_config_from_content(content: &str) -> (TempDir, Result<LoadResult>) {
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join("test.toml");
+    std::fs::write(&config_path, content).unwrap();
+    let result = load_config(Some(&config_path), false, false, FetchPolicy::Normal);
+    (temp_dir, result)
+}
+
+/// Asserts that the result is a `SlocGuardError::Config` containing the expected substring.
+fn assert_config_error_contains(result: Result<LoadResult>, expected_substring: &str) {
+    match result {
+        Err(SlocGuardError::Config(msg)) => {
+            assert!(
+                msg.contains(expected_substring),
+                "expected error containing '{expected_substring}', got: {msg}"
+            );
+        }
+        Err(other) => panic!(
+            "expected SlocGuardError::Config containing '{expected_substring}', got: {other}"
+        ),
+        Ok(_) => {
+            panic!("expected SlocGuardError::Config containing '{expected_substring}', but got Ok")
+        }
+    }
+}
 
 #[test]
 fn exit_codes_documented() {
@@ -141,6 +175,142 @@ max_lines = 200
     );
     // preset_used is None when extends is not resolved
     assert!(result.preset_used.is_none());
+}
+
+// =============================================================================
+// load_config Semantic Validation Tests
+// =============================================================================
+
+#[test]
+fn load_config_rejects_invalid_content_warn_threshold_too_high() {
+    let (_temp_dir, result) = load_config_from_content(
+        r#"
+version = "2"
+[content]
+warn_threshold = 1.5
+"#,
+    );
+    assert_config_error_contains(result, "warn_threshold");
+}
+
+#[test]
+fn load_config_rejects_invalid_content_warn_threshold_negative() {
+    let (_temp_dir, result) = load_config_from_content(
+        r#"
+version = "2"
+[content]
+warn_threshold = -0.1
+"#,
+    );
+    assert_config_error_contains(result, "warn_threshold");
+}
+
+#[test]
+fn load_config_rejects_invalid_structure_warn_threshold() {
+    let (_temp_dir, result) = load_config_from_content(
+        r#"
+version = "2"
+[structure]
+warn_threshold = 2.0
+"#,
+    );
+    assert_config_error_contains(result, "structure.warn_threshold");
+}
+
+#[test]
+fn load_config_rejects_warn_at_exceeds_max_lines() {
+    let (_temp_dir, result) = load_config_from_content(
+        r#"
+version = "2"
+[content]
+max_lines = 500
+warn_at = 600
+"#,
+    );
+    assert_config_error_contains(result, "warn_at");
+}
+
+#[test]
+fn load_config_rejects_invalid_glob_pattern() {
+    let (_temp_dir, result) = load_config_from_content(
+        r#"
+version = "2"
+[scanner]
+exclude = ["[invalid"]
+"#,
+    );
+    // Glob pattern errors use SlocGuardError::InvalidPattern variant
+    match result {
+        Err(SlocGuardError::InvalidPattern { pattern, .. }) => {
+            assert!(
+                pattern.contains("[invalid"),
+                "expected pattern '[invalid', got: {pattern}"
+            );
+        }
+        Err(other) => panic!("expected SlocGuardError::InvalidPattern, got: {other}"),
+        Ok(_) => panic!("expected SlocGuardError::InvalidPattern, but got Ok"),
+    }
+}
+
+#[test]
+fn load_config_accepts_valid_config() {
+    let (_temp_dir, result) = load_config_from_content(
+        r#"
+version = "2"
+[content]
+max_lines = 500
+warn_threshold = 0.8
+warn_at = 400
+[structure]
+warn_threshold = 0.9
+"#,
+    );
+    assert!(result.is_ok(), "valid config should be accepted");
+    let config = result.unwrap().config;
+    assert_eq!(config.content.max_lines, 500);
+    assert!((config.content.warn_threshold - 0.8).abs() < f64::EPSILON);
+}
+
+/// Validates that semantic errors from parent configs are caught after extends resolution.
+///
+/// The "two-phase" design:
+/// 1. Config loading resolves extends chain and merges values
+/// 2. Semantic validation runs on the final merged config
+///
+/// This test confirms that invalid values inherited from a parent config
+/// are properly rejected during semantic validation.
+#[test]
+fn load_config_rejects_invalid_threshold_from_extended_parent() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Parent config with invalid warn_threshold (out of 0.0-1.0 range)
+    let parent_path = temp_dir.path().join("parent.toml");
+    std::fs::write(
+        &parent_path,
+        r#"
+version = "2"
+[content]
+warn_threshold = 1.5
+"#,
+    )
+    .unwrap();
+
+    // Child extends parent using relative path (inherits invalid warn_threshold)
+    let child_path = temp_dir.path().join("child.toml");
+    std::fs::write(
+        &child_path,
+        r#"
+version = "2"
+extends = "parent.toml"
+[content]
+max_lines = 300
+"#,
+    )
+    .unwrap();
+
+    // Load child config - should fail due to inherited invalid warn_threshold
+    let result = load_config(Some(&child_path), false, false, FetchPolicy::Normal);
+    assert_config_error_contains(result, "warn_threshold");
 }
 
 #[test]

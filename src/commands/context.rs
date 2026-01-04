@@ -10,7 +10,9 @@ use sha2::{Digest, Sha256};
 use crate::cache::Cache;
 use crate::checker::{StructureChecker, ThresholdChecker};
 use crate::cli::ColorChoice;
-use crate::config::{Config, ConfigLoader, FetchPolicy, FileConfigLoader, LoadResult};
+use crate::config::{
+    Config, ConfigLoader, FetchPolicy, FileConfigLoader, LoadResult, validate_config_semantics,
+};
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
@@ -139,14 +141,19 @@ pub(crate) fn load_config(
     let project_root = Some(resolve_project_root());
 
     let loader = FileConfigLoader::with_options(extends_policy, project_root);
-    if no_extends {
+    let result = if no_extends {
         config_path.map_or_else(
             || loader.load_without_extends(),
             |path| loader.load_from_path_without_extends(path),
         )
     } else {
         config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
-    }
+    }?;
+
+    // Validate semantic correctness after loading
+    validate_config_semantics(&result.config)?;
+
+    Ok(result)
 }
 
 /// Resolves the project root directory.
