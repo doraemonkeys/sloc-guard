@@ -2,7 +2,9 @@
 
 use toml::Value;
 
-use crate::config::merge::{RESET_MARKER, has_reset_marker, is_reset_element, merge_arrays};
+use crate::config::merge::{
+    RESET_MARKER, has_any_reset_markers, has_reset_marker, is_reset_element, merge_arrays,
+};
 
 #[test]
 fn is_reset_element_detects_string_marker() {
@@ -204,4 +206,153 @@ fn merge_arrays_reset_table_clears_base() {
 
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0].get("pattern").unwrap().as_str().unwrap(), "**/*.go");
+}
+
+// ===== has_any_reset_markers tests =====
+
+#[test]
+fn has_any_reset_markers_returns_false_for_empty_table() {
+    let value = Value::Table(toml::map::Map::new());
+    assert!(!has_any_reset_markers(&value));
+}
+
+#[test]
+fn has_any_reset_markers_returns_false_for_simple_values() {
+    assert!(!has_any_reset_markers(&Value::String("hello".to_string())));
+    assert!(!has_any_reset_markers(&Value::Integer(42)));
+    assert!(!has_any_reset_markers(&Value::Boolean(true)));
+}
+
+#[test]
+fn has_any_reset_markers_returns_false_for_array_without_markers() {
+    let arr = Value::Array(vec![
+        Value::String("pattern1".to_string()),
+        Value::String("pattern2".to_string()),
+    ]);
+    assert!(!has_any_reset_markers(&arr));
+}
+
+#[test]
+fn has_any_reset_markers_detects_string_marker_in_array() {
+    let arr = Value::Array(vec![
+        Value::String(RESET_MARKER.to_string()),
+        Value::String("pattern1".to_string()),
+    ]);
+    assert!(has_any_reset_markers(&arr));
+}
+
+#[test]
+fn has_any_reset_markers_detects_table_marker_in_array() {
+    let mut reset_table = toml::map::Map::new();
+    reset_table.insert(
+        "pattern".to_string(),
+        Value::String(RESET_MARKER.to_string()),
+    );
+
+    let arr = Value::Array(vec![Value::Table(reset_table)]);
+    assert!(has_any_reset_markers(&arr));
+}
+
+#[test]
+fn has_any_reset_markers_detects_nested_marker_in_table() {
+    // Create: { scanner: { exclude: ["$reset", "pattern"] } }
+    let exclude_arr = Value::Array(vec![
+        Value::String(RESET_MARKER.to_string()),
+        Value::String("**/build/**".to_string()),
+    ]);
+
+    let mut scanner = toml::map::Map::new();
+    scanner.insert("exclude".to_string(), exclude_arr);
+
+    let mut root = toml::map::Map::new();
+    root.insert("scanner".to_string(), Value::Table(scanner));
+
+    assert!(has_any_reset_markers(&Value::Table(root)));
+}
+
+#[test]
+fn has_any_reset_markers_detects_deeply_nested_marker() {
+    // Create: { content: { rules: [{ pattern: "$reset" }] } }
+    let mut reset_rule = toml::map::Map::new();
+    reset_rule.insert(
+        "pattern".to_string(),
+        Value::String(RESET_MARKER.to_string()),
+    );
+
+    let rules_arr = Value::Array(vec![Value::Table(reset_rule)]);
+
+    let mut content = toml::map::Map::new();
+    content.insert("rules".to_string(), rules_arr);
+
+    let mut root = toml::map::Map::new();
+    root.insert("content".to_string(), Value::Table(content));
+
+    assert!(has_any_reset_markers(&Value::Table(root)));
+}
+
+#[test]
+fn has_any_reset_markers_returns_false_for_typical_config() {
+    // Typical config without any reset markers
+    let mut content = toml::map::Map::new();
+    content.insert("max_lines".to_string(), Value::Integer(500));
+    content.insert(
+        "extensions".to_string(),
+        Value::Array(vec![
+            Value::String("rs".to_string()),
+            Value::String("py".to_string()),
+        ]),
+    );
+
+    let mut rule = toml::map::Map::new();
+    rule.insert("pattern".to_string(), Value::String("**/*.rs".to_string()));
+    rule.insert("max_lines".to_string(), Value::Integer(300));
+    content.insert("rules".to_string(), Value::Array(vec![Value::Table(rule)]));
+
+    let mut root = toml::map::Map::new();
+    root.insert("version".to_string(), Value::String("2".to_string()));
+    root.insert("content".to_string(), Value::Table(content));
+
+    assert!(!has_any_reset_markers(&Value::Table(root)));
+}
+
+#[test]
+fn has_any_reset_markers_detects_marker_in_non_first_position() {
+    // "$reset" in an invalid (non-first) position must still be detected
+    // so that validate_reset_positions can catch and reject it
+    let arr = Value::Array(vec![
+        Value::String("pattern1".to_string()),
+        Value::String(RESET_MARKER.to_string()), // Invalid position
+        Value::String("pattern2".to_string()),
+    ]);
+    assert!(has_any_reset_markers(&arr));
+}
+
+#[test]
+fn has_any_reset_markers_detects_marker_at_end_of_array() {
+    // Edge case: marker at the very end
+    let arr = Value::Array(vec![
+        Value::String("first".to_string()),
+        Value::String("second".to_string()),
+        Value::String(RESET_MARKER.to_string()), // End position
+    ]);
+    assert!(has_any_reset_markers(&arr));
+}
+
+#[test]
+fn has_any_reset_markers_detects_nested_table_marker_in_non_first_position() {
+    // Table marker in non-first position of rules array
+    let mut normal_rule = toml::map::Map::new();
+    normal_rule.insert("pattern".to_string(), Value::String("src/**".to_string()));
+
+    let mut reset_rule = toml::map::Map::new();
+    reset_rule.insert(
+        "pattern".to_string(),
+        Value::String(RESET_MARKER.to_string()),
+    );
+
+    let arr = Value::Array(vec![
+        Value::Table(normal_rule),
+        Value::Table(reset_rule), // Invalid: not in first position
+    ]);
+    assert!(has_any_reset_markers(&arr));
 }

@@ -171,6 +171,184 @@ fn syntax_error_includes_remote_origin() {
     }
 }
 
+// ===== Line number preservation tests =====
+// These tests verify that type errors report correct line numbers
+// by parsing directly from original content (not via toml::Value re-serialization)
+
+#[test]
+fn type_error_has_precise_line_number_single_file() {
+    // Type error on line 8 (max_lines expects integer, got string)
+    // The blank lines and comments should NOT affect the line number
+    let config_content = r#"version = "2"
+
+# This is a comment
+[content]
+
+# Another comment
+extensions = ["rs"]
+max_lines = "not_a_number"
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    // Check error message contains the correct line number
+    let msg = err.to_string();
+    assert!(
+        msg.contains("line 8"),
+        "Expected error on line 8, got: {msg}"
+    );
+}
+
+#[test]
+fn type_error_with_blank_lines_preserved() {
+    // Error is on line 10 due to blank lines before it
+    let config_content = r#"version = "2"
+
+[scanner]
+gitignore = true
+
+[content]
+extensions = ["rs"]
+
+# Type error: warn_at expects usize, got negative
+warn_at = -900
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    // Line 10 is where warn_at = -900 is
+    let msg = err.to_string();
+    assert!(
+        msg.contains("line 10"),
+        "Expected error on line 10, got: {msg}"
+    );
+}
+
+#[test]
+fn type_error_in_content_rule_has_correct_line() {
+    // Error on line 9 (max_lines in rule expects integer)
+    let config_content = r#"version = "2"
+
+[content]
+extensions = ["rs"]
+
+[[content.rules]]
+pattern = "**/*.rs"
+max_lines = "bad"
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let msg = err.to_string();
+    assert!(
+        msg.contains("line 8"),
+        "Expected error on line 8, got: {msg}"
+    );
+}
+
+#[test]
+fn type_error_with_reset_marker_still_works() {
+    // Config with $reset marker - line numbers may shift but should not crash
+    let config_content = r#"version = "2"
+
+[scanner]
+exclude = ["$reset", "**/build/**"]
+
+[content]
+max_lines = "not_a_number"
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    // With reset markers, we go through Value path - line may differ
+    // Just verify it produces a parseable error message
+    let msg = err.to_string();
+    assert!(
+        msg.contains("max_lines") || msg.contains("integer") || msg.contains("string"),
+        "Expected type error mentioning field or types, got: {msg}"
+    );
+}
+
+#[test]
+fn line_number_preserved_with_multiline_arrays() {
+    // Error on line 12 after multiline array
+    let config_content = r#"version = "2"
+
+[scanner]
+exclude = [
+    "**/target/**",
+    "**/vendor/**",
+    "**/node_modules/**"
+]
+
+[content]
+max_lines = "invalid"
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let msg = err.to_string();
+    assert!(
+        msg.contains("line 11"),
+        "Expected error on line 11, got: {msg}"
+    );
+}
+
+#[test]
+fn line_number_preserved_in_load_without_extends() {
+    // Verify load_from_path_without_extends also preserves line numbers
+    let config_content = r#"version = "2"
+
+# Comment
+[content]
+max_lines = "bad"
+"#;
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path_without_extends(Path::new("/project/.sloc-guard.toml"));
+
+    assert!(result.is_err());
+    let err = result.unwrap_err();
+
+    let msg = err.to_string();
+    assert!(
+        msg.contains("line 5"),
+        "Expected error on line 5, got: {msg}"
+    );
+}
+
 #[test]
 fn parses_full_v2_config() {
     let config_content = r#"

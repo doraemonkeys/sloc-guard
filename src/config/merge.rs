@@ -104,6 +104,25 @@ pub fn strip_reset_markers(value: &mut toml::Value) {
     }
 }
 
+/// Check if a TOML value contains any reset markers anywhere in its structure.
+///
+/// Used to determine whether we can skip the serialize-then-parse path
+/// for configs without reset markers (preserving precise line numbers).
+///
+/// Detects markers at ANY array position (including invalid non-first positions)
+/// so that `validate_reset_positions` can catch misplaced markers.
+pub fn has_any_reset_markers(value: &toml::Value) -> bool {
+    match value {
+        toml::Value::Table(table) => table.values().any(has_any_reset_markers),
+        toml::Value::Array(arr) => {
+            // Check if ANY element is a reset marker (at any position), or recursively contains one
+            arr.iter()
+                .any(|v| is_reset_element(v) || has_any_reset_markers(v))
+        }
+        _ => false,
+    }
+}
+
 /// Validate that `$reset` markers are only in first position of arrays.
 /// Returns an error if `$reset` is found in any position other than first.
 pub fn validate_reset_positions(value: &toml::Value, path: &str) -> Result<()> {

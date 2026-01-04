@@ -12,7 +12,7 @@ use crate::error::{ConfigSource, Result, SlocGuardError};
 use super::Config;
 use super::extends::ExtendsResolver;
 use super::filesystem::FileSystem;
-use super::merge::{strip_reset_markers, validate_reset_positions};
+use super::merge::{has_any_reset_markers, strip_reset_markers, validate_reset_positions};
 use super::model::CONFIG_VERSION;
 use super::remote::FetchPolicy;
 
@@ -206,6 +206,18 @@ impl<F: FileSystem> FileConfigLoader<F> {
         Self::parse_config(&config_str)
     }
 
+    /// Parse config from content or value, depending on presence of reset markers.
+    ///
+    /// - With reset markers: validates positions, strips markers, parses via Value
+    /// - Without reset markers: parses directly from content for precise line numbers
+    fn parse_config_with_reset_handling(content: &str, value: toml::Value) -> Result<Config> {
+        if has_any_reset_markers(&value) {
+            Self::finalize_value_to_config(value)
+        } else {
+            Self::parse_config(content)
+        }
+    }
+
     /// Create an extends resolver for this loader.
     fn resolver(&self) -> ExtendsResolver<'_, F> {
         ExtendsResolver::new(&self.fs, self.fetch_policy, self.project_root.as_deref())
@@ -291,8 +303,8 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                 preset_used,
             })
         } else {
-            // Single-file mode: finalize and parse
-            let config = Self::finalize_value_to_config(value)?;
+            // Single-file mode: use appropriate path based on reset marker presence
+            let config = Self::parse_config_with_reset_handling(&content, value)?;
             Ok(LoadResult {
                 config,
                 preset_used: None,
@@ -330,7 +342,9 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
         // Single-file mode: use precise syntax error reporting
         let source = ConfigSource::file(path);
         let value = ExtendsResolver::<F>::parse_value_with_location(&content, Some(source))?;
-        let config = Self::finalize_value_to_config(value)?;
+
+        // Single-file mode: use appropriate path based on reset marker presence
+        let config = Self::parse_config_with_reset_handling(&content, value)?;
         Ok(LoadResult {
             config,
             preset_used: None,
@@ -389,8 +403,8 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                 source_chain: sources,
             })
         } else {
-            // Single-file mode - just this file as source
-            let config = Self::finalize_value_to_config(value.clone())?;
+            // Single-file mode: use appropriate path based on reset marker presence
+            let config = Self::parse_config_with_reset_handling(&content, value.clone())?;
             Ok(LoadResultWithSources {
                 config,
                 preset_used: None,
@@ -437,8 +451,10 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
 
         let source = ConfigSource::file(path);
         let value = ExtendsResolver::<F>::parse_value_with_location(&content, Some(source))?;
-        // Single-file mode: ignore extends, return only this file as source
-        let config = Self::finalize_value_to_config(value.clone())?;
+
+        // Single-file mode: use appropriate path based on reset marker presence
+        let config = Self::parse_config_with_reset_handling(&content, value.clone())?;
+
         Ok(LoadResultWithSources {
             config,
             preset_used: None,

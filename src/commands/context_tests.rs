@@ -38,8 +38,23 @@ fn load_config_with_nonexistent_path_returns_error() {
 
 #[test]
 fn load_config_without_no_config_searches_defaults() {
+    // Use temp dir with a known config to ensure test isolation
+    let temp_dir = TempDir::new().unwrap();
+    let config_path = temp_dir.path().join(".sloc-guard.toml");
+    let content = r#"
+version = "2"
+[content]
+max_lines = 999
+"#;
+    std::fs::write(&config_path, content).unwrap();
+
+    let original_dir = std::env::current_dir().unwrap();
+    std::env::set_current_dir(temp_dir.path()).unwrap();
+
     let result = load_config(None, false, false, FetchPolicy::Normal).unwrap();
-    assert!(result.config.content.max_lines > 0);
+    assert_eq!(result.config.content.max_lines, 999);
+
+    std::env::set_current_dir(original_dir).unwrap();
 }
 
 #[test]
