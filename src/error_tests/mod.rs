@@ -6,4 +6,3 @@ mod pattern_tests;
 mod semantic_tests;
 mod syntax_tests;
 mod type_mismatch_tests;
-

@@ -113,4 +113,3 @@ fn config_suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("config file format"));
 }
-

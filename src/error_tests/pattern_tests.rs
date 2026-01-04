@@ -45,4 +45,3 @@ fn suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("glob pattern syntax"));
 }
-

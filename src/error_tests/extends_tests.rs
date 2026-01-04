@@ -188,4 +188,3 @@ fn remote_config_hash_mismatch_suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("extends_sha256"));
 }
-

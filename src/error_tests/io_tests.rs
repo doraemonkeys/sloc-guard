@@ -276,4 +276,3 @@ fn json_serialize_suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("non-serializable"));
 }
-

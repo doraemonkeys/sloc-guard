@@ -1,14 +1,17 @@
 mod expires;
+mod extends;
+mod filesystem;
 mod loader;
+pub(crate) mod merge;
 mod model;
 pub mod presets;
 mod remote;
 
 pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
-pub use loader::{
-    ConfigLoader, FileConfigLoader, FileSystem, LoadResult, LoadResultWithSources, RealFileSystem,
-    SourcedConfig,
-};
+pub use extends::SourcedConfig;
+pub use filesystem::{FileSystem, RealFileSystem};
+pub use loader::{ConfigLoader, FileConfigLoader, LoadResult, LoadResultWithSources};
+pub use merge::RESET_MARKER;
 pub use model::{
     BaselineConfig, CONFIG_VERSION, CheckConfig, Config, ContentConfig, ContentRule,
     CustomLanguageConfig, DEFAULT_MAX_LINES, RatchetMode, ScannerConfig, SiblingRequire,

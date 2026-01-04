@@ -1,4 +1,4 @@
-use crate::error::{span_to_line_col, ConfigSource, SlocGuardError};
+use crate::error::{ConfigSource, SlocGuardError, span_to_line_col};
 
 // =============================================================================
 // Syntax Error Tests
@@ -238,4 +238,3 @@ fn toml_parse_suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("TOML syntax"));
 }
-

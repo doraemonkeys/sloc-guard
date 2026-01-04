@@ -76,4 +76,3 @@ fn suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("type") || suggestion.contains("documentation"));
 }
-

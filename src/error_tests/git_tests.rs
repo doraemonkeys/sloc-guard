@@ -47,4 +47,3 @@ fn git_repo_not_found_suggestion() {
     let suggestion = err.suggestion().unwrap();
     assert!(suggestion.contains("git init"));
 }
-

@@ -32,4 +32,3 @@ fn constructors() {
     let preset = ConfigSource::preset("node-strict");
     assert!(matches!(&preset, ConfigSource::Preset { name } if name == "node-strict"));
 }
-

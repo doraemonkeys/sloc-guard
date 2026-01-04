@@ -2,7 +2,7 @@
 
 use toml::Value;
 
-use crate::config::loader::{RESET_MARKER, has_reset_marker, is_reset_element, merge_arrays};
+use crate::config::merge::{RESET_MARKER, has_reset_marker, is_reset_element, merge_arrays};
 
 #[test]
 fn is_reset_element_detects_string_marker() {
