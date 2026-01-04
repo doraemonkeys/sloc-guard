@@ -427,5 +427,5 @@ pub fn span_to_line_col(content: &str, byte_pos: usize) -> (usize, usize) {
 }
 
 #[cfg(test)]
-#[path = "error_tests.rs"]
+#[path = "error_tests/mod.rs"]
 mod tests;
