@@ -212,6 +212,8 @@ sloc-guard check --staged
 sloc-guard check --diff v1.0..v2.0
 ```
 
+> **Note**: `--diff` compares committed trees only (e.g., `main..HEAD`). Unstaged working directory changes are **not** checked. To catch uncommitted violations, stage your changes and use `--staged`.
+
 ### Baseline & Grandfathering
 
 Adopt sloc-guard in existing projects without fixing everything at once:
