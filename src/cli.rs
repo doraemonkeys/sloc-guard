@@ -586,13 +586,18 @@ pub enum ConfigAction {
 
 #[derive(Parser, Debug)]
 pub struct ExplainArgs {
-    /// Path to explain (file or directory)
-    #[arg(value_name = "PATH")]
-    pub path: PathBuf,
+    /// Path to explain (file or directory). Required unless --sources is specified.
+    #[arg(value_name = "PATH", required_unless_present = "sources")]
+    pub path: Option<PathBuf>,
 
     /// Path to configuration file
     #[arg(short, long)]
     pub config: Option<PathBuf>,
+
+    /// Show configuration inheritance chain and field sources.
+    /// Displays which config (preset/remote/local) contributed each setting.
+    #[arg(long)]
+    pub sources: bool,
 
     /// Output format
     #[arg(short, long, value_enum, default_value = "text")]

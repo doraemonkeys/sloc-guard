@@ -9,6 +9,18 @@ use super::model::CONFIG_VERSION;
 use super::presets;
 use super::remote::{FetchPolicy, fetch_remote_config, is_remote_url};
 
+/// A configuration value paired with its source.
+///
+/// Used during extends resolution to track which config contributed which values,
+/// enabling the `explain --sources` feature to show field origins.
+#[derive(Debug, Clone)]
+pub struct SourcedConfig {
+    /// The source of this configuration (file, remote URL, or preset).
+    pub source: ConfigSource,
+    /// The raw TOML value before merging.
+    pub value: toml::Value,
+}
+
 /// Result of loading a configuration, containing both the config and metadata.
 ///
 /// This allows the caller to decide how to handle loading side-effects (like printing
@@ -19,6 +31,20 @@ pub struct LoadResult {
     pub config: Config,
     /// The preset name if a preset was used (e.g., "rust-strict").
     pub preset_used: Option<String>,
+}
+
+/// Result of loading a configuration with full source tracking.
+///
+/// Used by `explain --sources` to show which config contributed which settings.
+#[derive(Debug, Clone)]
+pub struct LoadResultWithSources {
+    /// The loaded configuration.
+    pub config: Config,
+    /// The preset name if a preset was used (e.g., "rust-strict").
+    pub preset_used: Option<String>,
+    /// The inheritance chain from base to child (root → leaf).
+    /// First element is the deepest base (e.g., preset), last is the local config.
+    pub source_chain: Vec<SourcedConfig>,
 }
 
 /// Trait for loading configuration from various sources.
@@ -46,6 +72,39 @@ pub trait ConfigLoader {
     /// # Errors
     /// Returns an error if the file cannot be read or parsed.
     fn load_from_path_without_extends(&self, path: &Path) -> Result<LoadResult>;
+
+    /// Load configuration with full source tracking.
+    ///
+    /// Returns the merged config along with the source chain showing which config
+    /// contributed which values. Used by `explain --sources`.
+    ///
+    /// # Errors
+    /// Returns an error if the config file cannot be read or parsed.
+    fn load_with_sources(&self) -> Result<LoadResultWithSources>;
+
+    /// Load configuration from a specific path with full source tracking.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read or parsed.
+    fn load_from_path_with_sources(&self, path: &Path) -> Result<LoadResultWithSources>;
+
+    /// Load configuration without resolving extends, with source tracking.
+    ///
+    /// Returns the config with a single-element source chain (the local file only).
+    /// Used by `explain --sources --no-extends`.
+    ///
+    /// # Errors
+    /// Returns an error if the config file cannot be read or parsed.
+    fn load_without_extends_with_sources(&self) -> Result<LoadResultWithSources>;
+
+    /// Load configuration from a specific path without resolving extends, with source tracking.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read or parsed.
+    fn load_from_path_without_extends_with_sources(
+        &self,
+        path: &Path,
+    ) -> Result<LoadResultWithSources>;
 }
 
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
@@ -217,11 +276,19 @@ impl<F: FileSystem> FileConfigLoader<F> {
         toml::from_str(content).map_err(|e| SlocGuardError::syntax_from_toml(&e, content, source))
     }
 
-    /// Load config with extends chain, returning (value, `preset_used`).
-    fn load_with_extends(
+    // =========================================================================
+    // Unified internal methods with optional source tracking
+    // =========================================================================
+
+    /// Load config with extends chain, optionally tracking sources.
+    ///
+    /// When `sources` is `Some`, records each config source in the chain for
+    /// `explain --sources` output. When `None`, skips source tracking overhead.
+    fn load_with_extends_impl(
         &self,
         path: &Path,
         visited: &mut IndexSet<String>,
+        sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         let content =
@@ -232,28 +299,30 @@ impl<F: FileSystem> FileConfigLoader<F> {
                     source,
                 })?;
 
-        self.load_with_extends_from_content(path, &content, visited, depth)
+        self.load_with_extends_from_content_impl(path, &content, visited, sources, depth)
     }
 
-    /// Continue extends chain with pre-read content (avoids re-reading the file).
-    fn load_with_extends_from_content(
+    /// Continue extends chain with pre-read content, optionally tracking sources.
+    fn load_with_extends_from_content_impl(
         &self,
         path: &Path,
         content: &str,
         visited: &mut IndexSet<String>,
+        sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         let source = ConfigSource::file(path);
         let config_value = Self::parse_value_with_location(content, Some(source))?;
-        self.load_with_extends_from_value(path, config_value, visited, depth)
+        self.load_with_extends_from_value_impl(path, config_value, visited, sources, depth)
     }
 
-    /// Continue extends chain with pre-parsed value (avoids re-parsing).
-    fn load_with_extends_from_value(
+    /// Continue extends chain with pre-parsed value, optionally tracking sources.
+    fn load_with_extends_from_value_impl(
         &self,
         path: &Path,
         config_value: toml::Value,
         visited: &mut IndexSet<String>,
+        sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         if depth > MAX_EXTENDS_DEPTH {
@@ -274,21 +343,21 @@ impl<F: FileSystem> FileConfigLoader<F> {
         let key = canonical.to_string_lossy().to_string();
 
         if !visited.insert(key.clone()) {
-            // IndexSet preserves insertion order, so chain shows the actual traversal sequence
             let mut chain: Vec<String> = visited.iter().cloned().collect();
             chain.push(key);
             return Err(SlocGuardError::CircularExtends { chain });
         }
 
-        self.process_config_value(config_value, Some(path), visited, depth)
+        self.process_config_value_impl(config_value, Some(path), visited, sources, depth)
     }
 
-    /// Load remote config with extends chain, returning (value, `preset_used`).
-    fn load_remote_with_extends(
+    /// Load remote config with extends chain, optionally tracking sources.
+    fn load_remote_with_extends_impl(
         &self,
         url: &str,
         expected_hash: Option<&str>,
         visited: &mut IndexSet<String>,
+        mut sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         if depth > MAX_EXTENDS_DEPTH {
@@ -301,7 +370,6 @@ impl<F: FileSystem> FileConfigLoader<F> {
 
         let url_key = url.to_string();
         if !visited.insert(url_key.clone()) {
-            // IndexSet preserves insertion order, so chain shows the actual traversal sequence
             let mut chain: Vec<String> = visited.iter().cloned().collect();
             chain.push(url_key);
             return Err(SlocGuardError::CircularExtends { chain });
@@ -314,41 +382,54 @@ impl<F: FileSystem> FileConfigLoader<F> {
             self.fetch_policy,
         )?;
         let source = ConfigSource::remote(url);
-        self.process_config_content(&content, Some(source), None, visited, depth)
+        let config_value = Self::parse_value_with_location(&content, Some(source))?;
+
+        // Process extends chain (base sources come first via recursion)
+        // Clone only when tracking sources; move otherwise for efficiency
+        if sources.is_some() {
+            let (merged_value, preset_used) = self.process_config_value_impl(
+                config_value.clone(),
+                None, // No base_path for remote configs
+                visited,
+                sources.as_deref_mut(),
+                depth,
+            )?;
+
+            // Record remote source (after recursion, so base sources come first)
+            // INVARIANT: sources was Some, unwrap is safe
+            sources.as_mut().unwrap().push(SourcedConfig {
+                source: ConfigSource::remote(url),
+                value: config_value,
+            });
+
+            Ok((merged_value, preset_used))
+        } else {
+            self.process_config_value_impl(
+                config_value, // Move, no clone needed
+                None,
+                visited,
+                None,
+                depth,
+            )
+        }
     }
 
-    /// Process config content and return (value, `preset_used`).
+    /// Process pre-parsed config value, optionally tracking sources.
     ///
-    /// # Arguments
-    /// - `content`: Raw TOML content
-    /// - `source`: Config source for error reporting (file/remote/preset)
-    /// - `base_path`: Optional file path for resolving relative extends
-    /// - `visited`: Set of visited configs for cycle detection
-    /// - `depth`: Current depth in extends chain
-    fn process_config_content(
+    /// This is the core method that handles extends resolution and optional source collection.
+    /// When `sources` is `Some`, records each config in the inheritance chain.
+    //
+    // Note: We use `as_mut().map(|v| &mut **v)` instead of `as_deref_mut()` because we need
+    // `Option<&mut Vec<T>>` (for `push()`), not `Option<&mut [T]>` (slice) which `as_deref_mut` returns.
+    // The `useless_let_if_seq` lint is suppressed because the conditional mutation pattern
+    // is clearer with explicit `let mut` for this complex extends resolution logic.
+    #[allow(clippy::option_as_ref_deref, clippy::useless_let_if_seq)]
+    fn process_config_value_impl(
         &self,
-        content: &str,
-        source: Option<ConfigSource>,
+        config_value: toml::Value,
         base_path: Option<&Path>,
         visited: &mut IndexSet<String>,
-        depth: usize,
-    ) -> Result<(toml::Value, Option<String>)> {
-        let config_value = Self::parse_value_with_location(content, source)?;
-        self.process_config_value(config_value, base_path, visited, depth)
-    }
-
-    /// Process pre-parsed config value and return (value, `preset_used`).
-    ///
-    /// # Arguments
-    /// - `config_value`: Pre-parsed TOML value
-    /// - `base_path`: Optional file path for resolving relative extends
-    /// - `visited`: Set of visited configs for cycle detection
-    /// - `depth`: Current depth in extends chain
-    fn process_config_value(
-        &self,
-        mut config_value: toml::Value,
-        base_path: Option<&Path>,
-        visited: &mut IndexSet<String>,
+        mut sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         let extends_value = config_value
@@ -361,20 +442,24 @@ impl<F: FileSystem> FileConfigLoader<F> {
             .and_then(toml::Value::as_str)
             .map(String::from);
 
-        let mut preset_used = None;
-
-        if let Some(extends) = extends_value {
-            let (base_value, child_preset) =
+        let (mut merged_value, preset_used) = if let Some(extends) = extends_value {
+            let (base_value, preset_used) =
                 if let Some(preset_name) = extends.strip_prefix("preset:") {
-                    // Track which preset was used (caller decides whether/how to notify user)
-                    // Presets are terminal - they don't count toward depth
-                    preset_used = Some(preset_name.to_string());
-                    (presets::load_preset(preset_name)?, None)
+                    let preset_value = presets::load_preset(preset_name)?;
+                    // Record preset source if tracking
+                    if let Some(src_vec) = sources.as_mut() {
+                        src_vec.push(SourcedConfig {
+                            source: ConfigSource::preset(preset_name),
+                            value: preset_value.clone(),
+                        });
+                    }
+                    (preset_value, Some(preset_name.to_string()))
                 } else if is_remote_url(&extends) {
-                    self.load_remote_with_extends(
+                    self.load_remote_with_extends_impl(
                         &extends,
                         extends_sha256.as_deref(),
                         visited,
+                        sources.as_deref_mut(),
                         depth + 1,
                     )?
                 } else {
@@ -391,27 +476,72 @@ impl<F: FileSystem> FileConfigLoader<F> {
                             base: "remote config".to_string(),
                         });
                     };
-                    self.load_with_extends(&resolved_path, visited, depth + 1)?
+                    self.load_with_extends_impl(
+                        &resolved_path,
+                        visited,
+                        sources.as_deref_mut(),
+                        depth + 1,
+                    )?
                 };
-            // Propagate preset from child if we didn't find one at this level
-            if preset_used.is_none() {
-                preset_used = child_preset;
+            // Record source before merge (clone only when tracking is needed)
+            if let Some(src_vec) = sources.as_mut()
+                && let Some(path) = base_path
+            {
+                src_vec.push(SourcedConfig {
+                    source: ConfigSource::file(path),
+                    value: config_value.clone(),
+                });
             }
-            config_value = merge_toml_values(base_value, config_value);
-        }
+            (merge_toml_values(base_value, config_value), preset_used)
+        } else {
+            // Record source before return (clone only when tracking is needed)
+            if let Some(src_vec) = sources.as_mut()
+                && let Some(path) = base_path
+            {
+                src_vec.push(SourcedConfig {
+                    source: ConfigSource::file(path),
+                    value: config_value.clone(),
+                });
+            }
+            (config_value, None)
+        };
 
-        if let Some(table) = config_value.as_table_mut() {
+        if let Some(table) = merged_value.as_table_mut() {
             table.remove("extends");
             table.remove("extends_sha256");
         }
 
-        // Validate $reset marker positions before stripping
-        validate_reset_positions(&config_value, "")?;
+        validate_reset_positions(&merged_value, "")?;
+        strip_reset_markers(&mut merged_value);
 
-        // Strip any remaining $reset markers (for configs without extends)
-        strip_reset_markers(&mut config_value);
+        Ok((merged_value, preset_used))
+    }
 
-        Ok((config_value, preset_used))
+    // =========================================================================
+    // Convenience wrappers delegating to unified implementation
+    // =========================================================================
+
+    /// Continue extends chain with pre-parsed value (non-tracking variant).
+    fn load_with_extends_from_value(
+        &self,
+        path: &Path,
+        config_value: toml::Value,
+        visited: &mut IndexSet<String>,
+        depth: usize,
+    ) -> Result<(toml::Value, Option<String>)> {
+        self.load_with_extends_from_value_impl(path, config_value, visited, None, depth)
+    }
+
+    /// Continue extends chain with pre-parsed value, tracking sources.
+    fn load_with_extends_from_value_tracking(
+        &self,
+        path: &Path,
+        config_value: toml::Value,
+        visited: &mut IndexSet<String>,
+        sources: &mut Vec<SourcedConfig>,
+        depth: usize,
+    ) -> Result<(toml::Value, Option<String>)> {
+        self.load_with_extends_from_value_impl(path, config_value, visited, Some(sources), depth)
     }
 }
 
@@ -634,6 +764,118 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
         Ok(LoadResult {
             config,
             preset_used: None,
+        })
+    }
+
+    fn load_with_sources(&self) -> Result<LoadResultWithSources> {
+        if let Some(local_path) = self.local_config_path()
+            && self.fs.exists(&local_path)
+        {
+            return self.load_from_path_with_sources(&local_path);
+        }
+
+        if let Some(user_path) = self.user_config_path()
+            && self.fs.exists(&user_path)
+        {
+            return self.load_from_path_with_sources(&user_path);
+        }
+
+        // No config file found - return default with empty source chain
+        Ok(LoadResultWithSources {
+            config: Config::default(),
+            preset_used: None,
+            source_chain: vec![],
+        })
+    }
+
+    fn load_from_path_with_sources(&self, path: &Path) -> Result<LoadResultWithSources> {
+        let content =
+            self.fs
+                .read_to_string(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+
+        let source = ConfigSource::file(path);
+        let value = Self::parse_value_with_location(&content, Some(source))?;
+        let has_extends = value.get("extends").is_some();
+
+        if has_extends {
+            // Inheritance mode with source tracking
+            let mut visited = IndexSet::new();
+            let mut sources = Vec::new();
+            let (merged_value, preset_used) = self.load_with_extends_from_value_tracking(
+                path,
+                value,
+                &mut visited,
+                &mut sources,
+                0,
+            )?;
+            let config = Self::finalize_value_to_config(merged_value)?;
+            Ok(LoadResultWithSources {
+                config,
+                preset_used,
+                source_chain: sources,
+            })
+        } else {
+            // Single-file mode - just this file as source
+            let config = Self::finalize_value_to_config(value.clone())?;
+            Ok(LoadResultWithSources {
+                config,
+                preset_used: None,
+                source_chain: vec![SourcedConfig {
+                    source: ConfigSource::file(path),
+                    value,
+                }],
+            })
+        }
+    }
+
+    fn load_without_extends_with_sources(&self) -> Result<LoadResultWithSources> {
+        if let Some(local_path) = self.local_config_path()
+            && self.fs.exists(&local_path)
+        {
+            return self.load_from_path_without_extends_with_sources(&local_path);
+        }
+
+        if let Some(user_path) = self.user_config_path()
+            && self.fs.exists(&user_path)
+        {
+            return self.load_from_path_without_extends_with_sources(&user_path);
+        }
+
+        // No config file found - return default with empty source chain
+        Ok(LoadResultWithSources {
+            config: Config::default(),
+            preset_used: None,
+            source_chain: vec![],
+        })
+    }
+
+    fn load_from_path_without_extends_with_sources(
+        &self,
+        path: &Path,
+    ) -> Result<LoadResultWithSources> {
+        let content =
+            self.fs
+                .read_to_string(path)
+                .map_err(|source| SlocGuardError::FileAccess {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+
+        let source = ConfigSource::file(path);
+        let value = Self::parse_value_with_location(&content, Some(source))?;
+        // Single-file mode: ignore extends, return only this file as source
+        let config = Self::finalize_value_to_config(value.clone())?;
+        Ok(LoadResultWithSources {
+            config,
+            preset_used: None,
+            source_chain: vec![SourcedConfig {
+                source: ConfigSource::file(path),
+                value,
+            }],
         })
     }
 }

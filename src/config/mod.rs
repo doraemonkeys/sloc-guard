@@ -5,11 +5,15 @@ pub mod presets;
 mod remote;
 
 pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
-pub use loader::{ConfigLoader, FileConfigLoader, FileSystem, LoadResult, RealFileSystem};
+pub use loader::{
+    ConfigLoader, FileConfigLoader, FileSystem, LoadResult, LoadResultWithSources, RealFileSystem,
+    SourcedConfig,
+};
 pub use model::{
-    BaselineConfig, CONFIG_VERSION, Config, ContentConfig, ContentRule, CustomLanguageConfig,
-    DEFAULT_MAX_LINES, RatchetMode, ScannerConfig, SiblingRequire, SiblingRule, SiblingSeverity,
-    StatsConfig, StatsReportConfig, StructureConfig, StructureRule, TrendConfig, UNLIMITED,
+    BaselineConfig, CONFIG_VERSION, CheckConfig, Config, ContentConfig, ContentRule,
+    CustomLanguageConfig, DEFAULT_MAX_LINES, RatchetMode, ScannerConfig, SiblingRequire,
+    SiblingRule, SiblingSeverity, StatsConfig, StatsReportConfig, StructureConfig, StructureRule,
+    TrendConfig, UNLIMITED,
 };
 pub use remote::{
     FetchPolicy, clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url,
