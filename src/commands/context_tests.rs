@@ -639,9 +639,13 @@ fn process_file_with_cache_returns_success_for_valid_file() {
     let cache = Mutex::new(Cache::new(String::new()));
     let reader = RealFileReader;
 
-    // Use an existing rust file from the project
-    let file_path = std::path::Path::new("src/lib.rs");
-    let result = process_file_with_cache(file_path, &registry, &cache, &reader);
+    // Create a temp Rust file to ensure the test is self-contained
+    // and doesn't depend on the working directory
+    let temp_dir = TempDir::new().unwrap();
+    let file_path = temp_dir.path().join("test.rs");
+    std::fs::write(&file_path, "fn main() {\n    println!(\"hello\");\n}\n").unwrap();
+
+    let result = process_file_with_cache(&file_path, &registry, &cache, &reader);
     match result {
         FileProcessResult::Success { stats, language } => {
             assert!(stats.code > 0, "should have some code lines");

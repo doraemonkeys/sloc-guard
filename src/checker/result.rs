@@ -178,6 +178,26 @@ impl CheckResult {
         matches!(self, Self::Grandfathered { .. })
     }
 
+    /// Returns true if this result represents an actionable issue (failure or warning).
+    ///
+    /// Useful for determining whether output should be shown in quiet mode
+    /// (suppress success, preserve failure/warning semantics).
+    ///
+    /// # Design Note: Grandfathered Exclusion
+    ///
+    /// `Grandfathered` results are **not** considered issues because they represent
+    /// acknowledged technical debt recorded in the baseline. In CI environments:
+    /// - Failures and warnings require immediate attention
+    /// - Grandfathered items have already been triaged and accepted
+    ///
+    /// This keeps CI output focused on new regressions rather than known debt.
+    /// Users wanting visibility into grandfathered items can use non-quiet mode
+    /// or query the baseline file directly.
+    #[must_use]
+    pub const fn is_issue(&self) -> bool {
+        matches!(self, Self::Failed { .. } | Self::Warning { .. })
+    }
+
     // Transformation methods
 
     /// Convert a Failed result to Grandfathered (used for baseline comparison).

@@ -165,6 +165,10 @@ pub fn structure_violation_to_check_result(violation: &StructureViolation) -> Ch
 ///
 /// Supports `--write-sarif` and `--write-json` flags that write extra output files
 /// while the primary `--format` output goes to stdout.
+///
+/// Note: These paths always have `Some(path)` when this function is called, so the
+/// quiet flag only affects the (unused) stdout path. File writes always proceed
+/// regardless of the quiet flag—see `write_output` for details.
 pub fn write_additional_formats(
     args: &CheckArgs,
     results: &[CheckResult],
@@ -173,6 +177,7 @@ pub fn write_additional_formats(
     project_root: &Path,
     cli: &Cli,
 ) -> crate::Result<()> {
+    // File writes always proceed; quiet only affects stdout (which isn't used here)
     if let Some(ref sarif_path) = args.write_sarif {
         let sarif_output = format_output(
             OutputFormat::Sarif,

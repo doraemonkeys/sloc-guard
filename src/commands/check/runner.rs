@@ -7,6 +7,7 @@ use rayon::prelude::*;
 use crate::analyzer::generate_split_suggestions;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
+use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
 use crate::config::{FetchPolicy, collect_expired_rules};
 use crate::output::{
@@ -31,6 +32,7 @@ use crate::commands::context::{
     CheckContext, color_choice_to_mode, load_cache, load_config, print_preset_info, save_cache,
     write_output,
 };
+use crate::output::ColorMode;
 
 /// Options for running a check with injected context.
 ///
@@ -45,6 +47,66 @@ pub struct CheckOptions<'a> {
     pub cache: &'a Mutex<Cache>,
     pub baseline: Option<&'a Baseline>,
     pub project_root: &'a Path,
+}
+
+/// Parameters for output writing operations.
+#[derive(Debug)]
+struct OutputParams<'a> {
+    results: &'a [CheckResult],
+    project_stats: Option<ProjectStatistics>,
+    project_root: &'a Path,
+    color_mode: ColorMode,
+}
+
+/// Write check outputs: stats JSON, main output, and additional formats.
+///
+/// Note: `write_output` only suppresses stdout; file writes always proceed regardless
+/// of the quiet flag. This means `--report-json` and `--output` both always write to
+/// their target files—the quiet flag only affects console output.
+fn write_check_outputs(
+    args: &CheckArgs,
+    cli: &Cli,
+    params: &OutputParams<'_>,
+) -> crate::Result<()> {
+    // Write stats JSON if --report-json is specified
+    // (file writes always proceed; quiet only suppresses stdout)
+    if let Some(ref report_path) = args.report_json
+        && let Some(ref stats) = params.project_stats
+    {
+        let stats_json = StatsJsonFormatter::new()
+            .with_project_root(Some(params.project_root.to_path_buf()))
+            .format(stats)?;
+        write_output(Some(report_path), &stats_json, cli.quiet)?;
+    }
+
+    // Format main output
+    let output = format_output(
+        args.format,
+        params.results,
+        params.color_mode,
+        cli.verbose,
+        args.suggest,
+        params.project_stats.clone(),
+        Some(params.project_root.to_path_buf()),
+    )?;
+
+    // Write main output with "suppress success, preserve failure" semantics for stdout.
+    // File writes always proceed regardless of quiet flag.
+    let has_issues = params.results.iter().any(CheckResult::is_issue);
+    let quiet_for_stdout = cli.quiet && !has_issues;
+    write_output(args.output.as_deref(), &output, quiet_for_stdout)?;
+
+    // Write additional format outputs (single-run multi-format for CI efficiency)
+    write_additional_formats(
+        args,
+        params.results,
+        params.color_mode,
+        params.project_stats.clone(),
+        params.project_root,
+        cli,
+    )?;
+
+    Ok(())
 }
 
 #[must_use]
@@ -311,40 +373,15 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         None
     };
 
-    // 7.3 Write stats JSON if --report-json is specified
-    if let Some(ref report_path) = args.report_json
-        && let Some(ref stats) = project_stats
-    {
-        let stats_json = StatsJsonFormatter::new()
-            .with_project_root(Some(project_root.to_path_buf()))
-            .format(stats)?;
-        write_output(Some(report_path), &stats_json, cli.quiet)?;
-    }
-
-    // 8. Format output
+    // 8. Write all outputs (stats JSON, main output, additional formats)
     let color_mode = color_choice_to_mode(cli.color);
-    let output = format_output(
-        args.format,
-        &results,
-        color_mode,
-        cli.verbose,
-        args.suggest,
-        project_stats.clone(),
-        Some(project_root.to_path_buf()),
-    )?;
-
-    // 9. Write output
-    write_output(args.output.as_deref(), &output, cli.quiet)?;
-
-    // 9.1 Write additional format outputs (single-run multi-format for CI efficiency)
-    write_additional_formats(
-        args,
-        &results,
-        color_mode,
-        project_stats.clone(),
+    let output_params = OutputParams {
+        results: &results,
+        project_stats: project_stats.clone(),
         project_root,
-        cli,
-    )?;
+        color_mode,
+    };
+    write_check_outputs(args, cli, &output_params)?;
 
     // 10. Determine exit code (CLI flags take precedence over config)
     let warnings_as_errors =

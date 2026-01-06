@@ -104,7 +104,8 @@ pub struct Cli {
     #[arg(short, long, action = clap::ArgAction::Count, global = true)]
     pub verbose: u8,
 
-    /// Suppress non-essential output
+    /// Suppress non-essential output (progress bar, success messages).
+    /// Errors and warnings are still displayed.
     #[arg(short, long, global = true)]
     pub quiet: bool,
 

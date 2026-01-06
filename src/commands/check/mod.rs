@@ -48,6 +48,8 @@ mod check_run_filter_tests;
 #[cfg(test)]
 mod check_run_output_format_tests;
 #[cfg(test)]
+mod check_run_quiet_mode_tests;
+#[cfg(test)]
 mod check_run_sidecar_output_tests;
 #[cfg(test)]
 mod check_run_strict_warn_tests;
