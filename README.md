@@ -64,7 +64,7 @@ cargo install sloc-guard
 cargo install --git https://github.com/doraemonkeys/sloc-guard
 ```
 
-**Or download pre-built binary from [GitHub Releases](https://github.com/doraemonkeys/sloc-guard/releases).**
+**Or download pre-built binary from [GitHub Releases](https://github.com/doraemonkeys/sloc-guard/releases) and add it to your PATH.**
 
 ### 30-Second Setup
 
