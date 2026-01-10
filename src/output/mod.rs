@@ -4,7 +4,7 @@ mod html;
 mod html_template;
 mod json;
 mod markdown;
-mod path;
+pub mod path;
 mod progress;
 mod sarif;
 mod stats;

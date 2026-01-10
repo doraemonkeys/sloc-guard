@@ -3,7 +3,7 @@
 //! This module provides utilities for displaying paths relative to the project root,
 //! with consistent forward-slash separators across platforms.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Format a path for display, making it relative to the project root if possible.
 ///
@@ -36,6 +36,44 @@ pub fn display_path(path: &Path, project_root: Option<&Path>) -> String {
 #[must_use]
 pub fn normalize_separators(path: &str) -> String {
     path.replace('\\', "/")
+}
+
+/// Normalize a path for consistent glob pattern matching.
+///
+/// This function performs two normalizations:
+/// 1. Strips leading `.` component (e.g., `./src/foo` or `.\src\foo` → `src/foo`)
+/// 2. Normalizes backslashes to forward slashes for cross-platform glob matching
+///
+/// This ensures patterns like `src/**/*tests.rs` match regardless of whether
+/// the path is specified as `src/lib.rs`, `./src/lib.rs`, or `.\src\lib.rs`.
+///
+/// # Edge Case: Root Directory
+///
+/// When the input is `.` or `./`, returns an empty `PathBuf`. This is intentional:
+/// an empty path won't match file-targeting patterns like `src/**/*.rs`, which is
+/// correct since the project root itself is not a file. For glob patterns that
+/// should match everything (like `**`), `GlobSet` handles empty strings correctly.
+#[must_use]
+pub(crate) fn normalize_for_matching(path: &Path) -> PathBuf {
+    let path_str = path.to_string_lossy();
+
+    // Strip leading "./" (Unix) or ".\" (Windows)
+    let stripped = path_str
+        .strip_prefix("./")
+        .or_else(|| path_str.strip_prefix(".\\"))
+        .unwrap_or(&path_str);
+
+    // Handle bare "." - return empty path (see doc comment for rationale)
+    if stripped.is_empty() || stripped == "." {
+        return PathBuf::new();
+    }
+
+    // Normalize backslashes to forward slashes for consistent glob matching on all platforms.
+    if stripped.contains('\\') {
+        PathBuf::from(stripped.replace('\\', "/"))
+    } else {
+        PathBuf::from(stripped)
+    }
 }
 
 #[cfg(test)]
@@ -103,5 +141,87 @@ mod tests {
 
         let result = display_path(&file_path, Some(&project_root));
         assert_eq!(result, "src/main.rs");
+    }
+
+    // Tests for normalize_for_matching
+    #[test]
+    fn normalize_for_matching_strips_dot_slash() {
+        assert_eq!(
+            normalize_for_matching(Path::new("./src/lib.rs")),
+            PathBuf::from("src/lib.rs")
+        );
+    }
+
+    #[test]
+    fn normalize_for_matching_strips_dot_backslash() {
+        assert_eq!(
+            normalize_for_matching(Path::new(".\\src\\lib.rs")),
+            PathBuf::from("src/lib.rs")
+        );
+    }
+
+    #[test]
+    fn normalize_for_matching_normalizes_backslashes() {
+        assert_eq!(
+            normalize_for_matching(Path::new("src\\cache\\cache_tests.rs")),
+            PathBuf::from("src/cache/cache_tests.rs")
+        );
+    }
+
+    #[test]
+    fn normalize_for_matching_preserves_plain_paths() {
+        assert_eq!(
+            normalize_for_matching(Path::new("src/lib.rs")),
+            PathBuf::from("src/lib.rs")
+        );
+    }
+
+    #[test]
+    fn normalize_for_matching_handles_bare_dot() {
+        assert_eq!(normalize_for_matching(Path::new(".")), PathBuf::new());
+    }
+
+    #[test]
+    fn normalize_for_matching_handles_dot_slash_only() {
+        assert_eq!(normalize_for_matching(Path::new("./")), PathBuf::new());
+        assert_eq!(normalize_for_matching(Path::new(".\\")), PathBuf::new());
+    }
+
+    #[test]
+    fn normalize_for_matching_preserves_parent_dir() {
+        assert_eq!(
+            normalize_for_matching(Path::new("../src")),
+            PathBuf::from("../src")
+        );
+        assert_eq!(
+            normalize_for_matching(Path::new("..\\src")),
+            PathBuf::from("../src")
+        );
+    }
+
+    #[test]
+    fn normalize_for_matching_preserves_dot_in_filename() {
+        assert_eq!(
+            normalize_for_matching(Path::new("src/.gitignore")),
+            PathBuf::from("src/.gitignore")
+        );
+        assert_eq!(
+            normalize_for_matching(Path::new("src\\.eslintrc")),
+            PathBuf::from("src/.eslintrc")
+        );
+    }
+
+    #[test]
+    fn normalize_for_matching_handles_mixed_separators() {
+        // Path with Unix prefix "./" but Windows separators internally
+        assert_eq!(
+            normalize_for_matching(Path::new("./src\\lib")),
+            PathBuf::from("src/lib")
+        );
+        // Path with Windows prefix ".\" but Unix separators internally
+        assert_eq!(
+            normalize_for_matching(Path::new(".\\src/lib")),
+            PathBuf::from("src/lib")
+        );
     }
 }

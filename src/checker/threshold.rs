@@ -5,6 +5,7 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::config::Config;
 use crate::counter::LineStats;
+use crate::output::path::normalize_for_matching;
 
 use super::Checker;
 use super::explain::{
@@ -100,8 +101,10 @@ impl ThresholdChecker {
     /// checked if there's an explicit rule targeting them.
     #[must_use]
     pub fn should_process(&self, path: &Path) -> bool {
+        let normalized = normalize_for_matching(path);
+
         // Check content exclusion FIRST - excluded files skip SLOC checks entirely
-        if self.content_exclude.is_match(path) {
+        if self.content_exclude.is_match(&normalized) {
             return false;
         }
 
@@ -119,13 +122,14 @@ impl ThresholdChecker {
         }
 
         // Check if file matches any rule pattern (O(1) via GlobSet)
-        self.path_rules_set.is_match(path)
+        self.path_rules_set.is_match(&normalized)
     }
 
     /// Check if a file is excluded from content checks via `content.exclude`.
     #[must_use]
     pub fn is_content_excluded(&self, path: &Path) -> bool {
-        self.content_exclude.is_match(path)
+        let normalized = normalize_for_matching(path);
+        self.content_exclude.is_match(&normalized)
     }
 
     /// Build path rules and a combined `GlobSet` for efficient matching.
@@ -166,9 +170,15 @@ impl ThresholdChecker {
 
     /// Returns (`max_lines`, `override_reason`) for a path.
     fn get_limit_for_path(&self, path: &Path) -> (usize, Option<String>) {
+        let normalized = normalize_for_matching(path);
+        self.get_limit_for_path_impl(&normalized)
+    }
+
+    /// Internal implementation accepting a path already processed by `normalize_for_matching`.
+    fn get_limit_for_path_impl(&self, normalized: &Path) -> (usize, Option<String>) {
         // Check path_rules (glob patterns) - last match wins
         // Use GlobSet::matches() for O(n) matching where n = path length
-        let matches = self.path_rules_set.matches(path);
+        let matches = self.path_rules_set.matches(normalized);
         if let Some(&last_idx) = matches.last() {
             let rule = &self.path_rules[last_idx];
             return (rule.max_lines, rule.reason.clone());
@@ -178,9 +188,10 @@ impl ThresholdChecker {
         (self.config.content.max_lines, None)
     }
 
-    fn get_warn_threshold_for_path(&self, path: &Path) -> f64 {
+    /// Returns warn threshold for a pre-normalized path.
+    fn get_warn_threshold_for_path_impl(&self, normalized: &Path) -> f64 {
         // 1. Check path_rules (last match wins) via GlobSet
-        let matches = self.path_rules_set.matches(path);
+        let matches = self.path_rules_set.matches(normalized);
         if let Some(&last_idx) = matches.last() {
             return self.path_rules[last_idx]
                 .warn_threshold
@@ -198,11 +209,6 @@ impl ThresholdChecker {
     /// 2. `rule.warn_threshold` → calculate `rule.max_lines * threshold`
     /// 3. `global.warn_at` → absolute value
     /// 4. `global.warn_threshold` → calculate `effective_max_lines * threshold`
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
     fn get_warn_limit_for_path(&self, path: &Path, effective_limit: usize) -> usize {
         self.get_warn_limit_with_source(path, effective_limit).0
     }
@@ -210,18 +216,30 @@ impl ThresholdChecker {
     /// Calculate the effective warn limit and its source for a path.
     ///
     /// Returns `(warn_limit, WarnAtSource)` for debugging/explain output.
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss
-    )]
     fn get_warn_limit_with_source(
         &self,
         path: &Path,
         effective_limit: usize,
     ) -> (usize, WarnAtSource) {
+        let normalized = normalize_for_matching(path);
+        self.get_warn_limit_with_source_impl(&normalized, effective_limit)
+    }
+
+    /// Internal implementation accepting a path already processed by `normalize_for_matching`.
+    // Casts required for percentage calculation: usize → f64 for multiplication, then → usize.
+    // Precision loss is acceptable since we're working with line counts (small integers).
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
+    fn get_warn_limit_with_source_impl(
+        &self,
+        normalized: &Path,
+        effective_limit: usize,
+    ) -> (usize, WarnAtSource) {
         // Check path_rules (last match wins) via GlobSet
-        let matches = self.path_rules_set.matches(path);
+        let matches = self.path_rules_set.matches(normalized);
         if let Some(&last_idx) = matches.last() {
             let rule = &self.path_rules[last_idx];
 
@@ -260,8 +278,14 @@ impl ThresholdChecker {
     /// Priority: `path_rules` (last match) > global defaults
     #[must_use]
     pub fn get_skip_settings_for_path(&self, path: &Path) -> (bool, bool) {
+        let normalized = normalize_for_matching(path);
+        self.get_skip_settings_for_path_impl(&normalized)
+    }
+
+    /// Internal implementation accepting a path already processed by `normalize_for_matching`.
+    fn get_skip_settings_for_path_impl(&self, normalized: &Path) -> (bool, bool) {
         // Check path_rules (last match wins) via GlobSet
-        let matches = self.path_rules_set.matches(path);
+        let matches = self.path_rules_set.matches(normalized);
         if let Some(&last_idx) = matches.last() {
             let path_rule = &self.path_rules[last_idx];
             let skip_comments = path_rule
@@ -285,9 +309,11 @@ impl ThresholdChecker {
     /// Returns a detailed breakdown of all evaluated rules and which one won.
     #[must_use]
     pub fn explain(&self, path: &Path) -> ContentExplanation {
+        let normalized = normalize_for_matching(path);
+
         // 0. Check content exclusion FIRST (highest priority)
-        if let Some(pattern) = self.find_matching_exclude_pattern(path) {
-            let (skip_comments, skip_blank) = self.get_skip_settings_for_path(path);
+        if let Some(pattern) = self.find_matching_exclude_pattern_normalized(&normalized) {
+            let (skip_comments, skip_blank) = self.get_skip_settings_for_path_impl(&normalized);
             return ContentExplanation {
                 path: path.to_path_buf(),
                 is_excluded: true,
@@ -297,7 +323,7 @@ impl ThresholdChecker {
                 warn_at_source: WarnAtSource::GlobalPercentage {
                     threshold: self.warning_threshold,
                 },
-                warn_threshold: self.get_warn_threshold_for_path(path),
+                warn_threshold: self.get_warn_threshold_for_path_impl(&normalized),
                 skip_comments,
                 skip_blank,
                 rule_chain: Vec::new(),
@@ -310,7 +336,7 @@ impl ThresholdChecker {
 
         // Check content.rules (last match wins) via GlobSet
         // Get all matching indices in one pass
-        let rule_matches = self.path_rules_set.matches(path);
+        let rule_matches = self.path_rules_set.matches(&normalized);
         let matching_set: HashSet<usize> = rule_matches.iter().copied().collect();
         let last_match_idx = rule_matches.last().copied();
 
@@ -359,10 +385,10 @@ impl ThresholdChecker {
             },
         });
 
-        let (skip_comments, skip_blank) = self.get_skip_settings_for_path(path);
-        let effective_limit = self.get_limit_for_path(path).0;
+        let (skip_comments, skip_blank) = self.get_skip_settings_for_path_impl(&normalized);
+        let effective_limit = self.get_limit_for_path_impl(&normalized).0;
         let (effective_warn_at, warn_at_source) =
-            self.get_warn_limit_with_source(path, effective_limit);
+            self.get_warn_limit_with_source_impl(&normalized, effective_limit);
 
         ContentExplanation {
             path: path.to_path_buf(),
@@ -371,17 +397,16 @@ impl ThresholdChecker {
             effective_limit,
             effective_warn_at,
             warn_at_source,
-            warn_threshold: self.get_warn_threshold_for_path(path),
+            warn_threshold: self.get_warn_threshold_for_path_impl(&normalized),
             skip_comments,
             skip_blank,
             rule_chain,
         }
     }
 
-    /// Find the first matching content.exclude pattern for a path.
-    /// Uses pre-compiled `GlobSet` for O(1) lookup.
-    fn find_matching_exclude_pattern(&self, path: &Path) -> Option<String> {
-        let matches = self.content_exclude.matches(path);
+    /// Find the first matching content.exclude pattern for an already-normalized path.
+    fn find_matching_exclude_pattern_normalized(&self, normalized_path: &Path) -> Option<String> {
+        let matches = self.content_exclude.matches(normalized_path);
         matches
             .first()
             .map(|&idx| self.config.content.exclude[idx].clone())
