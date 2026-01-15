@@ -28,15 +28,14 @@ Large files and messy directory structures are silent killers of codebase mainta
 
 | Feature | sloc-guard | cloc | tokei | SCC |
 |---------|------------|------|-------|-----|
-| **Enforce limits** | ✅ | ❌ | ❌ | ❌ |
-| **Directory structure rules** | ✅ | ❌ | ❌ | ❌ |
-| **Path-based rule overrides** | ✅ | ❌ | ❌ | ❌ |
-| **Git diff mode** | ✅ | ❌ | ❌ | ❌ |
-| **Baseline grandfathering** | ✅ | ❌ | ❌ | ❌ |
-| **Trend tracking** | ✅ | ❌ | ❌ | ❌ |
-| **Split suggestions** | ✅ | ❌ | ❌ | ❌ |
-| **SARIF output** | ✅ | ❌ | ❌ | ❌ |
-| **Remote config inheritance** | ✅ | ❌ | ❌ | ❌ |
+| **Enforce limits** | ✅ | — | — | — |
+| **Directory structure rules** | ✅ | — | — | — |
+| **Path-based rule overrides** | ✅ | — | — | — |
+| **Git diff mode** | ✅ | — | — | — |
+| **Baseline grandfathering** | ✅ | — | — | — |
+| **Trend tracking** | ✅ | — | — | — |
+| **SARIF output** | ✅ | — | — | — |
+| **Remote config inheritance** | ✅ | — | — | — |
 
 > Other tools *count* lines. sloc-guard *enforces* them.
 
