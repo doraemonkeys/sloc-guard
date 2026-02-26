@@ -43,6 +43,16 @@ fn load_rust_strict_preset() {
     let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
     let exclude = scanner.get("exclude").and_then(Value::as_array).unwrap();
     assert!(exclude.iter().any(|v| v.as_str() == Some("target/**")));
+    assert!(
+        exclude
+            .iter()
+            .any(|v| v.as_str() == Some("**/*.generated.rs")),
+        "Should exclude generated files in all directories"
+    );
+    assert!(
+        !exclude.iter().any(|v| v.as_str() == Some("benches/**")),
+        "Should not exclude benches (content rules handle them)"
+    );
 
     let structure = table.get("structure").and_then(Value::as_table).unwrap();
     assert_eq!(
@@ -109,6 +119,17 @@ fn load_node_strict_preset() {
             .is_some_and(|p| p.contains(".test."))
     });
     assert!(test_rule.is_some(), "Should have a rule for *.test.* files");
+
+    // Verify test patterns include mjs/cjs extensions
+    let test_pattern = test_rule
+        .unwrap()
+        .get("pattern")
+        .and_then(Value::as_str)
+        .unwrap();
+    assert!(
+        test_pattern.contains("mjs") && test_pattern.contains("cjs"),
+        "Test pattern should cover mjs and cjs extensions: {test_pattern}"
+    );
 
     // Verify storybook rules
     let story_rule = rules.iter().find(|r| {
@@ -309,6 +330,10 @@ fn load_go_strict_preset() {
     assert!(
         exclude.iter().any(|v| v.as_str() == Some("bin/**")),
         "Should exclude bin directory"
+    );
+    assert!(
+        !exclude.iter().any(|v| v.as_str() == Some("testdata/**")),
+        "Should not exclude testdata (structure rules handle it)"
     );
 
     let structure = table.get("structure").and_then(Value::as_table).unwrap();
@@ -574,6 +599,18 @@ fn load_monorepo_base_preset() {
     assert!(
         deny_ext.iter().any(|v| v.as_str() == Some(".exe")),
         "Should deny .exe files"
+    );
+
+    // Verify no duplicate entries in scanner.exclude
+    let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
+    let exclude = scanner.get("exclude").and_then(Value::as_array).unwrap();
+    let vendor_count = exclude
+        .iter()
+        .filter(|v| v.as_str() == Some("vendor/**"))
+        .count();
+    assert_eq!(
+        vendor_count, 1,
+        "vendor/** should appear exactly once in scanner.exclude"
     );
 }
 

@@ -405,6 +405,13 @@ impl Default for LanguageRegistry {
             CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
         ));
 
+        // Svelte templates mix JS/CSS/HTML, same comment styles as Vue
+        registry.register(Language::new(
+            "Svelte",
+            vec!["svelte"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/"), ("<!--", "-->")]),
+        ));
+
         registry.register(Language::new(
             "Move",
             vec!["move"],

@@ -336,6 +336,36 @@ max_lines = 600
 # exclude = ["$reset", "only-this/**"]
 ```
 
+### Supported Languages
+
+sloc-guard ships with built-in comment-aware parsing for the following languages:
+
+| Language | Extensions |
+|----------|------------|
+| Rust | `rs` |
+| Go | `go` |
+| Python | `py`, `pyi` |
+| JavaScript | `js`, `mjs`, `cjs` |
+| TypeScript | `ts`, `mts`, `cts`, `tsx` |
+| JSX | `jsx` |
+| Vue | `vue` |
+| C | `c`, `h` |
+| C++ | `cpp`, `hpp`, `cc`, `cxx`, `hxx` |
+| C# | `cs` |
+| Java | `java` |
+| Kotlin | `kt`, `kts` |
+| Swift | `swift` |
+| Dart | `dart` |
+| PHP | `php` |
+| Ruby | `rb`, `rake` |
+| Scala | `scala`, `sc` |
+| Lua | `lua` |
+| SQL | `sql` |
+| Shell | `sh`, `bash`, `zsh` |
+| Move | `move` |
+
+Nested block comments are correctly handled for Rust and Swift. Need a language not listed? Define it below.
+
 ### Custom Languages
 
 Define comment syntax for unsupported languages:

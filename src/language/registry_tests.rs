@@ -56,8 +56,8 @@ fn registry_all_returns_all_languages() {
     let registry = LanguageRegistry::default();
     let all = registry.all();
 
-    // 20 built-in languages as of this writing
-    assert!(all.len() >= 21);
+    // 22 built-in languages as of this writing
+    assert!(all.len() >= 22);
 }
 
 #[test]
@@ -155,6 +155,25 @@ fn default_registry_has_move() {
     assert_eq!(move_lang.comment_syntax.multi_line[0].start, "/*");
     assert_eq!(move_lang.comment_syntax.multi_line[0].end, "*/");
     assert!(!move_lang.comment_syntax.multi_line[0].supports_nesting);
+}
+
+#[test]
+fn default_registry_has_svelte() {
+    let registry = LanguageRegistry::default();
+    let svelte = registry.get_by_extension("svelte").unwrap();
+
+    assert_eq!(svelte.name, "Svelte");
+    assert!(
+        svelte
+            .comment_syntax
+            .single_line
+            .contains(&"//".to_string())
+    );
+    assert_eq!(svelte.comment_syntax.multi_line.len(), 2);
+    assert_eq!(svelte.comment_syntax.multi_line[0].start, "/*");
+    assert_eq!(svelte.comment_syntax.multi_line[0].end, "*/");
+    assert_eq!(svelte.comment_syntax.multi_line[1].start, "<!--");
+    assert_eq!(svelte.comment_syntax.multi_line[1].end, "-->");
 }
 
 #[test]

@@ -40,7 +40,7 @@ const PRESET_RUST_STRICT: &str = r#"
 version = "2"
 
 [scanner]
-exclude = [".git/**", "target/**", "vendor/**", "*.generated.rs", "benches/**"]
+exclude = [".git/**", "target/**", "vendor/**", "**/*.generated.rs"]
 
 [content]
 extensions = ["rs"]
@@ -108,37 +108,37 @@ skip_blank = true
 
 # Test files need more space for fixtures and mocks
 [[content.rules]]
-pattern = "**/*.test.{js,jsx,ts,tsx}"
+pattern = "**/*.test.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space for fixtures and assertions"
 
 [[content.rules]]
-pattern = "**/*.spec.{js,jsx,ts,tsx}"
+pattern = "**/*.spec.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space for fixtures and assertions"
 
 [[content.rules]]
-pattern = "**/__tests__/**/*.{js,jsx,ts,tsx}"
+pattern = "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space for fixtures and assertions"
 
 [[content.rules]]
-pattern = "**/test/**/*.{js,jsx,ts,tsx}"
+pattern = "**/test/**/*.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space for fixtures and assertions"
 
 [[content.rules]]
-pattern = "**/stories/**/*.{js,jsx,ts,tsx}"
+pattern = "**/stories/**/*.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 800
 reason = "Storybook stories may include multiple variants"
 
 [[content.rules]]
-pattern = "**/*.stories.{js,jsx,ts,tsx}"
+pattern = "**/*.stories.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 800
 reason = "Storybook stories may include multiple variants"
 
 [[content.rules]]
-pattern = "**/e2e/**/*.{js,ts}"
+pattern = "**/e2e/**/*.{js,ts,mjs}"
 max_lines = 800
 reason = "E2E tests may have longer flows"
 
@@ -246,7 +246,7 @@ version = "2"
 [scanner]
 exclude = [
     ".git/**", "vendor/**", "bin/**", "dist/**",
-    "testdata/**", ".idea/**", ".vscode/**"
+    ".idea/**", ".vscode/**"
 ]
 
 [content]
@@ -402,12 +402,12 @@ version = "2"
 exclude = [
     ".git/**",
     # Rust
-    "target/**", "vendor/**",
+    "target/**",
     # Node.js
     "node_modules/**", "dist/**", "build/**", ".next/**", ".nuxt/**",
     # Python
     "__pycache__/**", ".venv/**", "venv/**", "*.egg-info/**", ".pytest_cache/**",
-    # Go
+    # Rust/Go shared
     "vendor/**",
     # General
     "coverage/**", ".cache/**"
@@ -433,17 +433,17 @@ reason = "Test files need more space"
 
 # Node tests
 [[content.rules]]
-pattern = "**/*.test.{js,jsx,ts,tsx}"
+pattern = "**/*.test.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space"
 
 [[content.rules]]
-pattern = "**/*.spec.{js,jsx,ts,tsx}"
+pattern = "**/*.spec.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space"
 
 [[content.rules]]
-pattern = "**/__tests__/**/*.{js,jsx,ts,tsx}"
+pattern = "**/__tests__/**/*.{js,jsx,ts,tsx,mjs,cjs}"
 max_lines = 1000
 reason = "Test files need more space"
 
