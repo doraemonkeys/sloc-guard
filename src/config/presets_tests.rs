@@ -351,6 +351,97 @@ fn load_go_strict_preset() {
 }
 
 #[test]
+fn load_move_strict_preset() {
+    let value = load_preset("move-strict").expect("should load move-strict preset");
+
+    let table = value.as_table().expect("should be a table");
+    assert_eq!(table.get("version").and_then(Value::as_str), Some("2"));
+
+    let content = table.get("content").and_then(Value::as_table).unwrap();
+    let extensions = content.get("extensions").and_then(Value::as_array).unwrap();
+
+    assert!(
+        extensions
+            .iter()
+            .filter_map(Value::as_str)
+            .any(|x| x == "move")
+    );
+    assert_eq!(
+        content.get("max_lines").and_then(Value::as_integer),
+        Some(600)
+    );
+
+    // Verify test file relaxation rules
+    let rules = content.get("rules").and_then(Value::as_array).unwrap();
+    assert!(
+        !rules.is_empty(),
+        "move-strict should have content rules for test files"
+    );
+    let test_rule = rules.iter().find(|r| {
+        r.get("pattern")
+            .and_then(Value::as_str)
+            .is_some_and(|p| p.contains("_test.move"))
+    });
+    assert!(
+        test_rule.is_some(),
+        "Should have a rule for *_test.move files"
+    );
+    assert_eq!(
+        test_rule
+            .unwrap()
+            .get("max_lines")
+            .and_then(Value::as_integer),
+        Some(1000),
+        "Test files should have relaxed limit of 1000 lines"
+    );
+
+    // Verify example file rules
+    let example_rule = rules.iter().find(|r| {
+        r.get("pattern")
+            .and_then(Value::as_str)
+            .is_some_and(|p| p.contains("examples"))
+    });
+    assert!(
+        example_rule.is_some(),
+        "Should have a rule for example files"
+    );
+
+    let scanner = table.get("scanner").and_then(Value::as_table).unwrap();
+    let exclude = scanner.get("exclude").and_then(Value::as_array).unwrap();
+    assert!(
+        exclude.iter().any(|v| v.as_str() == Some("build/**")),
+        "Should exclude build directory"
+    );
+
+    let structure = table.get("structure").and_then(Value::as_table).unwrap();
+    assert_eq!(
+        structure.get("max_files").and_then(Value::as_integer),
+        Some(20)
+    );
+    assert_eq!(
+        structure.get("max_dirs").and_then(Value::as_integer),
+        Some(10)
+    );
+
+    // Verify structure rules
+    let struct_rules = structure.get("rules").and_then(Value::as_array).unwrap();
+    assert!(
+        !struct_rules.is_empty(),
+        "move-strict should have structure rules"
+    );
+
+    // Verify deny lists
+    let deny_files = structure
+        .get("deny_files")
+        .and_then(Value::as_array)
+        .unwrap();
+    assert!(
+        deny_files.iter().any(|v| v.as_str() == Some("*.bak")),
+        "Should deny .bak files"
+    );
+}
+
+#[test]
 fn load_monorepo_base_preset() {
     let value = load_preset("monorepo-base").expect("should load monorepo-base preset");
 
@@ -371,6 +462,10 @@ fn load_monorepo_base_preset() {
         ext_strs.contains(&"svelte"),
         "monorepo-base should include svelte files"
     );
+    assert!(
+        ext_strs.contains(&"move"),
+        "monorepo-base should include move files"
+    );
     assert_eq!(
         content.get("max_lines").and_then(Value::as_integer),
         Some(600)
@@ -379,7 +474,7 @@ fn load_monorepo_base_preset() {
     // Verify test file relaxation rules for multiple languages
     let rules = content.get("rules").and_then(Value::as_array).unwrap();
     assert!(
-        rules.len() >= 5,
+        rules.len() >= 7,
         "monorepo-base should have multiple test file rules for different languages"
     );
 
@@ -417,6 +512,34 @@ fn load_monorepo_base_preset() {
             .is_some_and(|p| p.contains("_test.go"))
     });
     assert!(go_test_rule.is_some(), "Should have Go test file rules");
+
+    // Check for Move test rules
+    let move_test_rule = rules.iter().find(|r| {
+        r.get("pattern")
+            .and_then(Value::as_str)
+            .is_some_and(|p| p.contains("_test.move"))
+    });
+    assert!(move_test_rule.is_some(), "Should have Move test file rules");
+
+    let move_plural_test_rule = rules.iter().find(|r| {
+        r.get("pattern")
+            .and_then(Value::as_str)
+            .is_some_and(|p| p.contains("_tests.move"))
+    });
+    assert!(
+        move_plural_test_rule.is_some(),
+        "Should have Move *_tests.move file rules"
+    );
+
+    let move_tests_dir_rule = rules.iter().find(|r| {
+        r.get("pattern")
+            .and_then(Value::as_str)
+            .is_some_and(|p| p.contains("tests/**/*.move"))
+    });
+    assert!(
+        move_tests_dir_rule.is_some(),
+        "Should have Move tests directory rules"
+    );
 
     let structure = table.get("structure").and_then(Value::as_table).unwrap();
     assert_eq!(
@@ -466,6 +589,7 @@ fn unknown_preset_returns_error() {
     assert!(msg.contains("node-strict"));
     assert!(msg.contains("python-strict"));
     assert!(msg.contains("go-strict"));
+    assert!(msg.contains("move-strict"));
     assert!(msg.contains("monorepo-base"));
 }
 

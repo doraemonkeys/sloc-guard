@@ -405,6 +405,12 @@ impl Default for LanguageRegistry {
             CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
         ));
 
+        registry.register(Language::new(
+            "Move",
+            vec!["move"],
+            CommentSyntax::new(vec!["//"], vec![("/*", "*/")]),
+        ));
+
         registry
     }
 }

@@ -7,6 +7,7 @@ pub const AVAILABLE_PRESETS: &[&str] = &[
     "node-strict",
     "python-strict",
     "go-strict",
+    "move-strict",
     "monorepo-base",
 ];
 
@@ -20,6 +21,7 @@ pub fn load_preset(name: &str) -> Result<Value> {
         "node-strict" => PRESET_NODE_STRICT,
         "python-strict" => PRESET_PYTHON_STRICT,
         "go-strict" => PRESET_GO_STRICT,
+        "move-strict" => PRESET_MOVE_STRICT,
         "monorepo-base" => PRESET_MONOREPO_BASE,
         _ => {
             return Err(SlocGuardError::Config(format!(
@@ -334,6 +336,65 @@ max_dirs = 10
 reason = "Each command should be relatively small"
 "#;
 
+const PRESET_MOVE_STRICT: &str = r#"
+version = "2"
+
+[scanner]
+exclude = [
+    ".git/**", "build/**", ".idea/**", ".vscode/**"
+]
+
+[content]
+extensions = ["move"]
+max_lines = 600
+warn_threshold = 0.85
+skip_comments = true
+skip_blank = true
+
+# Test modules often need more space for assertions and fixtures
+[[content.rules]]
+pattern = "**/*_test.move"
+max_lines = 1000
+reason = "Test modules need more space for assertions and fixtures"
+
+[[content.rules]]
+pattern = "**/*_tests.move"
+max_lines = 1000
+reason = "Test modules need more space for assertions and fixtures"
+
+[[content.rules]]
+pattern = "**/tests/**/*.move"
+max_lines = 1000
+reason = "Test directory files need more space"
+
+# Example files may be more verbose for clarity
+[[content.rules]]
+pattern = "**/examples/**/*.move"
+max_lines = 800
+reason = "Example files may be more verbose for clarity"
+
+[structure]
+max_files = 20
+max_dirs = 10
+warn_threshold = 0.9
+deny_files = ["*.bak", "*.tmp", ".DS_Store", "Thumbs.db"]
+deny_extensions = [".exe", ".dll", ".so", ".dylib"]
+
+# Relax limits for test directories
+[[structure.rules]]
+scope = "tests/**"
+max_files = 50
+max_dirs = 15
+reason = "Test directories often have more files"
+
+# Example directories
+[[structure.rules]]
+scope = "examples/**"
+max_files = 30
+max_dirs = 15
+reason = "Example directories may have many demo modules"
+"#;
+
 const PRESET_MONOREPO_BASE: &str = r#"
 version = "2"
 
@@ -353,7 +414,7 @@ exclude = [
 ]
 
 [content]
-extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "go", "java", "kt", "swift", "vue", "svelte"]
+extensions = ["rs", "js", "jsx", "ts", "tsx", "py", "go", "java", "kt", "swift", "vue", "svelte", "move"]
 max_lines = 600
 warn_threshold = 0.85
 skip_comments = true
@@ -406,6 +467,22 @@ reason = "Test files need more space"
 # Java/Kotlin tests
 [[content.rules]]
 pattern = "**/src/test/**/*.{java,kt}"
+max_lines = 1000
+reason = "Test files need more space"
+
+# Move tests
+[[content.rules]]
+pattern = "**/*_test.move"
+max_lines = 1000
+reason = "Test files need more space"
+
+[[content.rules]]
+pattern = "**/*_tests.move"
+max_lines = 1000
+reason = "Test files need more space"
+
+[[content.rules]]
+pattern = "**/tests/**/*.move"
 max_lines = 1000
 reason = "Test files need more space"
 

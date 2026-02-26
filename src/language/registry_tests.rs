@@ -57,7 +57,7 @@ fn registry_all_returns_all_languages() {
     let all = registry.all();
 
     // 20 built-in languages as of this writing
-    assert!(all.len() >= 20);
+    assert!(all.len() >= 21);
 }
 
 #[test]
@@ -137,6 +137,24 @@ fn default_registry_has_lua() {
     // Lua uses --[[ / ]] for multi-line comments
     assert_eq!(lua.comment_syntax.multi_line[0].start, "--[[");
     assert_eq!(lua.comment_syntax.multi_line[0].end, "]]");
+}
+
+#[test]
+fn default_registry_has_move() {
+    let registry = LanguageRegistry::default();
+    let move_lang = registry.get_by_extension("move").unwrap();
+
+    assert_eq!(move_lang.name, "Move");
+    assert!(
+        move_lang
+            .comment_syntax
+            .single_line
+            .contains(&"//".to_string())
+    );
+    assert_eq!(move_lang.comment_syntax.multi_line.len(), 1);
+    assert_eq!(move_lang.comment_syntax.multi_line[0].start, "/*");
+    assert_eq!(move_lang.comment_syntax.multi_line[0].end, "*/");
+    assert!(!move_lang.comment_syntax.multi_line[0].supports_nesting);
 }
 
 #[test]

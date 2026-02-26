@@ -357,6 +357,8 @@ fn default_extensions() -> Vec<String> {
         "php".to_string(),
         "lua".to_string(),
         "sh".to_string(),
+        // Blockchain / Smart Contracts
+        "move".to_string(),
     ]
 }
 
