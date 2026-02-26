@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
+use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, REPO_URL, Result, SlocGuardError};
 
 use super::detect;
 
@@ -53,8 +53,9 @@ pub(crate) fn run_init_with_cwd(args: &crate::cli::InitArgs, cwd: &std::path::Pa
 
 #[must_use]
 pub(crate) fn generate_config_template() -> String {
-    r##"# sloc-guard configuration file
-# See: https://github.com/doraemonkeys/sloc-guard for documentation
+    format!(
+        r##"# sloc-guard configuration file
+# See: {REPO_URL} for documentation
 version = "2"
 
 # Optional: inherit from presets or remote configs
@@ -154,7 +155,7 @@ min_interval_secs = 3600                  # At most one entry per hour
 # single_line_comments = ["#", "//"]
 # multi_line_comments = [["/*", "*/"]]
 "##
-    .to_string()
+    )
 }
 
 #[cfg(test)]

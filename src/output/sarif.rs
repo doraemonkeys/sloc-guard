@@ -51,7 +51,7 @@ const SARIF_SCHEMA: &str = "https://raw.githubusercontent.com/oasis-tcs/sarif-sp
 const SARIF_VERSION: &str = "2.1.0";
 const TOOL_NAME: &str = "sloc-guard";
 const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
-const TOOL_INFO_URI: &str = "https://github.com/doraemonkeys/sloc-guard";
+const TOOL_INFO_URI: &str = crate::REPO_URL;
 
 // Content (SLOC) rule IDs
 const RULE_LINE_LIMIT_EXCEEDED: &str = "sloc-guard/line-limit-exceeded";

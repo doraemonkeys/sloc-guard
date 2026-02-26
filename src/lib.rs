@@ -16,6 +16,8 @@ pub mod stats;
 
 pub use error::{Result, SlocGuardError};
 
+pub const REPO_URL: &str = "https://github.com/doraemonkeys/sloc-guard";
+
 pub const EXIT_SUCCESS: i32 = 0;
 pub const EXIT_THRESHOLD_EXCEEDED: i32 = 1;
 pub const EXIT_CONFIG_ERROR: i32 = 2;

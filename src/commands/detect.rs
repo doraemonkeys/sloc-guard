@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
-use crate::{Result, SlocGuardError};
+use crate::{REPO_URL, Result, SlocGuardError};
 
 /// Represents a detected project type with its configuration defaults.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -290,6 +290,7 @@ pub fn generate_detected_config(result: &DetectionResult) -> String {
     let mut output = String::new();
 
     output.push_str("# sloc-guard configuration file\n");
+    let _ = writeln!(output, "# See: {REPO_URL} for documentation");
     output.push_str("# Generated with --detect flag\n");
 
     if result.is_monorepo {
