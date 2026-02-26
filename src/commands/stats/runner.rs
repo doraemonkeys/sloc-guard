@@ -84,10 +84,12 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
     // Warn if --depth is used with --by lang (not applicable)
-    if args.depth.is_some() && args.by == BreakdownBy::Lang {
+    if let Some(depth) = args.depth
+        && args.by == BreakdownBy::Lang
+    {
         crate::output::print_warning_full(
             "--depth is only applicable with --by dir",
-            Some(&format!("Ignoring depth: {}", args.depth.unwrap())),
+            Some(&format!("Ignoring depth: {depth}")),
             None,
         );
     }
