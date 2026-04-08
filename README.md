@@ -445,7 +445,7 @@ The hook uses `--staged` mode for fast incremental checks.
 
 ### CI Integration
 
-See [GitHub Action README](.github/action/README.md) for GitHub Actions, GitLab CI, Jenkins, Azure Pipelines, CircleCI examples.
+See [GitHub Action README](.github/action/README.md) for copy-paste GitHub Actions workflows plus GitLab CI, Jenkins, Azure Pipelines, and CircleCI examples. 
 
 ### Docker
 

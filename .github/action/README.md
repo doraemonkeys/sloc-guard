@@ -5,10 +5,17 @@ Enforce source lines of code limits and directory structure constraints in your 
 ## Usage
 
 ```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0 # Recommended when using diff mode
+
 - uses: doraemonkeys/sloc-guard/.github/action@master
   with:
-    paths: 'src'
+    config-path: .sloc-guard.toml
+    paths: '.'
 ```
+
+`version` defaults to `latest`, so you usually do not need to set it. If you need reproducible behavior, pin both `uses:` and `version` to the same release tag.
 
 ## Inputs
 
@@ -17,13 +24,15 @@ Enforce source lines of code limits and directory structure constraints in your 
 | `paths` | Paths to check (space-separated, see note below) | `.` |
 | `config-path` | Path to sloc-guard.toml | Auto-detected |
 | `fail-on-warning` | Treat warnings as failures | `false` |
-| `version` | sloc-guard version to install | `latest` |
+| `version` | sloc-guard version to install. Defaults to `latest`; if you pin it, keep it aligned with the `uses:` release tag | `latest` |
 | `cache` | Enable result caching | `true` |
 | `sarif-output` | Path for SARIF output file | (disabled) |
 | `baseline` | Path to baseline file | (disabled) |
 | `diff` | Only check files changed since ref | (disabled) |
 
 **Note on `paths`:** Paths containing spaces are not supported. If you need to check directories with spaces in their names, use glob patterns in your `sloc-guard.toml` configuration instead.
+
+**Note on `diff`:** The base ref must exist in the local checkout. If you use values such as `origin/main` or `origin/master`, configure `actions/checkout@v4` with `fetch-depth: 0` or fetch the base ref explicitly before running the action.
 
 ## Outputs
 
@@ -84,29 +93,51 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: doraemonkeys/sloc-guard/.github/action@master
+        with:
+          config-path: .sloc-guard.toml
+          paths: '.'
 ```
 
 ### PR Checks with Diff Mode
 
 ```yaml
-- uses: doraemonkeys/sloc-guard/.github/action@master
-  with:
-    diff: 'origin/master'
-    fail-on-warning: 'true'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: doraemonkeys/sloc-guard/.github/action@master
+        with:
+          diff: 'origin/main'
+          fail-on-warning: 'true'
 ```
+
+Replace `origin/main` with the ref that matches your default branch.
 
 ### SARIF Upload to GitHub Security
 
 ```yaml
-- uses: doraemonkeys/sloc-guard/.github/action@master
-  id: sloc-guard
-  with:
-    sarif-output: 'sloc-guard.sarif'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
 
-- uses: github/codeql-action/upload-sarif@v3
-  if: always()
-  with:
-    sarif_file: ${{ steps.sloc-guard.outputs.sarif-file }}
+      - uses: doraemonkeys/sloc-guard/.github/action@master
+        id: sloc-guard
+        with:
+          sarif-output: 'sloc-guard.sarif'
+
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ steps.sloc-guard.outputs.sarif-file }}
 ```
 
 ### Using Outputs
