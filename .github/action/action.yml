@@ -116,7 +116,7 @@ runs:
 
     - name: Cache sloc-guard binary
       id: cache-binary
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.cargo/bin/sloc-guard*
         key: sloc-guard-${{ steps.detect-platform.outputs.platform }}-${{ steps.detect-platform.outputs.arch }}-${{ steps.detect-platform.outputs.resolved_version }}
@@ -267,7 +267,7 @@ runs:
     - name: Restore cargo registry cache
       id: cargo-cache
       if: steps.cache-binary.outputs.cache-hit != 'true' && steps.install-binary.outputs.need-cargo-install == 'true'
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v5
       with:
         path: |
           ~/.cargo/registry
@@ -294,7 +294,7 @@ runs:
 
     - name: Save cargo registry cache
       if: steps.cargo-install.outcome == 'success' && steps.cargo-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v5
       with:
         path: |
           ~/.cargo/registry
@@ -321,7 +321,7 @@ runs:
     # jobs may have incomplete/invalid cache state that shouldn't be persisted.
     - name: Cache sloc-guard results
       if: inputs.cache == 'true'
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           .git/sloc-guard/cache.json
