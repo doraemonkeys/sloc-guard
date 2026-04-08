@@ -73,7 +73,7 @@ runs:
       id: detect-platform
       shell: bash
       env:
-        ACTION_REPO: ${{ github.action_repository }}
+        ACTION_REPO: ${{ github.action_repository || github.repository }}
         VERSION: ${{ inputs.version }}
       run: |
         # Map runner OS to release platform name
@@ -126,7 +126,7 @@ runs:
       if: steps.cache-binary.outputs.cache-hit != 'true'
       shell: bash
       env:
-        ACTION_REPO: ${{ github.action_repository }}
+        ACTION_REPO: ${{ github.action_repository || github.repository }}
         PLATFORM: ${{ steps.detect-platform.outputs.platform }}
         ARCH: ${{ steps.detect-platform.outputs.arch }}
         VERSION: ${{ inputs.version }}
@@ -281,7 +281,7 @@ runs:
       if: steps.cache-binary.outputs.cache-hit != 'true' && steps.install-binary.outputs.need-cargo-install == 'true'
       shell: bash
       env:
-        ACTION_REPO: ${{ github.action_repository }}
+        ACTION_REPO: ${{ github.action_repository || github.repository }}
         VERSION: ${{ inputs.version }}
       run: |
         REPO_URL="https://github.com/${ACTION_REPO}"

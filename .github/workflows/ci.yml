@@ -78,7 +78,7 @@ jobs:
 
   # Self-check with sloc-guard action (for SARIF upload)
   sloc-guard:
-    name: SLOC Guard
+    name: SLOC Guard (Action / Ubuntu)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -89,7 +89,7 @@ jobs:
           fetch-depth: 0 # For --diff mode
 
       - name: Run sloc-guard
-        uses: doraemonkeys/sloc-guard/.github/action@master
+        uses: ./.github/action
         with:
           sarif-output: results.sarif
           diff: ${{ github.event.pull_request.base.ref && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
@@ -98,3 +98,19 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
+
+  # Validate the in-branch GitHub Action implementation on Windows
+  sloc-guard-windows:
+    name: SLOC Guard (Action / Windows)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # For --diff mode
+
+      - name: Run sloc-guard
+        uses: ./.github/action
+        with:
+          diff: ${{ github.event.pull_request.base.ref && format('origin/{0}', github.event.pull_request.base.ref) || '' }}
