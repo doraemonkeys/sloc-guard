@@ -62,21 +62,12 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup Rust
-      uses: dtolnay/rust-toolchain@stable
-
-    # Note: Cargo registry cache is only needed when falling back to `cargo install`.
-    # Use restore-only here; save step runs conditionally after install.
-    - name: Restore cargo registry cache
-      id: cargo-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-registry-
+    - name: Add sloc-guard bin directory to PATH
+      shell: bash
+      run: |
+        INSTALL_DIR="$HOME/.cargo/bin"
+        mkdir -p "$INSTALL_DIR"
+        echo "$INSTALL_DIR" >> $GITHUB_PATH
 
     - name: Detect platform and resolve version
       id: detect-platform
@@ -130,8 +121,8 @@ runs:
         path: ~/.cargo/bin/sloc-guard*
         key: sloc-guard-${{ steps.detect-platform.outputs.platform }}-${{ steps.detect-platform.outputs.arch }}-${{ steps.detect-platform.outputs.resolved_version }}
 
-    - name: Install sloc-guard
-      id: install
+    - name: Install sloc-guard from pre-built binary
+      id: install-binary
       if: steps.cache-binary.outputs.cache-hit != 'true'
       shell: bash
       env:
@@ -144,6 +135,8 @@ runs:
         REPO_URL="https://github.com/${ACTION_REPO}"
         INSTALL_DIR="$HOME/.cargo/bin"
         mkdir -p "$INSTALL_DIR"
+
+        echo "need-cargo-install=false" >> $GITHUB_OUTPUT
 
         # Function: download with exponential backoff retry
         download_with_retry() {
@@ -185,28 +178,21 @@ runs:
           fi
         }
 
-        # Function: fallback to cargo install
-        fallback_cargo_install() {
-          echo "Falling back to cargo install..."
-          echo "used-cargo-install=true" >> $GITHUB_OUTPUT
-          if [ "$VERSION" = "latest" ]; then
-            cargo install --git "$REPO_URL" --locked
-          else
-            cargo install --git "$REPO_URL" --tag "v$VERSION" --locked
-          fi
+        mark_need_cargo_install() {
+          echo "$1"
+          echo "need-cargo-install=true" >> $GITHUB_OUTPUT
         }
 
-        # Skip binary download if platform/arch is unknown or version resolution failed
+        # Skip binary download if platform/arch is unknown or version resolution failed.
+        # The caller will fall back to cargo install in a separate step.
         if [ -z "$PLATFORM" ] || [ -z "$ARCH" ]; then
-          echo "Unknown platform/arch: ${{ runner.os }}-${{ runner.arch }}"
-          fallback_cargo_install
+          mark_need_cargo_install "Unknown platform/arch: ${{ runner.os }}-${{ runner.arch }}"
           exit 0
         fi
 
         # Use pre-resolved version from detect-platform step
         if [ "$RESOLVED_VERSION" = "latest-fallback" ]; then
-          echo "Version resolution failed earlier"
-          fallback_cargo_install
+          mark_need_cargo_install "Version resolution failed earlier"
           exit 0
         fi
 
@@ -230,23 +216,20 @@ runs:
         # Download binary archive
         ARCHIVE_PATH="$TEMP_DIR/$ARCHIVE_NAME"
         if ! download_with_retry "$ARCHIVE_URL" "$ARCHIVE_PATH"; then
-          echo "Binary download failed"
-          fallback_cargo_install
+          mark_need_cargo_install "Binary download failed"
           exit 0
         fi
 
         # Download checksums
         SUMS_PATH="$TEMP_DIR/checksums-sha256.txt"
         if ! download_with_retry "$SUMS_URL" "$SUMS_PATH"; then
-          echo "Checksum file download failed"
-          fallback_cargo_install
+          mark_need_cargo_install "Checksum file download failed"
           exit 0
         fi
 
         # Verify checksum
         if ! verify_checksum "$ARCHIVE_PATH" "$SUMS_PATH"; then
-          echo "Checksum verification failed"
-          fallback_cargo_install
+          mark_need_cargo_install "Checksum verification failed"
           exit 0
         fi
 
@@ -267,21 +250,50 @@ runs:
         fi
 
         if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
-          echo "Binary not found in archive"
-          fallback_cargo_install
+          mark_need_cargo_install "Binary not found in archive"
           exit 0
         fi
 
         cp "$BINARY" "$INSTALL_DIR/"
         chmod +x "$INSTALL_DIR/sloc-guard"* 2>/dev/null || true
         echo "Successfully installed sloc-guard from pre-built binary"
-        echo "used-cargo-install=false" >> $GITHUB_OUTPUT
 
-    # Note: Save cargo registry cache only when cargo install was used AND cache wasn't restored.
-    # - When binary cache hits, install step is skipped, so used-cargo-install is undefined (empty)
-    # - When cargo registry cache hits, don't re-save identical content
+    # Note: Cargo registry cache and Rust toolchain are only needed when the
+    # pre-built binary path is unavailable and we have to fall back to cargo install.
+    - name: Setup Rust
+      if: steps.cache-binary.outputs.cache-hit != 'true' && steps.install-binary.outputs.need-cargo-install == 'true'
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Restore cargo registry cache
+      id: cargo-cache
+      if: steps.cache-binary.outputs.cache-hit != 'true' && steps.install-binary.outputs.need-cargo-install == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+
+    - name: Install sloc-guard with cargo fallback
+      id: cargo-install
+      if: steps.cache-binary.outputs.cache-hit != 'true' && steps.install-binary.outputs.need-cargo-install == 'true'
+      shell: bash
+      env:
+        ACTION_REPO: ${{ github.action_repository }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        REPO_URL="https://github.com/${ACTION_REPO}"
+        echo "Falling back to cargo install..."
+        if [ "$VERSION" = "latest" ]; then
+          cargo install --git "$REPO_URL" --locked
+        else
+          cargo install --git "$REPO_URL" --tag "v$VERSION" --locked
+        fi
+
     - name: Save cargo registry cache
-      if: steps.install.outputs.used-cargo-install == 'true' && steps.cargo-cache.outputs.cache-hit != 'true'
+      if: steps.cargo-install.outcome == 'success' && steps.cargo-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: |
