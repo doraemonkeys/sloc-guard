@@ -8,9 +8,11 @@ use super::*;
 fn create_git_repo() -> TempDir {
     let dir = TempDir::new().unwrap();
 
-    // Initialize git repo
+    // Initialize git repo with a deterministic initial branch name. Without this the
+    // branch follows the host's `init.defaultBranch` (often `main`), which breaks tests
+    // that reference `master` by name (e.g. `changed_files_range_between_branches`).
     Command::new("git")
-        .args(["init"])
+        .args(["init", "-b", "master"])
         .current_dir(dir.path())
         .output()
         .expect("Failed to init git repo");
