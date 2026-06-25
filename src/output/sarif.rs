@@ -18,9 +18,7 @@ use super::path::display_path;
 /// Scanning alert. This is why approaching-limit advisories (`Warning`) and
 /// grandfathered/baselined records (`Note`) can be kept out of the Security tab
 /// while real violations (`Error`) still surface.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum SarifLevel {
     /// Informational record (e.g. grandfathered/baselined violation). Lowest severity.

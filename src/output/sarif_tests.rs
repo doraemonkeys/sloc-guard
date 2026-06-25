@@ -368,7 +368,10 @@ fn sarif_level_as_str_matches_spec() {
 #[test]
 fn sarif_level_from_str_is_case_insensitive() {
     assert_eq!("ERROR".parse::<SarifLevel>().unwrap(), SarifLevel::Error);
-    assert_eq!("Warning".parse::<SarifLevel>().unwrap(), SarifLevel::Warning);
+    assert_eq!(
+        "Warning".parse::<SarifLevel>().unwrap(),
+        SarifLevel::Warning
+    );
     assert_eq!("warn".parse::<SarifLevel>().unwrap(), SarifLevel::Warning);
     assert_eq!("note".parse::<SarifLevel>().unwrap(), SarifLevel::Note);
     assert!("bogus".parse::<SarifLevel>().is_err());
@@ -381,9 +384,9 @@ fn sarif_level_from_str_is_case_insensitive() {
 /// A mixed result set spanning every emitted level: error, warning, note.
 fn mixed_severity_results() -> Vec<CheckResult> {
     vec![
-        make_failed_result("fail.rs", 600, 500),             // error
-        make_warning_result("approaching.rs", 460, 500),     // warning
-        make_grandfathered_result("legacy.rs", 700, 500),    // note
+        make_failed_result("fail.rs", 600, 500),          // error
+        make_warning_result("approaching.rs", 460, 500),  // warning
+        make_grandfathered_result("legacy.rs", 700, 500), // note
     ]
 }
 
