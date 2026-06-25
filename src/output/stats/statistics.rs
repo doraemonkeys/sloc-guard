@@ -154,7 +154,7 @@ impl ProjectStatistics {
         }
 
         let mut by_language: Vec<LanguageStats> = lang_map.into_values().collect();
-        by_language.sort_by(|a, b| b.code.cmp(&a.code));
+        by_language.sort_by_key(|s| std::cmp::Reverse(s.code));
 
         self.by_language = Some(by_language);
         self
@@ -211,7 +211,7 @@ impl ProjectStatistics {
         }
 
         let mut by_directory: Vec<DirectoryStats> = dir_map.into_values().collect();
-        by_directory.sort_by(|a, b| b.code.cmp(&a.code));
+        by_directory.sort_by_key(|s| std::cmp::Reverse(s.code));
 
         self.by_directory = Some(by_directory);
         self
@@ -222,7 +222,7 @@ impl ProjectStatistics {
     #[allow(clippy::cast_precision_loss)] // Precision loss is acceptable for average calculation
     pub fn with_top_files(mut self, n: usize) -> Self {
         let mut sorted_files = self.files.clone();
-        sorted_files.sort_by(|a, b| b.stats.code.cmp(&a.stats.code));
+        sorted_files.sort_by_key(|s| std::cmp::Reverse(s.stats.code));
         self.top_files = Some(sorted_files.into_iter().take(n).collect());
 
         if self.total_files > 0 {
@@ -248,16 +248,16 @@ impl ProjectStatistics {
 
         match sort {
             FileSortOrder::Code => {
-                sorted_files.sort_by(|a, b| b.stats.code.cmp(&a.stats.code));
+                sorted_files.sort_by_key(|s| std::cmp::Reverse(s.stats.code));
             }
             FileSortOrder::Total => {
-                sorted_files.sort_by(|a, b| b.stats.total.cmp(&a.stats.total));
+                sorted_files.sort_by_key(|s| std::cmp::Reverse(s.stats.total));
             }
             FileSortOrder::Comment => {
-                sorted_files.sort_by(|a, b| b.stats.comment.cmp(&a.stats.comment));
+                sorted_files.sort_by_key(|s| std::cmp::Reverse(s.stats.comment));
             }
             FileSortOrder::Blank => {
-                sorted_files.sort_by(|a, b| b.stats.blank.cmp(&a.stats.blank));
+                sorted_files.sort_by_key(|s| std::cmp::Reverse(s.stats.blank));
             }
             FileSortOrder::Name => {
                 sorted_files.sort_by(|a, b| {

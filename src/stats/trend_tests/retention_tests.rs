@@ -237,8 +237,7 @@ fn test_save_with_retention_age_based() {
     let mut history = TrendHistory::new();
     let current_time = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_secs());
 
     let one_day = SECONDS_PER_DAY;
     // Add entries: 100 days old, 50 days old, 1 day old
