@@ -341,6 +341,127 @@ fn sarif_override_reason_included() {
 }
 
 // ============================================================================
+// SarifLevel ordering / parsing
+// ============================================================================
+
+#[test]
+fn sarif_level_severity_ordering() {
+    // The floor logic depends on Note < Warning < Error.
+    assert!(SarifLevel::Note < SarifLevel::Warning);
+    assert!(SarifLevel::Warning < SarifLevel::Error);
+    assert!(SarifLevel::Note < SarifLevel::Error);
+}
+
+#[test]
+fn sarif_level_default_is_error() {
+    // Product default: only real violations reach the Security tab.
+    assert_eq!(SarifLevel::default(), SarifLevel::Error);
+}
+
+#[test]
+fn sarif_level_as_str_matches_spec() {
+    assert_eq!(SarifLevel::Error.as_str(), "error");
+    assert_eq!(SarifLevel::Warning.as_str(), "warning");
+    assert_eq!(SarifLevel::Note.as_str(), "note");
+}
+
+#[test]
+fn sarif_level_from_str_is_case_insensitive() {
+    assert_eq!("ERROR".parse::<SarifLevel>().unwrap(), SarifLevel::Error);
+    assert_eq!("Warning".parse::<SarifLevel>().unwrap(), SarifLevel::Warning);
+    assert_eq!("warn".parse::<SarifLevel>().unwrap(), SarifLevel::Warning);
+    assert_eq!("note".parse::<SarifLevel>().unwrap(), SarifLevel::Note);
+    assert!("bogus".parse::<SarifLevel>().is_err());
+}
+
+// ============================================================================
+// Severity-floor (min_level) filtering
+// ============================================================================
+
+/// A mixed result set spanning every emitted level: error, warning, note.
+fn mixed_severity_results() -> Vec<CheckResult> {
+    vec![
+        make_failed_result("fail.rs", 600, 500),             // error
+        make_warning_result("approaching.rs", 460, 500),     // warning
+        make_grandfathered_result("legacy.rs", 700, 500),    // note
+    ]
+}
+
+fn emitted_rule_ids(formatter: &SarifFormatter, results: &[CheckResult]) -> Vec<String> {
+    let output = formatter.format(results).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    parsed["runs"][0]["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["ruleId"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn min_level_default_new_emits_all_levels() {
+    // `new()` is a faithful renderer (floor = Note); product policy is applied elsewhere.
+    let ids = emitted_rule_ids(&SarifFormatter::new(), &mixed_severity_results());
+    assert_eq!(ids.len(), 3);
+}
+
+#[test]
+fn min_level_error_drops_warning_and_note() {
+    let formatter = SarifFormatter::new().with_min_level(SarifLevel::Error);
+    let ids = emitted_rule_ids(&formatter, &mixed_severity_results());
+    assert_eq!(ids, vec!["sloc-guard/line-limit-exceeded"]);
+}
+
+#[test]
+fn min_level_warning_keeps_warning_drops_note() {
+    let formatter = SarifFormatter::new().with_min_level(SarifLevel::Warning);
+    let ids = emitted_rule_ids(&formatter, &mixed_severity_results());
+    assert_eq!(
+        ids,
+        vec![
+            "sloc-guard/line-limit-exceeded",
+            "sloc-guard/line-limit-warning",
+        ]
+    );
+}
+
+#[test]
+fn min_level_note_emits_everything() {
+    let formatter = SarifFormatter::new().with_min_level(SarifLevel::Note);
+    let ids = emitted_rule_ids(&formatter, &mixed_severity_results());
+    assert_eq!(ids.len(), 3);
+}
+
+#[test]
+fn min_level_error_drops_structure_warning() {
+    // Floor applies uniformly across content and structure categories.
+    use crate::checker::{ViolationCategory, ViolationType};
+    let results = vec![CheckResult::Warning {
+        path: PathBuf::from("src/large_dir"),
+        stats: LineStats {
+            total: 0,
+            code: 18,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        raw_stats: None,
+        limit: 20,
+        override_reason: None,
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::FileCount,
+            triggering_rule: None,
+        }),
+    }];
+
+    let formatter = SarifFormatter::new().with_min_level(SarifLevel::Error);
+    let output = formatter.format(&results).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert!(parsed["runs"][0]["results"].as_array().unwrap().is_empty());
+}
+
+// ============================================================================
 // Structure violation tests
 // ============================================================================
 

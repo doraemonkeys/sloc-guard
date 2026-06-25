@@ -56,6 +56,7 @@ fn default_check_args() -> CheckArgs {
         max_depth: None,
         report_json: None,
         write_sarif: None,
+        sarif_min_level: None,
         write_json: None,
         files: vec![],
     }
@@ -150,6 +151,7 @@ fn run_check_impl_with_write_sarif_creates_sarif_file() {
 
     let args = CheckArgs {
         write_sarif: Some(sarif_path.clone()),
+        sarif_min_level: None,
         ..default_check_args()
     };
 
@@ -210,6 +212,7 @@ fn run_check_impl_with_both_write_sarif_and_write_json() {
 
     let args = CheckArgs {
         write_sarif: Some(sarif_path.clone()),
+        sarif_min_level: None,
         write_json: Some(json_path.clone()),
         ..default_check_args()
     };
@@ -244,6 +247,7 @@ fn run_check_impl_write_formats_create_parent_directories() {
 
     let args = CheckArgs {
         write_sarif: Some(sarif_path.clone()),
+        sarif_min_level: None,
         write_json: Some(json_path.clone()),
         ..default_check_args()
     };

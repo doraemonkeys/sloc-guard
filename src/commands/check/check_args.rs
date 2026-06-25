@@ -43,6 +43,10 @@ pub const fn apply_cli_overrides(config: &mut crate::config::Config, args: &Chec
         config.content.warn_threshold = warn_threshold;
     }
 
+    if let Some(sarif_min_level) = args.sarif_min_level {
+        config.sarif.min_level = sarif_min_level;
+    }
+
     // Apply CLI structure overrides (override defaults, not rules)
     if let Some(max_files) = args.max_files {
         config.structure.max_files = Some(max_files);

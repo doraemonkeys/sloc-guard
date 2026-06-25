@@ -27,6 +27,7 @@ Enforce source lines of code limits and directory structure constraints in your 
 | `version` | sloc-guard version to install. Defaults to `latest`; if you pin it, keep it aligned with the `uses:` release tag | `latest` |
 | `cache` | Enable result caching | `true` |
 | `sarif-output` | Path for SARIF output file | (disabled) |
+| `sarif-min-level` | Minimum severity to emit into SARIF (`error`, `warning`, `note`) | (config default: `error`) |
 | `baseline` | Path to baseline file | (disabled) |
 | `diff` | Only check files changed since ref | (disabled) |
 
@@ -139,6 +140,20 @@ jobs:
         with:
           sarif_file: ${{ steps.sloc-guard.outputs.sarif-file }}
 ```
+
+#### What shows up in the Security tab
+
+By default the SARIF document contains **only real violations** (files that exceed
+their limit). Approaching-limit *warnings* and grandfathered/baselined *notes* are
+intentionally omitted, so a passing repository keeps a clean Security tab and a
+zero open-alert count. The warnings still appear in the run logs, the Job Summary,
+and as PR diff annotations — that is the right home for a pre-violation nudge.
+
+This floor is controlled by `[sarif] min_level` (default `error`) or the
+`sarif-min-level` action input. Set it to `warning` to also surface approaching-limit
+heads-up in the Security tab, or `note` to include everything (including baselined
+records). It only affects the **report**; exit codes and `fail-on-warning` are
+unchanged, since those run off the check results, not the SARIF document.
 
 ### Using Outputs
 

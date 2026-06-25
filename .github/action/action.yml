@@ -30,6 +30,10 @@ inputs:
     description: 'Path for SARIF output file. Empty to disable'
     required: false
     default: ''
+  sarif-min-level:
+    description: 'Minimum severity to emit into SARIF (error, warning, note). Empty uses config/default (error). "error" keeps approaching-limit warnings out of the Security tab'
+    required: false
+    default: ''
   baseline:
     description: 'Path to baseline file for grandfathering existing violations'
     required: false
@@ -341,6 +345,7 @@ runs:
         INPUT_CONFIG_PATH: ${{ inputs.config-path }}
         INPUT_FAIL_ON_WARNING: ${{ inputs.fail-on-warning }}
         INPUT_SARIF_OUTPUT: ${{ inputs.sarif-output }}
+        INPUT_SARIF_MIN_LEVEL: ${{ inputs.sarif-min-level }}
         INPUT_BASELINE: ${{ inputs.baseline }}
         INPUT_DIFF: ${{ inputs.diff }}
         INPUT_PATHS: ${{ inputs.paths }}
@@ -383,6 +388,11 @@ runs:
         # Add SARIF output if requested
         if [ -n "$SARIF_FILE" ]; then
           CMD+=(--write-sarif "$SARIF_FILE")
+        fi
+
+        # SARIF severity floor (defaults to error in config when unset)
+        if [ -n "$INPUT_SARIF_MIN_LEVEL" ]; then
+          CMD+=(--sarif-min-level "$INPUT_SARIF_MIN_LEVEL")
         fi
         
         # Force text output for problem matcher, disable color

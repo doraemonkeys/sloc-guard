@@ -501,3 +501,101 @@ fn action_contract_full_workflow_with_sarif() {
         "SARIF must have $schema field"
     );
 }
+
+/// Read the rule IDs of every result in a SARIF file written by a check run.
+fn sarif_rule_ids(path: &std::path::Path) -> Vec<String> {
+    let content = std::fs::read_to_string(path).unwrap();
+    let sarif: serde_json::Value = serde_json::from_str(&content).unwrap();
+    sarif["runs"][0]["results"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["ruleId"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn sarif_default_floor_omits_approaching_limit_warnings() {
+    // Regression test for the GitHub Security tab noise: an approaching-limit file
+    // is still passing (exit 0) and must NOT appear as a Code Scanning warning by default.
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    // 85 lines warns (warn_threshold 0.8 of max_lines 100) but does not exceed the limit.
+    fixture.create_rust_file("src/approaching.rs", 85);
+
+    let sarif_path = fixture.path().join("out.sarif");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "check",
+            "--no-sloc-cache",
+            "--quiet",
+            "--write-sarif",
+            sarif_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success(); // warnings never fail the build
+
+    assert!(
+        !sarif_rule_ids(&sarif_path).contains(&"sloc-guard/line-limit-warning".to_string()),
+        "default SARIF floor (error) must drop approaching-limit warnings"
+    );
+}
+
+#[test]
+fn sarif_min_level_warning_opts_back_in() {
+    // Teams that want the heads-up in the Security tab can opt in explicitly.
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/approaching.rs", 85);
+
+    let sarif_path = fixture.path().join("out.sarif");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "check",
+            "--no-sloc-cache",
+            "--quiet",
+            "--sarif-min-level",
+            "warning",
+            "--write-sarif",
+            sarif_path.to_str().unwrap(),
+        ])
+        .assert()
+        .success();
+
+    assert!(
+        sarif_rule_ids(&sarif_path).contains(&"sloc-guard/line-limit-warning".to_string()),
+        "--sarif-min-level warning must include approaching-limit warnings"
+    );
+}
+
+#[test]
+fn sarif_default_floor_keeps_real_violations() {
+    // The floor must never hide genuine violations: an over-limit file stays an error.
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    // 150 lines exceeds max_lines 100 → error.
+    fixture.create_rust_file("src/too_big.rs", 150);
+
+    let sarif_path = fixture.path().join("out.sarif");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args([
+            "check",
+            "--no-sloc-cache",
+            "--quiet",
+            "--write-sarif",
+            sarif_path.to_str().unwrap(),
+        ])
+        .assert()
+        .code(1);
+
+    assert!(
+        sarif_rule_ids(&sarif_path).contains(&"sloc-guard/line-limit-exceeded".to_string()),
+        "default SARIF floor must still report real (error-level) violations"
+    );
+}

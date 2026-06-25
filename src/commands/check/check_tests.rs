@@ -38,6 +38,7 @@ fn apply_cli_overrides_max_lines() {
         max_depth: None,
         report_json: None,
         write_sarif: None,
+        sarif_min_level: None,
         write_json: None,
         files: vec![],
     };
@@ -80,6 +81,7 @@ fn apply_cli_overrides_count_comments() {
         max_depth: None,
         report_json: None,
         write_sarif: None,
+        sarif_min_level: None,
         write_json: None,
         files: vec![],
     };
@@ -122,6 +124,7 @@ fn apply_cli_overrides_count_blank() {
         max_depth: None,
         report_json: None,
         write_sarif: None,
+        sarif_min_level: None,
         write_json: None,
         files: vec![],
     };
@@ -162,6 +165,7 @@ fn apply_cli_overrides_warn_threshold() {
         max_depth: None,
         report_json: None,
         write_sarif: None,
+        sarif_min_level: None,
         write_json: None,
         files: vec![],
     };

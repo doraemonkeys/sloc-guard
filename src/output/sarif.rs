@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::analyzer::SplitSuggestion;
 use crate::checker::{CheckResult, ViolationCategory, ViolationType};
@@ -9,19 +10,84 @@ use crate::error::Result;
 use super::OutputFormatter;
 use super::path::display_path;
 
+/// SARIF result severity, ordered from least to most severe (`Note < Warning < Error`).
+///
+/// The ordering is load-bearing: it doubles as a reporting floor via
+/// [`SarifFormatter::with_min_level`]. A result whose level is *below* the floor is
+/// omitted from the SARIF document entirely, so it never becomes a GitHub Code
+/// Scanning alert. This is why approaching-limit advisories (`Warning`) and
+/// grandfathered/baselined records (`Note`) can be kept out of the Security tab
+/// while real violations (`Error`) still surface.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default,
+)]
+#[serde(rename_all = "lowercase")]
+pub enum SarifLevel {
+    /// Informational record (e.g. grandfathered/baselined violation). Lowest severity.
+    Note,
+    /// Advisory pre-violation signal: a still-conformant file approaching its limit.
+    Warning,
+    /// Actual violation: limit exceeded or a structure rule broken. Highest severity.
+    #[default]
+    Error,
+}
+
+impl SarifLevel {
+    /// SARIF 2.1.0 `level` string for this severity.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Note => "note",
+            Self::Warning => "warning",
+            Self::Error => "error",
+        }
+    }
+}
+
+impl FromStr for SarifLevel {
+    type Err = String;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "error" => Ok(Self::Error),
+            "warning" | "warn" => Ok(Self::Warning),
+            "note" => Ok(Self::Note),
+            _ => Err(format!(
+                "Unknown SARIF level: {s} (expected error, warning, or note)"
+            )),
+        }
+    }
+}
+
 /// SARIF 2.1.0 output formatter for GitHub Code Scanning and other CI/CD tools.
 pub struct SarifFormatter {
     show_suggestions: bool,
     project_root: Option<PathBuf>,
+    /// Minimum severity to emit. Results below this floor are dropped, keeping
+    /// advisory/baseline noise out of consumers like GitHub's Security tab.
+    min_level: SarifLevel,
 }
 
 impl SarifFormatter {
+    /// Creates a formatter that faithfully renders every non-passing result.
+    ///
+    /// The floor defaults to [`SarifLevel::Note`] (emit everything) so the formatter
+    /// stays a pure renderer; the product-level default floor lives in
+    /// `[sarif] min_level` config and is injected via [`Self::with_min_level`].
     #[must_use]
     pub const fn new() -> Self {
         Self {
             show_suggestions: false,
             project_root: None,
+            min_level: SarifLevel::Note,
         }
+    }
+
+    /// Set the minimum severity to emit; results below it are dropped entirely.
+    #[must_use]
+    pub const fn with_min_level(mut self, min_level: SarifLevel) -> Self {
+        self.min_level = min_level;
+        self
     }
 
     #[must_use]
@@ -301,7 +367,7 @@ impl SarifFormatter {
     }
 
     /// Get rule ID and index based on violation category and result type.
-    fn get_rule_info(result: &CheckResult) -> (&'static str, usize, &'static str) {
+    fn get_rule_info(result: &CheckResult) -> (&'static str, usize, SarifLevel) {
         let is_warning = result.is_warning();
         let is_grandfathered = result.is_grandfathered();
 
@@ -321,22 +387,22 @@ impl SarifFormatter {
                     | ViolationType::GroupIncomplete { .. } => (RULE_STRUCTURE_SIBLING, 9),
                 };
                 let level = if is_grandfathered {
-                    "note"
+                    SarifLevel::Note
                 } else if is_warning {
-                    "warning"
+                    SarifLevel::Warning
                 } else {
-                    "error"
+                    SarifLevel::Error
                 };
                 (rule_id, rule_index, level)
             }
             Some(ViolationCategory::Content) | None => {
                 // Content (SLOC) violation
                 if is_grandfathered {
-                    (RULE_LINE_LIMIT_EXCEEDED, 0, "note")
+                    (RULE_LINE_LIMIT_EXCEEDED, 0, SarifLevel::Note)
                 } else if is_warning {
-                    (RULE_LINE_LIMIT_WARNING, 1, "warning")
+                    (RULE_LINE_LIMIT_WARNING, 1, SarifLevel::Warning)
                 } else {
-                    (RULE_LINE_LIMIT_EXCEEDED, 0, "error")
+                    (RULE_LINE_LIMIT_EXCEEDED, 0, SarifLevel::Error)
                 }
             }
         }
@@ -437,6 +503,15 @@ impl SarifFormatter {
         }
 
         let (rule_id, rule_index, level) = Self::get_rule_info(result);
+
+        // Apply the severity floor: anything below `min_level` is dropped so it never
+        // becomes a Code Scanning alert (e.g. approaching-limit warnings under the
+        // default `error` floor). Gating/exit-code logic is unaffected—it runs off
+        // CheckResult, not the SARIF document.
+        if level < self.min_level {
+            return None;
+        }
+
         let message_text = Self::get_message_text(result);
 
         let suppressions = if result.is_grandfathered() {
@@ -460,7 +535,7 @@ impl SarifFormatter {
         Some(SarifResult {
             rule_id,
             rule_index,
-            level,
+            level: level.as_str(),
             message: Message { text: message_text },
             locations: vec![Location {
                 physical_location: PhysicalLocation {

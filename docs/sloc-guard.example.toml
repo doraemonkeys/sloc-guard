@@ -107,6 +107,19 @@ siblings = [{ match = "*.tsx", require = "{stem}.test.tsx" }]
 reason = "Every component must have a test file"
 
 # =============================================================================
+# SARIF: GitHub Code Scanning output (Security tab)
+# =============================================================================
+[sarif]
+# Minimum severity to emit into SARIF. Results below the floor are dropped, so
+# they never become Code Scanning alerts. This only affects the SARIF report —
+# exit codes and `fail-on-warning` are unaffected (they run off check results).
+#   error   (default) - only real violations; keeps approaching-limit warnings
+#                       and grandfathered notes out of the Security tab
+#   warning           - also surface approaching-limit heads-up
+#   note              - emit everything, including baselined records
+min_level = "error"
+
+# =============================================================================
 # Baseline: Grandfather existing violations
 # =============================================================================
 [baseline]

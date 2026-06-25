@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::output::OutputFormat;
+use crate::output::{OutputFormat, SarifLevel};
 
 // Re-export FileSortOrder from output module for unified usage
 pub use crate::output::FileSortOrder;
@@ -283,6 +283,12 @@ pub struct CheckArgs {
     /// Enables single-run multi-format output for CI pipelines.
     #[arg(long, value_name = "PATH")]
     pub write_sarif: Option<PathBuf>,
+
+    /// Minimum severity to emit into SARIF output [possible values: error, warning, note].
+    /// Below the floor is dropped, so it never becomes a Code Scanning alert.
+    /// Overrides `[sarif] min_level` (config default: error). Does not affect exit codes.
+    #[arg(long, value_name = "LEVEL")]
+    pub sarif_min_level: Option<SarifLevel>,
 
     /// Write check results in JSON format to file (in addition to primary output).
     /// Enables single-run multi-format output for CI pipelines.

@@ -63,6 +63,7 @@ fn make_check_args(paths: Vec<PathBuf>) -> CheckArgs {
         max_depth: None,
         report_json: None,
         write_sarif: None,
+        sarif_min_level: None,
         write_json: None,
         files: vec![],
     }

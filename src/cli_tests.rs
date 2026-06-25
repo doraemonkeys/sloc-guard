@@ -659,6 +659,37 @@ fn cli_check_write_json() {
 }
 
 #[test]
+fn cli_check_sarif_min_level_unset_by_default() {
+    // Absent flag means "defer to config" (which defaults to error), so it stays None here.
+    let cli = Cli::parse_from(["sloc-guard", "check"]);
+    match cli.command {
+        Commands::Check(args) => assert_eq!(args.sarif_min_level, None),
+        _ => panic!("Expected Check command"),
+    }
+}
+
+#[test]
+fn cli_check_sarif_min_level_parses_levels() {
+    for (input, expected) in [
+        ("error", SarifLevel::Error),
+        ("warning", SarifLevel::Warning),
+        ("note", SarifLevel::Note),
+    ] {
+        let cli = Cli::parse_from(["sloc-guard", "check", "--sarif-min-level", input]);
+        match cli.command {
+            Commands::Check(args) => assert_eq!(args.sarif_min_level, Some(expected)),
+            _ => panic!("Expected Check command"),
+        }
+    }
+}
+
+#[test]
+fn cli_check_sarif_min_level_rejects_unknown() {
+    let result = Cli::try_parse_from(["sloc-guard", "check", "--sarif-min-level", "bogus"]);
+    assert!(result.is_err());
+}
+
+#[test]
 fn cli_check_multi_format_output() {
     // Test combining primary format with additional output files
     let cli = Cli::parse_from([

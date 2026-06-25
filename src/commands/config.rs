@@ -202,6 +202,14 @@ pub(crate) fn format_config_text(config: &Config) -> String {
         }
     }
 
+    // SARIF section (severity floor for Code Scanning output)
+    output.push_str("\n[sarif]\n");
+    let _ = writeln!(
+        output,
+        "  min_level = \"{}\"",
+        config.sarif.min_level.as_str()
+    );
+
     // Stats section (if configured)
     let report = &config.stats.report;
     if !report.exclude.is_empty()

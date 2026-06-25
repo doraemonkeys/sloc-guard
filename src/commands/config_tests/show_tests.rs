@@ -113,6 +113,25 @@ fn format_config_text_includes_all_sections() {
 }
 
 #[test]
+fn format_config_text_shows_sarif_default_floor() {
+    // The effective SARIF floor governs what reaches GitHub's Security tab, so
+    // `config show` must surface it. Default is the error floor.
+    let config = Config::default();
+    let output = format_config_text(&config);
+    assert!(output.contains("[sarif]"));
+    assert!(output.contains("min_level = \"error\""));
+}
+
+#[test]
+fn format_config_text_shows_sarif_opted_in_floor() {
+    use crate::output::SarifLevel;
+    let mut config = Config::default();
+    config.sarif.min_level = SarifLevel::Warning;
+    let output = format_config_text(&config);
+    assert!(output.contains("min_level = \"warning\""));
+}
+
+#[test]
 fn format_config_text_shows_check_section() {
     let mut config = Config::default();
     config.check.warnings_as_errors = true;

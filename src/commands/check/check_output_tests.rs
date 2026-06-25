@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use crate::checker::{CheckResult, StructureViolation, ViolationType};
-use crate::output::{ColorMode, OutputFormat};
+use crate::output::{ColorMode, OutputFormat, SarifLevel};
 
-use super::{format_output, structure_violation_to_check_result};
+use super::{RenderOptions, format_output, structure_violation_to_check_result};
 
 #[test]
 fn format_output_text() {
@@ -11,11 +11,14 @@ fn format_output_text() {
     let output = format_output(
         OutputFormat::Text,
         &results,
-        ColorMode::Never,
-        0,
-        false,
         None,
         None,
+        RenderOptions {
+            color_mode: ColorMode::Never,
+            verbose: 0,
+            show_suggestions: false,
+            sarif_min_level: SarifLevel::Error,
+        },
     )
     .unwrap();
     assert!(output.contains("Summary"));
@@ -27,11 +30,14 @@ fn format_output_json() {
     let output = format_output(
         OutputFormat::Json,
         &results,
-        ColorMode::Never,
-        0,
-        false,
         None,
         None,
+        RenderOptions {
+            color_mode: ColorMode::Never,
+            verbose: 0,
+            show_suggestions: false,
+            sarif_min_level: SarifLevel::Error,
+        },
     )
     .unwrap();
     assert!(output.contains("summary"));
@@ -43,11 +49,14 @@ fn format_output_sarif_works() {
     let result = format_output(
         OutputFormat::Sarif,
         &results,
-        ColorMode::Never,
-        0,
-        false,
         None,
         None,
+        RenderOptions {
+            color_mode: ColorMode::Never,
+            verbose: 0,
+            show_suggestions: false,
+            sarif_min_level: SarifLevel::Error,
+        },
     );
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -61,11 +70,14 @@ fn format_output_markdown_works() {
     let result = format_output(
         OutputFormat::Markdown,
         &results,
-        ColorMode::Never,
-        0,
-        false,
         None,
         None,
+        RenderOptions {
+            color_mode: ColorMode::Never,
+            verbose: 0,
+            show_suggestions: false,
+            sarif_min_level: SarifLevel::Error,
+        },
     );
     assert!(result.is_ok());
     let output = result.unwrap();

@@ -15,9 +15,9 @@ pub use loader::{ConfigLoader, FileConfigLoader, LoadResult, LoadResultWithSourc
 pub use merge::RESET_MARKER;
 pub use model::{
     BaselineConfig, CONFIG_VERSION, CheckConfig, Config, ContentConfig, ContentRule,
-    CustomLanguageConfig, DEFAULT_MAX_LINES, RatchetMode, ScannerConfig, SiblingRequire,
-    SiblingRule, SiblingSeverity, StatsConfig, StatsReportConfig, StructureConfig, StructureRule,
-    TrendConfig, UNLIMITED,
+    CustomLanguageConfig, DEFAULT_MAX_LINES, RatchetMode, SarifConfig, ScannerConfig,
+    SiblingRequire, SiblingRule, SiblingSeverity, StatsConfig, StatsReportConfig, StructureConfig,
+    StructureRule, TrendConfig, UNLIMITED,
 };
 pub use remote::{
     FetchPolicy, clear_cache as clear_remote_cache, fetch_remote_config, is_remote_url,

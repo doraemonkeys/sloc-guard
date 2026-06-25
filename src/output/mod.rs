@@ -20,7 +20,7 @@ pub use json::JsonFormatter;
 pub use markdown::MarkdownFormatter;
 pub use path::display_path;
 pub use progress::ScanProgress;
-pub use sarif::SarifFormatter;
+pub use sarif::{SarifFormatter, SarifLevel};
 pub use stats::{
     DirectoryStats, FileSortOrder, FileStatistics, LanguageStats, ProjectStatistics,
     StatsFormatter, StatsHtmlFormatter, StatsJsonFormatter, StatsMarkdownFormatter,

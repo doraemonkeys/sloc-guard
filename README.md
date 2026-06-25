@@ -124,6 +124,11 @@ count_exclude = ["*.md", ".gitkeep"]         # Don't count these toward limits
 deny_extensions = [".exe", ".dll", ".bak"]   # Forbidden file types
 deny_files = [".DS_Store", "Thumbs.db"]      # Forbidden files
 
+[sarif]
+min_level = "error"                          # error|warning|note - severity floor for SARIF/Code Scanning.
+                                             # Default "error" keeps approaching-limit warnings out of the
+                                             # GitHub Security tab (report-only; does not affect exit codes).
+
 [baseline]
 ratchet = "warn"                             # warn|auto|strict - violations can only decrease
 

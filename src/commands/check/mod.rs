@@ -21,7 +21,7 @@ pub(crate) use check_baseline_ops::{
 #[cfg(test)]
 pub(crate) use check_git_diff::{DiffRange, parse_diff_range};
 #[cfg(test)]
-pub(crate) use check_output::{format_output, structure_violation_to_check_result};
+pub(crate) use check_output::{RenderOptions, format_output, structure_violation_to_check_result};
 #[cfg(test)]
 pub(crate) use check_processing::{
     CheckFileResult, compute_effective_stats, process_file_for_check,

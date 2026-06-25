@@ -11,7 +11,7 @@ use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli};
 use crate::config::{FetchPolicy, collect_expired_rules};
 use crate::output::{
-    OutputFormat, ProjectStatistics, ScanProgress, StatsFormatter, StatsJsonFormatter,
+    OutputFormat, ProjectStatistics, SarifLevel, ScanProgress, StatsFormatter, StatsJsonFormatter,
 };
 use crate::state;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
@@ -23,7 +23,7 @@ use super::check_baseline_ops::{
 };
 use super::check_exit::determine_exit_code;
 use super::check_output::{
-    format_output, structure_violation_to_check_result, write_additional_formats,
+    RenderOptions, format_output, structure_violation_to_check_result, write_additional_formats,
 };
 use super::check_processing::process_file_for_check;
 use super::check_scan::{partition_file_results, scan_or_filter_files};
@@ -56,6 +56,8 @@ struct OutputParams<'a> {
     project_stats: Option<ProjectStatistics>,
     project_root: &'a Path,
     color_mode: ColorMode,
+    /// Severity floor for SARIF output (resolved from CLI override / `[sarif] min_level`).
+    sarif_min_level: SarifLevel,
 }
 
 /// Write check outputs: stats JSON, main output, and additional formats.
@@ -83,11 +85,14 @@ fn write_check_outputs(
     let output = format_output(
         args.format,
         params.results,
-        params.color_mode,
-        cli.verbose,
-        args.suggest,
         params.project_stats.clone(),
         Some(params.project_root.to_path_buf()),
+        RenderOptions {
+            color_mode: params.color_mode,
+            verbose: cli.verbose,
+            show_suggestions: args.suggest,
+            sarif_min_level: params.sarif_min_level,
+        },
     )?;
 
     // Write main output with "suppress success, preserve failure" semantics for stdout.
@@ -104,6 +109,7 @@ fn write_check_outputs(
         params.project_stats.clone(),
         params.project_root,
         cli,
+        params.sarif_min_level,
     )?;
 
     Ok(())
@@ -380,6 +386,8 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         project_stats: project_stats.clone(),
         project_root,
         color_mode,
+        // Resolved earlier by `apply_cli_overrides` (CLI flag > `[sarif] min_level` > default error).
+        sarif_min_level: config.sarif.min_level,
     };
     write_check_outputs(args, cli, &output_params)?;
 

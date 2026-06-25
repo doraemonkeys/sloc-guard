@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::output::SarifLevel;
+
 /// Supported config version. Current version is "2".
 pub const CONFIG_VERSION: &str = "2";
 
@@ -263,6 +265,32 @@ pub struct ContentRule {
     pub expires: Option<String>,
 }
 
+/// SARIF output configuration `[sarif]`.
+///
+/// Controls how check results are projected into the SARIF document consumed by
+/// GitHub Code Scanning (and equivalents). Kept separate from `[content]` because
+/// the floor applies to *all* result categories (content + structure), not just SLOC.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SarifConfig {
+    /// Minimum severity to emit into SARIF. Results below this are omitted entirely,
+    /// so they never surface as Code Scanning alerts.
+    ///
+    /// Defaults to `error`: the Security tab shows real violations only, while
+    /// approaching-limit advisories (`warning`) and grandfathered records (`note`)
+    /// stay out of it. They remain visible in text/JSON output and PR annotations.
+    /// Opt back in with `warning` (advisories too) or `note` (everything).
+    #[serde(default)]
+    pub min_level: SarifLevel,
+}
+
+impl Default for SarifConfig {
+    fn default() -> Self {
+        Self {
+            min_level: SarifLevel::Error,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
     /// Config schema version. Must be "2".
@@ -288,6 +316,10 @@ pub struct Config {
     /// Structure configuration (directory limits).
     #[serde(default)]
     pub structure: StructureConfig,
+
+    /// SARIF output configuration (Code Scanning severity floor).
+    #[serde(default)]
+    pub sarif: SarifConfig,
 
     /// Baseline configuration (grandfathering/ratchet).
     #[serde(default)]

@@ -6,38 +6,50 @@ use crate::commands::context::write_output;
 use crate::counter::LineStats;
 use crate::output::{
     ColorMode, HtmlFormatter, JsonFormatter, MarkdownFormatter, OutputFormat, OutputFormatter,
-    ProjectStatistics, SarifFormatter, TextFormatter,
+    ProjectStatistics, SarifFormatter, SarifLevel, TextFormatter,
 };
+
+/// Format-independent rendering knobs for [`format_output`].
+///
+/// Bundled into a struct so the formatter entry point keeps a small, readable
+/// signature rather than a long positional argument list.
+#[derive(Debug, Clone, Copy)]
+pub struct RenderOptions {
+    pub color_mode: ColorMode,
+    pub verbose: u8,
+    pub show_suggestions: bool,
+    /// Severity floor for SARIF output; ignored by the other formats.
+    pub sarif_min_level: SarifLevel,
+}
 
 pub fn format_output(
     format: OutputFormat,
     results: &[CheckResult],
-    color_mode: crate::output::ColorMode,
-    verbose: u8,
-    show_suggestions: bool,
     project_stats: Option<ProjectStatistics>,
     project_root: Option<PathBuf>,
+    opts: RenderOptions,
 ) -> crate::Result<String> {
     match format {
-        OutputFormat::Text => TextFormatter::with_verbose(color_mode, verbose)
-            .with_suggestions(show_suggestions)
+        OutputFormat::Text => TextFormatter::with_verbose(opts.color_mode, opts.verbose)
+            .with_suggestions(opts.show_suggestions)
             .with_project_root(project_root)
             .format(results),
         OutputFormat::Json => JsonFormatter::new()
-            .with_suggestions(show_suggestions)
+            .with_suggestions(opts.show_suggestions)
             .with_project_root(project_root)
             .format(results),
         OutputFormat::Sarif => SarifFormatter::new()
-            .with_suggestions(show_suggestions)
+            .with_min_level(opts.sarif_min_level)
+            .with_suggestions(opts.show_suggestions)
             .with_project_root(project_root)
             .format(results),
         OutputFormat::Markdown => MarkdownFormatter::new()
-            .with_suggestions(show_suggestions)
+            .with_suggestions(opts.show_suggestions)
             .with_project_root(project_root)
             .format(results),
         OutputFormat::Html => {
             let mut formatter = HtmlFormatter::new()
-                .with_suggestions(show_suggestions)
+                .with_suggestions(opts.show_suggestions)
                 .with_project_root(project_root);
             if let Some(stats) = project_stats {
                 formatter = formatter.with_stats(stats);
@@ -176,17 +188,23 @@ pub fn write_additional_formats(
     project_stats: Option<ProjectStatistics>,
     project_root: &Path,
     cli: &Cli,
+    sarif_min_level: SarifLevel,
 ) -> crate::Result<()> {
+    let opts = RenderOptions {
+        color_mode,
+        verbose: cli.verbose,
+        show_suggestions: args.suggest,
+        sarif_min_level,
+    };
+
     // File writes always proceed; quiet only affects stdout (which isn't used here)
     if let Some(ref sarif_path) = args.write_sarif {
         let sarif_output = format_output(
             OutputFormat::Sarif,
             results,
-            color_mode,
-            cli.verbose,
-            args.suggest,
             project_stats.clone(),
             Some(project_root.to_path_buf()),
+            opts,
         )?;
         write_output(Some(sarif_path), &sarif_output, cli.quiet)?;
     }
@@ -195,11 +213,9 @@ pub fn write_additional_formats(
         let json_output = format_output(
             OutputFormat::Json,
             results,
-            color_mode,
-            cli.verbose,
-            args.suggest,
             project_stats,
             Some(project_root.to_path_buf()),
+            opts,
         )?;
         write_output(Some(json_path), &json_output, cli.quiet)?;
     }
