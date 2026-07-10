@@ -11,11 +11,13 @@ use crate::cache::Cache;
 use crate::checker::{StructureChecker, ThresholdChecker};
 use crate::cli::ColorChoice;
 use crate::config::{
-    Config, ConfigLoader, FetchPolicy, FileConfigLoader, LoadResult, validate_config_semantics,
+    Config, ConfigOrigin, FetchPolicy, FileConfigLoader, LocatedLoadResult,
+    validate_config_semantics,
 };
 use crate::counter::{CountResult, LineStats, SlocCounter};
 use crate::language::LanguageRegistry;
 use crate::output::ColorMode;
+use crate::project::ProjectPaths;
 use crate::scanner::{AllowlistRuleBuilder, CompositeScanner, FileScanner, StructureScanConfig};
 use crate::state;
 
@@ -94,6 +96,17 @@ impl FileProcessError {
             | Self::ReadError { path, .. } => path,
         }
     }
+
+    /// Replace the physical I/O path with the logical path used in user-facing output.
+    #[must_use]
+    pub fn with_display_path(self, display_path: &Path) -> Self {
+        let path = display_path.to_path_buf();
+        match self {
+            Self::MetadataError { source, .. } => Self::MetadataError { path, source },
+            Self::CacheLockError { .. } => Self::CacheLockError { path },
+            Self::ReadError { source, .. } => Self::ReadError { path, source },
+        }
+    }
 }
 
 /// Result of attempting to process a single file.
@@ -129,11 +142,12 @@ pub(crate) fn load_config(
     no_config: bool,
     no_extends: bool,
     extends_policy: FetchPolicy,
-) -> crate::Result<LoadResult> {
+) -> crate::Result<LocatedLoadResult> {
     if no_config {
-        return Ok(LoadResult {
+        return Ok(LocatedLoadResult {
             config: Config::default(),
             preset_used: None,
+            origin: ConfigOrigin::Disabled,
         });
     }
 
@@ -143,11 +157,14 @@ pub(crate) fn load_config(
     let loader = FileConfigLoader::with_options(extends_policy, project_root);
     let result = if no_extends {
         config_path.map_or_else(
-            || loader.load_without_extends(),
-            |path| loader.load_from_path_without_extends(path),
+            || loader.load_without_extends_located(),
+            |path| loader.load_from_path_without_extends_located(path),
         )
     } else {
-        config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))
+        config_path.map_or_else(
+            || loader.load_located(),
+            |path| loader.load_from_path_located(path),
+        )
     }?;
 
     // Validate semantic correctness after loading
@@ -166,13 +183,20 @@ pub(crate) fn resolve_project_root() -> PathBuf {
     state::discover_project_root(Path::new("."))
 }
 
-/// Print preset usage info to stderr (once per session managed by caller).
-pub(crate) fn print_preset_info(preset_name: &str) {
-    crate::output::print_info_full(
-        &format!("Using preset: {preset_name}"),
-        None,
-        Some("Run `sloc-guard config show` to see effective settings"),
-    );
+/// Resolve the stable root used by all path-based configuration rules.
+///
+/// Project and explicitly selected configs are rooted at the leaf config file. User-level and
+/// built-in configs apply to the current project root instead of the user's config directory.
+#[must_use]
+pub(crate) fn resolve_config_root(load_result: &LocatedLoadResult, project_root: &Path) -> PathBuf {
+    match &load_result.origin {
+        ConfigOrigin::ProjectFile(path) | ConfigOrigin::ExplicitFile(path) => path
+            .parent()
+            .map_or_else(|| project_root.to_path_buf(), Path::to_path_buf),
+        ConfigOrigin::UserFile(_) | ConfigOrigin::BuiltInDefaults | ConfigOrigin::Disabled => {
+            project_root.to_path_buf()
+        }
+    }
 }
 
 #[must_use]
@@ -211,6 +235,27 @@ pub(crate) fn resolve_scan_paths(paths: &[PathBuf], include: &[String]) -> Vec<P
 
     // Use provided paths (or default ".")
     paths.to_vec()
+}
+
+/// Merge configuration and CLI scanner exclusions without changing either path namespace.
+///
+/// Configuration patterns are already relative to the selected config root. CLI patterns are
+/// authored at invocation time and historically match paths relative to that working directory, so
+/// they must be translated into the config-root namespace before both sets share one matcher.
+#[must_use]
+pub(crate) fn resolve_exclude_patterns(
+    config_patterns: &[String],
+    cli_patterns: &[String],
+    project_paths: &ProjectPaths,
+) -> Vec<String> {
+    let mut patterns = config_patterns.to_vec();
+    patterns.extend(cli_patterns.iter().map(|pattern| {
+        project_paths
+            .logical(Path::new(pattern))
+            .to_string_lossy()
+            .replace('\\', "/")
+    }));
+    patterns
 }
 
 /// Write output to a file or stdout.
@@ -260,6 +305,17 @@ pub fn process_file_with_cache(
     cache: &Mutex<Cache>,
     reader: &dyn FileReader,
 ) -> FileProcessResult {
+    process_file_with_cache_key(file_path, file_path, registry, cache, reader)
+}
+
+/// Process a physical file while using a stable logical path as its cache identity.
+pub fn process_file_with_cache_key(
+    file_path: &Path,
+    cache_path: &Path,
+    registry: &LanguageRegistry,
+    cache: &Mutex<Cache>,
+    reader: &dyn FileReader,
+) -> FileProcessResult {
     // Check for extension
     let Some(ext_os) = file_path.extension() else {
         return FileProcessResult::Skipped(FileSkipReason::NoExtension);
@@ -273,7 +329,7 @@ pub fn process_file_with_cache(
         return FileProcessResult::Skipped(FileSkipReason::UnrecognizedExtension(ext.to_string()));
     };
 
-    let path_key = file_path.to_string_lossy().replace('\\', "/");
+    let path_key = cache_path.to_string_lossy().replace('\\', "/");
 
     // Get file metadata for fast cache validation
     let (mtime, size) = match reader.metadata(file_path) {
@@ -435,6 +491,27 @@ impl CheckContext {
         exclude_patterns: Vec<String>,
         use_gitignore: bool,
     ) -> crate::Result<Self> {
+        Self::from_config_with_project_paths(
+            config,
+            warn_threshold,
+            exclude_patterns,
+            use_gitignore,
+            ProjectPaths::unrooted(),
+        )
+    }
+
+    /// Create a production context with stable configuration-root-relative path semantics.
+    ///
+    /// # Errors
+    /// Returns an error if configured content, structure, allowlist, or exclusion patterns cannot
+    /// be compiled.
+    pub fn from_config_with_project_paths(
+        config: &Config,
+        warn_threshold: f64,
+        exclude_patterns: Vec<String>,
+        use_gitignore: bool,
+        project_paths: ProjectPaths,
+    ) -> crate::Result<Self> {
         let registry = LanguageRegistry::with_custom_languages(&config.languages);
         let threshold_checker =
             ThresholdChecker::new(config.clone())?.with_warning_threshold(warn_threshold);
@@ -443,7 +520,11 @@ impl CheckContext {
         // Build structure scan config for unified traversal
         let structure_scan_config = Self::build_structure_scan_config(config, &exclude_patterns)?;
 
-        let scanner = Box::new(CompositeScanner::new(exclude_patterns, use_gitignore));
+        let scanner = Box::new(CompositeScanner::with_project_paths(
+            exclude_patterns,
+            use_gitignore,
+            project_paths,
+        ));
         let file_reader = Box::new(RealFileReader);
 
         Ok(Self {
@@ -529,6 +610,12 @@ impl CheckContext {
             scanner,
             file_reader,
         }
+    }
+
+    /// Stable mapping between physical I/O paths and configuration-relative logical identities.
+    #[must_use]
+    pub fn project_paths(&self) -> &ProjectPaths {
+        self.scanner.project_paths()
     }
 }
 

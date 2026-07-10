@@ -93,7 +93,7 @@ pub fn ensure_parent_dir(path: &Path) -> io::Result<()> {
 /// Discover the project root by walking up from `start` looking for markers.
 ///
 /// Markers (checked in order at each directory level):
-///   1. `.git/` directory - git repository root
+///   1. `.git` file or directory - git repository root/worktree boundary
 ///   2. `.sloc-guard.toml` - explicit sloc-guard config
 ///
 /// Returns `start` if no markers found (backward compatible).
@@ -105,7 +105,7 @@ pub fn discover_project_root(start: &Path) -> PathBuf {
     let abs_start = dunce::canonicalize(start).unwrap_or_else(|_| start.to_path_buf());
 
     for ancestor in abs_start.ancestors() {
-        if ancestor.join(".git").is_dir() {
+        if ancestor.join(".git").exists() {
             return ancestor.to_path_buf();
         }
         if ancestor.join(CONFIG_FILENAME).is_file() {

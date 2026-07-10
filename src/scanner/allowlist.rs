@@ -5,7 +5,9 @@ use regex::Regex;
 
 use crate::SlocGuardError;
 use crate::error::Result;
-use crate::output::path::normalize_for_matching;
+use crate::project::{
+    compile_logical_path_glob, matching_logical_path_globs, normalize_for_matching,
+};
 
 /// A compiled allowlist rule for checking allowed file types in a directory.
 #[derive(Debug, Clone)]
@@ -17,6 +19,8 @@ pub struct AllowlistRule {
     pub allow_extensions: Vec<String>,
     /// Compiled patterns for allowlist matching.
     pub allow_patterns: GlobSet,
+    /// Original allow path patterns used to preserve explicit-path vs basename semantics.
+    allow_pattern_strs: Vec<String>,
     /// Compiled file-name-only allow patterns.
     pub allow_files: GlobSet,
     /// Original file-name-only allow pattern strings (for error messages).
@@ -29,6 +33,8 @@ pub struct AllowlistRule {
     pub deny_extensions: Vec<String>,
     /// Compiled patterns for deny matching.
     pub deny_patterns: GlobSet,
+    /// Original deny path patterns used to preserve explicit-path vs basename semantics.
+    deny_pattern_strs: Vec<String>,
     /// Compiled file-name-only deny patterns.
     pub deny_files: GlobSet,
     /// Original file-name-only deny pattern strings (for error messages).
@@ -59,9 +65,10 @@ impl AllowlistRule {
     /// Check if a file matches this denylist.
     /// Returns `Some(matched_pattern_or_extension)` if denied, `None` otherwise.
     pub(crate) fn file_matches_deny(&self, file_path: &Path) -> Option<String> {
+        let normalized = normalize_for_matching(file_path);
         // Check deny extensions first
         if !self.deny_extensions.is_empty()
-            && let Some(ext) = file_path.extension()
+            && let Some(ext) = normalized.extension()
         {
             let ext_with_dot = format!(".{}", ext.to_string_lossy());
             if self.deny_extensions.contains(&ext_with_dot) {
@@ -69,18 +76,19 @@ impl AllowlistRule {
             }
         }
 
-        let file_name = file_path.file_name().unwrap_or_default();
+        let file_name = normalized.file_name().unwrap_or_default();
 
         // Check deny_files (filename only)
         if let Some(idx) = self.deny_files.matches(file_name).into_iter().next() {
             return self.deny_file_strs.get(idx).cloned();
         }
 
-        // Check deny patterns (filename and full path)
-        if let Some(idx) = self.deny_patterns.matches(file_name).into_iter().next() {
-            return Some(format!("pattern #{idx}"));
-        }
-        if let Some(idx) = self.deny_patterns.matches(file_path).into_iter().next() {
+        // Unqualified patterns retain basename matching; explicit paths only match the logical path.
+        if let Some(idx) =
+            matching_logical_path_globs(&self.deny_patterns, &self.deny_pattern_strs, &normalized)
+                .into_iter()
+                .next()
+        {
             return Some(format!("pattern #{idx}"));
         }
 
@@ -102,9 +110,10 @@ impl AllowlistRule {
 
     /// Check if a file matches this allowlist (extensions OR patterns OR `allow_files`).
     pub(crate) fn file_matches(&self, file_path: &Path) -> bool {
+        let normalized = normalize_for_matching(file_path);
         // Check extensions first (OR logic)
         if !self.allow_extensions.is_empty()
-            && let Some(ext) = file_path.extension()
+            && let Some(ext) = normalized.extension()
         {
             let ext_with_dot = format!(".{}", ext.to_string_lossy());
             if self.allow_extensions.contains(&ext_with_dot) {
@@ -112,15 +121,17 @@ impl AllowlistRule {
             }
         }
 
-        let file_name = file_path.file_name().unwrap_or_default();
+        let file_name = normalized.file_name().unwrap_or_default();
 
         // Check allow_files (filename only, OR logic)
         if self.allow_files.is_match(file_name) {
             return true;
         }
 
-        // Check patterns (OR logic with extensions and files)
-        if self.allow_patterns.is_match(file_name) || self.allow_patterns.is_match(file_path) {
+        // Unqualified patterns retain basename matching; explicit paths only match the logical path.
+        if !matching_logical_path_globs(&self.allow_patterns, &self.allow_pattern_strs, &normalized)
+            .is_empty()
+        {
             return true;
         }
 
@@ -250,17 +261,11 @@ impl AllowlistRuleBuilder {
     /// # Errors
     /// Returns an error if any pattern is invalid.
     pub fn build(self) -> Result<AllowlistRule> {
-        let glob = Glob::new(&self.scope).map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: self.scope.clone(),
-            source: e,
-        })?;
+        let glob = compile_logical_path_glob(&self.scope)?;
 
         let mut pattern_builder = GlobSetBuilder::new();
         for p in &self.allow_patterns {
-            let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: p.clone(),
-                source: e,
-            })?;
+            let g = compile_logical_path_glob(p)?;
             pattern_builder.add(g);
         }
         let allow_patterns =
@@ -307,10 +312,7 @@ impl AllowlistRuleBuilder {
         // Build deny patterns GlobSet
         let mut deny_pattern_builder = GlobSetBuilder::new();
         for p in &self.deny_patterns {
-            let g = Glob::new(p).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: p.clone(),
-                source: e,
-            })?;
+            let g = compile_logical_path_glob(p)?;
             deny_pattern_builder.add(g);
         }
         let deny_patterns =
@@ -371,12 +373,14 @@ impl AllowlistRuleBuilder {
             matcher: glob.compile_matcher(),
             allow_extensions: self.allow_extensions,
             allow_patterns,
+            allow_pattern_strs: self.allow_patterns,
             allow_files,
             allow_file_strs: self.allow_files,
             allow_dirs,
             allow_dir_strs: self.allow_dirs,
             deny_extensions: self.deny_extensions,
             deny_patterns,
+            deny_pattern_strs: self.deny_patterns,
             deny_files,
             deny_file_strs: self.deny_files,
             deny_dirs,

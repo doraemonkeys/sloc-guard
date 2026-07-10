@@ -41,6 +41,75 @@ max_dirs = 5
 }
 
 #[test]
+fn explain_from_nested_directory_uses_project_relative_rule_path() {
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[content]
+max_lines = 50
+
+[[content.rules]]
+pattern = "core/**"
+max_lines = 200
+"#,
+    );
+    fixture.create_rust_file("core/session/receive_test.rs", 100);
+    let nested_cwd = fixture.path().join("core");
+
+    sloc_guard!()
+        .current_dir(&nested_cwd)
+        .args(["explain", "session/receive_test.rs"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Path: core/session/receive_test.rs",
+        ))
+        .stdout(predicate::str::contains("pattern \"core/**\""))
+        .stdout(predicate::str::contains("Limit:   200 lines"));
+
+    sloc_guard!()
+        .current_dir(nested_cwd)
+        .args(["explain", "--sources"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(".sloc-guard.toml"))
+        .stdout(predicate::str::contains("No configuration file found").not());
+}
+
+#[test]
+fn explain_verbose_reports_source_on_stderr_without_polluting_json() {
+    let fixture = TestFixture::new();
+    fixture.create_config(CONFIG_WITH_RULES);
+    fixture.create_rust_file("src/main.rs", 10);
+
+    let output = sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["explain", "src/main.rs", "--format", "json", "-v"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let _: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Using configuration:"));
+}
+
+#[test]
+fn explain_sources_does_not_emit_redundant_config_notice() {
+    let fixture = TestFixture::new();
+    fixture.create_config(CONFIG_WITH_RULES);
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["explain", "--sources", "-v"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Using configuration:").not());
+}
+
+#[test]
 fn explain_file_matching_rule() {
     let fixture = TestFixture::new();
     fixture.create_config(CONFIG_WITH_RULES);
@@ -69,6 +138,24 @@ fn explain_directory_structure() {
         .success()
         .stdout(predicate::str::contains("max_files"))
         .stdout(predicate::str::contains("max_dirs"));
+}
+
+#[test]
+fn explain_project_root_uses_dot_identity() {
+    let fixture = TestFixture::new();
+    fixture.create_config(CONFIG_WITH_STRUCTURE_RULES);
+
+    let output = sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["explain", ".", "--format", "json"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let json: serde_json::Value = serde_json::from_slice(&output).unwrap();
+
+    assert_eq!(json["path"], ".");
 }
 
 // =============================================================================

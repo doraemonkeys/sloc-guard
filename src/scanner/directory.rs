@@ -3,10 +3,11 @@ use std::path::{Path, PathBuf};
 
 use walkdir::WalkDir;
 
-use super::{FileFilter, FileScanner};
+use super::{DirectoryPruner, FileFilter, FileScanner};
 use super::{ScanResult, StructureScanConfig};
 use crate::checker::{DirStats, StructureViolation};
 use crate::error::Result;
+use crate::project::{ProjectPaths, normalize_for_matching};
 
 pub struct DirectoryScanner<F: FileFilter> {
     filter: F,
@@ -69,7 +70,7 @@ impl<F: FileFilter> DirectoryScanner<F> {
         &self,
         root: &Path,
         structure_config: Option<&StructureScanConfig>,
-    ) -> ScanResult {
+    ) -> Result<ScanResult> {
         if self.use_gitignore {
             self.scan_with_structure_gitignore(root, structure_config)
         } else {
@@ -77,21 +78,64 @@ impl<F: FileFilter> DirectoryScanner<F> {
         }
     }
 
+    fn structure_path_context(&self, root: &Path) -> (ProjectPaths, ProjectPaths, bool) {
+        let configured = self.filter.project_paths();
+        if configured.is_rooted() {
+            (configured.clone(), configured.clone(), false)
+        } else {
+            // Library callers that do not provide a project context historically match paths in
+            // the namespace passed to `scan_with_structure`. Preserve that namespace for structure
+            // rules while adding a scan-root-relative namespace specifically for scanner excludes.
+            (
+                configured.clone(),
+                ProjectPaths::rooted(root.to_path_buf()),
+                true,
+            )
+        }
+    }
+
+    fn combined_directory_pruner(
+        &self,
+        structure_config: Option<&StructureScanConfig>,
+        project_paths: &ProjectPaths,
+        match_identity_path: bool,
+    ) -> Result<DirectoryPruner> {
+        let filter_pruner = self.filter.directory_pruner();
+        let config_pruner = structure_config
+            .map(|config| {
+                config.scanner_exclude_directory_pruner(project_paths.clone(), match_identity_path)
+            })
+            .transpose()?;
+
+        Ok(std::sync::Arc::new(move |path| {
+            filter_pruner(path)
+                || config_pruner
+                    .as_ref()
+                    .is_some_and(|config_pruner| config_pruner(path))
+        }))
+    }
+
     fn scan_with_structure_walkdir(
         &self,
         root: &Path,
         structure_config: Option<&StructureScanConfig>,
-    ) -> ScanResult {
-        let mut state = StructureScanState::new(structure_config);
+    ) -> Result<ScanResult> {
+        let (project_paths, scanner_project_paths, match_identity_path) =
+            self.structure_path_context(root);
+        let directory_pruner = self.combined_directory_pruner(
+            structure_config,
+            &scanner_project_paths,
+            match_identity_path,
+        )?;
+        let mut state = StructureScanState::new(
+            structure_config,
+            project_paths,
+            scanner_project_paths,
+            match_identity_path,
+        );
         // Use filter_entry to skip excluded directories entirely (prunes subtree)
-        let walker = WalkDir::new(root).into_iter().filter_entry(|e| {
-            if e.file_type().is_dir()
-                && let Some(cfg) = structure_config
-            {
-                // Return false to skip this directory and all its children
-                return !cfg.is_scanner_excluded(e.path(), true);
-            }
-            true
+        let walker = WalkDir::new(root).into_iter().filter_entry(move |entry| {
+            !entry.file_type().is_dir() || !directory_pruner(entry.path())
         });
 
         for entry in walker {
@@ -110,19 +154,29 @@ impl<F: FileFilter> DirectoryScanner<F> {
             }
         }
 
-        state.finalize()
+        Ok(state.finalize())
     }
 
     fn scan_with_structure_gitignore(
         &self,
         root: &Path,
         structure_config: Option<&StructureScanConfig>,
-    ) -> ScanResult {
+    ) -> Result<ScanResult> {
         use ignore::WalkBuilder;
 
-        let mut state = StructureScanState::new(structure_config);
-        // Clone config: filter_entry closure must be 'static, but structure_config is a borrowed reference
-        let config_for_filter = structure_config.cloned();
+        let (project_paths, scanner_project_paths, match_identity_path) =
+            self.structure_path_context(root);
+        let directory_pruner = self.combined_directory_pruner(
+            structure_config,
+            &scanner_project_paths,
+            match_identity_path,
+        )?;
+        let mut state = StructureScanState::new(
+            structure_config,
+            project_paths,
+            scanner_project_paths,
+            match_identity_path,
+        );
         let walker = WalkBuilder::new(root)
             .git_ignore(true)
             .git_global(true)
@@ -130,14 +184,11 @@ impl<F: FileFilter> DirectoryScanner<F> {
             .require_git(false)
             .hidden(false)
             .parents(true)
-            .filter_entry(move |e| {
-                // Skip excluded directories entirely (prunes subtree)
-                if e.file_type().is_some_and(|ft| ft.is_dir())
-                    && let Some(ref cfg) = config_for_filter
-                {
-                    return !cfg.is_scanner_excluded(e.path(), true);
-                }
-                true
+            .filter_entry(move |entry| {
+                !entry
+                    .file_type()
+                    .is_some_and(|file_type| file_type.is_dir())
+                    || !directory_pruner(entry.path())
             })
             .build();
 
@@ -157,11 +208,15 @@ impl<F: FileFilter> DirectoryScanner<F> {
             }
         }
 
-        state.finalize()
+        Ok(state.finalize())
     }
 }
 
 impl<F: FileFilter + Send + Sync> FileScanner for DirectoryScanner<F> {
+    fn project_paths(&self) -> &ProjectPaths {
+        self.filter.project_paths()
+    }
+
     fn scan(&self, root: &Path) -> Result<Vec<PathBuf>> {
         Ok(self.scan_impl(root))
     }
@@ -171,7 +226,7 @@ impl<F: FileFilter + Send + Sync> FileScanner for DirectoryScanner<F> {
         root: &Path,
         structure_config: Option<&StructureScanConfig>,
     ) -> Result<ScanResult> {
-        Ok(self.scan_with_structure_impl(root, structure_config))
+        self.scan_with_structure_impl(root, structure_config)
     }
 }
 
@@ -181,14 +236,25 @@ struct StructureScanState<'a> {
     result: ScanResult,
     dir_entries: HashMap<PathBuf, DirStats>,
     structure_config: Option<&'a StructureScanConfig>,
+    project_paths: ProjectPaths,
+    scanner_project_paths: ProjectPaths,
+    match_identity_path: bool,
 }
 
 impl<'a> StructureScanState<'a> {
-    fn new(structure_config: Option<&'a StructureScanConfig>) -> Self {
+    fn new(
+        structure_config: Option<&'a StructureScanConfig>,
+        project_paths: ProjectPaths,
+        scanner_project_paths: ProjectPaths,
+        match_identity_path: bool,
+    ) -> Self {
         Self {
             result: ScanResult::default(),
             dir_entries: HashMap::new(),
             structure_config,
+            project_paths,
+            scanner_project_paths,
+            match_identity_path,
         }
     }
 
@@ -200,8 +266,15 @@ impl<'a> StructureScanState<'a> {
         abs_path: &Path,
     ) {
         // Check scanner_exclude - skip entry entirely
-        if let Some(cfg) = self.structure_config
-            && cfg.is_scanner_excluded(path, false)
+        if filter.is_scanner_excluded(path)
+            || self.structure_config.is_some_and(|cfg| {
+                cfg.is_scanner_excluded_with_namespaces(
+                    path,
+                    false,
+                    &self.scanner_project_paths,
+                    self.match_identity_path,
+                )
+            })
         {
             return;
         }
@@ -209,7 +282,7 @@ impl<'a> StructureScanState<'a> {
         // Check count_exclude - don't count but continue
         let is_count_excluded = self
             .structure_config
-            .is_some_and(|cfg| cfg.is_count_excluded(path));
+            .is_some_and(|cfg| cfg.is_count_excluded_with_project_paths(path, &self.project_paths));
 
         // Add to files list if filter allows
         if filter.should_include(path) {
@@ -235,14 +308,16 @@ impl<'a> StructureScanState<'a> {
         let Some(cfg) = self.structure_config else {
             return;
         };
+        let logical_file = self.project_paths.logical(abs_path);
+        let logical_parent = self.project_paths.logical(parent);
 
         // Find matching per-rule first (needed for override checks)
-        let matching_rule = cfg.find_matching_allowlist_rule(parent);
+        let matching_rule = cfg.find_matching_allowlist_rule_logical(&logical_parent);
 
         // 1. Check global level patterns
         if cfg.has_global_file_allowlist() {
             // Allow mode: file must match global allowlist
-            if !cfg.file_matches_global_allow(abs_path) {
+            if !cfg.file_matches_global_allow(&logical_file) {
                 self.result
                     .allowlist_violations
                     .push(StructureViolation::disallowed_file(
@@ -255,9 +330,11 @@ impl<'a> StructureScanState<'a> {
             // Deny mode: check global deny patterns
             // But first check if a per-rule allow would override global deny
             let overridden_by_rule = matching_rule
-                .is_some_and(|rule| rule.has_allowlist() && rule.file_matches(abs_path));
+                .is_some_and(|rule| rule.has_allowlist() && rule.file_matches(&logical_file));
 
-            if !overridden_by_rule && let Some(matched) = cfg.file_matches_global_deny(abs_path) {
+            if !overridden_by_rule
+                && let Some(matched) = cfg.file_matches_global_deny(&logical_file)
+            {
                 self.result
                     .allowlist_violations
                     .push(StructureViolation::denied_file(
@@ -275,7 +352,7 @@ impl<'a> StructureScanState<'a> {
         };
 
         // Check per-rule deny patterns first (they take precedence over per-rule allow)
-        if let Some(matched) = rule.file_matches_deny(abs_path) {
+        if let Some(matched) = rule.file_matches_deny(&logical_file) {
             self.result
                 .allowlist_violations
                 .push(StructureViolation::denied_file(
@@ -289,7 +366,7 @@ impl<'a> StructureScanState<'a> {
         // Then check if rule is in allow mode
         if rule.has_allowlist() {
             // Allow mode: file must match allowlist
-            if !rule.file_matches(abs_path) {
+            if !rule.file_matches(&logical_file) {
                 self.result
                     .allowlist_violations
                     .push(StructureViolation::disallowed_file(
@@ -315,24 +392,29 @@ impl<'a> StructureScanState<'a> {
     }
 
     fn process_directory(&mut self, path: &Path, depth: usize) {
-        // Check scanner_exclude - skip entry entirely
-        if let Some(cfg) = self.structure_config
-            && cfg.is_scanner_excluded(path, true)
-        {
-            return;
-        }
-
-        // Find matching per-rule for parent directory (needed for override checks)
-        let matching_rule = self.structure_config.and_then(|cfg| {
-            path.parent()
-                .and_then(|p| cfg.find_matching_allowlist_rule(p))
-        });
+        // Rule scopes and directory allow/deny patterns are configuration-root-relative.
+        // Derive the parent after rebasing so a scan rooted at `.` from a nested cwd does not
+        // accidentally treat the scan root as its own child.
+        let logical_path = self.project_paths.logical(path);
+        let is_configuration_root =
+            normalize_for_matching(&self.scanner_project_paths.logical(path))
+                .as_os_str()
+                .is_empty();
+        let matching_rule = if is_configuration_root {
+            None
+        } else {
+            self.structure_config.and_then(|cfg| {
+                logical_path
+                    .parent()
+                    .and_then(|parent| cfg.find_matching_allowlist_rule_logical(parent))
+            })
+        };
 
         // Check global level directory patterns
-        if let Some(cfg) = self.structure_config {
+        if !is_configuration_root && let Some(cfg) = self.structure_config {
             if cfg.has_global_dir_allowlist() {
                 // Allow mode: directory must match global allowlist
-                if !cfg.dir_matches_global_allow(path) {
+                if !cfg.dir_matches_global_allow(&logical_path) {
                     self.result.allowlist_violations.push(
                         StructureViolation::disallowed_directory(
                             path.to_path_buf(),
@@ -342,12 +424,13 @@ impl<'a> StructureScanState<'a> {
                 }
             } else {
                 // Check if a per-rule allow would override global deny
-                let overridden_by_rule = matching_rule
-                    .is_some_and(|rule| rule.has_dir_allowlist() && rule.dir_matches(path));
+                let overridden_by_rule = matching_rule.is_some_and(|rule| {
+                    rule.has_dir_allowlist() && rule.dir_matches(&logical_path)
+                });
 
                 if !overridden_by_rule {
                     // Deny mode: check directory-only deny patterns (patterns ending with `/`)
-                    if let Some(pattern) = cfg.dir_matches_global_deny(path) {
+                    if let Some(pattern) = cfg.dir_matches_global_deny(&logical_path) {
                         self.result.allowlist_violations.push(
                             StructureViolation::denied_directory(
                                 path.to_path_buf(),
@@ -358,7 +441,7 @@ impl<'a> StructureScanState<'a> {
                     }
 
                     // Check deny_dirs (basename-only matching from structure.deny_dirs)
-                    if let Some(pattern) = cfg.dir_matches_global_deny_basename(path) {
+                    if let Some(pattern) = cfg.dir_matches_global_deny_basename(&logical_path) {
                         self.result.allowlist_violations.push(
                             StructureViolation::denied_directory(
                                 path.to_path_buf(),
@@ -375,7 +458,7 @@ impl<'a> StructureScanState<'a> {
         if let Some(rule) = matching_rule {
             if rule.has_dir_allowlist() {
                 // Allow mode: directory must match allowlist
-                if !rule.dir_matches(path) {
+                if !rule.dir_matches(&logical_path) {
                     self.result.allowlist_violations.push(
                         StructureViolation::disallowed_directory(
                             path.to_path_buf(),
@@ -383,7 +466,7 @@ impl<'a> StructureScanState<'a> {
                         ),
                     );
                 }
-            } else if let Some(pattern) = rule.dir_matches_deny(path) {
+            } else if let Some(pattern) = rule.dir_matches_deny(&logical_path) {
                 // Deny mode: check per-rule deny_dirs
                 self.result
                     .allowlist_violations
@@ -398,7 +481,7 @@ impl<'a> StructureScanState<'a> {
         // Check count_exclude
         let is_count_excluded = self
             .structure_config
-            .is_some_and(|cfg| cfg.is_count_excluded(path));
+            .is_some_and(|cfg| cfg.is_count_excluded_with_project_paths(path, &self.project_paths));
 
         // Initialize this directory's stats
         self.dir_entries

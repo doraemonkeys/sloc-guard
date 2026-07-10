@@ -256,6 +256,35 @@ fn calculate_base_depth_simple_pattern() {
 }
 
 #[test]
+fn relative_depth_uses_normalized_dot_prefixed_scope() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "./src/**".to_string(),
+            max_depth: Some(1),
+            relative_depth: true,
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/a/b"),
+        DirStats {
+            file_count: 0,
+            dir_count: 0,
+            depth: 3,
+        },
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].violation_type, ViolationType::MaxDepth);
+    assert_eq!(violations[0].actual, 2);
+}
+
+#[test]
 fn relative_depth_allows_deep_nesting_within_base() {
     // Rule: src/features/** with relative_depth=true, max_depth=2
     // Absolute depth 4 = relative depth 2 (within limit)

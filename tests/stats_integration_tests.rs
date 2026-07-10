@@ -690,6 +690,30 @@ fn stats_summary_cli_exclude_pattern() {
 }
 
 #[test]
+fn stats_cli_exclude_from_subdirectory_is_invocation_relative() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("core/main.rs", 20);
+    fixture.create_rust_file("core/session/generated.rs", 20);
+    let nested_cwd = fixture.path().join("core");
+
+    sloc_guard!()
+        .current_dir(nested_cwd)
+        .args([
+            "stats",
+            "summary",
+            "--no-sloc-cache",
+            "--exclude",
+            "session/**",
+            "--format",
+            "json",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"total_files\": 1"));
+}
+
+#[test]
 fn stats_summary_cli_include_filter() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);

@@ -27,7 +27,7 @@ pub fn scan_or_filter_files(
         let paths_to_scan = resolve_scan_paths(paths, &args.include);
 
         // 2. Scan directories using unified traversal (collects files + dir stats in one pass)
-        let scan_result = ctx
+        let mut scan_result = ctx
             .scanner
             .scan_all_with_structure(&paths_to_scan, ctx.structure_scan_config.as_ref())?;
 
@@ -38,6 +38,9 @@ pub fn scan_or_filter_files(
             args.staged,
             project_root,
         )?;
+        // Keep `files` physical for IO/git, while structure checks and output consume stable
+        // configuration-root-relative identities.
+        scan_result.rebase_logical_paths(ctx.project_paths());
         Ok((files, Some(scan_result), false))
     } else {
         // Pure incremental mode: process only listed files, skip structure checks

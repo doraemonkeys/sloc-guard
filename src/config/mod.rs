@@ -12,6 +12,7 @@ pub use expires::{ExpiredRule, ExpiredRuleType, collect_expired_rules};
 pub use extends::SourcedConfig;
 pub use filesystem::{FileSystem, RealFileSystem};
 pub use loader::{ConfigLoader, FileConfigLoader, LoadResult, LoadResultWithSources};
+pub(crate) use loader::{ConfigOrigin, LocatedLoadResult};
 pub use merge::RESET_MARKER;
 pub use model::{
     BaselineConfig, CONFIG_VERSION, CheckConfig, Config, ContentConfig, ContentRule,

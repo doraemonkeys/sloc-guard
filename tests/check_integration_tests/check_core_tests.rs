@@ -240,6 +240,43 @@ fn check_verbose_mode_shows_details() {
         .stdout(predicate::str::contains("PASS"));
 }
 
+#[test]
+fn check_verbose_reports_builtin_defaults_without_polluting_json() {
+    let fixture = TestFixture::new();
+    // Keep repository-local TEMP directories from inheriting this repository's config.
+    fixture.create_dir(".git");
+    fixture.create_rust_file("src/main.rs", 10);
+    fixture.create_dir("empty-config-home");
+    let config_home = fixture.path().join("empty-config-home");
+
+    let output = sloc_guard!()
+        .current_dir(fixture.path())
+        .env("APPDATA", &config_home)
+        .env("XDG_CONFIG_HOME", &config_home)
+        .env("HOME", &config_home)
+        .args(["check", "--no-sloc-cache", "--format", "json", "-v"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let _: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("No configuration file found; using built-in defaults")
+    );
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .env("APPDATA", &config_home)
+        .env("XDG_CONFIG_HOME", &config_home)
+        .env("HOME", &config_home)
+        .args(["check", "--no-sloc-cache", "--no-config", "--quiet", "-v"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("built-in defaults").not());
+}
+
 // =============================================================================
 // Color Output Tests
 // =============================================================================

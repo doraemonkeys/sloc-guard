@@ -11,7 +11,9 @@ use crate::counter::LineStats;
 use crate::state::{DEFAULT_LOCK_TIMEOUT_MS, SaveOutcome, SharedLockGuard, atomic_write_with_lock};
 use crate::{Result, SlocGuardError};
 
-const CACHE_VERSION: u32 = 3;
+// Version 4 keys entries by configuration-root-relative logical path so one project cache is
+// stable regardless of the directory from which a command is invoked.
+const CACHE_VERSION: u32 = 4;
 
 /// Cached line statistics for a single file.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

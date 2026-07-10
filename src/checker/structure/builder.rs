@@ -4,6 +4,7 @@ use globset::Glob;
 
 use crate::config::StructureRule;
 use crate::error::{Result, SlocGuardError};
+use crate::project::{compile_logical_path_glob, normalize_pattern_for_matching};
 
 use super::compiled_rules::{CompiledSiblingRule, CompiledStructureRule};
 
@@ -12,13 +13,10 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
     rules
         .iter()
         .map(|rule| {
-            let glob = Glob::new(&rule.scope).map_err(|e| SlocGuardError::InvalidPattern {
-                pattern: rule.scope.clone(),
-                source: e,
-            })?;
+            let glob = compile_logical_path_glob(&rule.scope)?;
 
             // Calculate base_depth: count path components before first glob metacharacter
-            let base_depth = calculate_base_depth(&rule.scope);
+            let base_depth = calculate_base_depth(&normalize_pattern_for_matching(&rule.scope));
 
             Ok(CompiledStructureRule {
                 scope: rule.scope.clone(),
@@ -46,10 +44,7 @@ pub(super) fn build_sibling_rules(rules: &[StructureRule]) -> Result<Vec<Compile
     let mut compiled_rules = Vec::new();
 
     for rule in rules {
-        let dir_glob = Glob::new(&rule.scope).map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: rule.scope.clone(),
-            source: e,
-        })?;
+        let dir_glob = compile_logical_path_glob(&rule.scope)?;
         let dir_matcher = dir_glob.compile_matcher();
 
         for sibling in &rule.siblings {

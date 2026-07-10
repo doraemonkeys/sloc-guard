@@ -55,7 +55,7 @@ fn default_scanner_config_excludes_git_directory() {
         ..Default::default()
     })
     .unwrap();
-    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let scanner = DirectoryScanner::new(RootedAcceptAllFilter::new(temp_dir.path()));
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -118,7 +118,7 @@ fn scan_with_structure_scanner_exclude_prunes_directory_subtree() {
         ..Default::default()
     })
     .unwrap();
-    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let scanner = DirectoryScanner::new(RootedAcceptAllFilter::new(temp_dir.path()));
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -157,7 +157,7 @@ fn scan_with_structure_scanner_exclude_dotgit_pattern() {
         ..Default::default()
     })
     .unwrap();
-    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let scanner = DirectoryScanner::new(RootedAcceptAllFilter::new(temp_dir.path()));
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -200,7 +200,7 @@ fn scan_with_structure_scanner_exclude_multiple_patterns() {
         ..Default::default()
     })
     .unwrap();
-    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let scanner = DirectoryScanner::new(RootedAcceptAllFilter::new(temp_dir.path()));
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -227,7 +227,8 @@ fn scan_with_structure_gitignore_scanner_exclude_prunes_directory() {
         ..Default::default()
     })
     .unwrap();
-    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, true);
+    let scanner =
+        DirectoryScanner::with_gitignore(RootedAcceptAllFilter::new(temp_dir.path()), true);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -254,7 +255,7 @@ fn scan_with_structure_excluded_dir_not_counted_in_parent_stats() {
         ..Default::default()
     })
     .unwrap();
-    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let scanner = DirectoryScanner::new(RootedAcceptAllFilter::new(temp_dir.path()));
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -263,4 +264,136 @@ fn scan_with_structure_excluded_dir_not_counted_in_parent_stats() {
     let root_stats = result.dir_stats.get(temp_dir.path());
     assert!(root_stats.is_some());
     assert_eq!(root_stats.unwrap().dir_count, 1);
+}
+
+#[test]
+fn unrooted_absolute_scan_prunes_only_the_anchored_directory_prefix() {
+    let temp_dir = TempDir::new().unwrap();
+    let excluded = temp_dir.path().join("core/vendor");
+    let retained = temp_dir.path().join("apps/vendor");
+    std::fs::create_dir_all(&excluded).unwrap();
+    std::fs::create_dir_all(&retained).unwrap();
+    std::fs::write(excluded.join("excluded.rs"), "").unwrap();
+    std::fs::write(retained.join("retained.rs"), "").unwrap();
+
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["core/vendor/**".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    assert!(
+        !result
+            .files
+            .iter()
+            .any(|path| path.ends_with("excluded.rs"))
+    );
+    assert!(
+        result
+            .files
+            .iter()
+            .any(|path| path.ends_with("retained.rs"))
+    );
+    assert!(!result.dir_stats.contains_key(&excluded));
+    assert!(result.dir_stats.contains_key(&retained));
+}
+
+#[test]
+fn dot_prefixed_directory_exclusion_is_anchored_to_the_scan_root() {
+    let temp_dir = TempDir::new().unwrap();
+    let excluded = temp_dir.path().join("vendor");
+    let retained = temp_dir.path().join("apps/vendor");
+    std::fs::create_dir_all(&excluded).unwrap();
+    std::fs::create_dir_all(&retained).unwrap();
+    std::fs::write(excluded.join("excluded.rs"), "").unwrap();
+    std::fs::write(retained.join("retained.rs"), "").unwrap();
+
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["./vendor/**".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    assert!(
+        !result
+            .files
+            .iter()
+            .any(|path| path.ends_with("excluded.rs"))
+    );
+    assert!(
+        result
+            .files
+            .iter()
+            .any(|path| path.ends_with("retained.rs"))
+    );
+    assert!(!result.dir_stats.contains_key(&excluded));
+    assert!(result.dir_stats.contains_key(&retained));
+}
+
+#[test]
+fn non_recursive_file_glob_does_not_prune_its_parent_directory() {
+    let temp_dir = TempDir::new().unwrap();
+    let vendor = temp_dir.path().join("vendor");
+    std::fs::create_dir(&vendor).unwrap();
+    std::fs::write(vendor.join("a.rs"), "").unwrap();
+    std::fs::write(vendor.join("x.rs"), "").unwrap();
+
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["vendor/[!x]*".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    assert!(!result.files.iter().any(|path| path.ends_with("a.rs")));
+    assert!(result.files.iter().any(|path| path.ends_with("x.rs")));
+    assert!(result.dir_stats.contains_key(&vendor));
+}
+
+#[test]
+fn unrooted_relative_scan_retains_identity_path_compatibility() {
+    let _lock = crate::lock_test_cwd();
+    let cwd = std::env::current_dir().unwrap();
+    let temp_dir = tempfile::tempdir_in(&cwd).unwrap();
+    let relative_root = temp_dir.path().strip_prefix(&cwd).unwrap();
+    let vendor = temp_dir.path().join("vendor");
+    std::fs::create_dir(&vendor).unwrap();
+    std::fs::write(vendor.join("excluded.rs"), "").unwrap();
+    std::fs::write(temp_dir.path().join("retained.rs"), "").unwrap();
+
+    let identity_prefix = relative_root.to_string_lossy().replace('\\', "/");
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec![format!("{identity_prefix}/vendor/**")],
+        ..Default::default()
+    })
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(relative_root, Some(&config))
+        .unwrap();
+
+    assert!(
+        !result
+            .files
+            .iter()
+            .any(|path| path.ends_with("excluded.rs"))
+    );
+    assert!(
+        result
+            .files
+            .iter()
+            .any(|path| path.ends_with("retained.rs"))
+    );
+    assert!(!result.dir_stats.keys().any(|path| path.ends_with("vendor")));
 }

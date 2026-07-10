@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::*;
+use crate::project::ProjectPaths;
 use tempfile::TempDir;
 
 struct AcceptAllFilter;
@@ -8,6 +9,27 @@ struct AcceptAllFilter;
 impl FileFilter for AcceptAllFilter {
     fn should_include(&self, _path: &Path) -> bool {
         true
+    }
+}
+
+struct RootedAcceptAllFilter(ProjectPaths);
+
+impl RootedAcceptAllFilter {
+    fn new(root: &Path) -> Self {
+        Self(ProjectPaths::rooted_with_cwd(
+            root.to_path_buf(),
+            root.to_path_buf(),
+        ))
+    }
+}
+
+impl FileFilter for RootedAcceptAllFilter {
+    fn should_include(&self, _path: &Path) -> bool {
+        true
+    }
+
+    fn project_paths(&self) -> &ProjectPaths {
+        &self.0
     }
 }
 
@@ -361,7 +383,8 @@ fn directory_scanner_walkdir_prunes_excluded_directories() {
     .unwrap();
 
     // Use DirectoryScanner WITHOUT gitignore (exercises scan_with_structure_walkdir)
-    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, false);
+    let scanner =
+        DirectoryScanner::with_gitignore(RootedAcceptAllFilter::new(temp_dir.path()), false);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
@@ -401,12 +424,13 @@ fn directory_scanner_walkdir_prunes_nested_excluded() {
 
     // Exclude both .cache and build directories
     let config = StructureScanConfig::new(TestConfigParams {
-        scanner_exclude_patterns: vec![".cache/**".to_string(), "build/**".to_string()],
+        scanner_exclude_patterns: vec!["**/.cache/**".to_string(), "build/**".to_string()],
         ..Default::default()
     })
     .unwrap();
 
-    let scanner = DirectoryScanner::with_gitignore(AcceptAllFilter, false);
+    let scanner =
+        DirectoryScanner::with_gitignore(RootedAcceptAllFilter::new(temp_dir.path()), false);
     let result = scanner
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();

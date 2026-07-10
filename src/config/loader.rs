@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use indexmap::IndexSet;
 
 use crate::error::{ConfigSource, Result, SlocGuardError};
+use crate::project::lexical_absolute;
 
 use super::Config;
 use super::extends::ExtendsResolver;
@@ -24,6 +25,39 @@ pub use super::filesystem::RealFileSystem;
 #[cfg(test)]
 pub use super::extends::MAX_EXTENDS_DEPTH;
 
+/// Describes where the effective configuration came from.
+///
+/// File-backed variants contain an absolute, lexically normalized path. Symlinks are intentionally
+/// not resolved: relative `extends` entries and path rules are anchored at the selected config
+/// location rather than the symlink target.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConfigOrigin {
+    /// A `.sloc-guard.toml` discovered in the current directory or an ancestor.
+    ProjectFile(PathBuf),
+    /// The platform-specific user configuration file.
+    UserFile(PathBuf),
+    /// A configuration file explicitly selected by the caller.
+    ExplicitFile(PathBuf),
+    /// No configuration file was found, so built-in defaults are active.
+    BuiltInDefaults,
+    /// Configuration loading was explicitly disabled by the caller.
+    ///
+    /// The filesystem loader never produces this variant; it is provided for
+    /// command-layer options such as `--no-config`.
+    Disabled,
+}
+
+impl ConfigOrigin {
+    /// Return the backing file path, if this origin is file-backed.
+    #[must_use]
+    pub fn path(&self) -> Option<&Path> {
+        match self {
+            Self::ProjectFile(path) | Self::UserFile(path) | Self::ExplicitFile(path) => Some(path),
+            Self::BuiltInDefaults | Self::Disabled => None,
+        }
+    }
+}
+
 /// Result of loading a configuration, containing both the config and metadata.
 ///
 /// This allows the caller to decide how to handle loading side-effects (like printing
@@ -34,6 +68,33 @@ pub struct LoadResult {
     pub config: Config,
     /// The preset name if a preset was used (e.g., "rust-strict").
     pub preset_used: Option<String>,
+}
+
+/// Command-layer load result with source metadata used for stable path resolution and notices.
+///
+/// This stays crate-private so adding provenance does not break the public [`LoadResult`] struct.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LocatedLoadResult {
+    pub config: Config,
+    pub preset_used: Option<String>,
+    pub origin: ConfigOrigin,
+}
+
+impl LocatedLoadResult {
+    fn from_public(result: LoadResult, origin: ConfigOrigin) -> Self {
+        Self {
+            config: result.config,
+            preset_used: result.preset_used,
+            origin,
+        }
+    }
+
+    fn into_public(self) -> LoadResult {
+        LoadResult {
+            config: self.config,
+            preset_used: self.preset_used,
+        }
+    }
 }
 
 /// Result of loading a configuration with full source tracking.
@@ -128,7 +189,8 @@ fn validate_config_version(config: &Config) -> Result<()> {
 /// Loads configuration from the filesystem.
 ///
 /// Search order:
-/// 1. `.sloc-guard.toml` in current directory
+/// 1. The nearest `.sloc-guard.toml`, walking up from the current directory
+///    (the walk stops at a `.git` file or directory that has no config)
 /// 2. Platform-specific user config directory:
 ///    - Windows: `%APPDATA%\sloc-guard\config.toml`
 ///    - macOS: `~/Library/Application Support/sloc-guard/config.toml`
@@ -178,15 +240,47 @@ impl<F: FileSystem> FileConfigLoader<F> {
         }
     }
 
-    fn local_config_path(&self) -> Option<PathBuf> {
-        self.fs
-            .current_dir()
-            .ok()
-            .map(|dir| dir.join(LOCAL_CONFIG_NAME))
-    }
-
     fn user_config_path(&self) -> Option<PathBuf> {
         self.fs.config_dir().map(|dir| dir.join(USER_CONFIG_NAME))
+    }
+
+    /// Convert a path to the stable lexical form exposed in load metadata.
+    ///
+    /// Do not canonicalize here. Resolving a config symlink would change the base directory for
+    /// relative `extends` entries and make implicit and explicit loading of the same path disagree.
+    fn stable_path(&self, path: &Path) -> PathBuf {
+        self.fs
+            .current_dir()
+            .map_or_else(|_| path.to_path_buf(), |cwd| lexical_absolute(path, &cwd))
+    }
+
+    /// Discover the effective configuration source for all no-argument load
+    /// entry points.
+    ///
+    /// At each ancestor the project config is checked before the Git marker,
+    /// so a config at the repository root is selected. A `.git` file (linked
+    /// worktree/submodule) is intentionally the same boundary as a directory.
+    fn discover_origin(&self) -> Result<ConfigOrigin> {
+        let current_dir = self.fs.current_dir()?;
+        let start = self.stable_path(&current_dir);
+        for ancestor in start.ancestors() {
+            let project_path = ancestor.join(LOCAL_CONFIG_NAME);
+            if self.fs.exists(&project_path) {
+                return Ok(ConfigOrigin::ProjectFile(self.stable_path(&project_path)));
+            }
+
+            if self.fs.exists(&ancestor.join(".git")) {
+                break;
+            }
+        }
+
+        if let Some(user_path) = self.user_config_path()
+            && self.fs.exists(&user_path)
+        {
+            return Ok(ConfigOrigin::UserFile(self.stable_path(&user_path)));
+        }
+
+        Ok(ConfigOrigin::BuiltInDefaults)
     }
 
     fn parse_config(content: &str) -> Result<Config> {
@@ -252,26 +346,62 @@ impl<F: FileSystem> FileConfigLoader<F> {
             depth,
         )
     }
+
+    /// Load the implicitly selected configuration together with its filesystem origin.
+    pub(crate) fn load_located(&self) -> Result<LocatedLoadResult> {
+        let origin = self.discover_origin()?;
+        if let Some(path) = origin.path() {
+            let result = <Self as ConfigLoader>::load_from_path(self, path)?;
+            return Ok(LocatedLoadResult::from_public(result, origin));
+        }
+
+        Ok(LocatedLoadResult {
+            config: Config::default(),
+            preset_used: None,
+            origin,
+        })
+    }
+
+    /// Load an explicit configuration together with its lexical filesystem origin.
+    pub(crate) fn load_from_path_located(&self, path: &Path) -> Result<LocatedLoadResult> {
+        let result = <Self as ConfigLoader>::load_from_path(self, path)?;
+        Ok(LocatedLoadResult::from_public(
+            result,
+            ConfigOrigin::ExplicitFile(self.stable_path(path)),
+        ))
+    }
+
+    /// Load the implicitly selected configuration without inheritance, retaining its origin.
+    pub(crate) fn load_without_extends_located(&self) -> Result<LocatedLoadResult> {
+        let origin = self.discover_origin()?;
+        if let Some(path) = origin.path() {
+            let result = <Self as ConfigLoader>::load_from_path_without_extends(self, path)?;
+            return Ok(LocatedLoadResult::from_public(result, origin));
+        }
+
+        Ok(LocatedLoadResult {
+            config: Config::default(),
+            preset_used: None,
+            origin,
+        })
+    }
+
+    /// Load an explicit configuration without inheritance, retaining its lexical origin.
+    pub(crate) fn load_from_path_without_extends_located(
+        &self,
+        path: &Path,
+    ) -> Result<LocatedLoadResult> {
+        let result = <Self as ConfigLoader>::load_from_path_without_extends(self, path)?;
+        Ok(LocatedLoadResult::from_public(
+            result,
+            ConfigOrigin::ExplicitFile(self.stable_path(path)),
+        ))
+    }
 }
 
 impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     fn load(&self) -> Result<LoadResult> {
-        if let Some(local_path) = self.local_config_path()
-            && self.fs.exists(&local_path)
-        {
-            return self.load_from_path(&local_path);
-        }
-
-        if let Some(user_path) = self.user_config_path()
-            && self.fs.exists(&user_path)
-        {
-            return self.load_from_path(&user_path);
-        }
-
-        Ok(LoadResult {
-            config: Config::default(),
-            preset_used: None,
-        })
+        self.load_located().map(LocatedLoadResult::into_public)
     }
 
     fn load_from_path(&self, path: &Path) -> Result<LoadResult> {
@@ -313,22 +443,8 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_without_extends(&self) -> Result<LoadResult> {
-        if let Some(local_path) = self.local_config_path()
-            && self.fs.exists(&local_path)
-        {
-            return self.load_from_path_without_extends(&local_path);
-        }
-
-        if let Some(user_path) = self.user_config_path()
-            && self.fs.exists(&user_path)
-        {
-            return self.load_from_path_without_extends(&user_path);
-        }
-
-        Ok(LoadResult {
-            config: Config::default(),
-            preset_used: None,
-        })
+        self.load_without_extends_located()
+            .map(LocatedLoadResult::into_public)
     }
 
     fn load_from_path_without_extends(&self, path: &Path) -> Result<LoadResult> {
@@ -352,16 +468,9 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_with_sources(&self) -> Result<LoadResultWithSources> {
-        if let Some(local_path) = self.local_config_path()
-            && self.fs.exists(&local_path)
-        {
-            return self.load_from_path_with_sources(&local_path);
-        }
-
-        if let Some(user_path) = self.user_config_path()
-            && self.fs.exists(&user_path)
-        {
-            return self.load_from_path_with_sources(&user_path);
+        let origin = self.discover_origin()?;
+        if let Some(path) = origin.path() {
+            return self.load_from_path_with_sources(path);
         }
 
         // No config file found - return default with empty source chain
@@ -417,16 +526,9 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_without_extends_with_sources(&self) -> Result<LoadResultWithSources> {
-        if let Some(local_path) = self.local_config_path()
-            && self.fs.exists(&local_path)
-        {
-            return self.load_from_path_without_extends_with_sources(&local_path);
-        }
-
-        if let Some(user_path) = self.user_config_path()
-            && self.fs.exists(&user_path)
-        {
-            return self.load_from_path_without_extends_with_sources(&user_path);
+        let origin = self.discover_origin()?;
+        if let Some(path) = origin.path() {
+            return self.load_from_path_without_extends_with_sources(path);
         }
 
         // No config file found - return default with empty source chain

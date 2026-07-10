@@ -7,9 +7,19 @@ pub use split::{SplitAnalyzer, SplitChunk, SplitSuggestion};
 use crate::checker::CheckResult;
 use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
+use crate::project::ProjectPaths;
 
 /// Generate split suggestions for failed or warning results.
 pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &LanguageRegistry) {
+    generate_split_suggestions_with_project_paths(results, registry, &ProjectPaths::unrooted());
+}
+
+/// Generate split suggestions while resolving logical result paths back to physical files.
+pub fn generate_split_suggestions_with_project_paths(
+    results: &mut [CheckResult],
+    registry: &LanguageRegistry,
+    project_paths: &ProjectPaths,
+) {
     let analyzer = SplitAnalyzer::default();
 
     for result in results.iter_mut() {
@@ -25,7 +35,8 @@ pub fn generate_split_suggestions(results: &mut [CheckResult], registry: &Langua
             continue;
         };
 
-        let Ok(content) = std::fs::read_to_string(result.path()) else {
+        let physical_path = project_paths.physical(result.path());
+        let Ok(content) = std::fs::read_to_string(physical_path) else {
             continue;
         };
 

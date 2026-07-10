@@ -3,7 +3,10 @@
 //! This module provides utilities for displaying paths relative to the project root,
 //! with consistent forward-slash separators across platforms.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+
+#[cfg(test)]
+use crate::project::normalize_for_matching;
 
 /// Format a path for display, making it relative to the project root if possible.
 ///
@@ -36,44 +39,6 @@ pub fn display_path(path: &Path, project_root: Option<&Path>) -> String {
 #[must_use]
 pub fn normalize_separators(path: &str) -> String {
     path.replace('\\', "/")
-}
-
-/// Normalize a path for consistent glob pattern matching.
-///
-/// This function performs two normalizations:
-/// 1. Strips leading `.` component (e.g., `./src/foo` or `.\src\foo` → `src/foo`)
-/// 2. Normalizes backslashes to forward slashes for cross-platform glob matching
-///
-/// This ensures patterns like `src/**/*tests.rs` match regardless of whether
-/// the path is specified as `src/lib.rs`, `./src/lib.rs`, or `.\src\lib.rs`.
-///
-/// # Edge Case: Root Directory
-///
-/// When the input is `.` or `./`, returns an empty `PathBuf`. This is intentional:
-/// an empty path won't match file-targeting patterns like `src/**/*.rs`, which is
-/// correct since the project root itself is not a file. For glob patterns that
-/// should match everything (like `**`), `GlobSet` handles empty strings correctly.
-#[must_use]
-pub(crate) fn normalize_for_matching(path: &Path) -> PathBuf {
-    let path_str = path.to_string_lossy();
-
-    // Strip leading "./" (Unix) or ".\" (Windows)
-    let stripped = path_str
-        .strip_prefix("./")
-        .or_else(|| path_str.strip_prefix(".\\"))
-        .unwrap_or(&path_str);
-
-    // Handle bare "." - return empty path (see doc comment for rationale)
-    if stripped.is_empty() || stripped == "." {
-        return PathBuf::new();
-    }
-
-    // Normalize backslashes to forward slashes for consistent glob matching on all platforms.
-    if stripped.contains('\\') {
-        PathBuf::from(stripped.replace('\\', "/"))
-    } else {
-        PathBuf::from(stripped)
-    }
 }
 
 #[cfg(test)]

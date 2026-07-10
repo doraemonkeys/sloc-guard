@@ -4,7 +4,9 @@ mod history;
 mod report;
 mod runner;
 
-pub use collection::{collect_file_stats, collect_stats_with_config_and_reader};
+pub use collection::{
+    collect_file_stats, collect_file_stats_with_logical_path, collect_stats_with_config_and_reader,
+};
 pub use runner::run_stats;
 
 // Re-export internal items for tests

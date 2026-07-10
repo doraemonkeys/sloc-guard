@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 
 use crate::config::{StructureConfig, UNLIMITED};
 use crate::error::Result;
+use crate::project::normalize_for_matching;
 
 use super::explain::{
     MatchStatus, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
@@ -96,10 +97,11 @@ impl StructureChecker {
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
     fn resolve_limits(&self, path: &Path) -> StructureLimits {
+        let normalized = normalize_for_matching(path);
         // Check rules (glob patterns) - last match wins
         // Iterate in reverse to find the last matching rule
         for rule in self.rules.iter().rev() {
-            if rule.matcher.is_match(path) {
+            if rule.matcher.is_match(&normalized) {
                 return StructureLimits {
                     max_files: rule.max_files.or(self.max_files),
                     max_dirs: rule.max_dirs.or(self.max_dirs),
@@ -318,15 +320,16 @@ impl StructureChecker {
         let mut violations = Vec::new();
 
         for (parent, dir_files) in files_by_parent {
+            let normalized_parent = normalize_for_matching(parent);
             // Find rules that apply to this directory
             let applicable_rules: Vec<_> = self
                 .sibling_rules
                 .iter()
                 .filter(|rule| match rule {
-                    CompiledSiblingRule::Directed { dir_matcher, .. } => {
-                        dir_matcher.is_match(parent)
+                    CompiledSiblingRule::Directed { dir_matcher, .. }
+                    | CompiledSiblingRule::Group { dir_matcher, .. } => {
+                        dir_matcher.is_match(&normalized_parent)
                     }
-                    CompiledSiblingRule::Group { dir_matcher, .. } => dir_matcher.is_match(parent),
                 })
                 .collect();
 
@@ -511,6 +514,7 @@ impl StructureChecker {
     /// Returns a detailed breakdown of all evaluated rules and which one won.
     #[must_use]
     pub fn explain(&self, path: &Path) -> StructureExplanation {
+        let normalized = normalize_for_matching(path);
         let mut rule_chain = Vec::new();
         let mut matched_rule = StructureRuleMatch::Default;
         let mut found_match = false;
@@ -523,12 +527,12 @@ impl StructureChecker {
             .iter()
             .enumerate()
             .rev()
-            .find(|(_, rule)| rule.matcher.is_match(path))
+            .find(|(_, rule)| rule.matcher.is_match(&normalized))
             .map(|(i, _)| i);
 
         // Then iterate forward to build rule chain with correct statuses
         for (i, rule) in self.rules.iter().enumerate() {
-            let matches = rule.matcher.is_match(path);
+            let matches = rule.matcher.is_match(&normalized);
             let is_last_match = last_matching_rule_idx == Some(i);
             let status = if is_last_match && !found_match {
                 found_match = true;

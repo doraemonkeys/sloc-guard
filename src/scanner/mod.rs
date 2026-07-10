@@ -5,9 +5,9 @@ mod filter;
 mod structure_config;
 
 pub use allowlist::{AllowlistRule, AllowlistRuleBuilder};
-pub use composite::{CompositeScanner, scan_files};
+pub use composite::{CompositeScanner, scan_files, scan_files_with_project_paths};
 pub use directory::DirectoryScanner;
-pub use filter::{FileFilter, GlobFilter};
+pub use filter::{DirectoryPruner, FileFilter, GlobFilter};
 pub use structure_config::StructureScanConfig;
 
 #[cfg(test)]
@@ -18,6 +18,7 @@ use std::path::{Path, PathBuf};
 
 use crate::checker::{DirStats, StructureViolation};
 use crate::error::Result;
+use crate::project::{ProjectPaths, UNROOTED_PROJECT_PATHS};
 
 /// Result of unified directory scan with structure stats.
 #[derive(Debug, Clone, Default)]
@@ -30,10 +31,42 @@ pub struct ScanResult {
     pub allowlist_violations: Vec<StructureViolation>,
 }
 
+impl ScanResult {
+    /// Rebase paths used for rules, output, and persistent identity to the configuration root.
+    ///
+    /// Directory traversal initially retains physical paths so files can be opened and filtered by
+    /// git. Callers should clone the physical file list before rebasing it for structure checks.
+    pub(crate) fn rebase_logical_paths(&mut self, project_paths: &ProjectPaths) {
+        for file in &mut self.files {
+            *file = project_paths.logical(file);
+        }
+
+        self.dir_stats = std::mem::take(&mut self.dir_stats)
+            .into_iter()
+            .map(|(path, mut stats)| {
+                let logical = project_paths.logical(&path);
+                if project_paths.config_root().is_some() {
+                    stats.depth = project_paths.logical_depth(&path);
+                }
+                (logical, stats)
+            })
+            .collect();
+
+        for violation in &mut self.allowlist_violations {
+            violation.path = project_paths.logical(&violation.path);
+        }
+    }
+}
+
 /// Trait for scanning directories and finding files.
 ///
 /// Implementations must be thread-safe (`Send + Sync`) for parallel processing.
 pub trait FileScanner: Send + Sync {
+    /// Path namespace used by this scanner's configured globs and logical conversion.
+    fn project_paths(&self) -> &ProjectPaths {
+        &UNROOTED_PROJECT_PATHS
+    }
+
     /// Scan a directory and return all matching file paths.
     ///
     /// # Errors

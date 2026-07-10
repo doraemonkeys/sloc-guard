@@ -1,11 +1,12 @@
 use crate::cli::{
-    BreakdownArgs, BreakdownBy, Cli, FilesArgs, StatsAction, StatsArgs, SummaryArgs, TrendArgs,
+    BreakdownArgs, BreakdownBy, Cli, FilesArgs, StatsAction, StatsArgs, StatsOutputFormat,
+    SummaryArgs, TrendArgs,
 };
 use crate::state;
 use crate::stats::{TrendHistory, parse_duration};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
-use super::collection::{collect_stats, save_cache_if_enabled};
+use super::collection::{collect_stats_with_notice, save_cache_if_enabled};
 use super::formatting::format_stats_subcommand_output;
 use super::history::run_history;
 use super::report::run_report;
@@ -44,7 +45,8 @@ pub fn run_stats(args: &StatsArgs, cli: &Cli) -> i32 {
 // ============================================================================
 
 fn run_summary(args: &SummaryArgs, cli: &Cli) -> crate::Result<i32> {
-    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    let (project_stats, project_root, cache) =
+        collect_stats_with_notice(&args.common, cli, args.format == StatsOutputFormat::Text)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
     // Summary only: no file list, no breakdown
@@ -62,7 +64,8 @@ fn run_summary(args: &SummaryArgs, cli: &Cli) -> crate::Result<i32> {
 // ============================================================================
 
 fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
-    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    let (project_stats, project_root, cache) =
+        collect_stats_with_notice(&args.common, cli, args.format == StatsOutputFormat::Text)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
     // Apply sorting with unified FileSortOrder type
@@ -80,7 +83,8 @@ fn run_files(args: &FilesArgs, cli: &Cli) -> crate::Result<i32> {
 // ============================================================================
 
 fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
-    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    let (project_stats, project_root, cache) =
+        collect_stats_with_notice(&args.common, cli, args.format == StatsOutputFormat::Text)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
     // Warn if --depth is used with --by lang (not applicable)
@@ -123,7 +127,8 @@ fn run_breakdown(args: &BreakdownArgs, cli: &Cli) -> crate::Result<i32> {
 // ============================================================================
 
 fn run_trend(args: &TrendArgs, cli: &Cli) -> crate::Result<i32> {
-    let (project_stats, project_root, cache) = collect_stats(&args.common, cli)?;
+    let (project_stats, project_root, cache) =
+        collect_stats_with_notice(&args.common, cli, args.format == StatsOutputFormat::Text)?;
     save_cache_if_enabled(&args.common, &cache, &project_root);
 
     // Load history and compute trend delta

@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::*;
+use crate::project::ProjectPaths;
 
 #[test]
 fn filter_by_extension() {
@@ -96,4 +97,38 @@ fn filter_exclude_by_filename() {
 
     assert!(filter.should_include(Path::new("Cargo.toml")));
     assert!(!filter.should_include(Path::new("Cargo.lock")));
+}
+
+#[test]
+fn directory_pruner_uses_complete_terminal_recursive_prefixes() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let filter = GlobFilter::with_project_paths(
+        Vec::new(),
+        &["core/vendor/**".to_string(), "vendor/[!x]*".to_string()],
+        project_paths,
+    )
+    .unwrap();
+    let pruner = filter.directory_pruner();
+
+    assert!(pruner(&project_root.join("core/vendor")));
+    assert!(!pruner(&project_root.join("apps/vendor")));
+    assert!(!pruner(&project_root.join("vendor")));
+    assert!(!filter.should_include(&project_root.join("vendor/a.rs")));
+    assert!(filter.should_include(&project_root.join("vendor/x.rs")));
+}
+
+#[test]
+fn dot_prefixed_exclusion_is_normalized_to_the_logical_root() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let filter =
+        GlobFilter::with_project_paths(Vec::new(), &["./vendor/**".to_string()], project_paths)
+            .unwrap();
+    let pruner = filter.directory_pruner();
+
+    assert!(pruner(&project_root.join("vendor")));
+    assert!(!pruner(&project_root.join("apps/vendor")));
+    assert!(!filter.should_include(&project_root.join("vendor/a.rs")));
+    assert!(filter.should_include(&project_root.join("apps/vendor/a.rs")));
 }

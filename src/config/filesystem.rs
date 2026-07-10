@@ -59,6 +59,6 @@ impl FileSystem for RealFileSystem {
     }
 
     fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf> {
-        path.canonicalize()
+        dunce::canonicalize(path)
     }
 }

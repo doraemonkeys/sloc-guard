@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use rayon::prelude::*;
 
-use crate::analyzer::generate_split_suggestions;
+use crate::analyzer::generate_split_suggestions_with_project_paths;
 use crate::baseline::Baseline;
 use crate::cache::{Cache, compute_config_hash};
 use crate::checker::CheckResult;
@@ -18,21 +18,23 @@ use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::check_args::{apply_cli_overrides, validate_and_resolve_paths};
 use super::check_baseline_ops::{
-    apply_baseline_comparison, handle_baseline_ratchet, load_baseline, load_baseline_optional,
-    update_baseline_from_results,
+    apply_baseline_comparison_with_project_paths, handle_baseline_ratchet, load_baseline,
+    load_baseline_optional, update_baseline_from_results_with_project_paths,
 };
 use super::check_exit::determine_exit_code;
 use super::check_output::{
     RenderOptions, format_output, structure_violation_to_check_result, write_additional_formats,
 };
-use super::check_processing::process_file_for_check;
+use super::check_processing::process_file_for_check_with_logical_path;
 use super::check_scan::{partition_file_results, scan_or_filter_files};
 use super::check_snapshot::perform_auto_snapshot;
+use crate::commands::config_notice::{print_config_notice, print_preset_notice};
 use crate::commands::context::{
-    CheckContext, color_choice_to_mode, load_cache, load_config, print_preset_info, save_cache,
-    write_output,
+    CheckContext, color_choice_to_mode, load_cache, load_config, resolve_config_root,
+    resolve_exclude_patterns, save_cache, write_output,
 };
 use crate::output::ColorMode;
+use crate::project::ProjectPaths;
 
 /// Options for running a check with injected context.
 ///
@@ -145,11 +147,26 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
         cli.no_extends,
         FetchPolicy::from_cli(cli.extends_policy),
     )?;
+    print_config_notice(
+        &load_result.origin,
+        cli.quiet,
+        cli.verbose,
+        args.format == OutputFormat::Text,
+        color_choice_to_mode(cli.color),
+    );
+    let config_root = resolve_config_root(&load_result, &project_root);
+    let project_paths = ProjectPaths::rooted(config_root);
     let mut config = load_result.config;
 
     // 1.1 Print preset info if a preset was used
     if let Some(ref preset_name) = load_result.preset_used {
-        print_preset_info(preset_name);
+        print_preset_notice(
+            preset_name,
+            cli.quiet,
+            cli.verbose,
+            args.format == OutputFormat::Text,
+            color_choice_to_mode(cli.color),
+        );
     }
 
     // 2. Apply CLI argument overrides
@@ -197,10 +214,16 @@ pub fn run_check_impl(args: &CheckArgs, cli: &Cli) -> crate::Result<i32> {
 
     // 4. Build check context with dependencies
     let warn_threshold = args.warn_threshold.unwrap_or(config.content.warn_threshold);
-    let mut exclude_patterns = config.scanner.exclude.clone();
-    exclude_patterns.extend(args.exclude.clone());
+    let exclude_patterns =
+        resolve_exclude_patterns(&config.scanner.exclude, &args.exclude, &project_paths);
     let use_gitignore = config.scanner.gitignore && !args.no_gitignore;
-    let ctx = CheckContext::from_config(&config, warn_threshold, exclude_patterns, use_gitignore)?;
+    let ctx = CheckContext::from_config_with_project_paths(
+        &config,
+        warn_threshold,
+        exclude_patterns,
+        use_gitignore,
+        project_paths,
+    )?;
 
     // 5. Run check with context
     let options = CheckOptions {
@@ -243,7 +266,10 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     let progress = ScanProgress::new(all_files.len() as u64, cli.quiet);
     let file_results: Vec<_> = all_files
         .par_iter()
-        .filter(|file_path| ctx.threshold_checker.should_process(file_path)) // Filter by extension
+        .filter(|file_path| {
+            ctx.threshold_checker
+                .should_process(&ctx.project_paths().logical(file_path))
+        }) // Filter by extension and content.exclude using stable logical paths
         .filter_map(|file_path| {
             // Early exit check for fail_fast mode
             if fail_fast && failure_detected.load(Ordering::Relaxed) {
@@ -251,8 +277,10 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
                 return None;
             }
 
-            let result = process_file_for_check(
+            let logical_path = ctx.project_paths().logical(file_path);
+            let result = process_file_for_check_with_logical_path(
                 file_path,
+                &logical_path,
                 &ctx.registry,
                 &ctx.threshold_checker,
                 cache,
@@ -337,7 +365,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
     // while the original `baseline` in CheckOptions is a shared reference (`Option<&Baseline>`).
     let mut baseline_for_ratchet = baseline.cloned();
     if let Some(ref baseline) = baseline_for_ratchet {
-        apply_baseline_comparison(&mut results, baseline);
+        apply_baseline_comparison_with_project_paths(&mut results, baseline, ctx.project_paths());
     }
 
     // 7.0.1 Check baseline ratchet (violations should only decrease)
@@ -347,6 +375,7 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
         &results,
         &mut baseline_for_ratchet,
         project_root,
+        ctx.project_paths(),
         cli.quiet,
     )?;
 
@@ -356,17 +385,22 @@ pub fn run_check_with_context(opts: &CheckOptions<'_>) -> crate::Result<i32> {
             .baseline
             .clone()
             .unwrap_or_else(|| state::baseline_path(project_root));
-        update_baseline_from_results(
+        update_baseline_from_results_with_project_paths(
             &results,
             mode,
             &baseline_path,
             baseline_for_ratchet.as_ref(),
+            ctx.project_paths(),
         )?;
     }
 
     // 7.1 Generate split suggestions for failed files if --suggest is enabled
     if args.suggest {
-        generate_split_suggestions(&mut results, &ctx.registry);
+        generate_split_suggestions_with_project_paths(
+            &mut results,
+            &ctx.registry,
+            ctx.project_paths(),
+        );
     }
 
     // 7.2 Build project statistics for report-json, HTML charts, or auto-snapshot

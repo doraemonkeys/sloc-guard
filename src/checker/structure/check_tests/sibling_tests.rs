@@ -239,6 +239,72 @@ fn directed_file_missing_sibling_returns_violation() {
 }
 
 #[test]
+fn root_scope_directed_rule_checks_root_files() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: ".".to_string(),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let violations = checker.check_siblings(&[PathBuf::from("root.ts")]);
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("root.ts"));
+    assert_eq!(
+        violations[0].violation_type,
+        ViolationType::MissingSibling {
+            expected_sibling_pattern: "{stem}.spec".to_string()
+        }
+    );
+}
+
+#[test]
+fn dot_prefixed_scope_applies_to_limits_and_siblings() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "./src/**".to_string(),
+            max_files: Some(0),
+            siblings: vec![SiblingRule::Directed {
+                match_pattern: "*.ts".to_string(),
+                require: SiblingRequire::Single("{stem}.spec".to_string()),
+                severity: SiblingSeverity::Error,
+            }],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = std::collections::HashMap::new();
+    stats.insert(
+        PathBuf::from("src/lib"),
+        DirStats {
+            file_count: 1,
+            dir_count: 0,
+            depth: 2,
+        },
+    );
+
+    let limit_violations = checker.check(&stats);
+    let sibling_violations = checker.check_siblings(&[PathBuf::from("src/lib/foo.ts")]);
+
+    assert_eq!(limit_violations.len(), 1);
+    assert_eq!(limit_violations[0].violation_type, ViolationType::FileCount);
+    assert_eq!(sibling_violations.len(), 1);
+    assert!(matches!(
+        sibling_violations[0].violation_type,
+        ViolationType::MissingSibling { .. }
+    ));
+}
+
+#[test]
 fn directed_with_warn_severity_creates_warning() {
     let config = StructureConfig {
         rules: vec![StructureRule {

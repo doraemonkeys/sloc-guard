@@ -336,7 +336,7 @@ max_lines = 200
 
 /// Tests checking from a subdirectory with relative paths.
 ///
-/// When running from project root with path `src/cache/cache_tests.rs`:
+/// When running from `src/cache` with path `cache_tests.rs`:
 /// 1. Pattern `src/**/*_tests.rs` matches → uses 200 limit instead of 50
 ///
 /// Verification: Creates two files with same line count (100 lines):
@@ -365,35 +365,63 @@ max_lines = 200
     fixture.create_rust_file("src/cache/cache_tests.rs", 100);
     // Also create a non-test file with same lines to prove the rule matters
     fixture.create_rust_file("src/cache/mod.rs", 100);
+    let nested_cwd = fixture.path().join("src/cache");
 
     // Test file should pass - matches rule with 200 limit
     sloc_guard!()
-        .current_dir(fixture.path())
-        .args([
-            "check",
-            "--no-sloc-cache",
-            "--quiet",
-            "src/cache/cache_tests.rs",
-        ])
+        .current_dir(&nested_cwd)
+        .args(["check", "--no-sloc-cache", "--quiet", "cache_tests.rs"])
         .assert()
         .success();
 
     // Verification: Non-test file with same lines should FAIL (default 50 limit)
     // This proves the test file passed because of the rule, not a bug
     sloc_guard!()
-        .current_dir(fixture.path())
-        .args(["check", "--no-sloc-cache", "--quiet", "src/cache/mod.rs"])
+        .current_dir(&nested_cwd)
+        .args(["check", "--no-sloc-cache", "--quiet", "mod.rs"])
         .assert()
         .code(1);
 
     // Also verify "./" prefix works consistently
     sloc_guard!()
-        .current_dir(fixture.path())
+        .current_dir(&nested_cwd)
+        .args(["check", "--no-sloc-cache", "--quiet", "./cache_tests.rs"])
+        .assert()
+        .success();
+}
+
+#[test]
+fn cli_exclude_from_subdirectory_remains_relative_to_invocation_cwd() {
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+
+[content]
+extensions = ["rs"]
+max_lines = 5
+"#,
+    );
+    fixture.create_rust_file("core/session/large.rs", 20);
+    let nested_cwd = fixture.path().join("core");
+
+    sloc_guard!()
+        .current_dir(&nested_cwd)
+        .args(["check", "--no-sloc-cache", "--quiet"])
+        .assert()
+        .code(1);
+
+    sloc_guard!()
+        .current_dir(nested_cwd)
         .args([
             "check",
             "--no-sloc-cache",
             "--quiet",
-            "./src/cache/cache_tests.rs",
+            "--exclude",
+            "session/**",
         ])
         .assert()
         .success();

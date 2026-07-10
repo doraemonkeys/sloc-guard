@@ -25,6 +25,7 @@ pub(crate) use check_output::{RenderOptions, format_output, structure_violation_
 #[cfg(test)]
 pub(crate) use check_processing::{
     CheckFileResult, compute_effective_stats, process_file_for_check,
+    process_file_for_check_with_logical_path,
 };
 #[cfg(test)]
 pub(crate) use runner::{CheckOptions, run_check_impl, run_check_with_context};

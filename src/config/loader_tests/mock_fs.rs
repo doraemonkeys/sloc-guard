@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -7,7 +7,10 @@ use crate::config::FileSystem;
 
 pub struct MockFileSystem {
     files: Mutex<HashMap<PathBuf, String>>,
+    directories: Mutex<HashSet<PathBuf>>,
+    canonical_paths: Mutex<HashMap<PathBuf, PathBuf>>,
     current_dir: PathBuf,
+    current_dir_error: bool,
     config_dir: Option<PathBuf>,
 }
 
@@ -15,16 +18,36 @@ impl MockFileSystem {
     pub fn new() -> Self {
         Self {
             files: Mutex::new(HashMap::new()),
+            directories: Mutex::new(HashSet::new()),
+            canonical_paths: Mutex::new(HashMap::new()),
             current_dir: PathBuf::from("/project"),
+            current_dir_error: false,
             config_dir: Some(PathBuf::from("/home/user/.config/sloc-guard")),
         }
     }
 
     pub fn with_file(self, path: impl Into<PathBuf>, content: &str) -> Self {
-        self.files
-            .lock()
-            .unwrap()
-            .insert(path.into(), content.to_string());
+        let path = self.resolve_path(&path.into());
+        self.files.lock().unwrap().insert(path, content.to_string());
+        self
+    }
+
+    pub fn with_dir(self, path: impl Into<PathBuf>) -> Self {
+        let path = self.resolve_path(&path.into());
+        self.directories.lock().unwrap().insert(path);
+        self
+    }
+
+    /// Configure a path to canonicalize to a different location, modelling a symlink while keeping
+    /// reads anchored at the link path.
+    pub fn with_canonical_path(
+        self,
+        path: impl Into<PathBuf>,
+        canonical: impl Into<PathBuf>,
+    ) -> Self {
+        let path = self.resolve_path(&path.into());
+        let canonical = self.resolve_path(&canonical.into());
+        self.canonical_paths.lock().unwrap().insert(path, canonical);
         self
     }
 
@@ -33,15 +56,28 @@ impl MockFileSystem {
         self
     }
 
+    pub fn with_current_dir_error(mut self) -> Self {
+        self.current_dir_error = true;
+        self
+    }
+
     pub fn with_config_dir(mut self, path: Option<PathBuf>) -> Self {
         self.config_dir = path;
         self
+    }
+
+    fn resolve_path(&self, path: &Path) -> PathBuf {
+        if path.is_absolute() {
+            normalize_path(path)
+        } else {
+            normalize_path(&self.current_dir.join(path))
+        }
     }
 }
 
 impl FileSystem for MockFileSystem {
     fn read_to_string(&self, path: &Path) -> std::io::Result<String> {
-        let normalized = normalize_path(path);
+        let normalized = self.resolve_path(path);
         self.files
             .lock()
             .unwrap()
@@ -51,12 +87,20 @@ impl FileSystem for MockFileSystem {
     }
 
     fn exists(&self, path: &Path) -> bool {
-        let normalized = normalize_path(path);
+        let normalized = self.resolve_path(path);
         self.files.lock().unwrap().contains_key(&normalized)
+            || self.directories.lock().unwrap().contains(&normalized)
     }
 
     fn current_dir(&self) -> std::io::Result<PathBuf> {
-        Ok(self.current_dir.clone())
+        if self.current_dir_error {
+            Err(Error::new(
+                ErrorKind::NotFound,
+                "current directory is unavailable",
+            ))
+        } else {
+            Ok(self.current_dir.clone())
+        }
     }
 
     fn config_dir(&self) -> Option<PathBuf> {
@@ -64,9 +108,20 @@ impl FileSystem for MockFileSystem {
     }
 
     fn canonicalize(&self, path: &Path) -> std::io::Result<PathBuf> {
-        let normalized = normalize_path(path);
+        let normalized = self.resolve_path(path);
+        let canonical = self
+            .canonical_paths
+            .lock()
+            .unwrap()
+            .get(&normalized)
+            .cloned();
+        if let Some(canonical) = canonical {
+            return Ok(canonical);
+        }
         // In mock, return error if file doesn't exist (like real canonicalize)
-        if self.files.lock().unwrap().contains_key(&normalized) {
+        if self.files.lock().unwrap().contains_key(&normalized)
+            || self.directories.lock().unwrap().contains(&normalized)
+        {
             Ok(normalized)
         } else {
             Err(Error::new(ErrorKind::NotFound, "file not found"))

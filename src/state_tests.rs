@@ -47,6 +47,20 @@ fn detect_state_dir_in_git_repo_returns_git_path() {
 }
 
 #[test]
+fn detect_state_dir_with_git_file_uses_safe_fallback() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join(".git"),
+        "gitdir: ../git/worktrees/project",
+    )
+    .unwrap();
+
+    let result = detect_state_dir(temp_dir.path());
+
+    assert_eq!(result, temp_dir.path().join(".sloc-guard"));
+}
+
+#[test]
 fn cache_path_construction() {
     let temp_dir = TempDir::new().unwrap();
     let result = cache_path(temp_dir.path());
@@ -131,6 +145,23 @@ fn discover_project_root_finds_git_directory() {
     fs::create_dir_all(&sub_dir).unwrap();
 
     let result = discover_project_root(&sub_dir);
+    assert_eq!(result, dunce::canonicalize(temp_dir.path()).unwrap());
+}
+
+#[test]
+fn discover_project_root_finds_git_file() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join(".git"),
+        "gitdir: ../git/worktrees/project",
+    )
+    .unwrap();
+
+    let sub_dir = temp_dir.path().join("src").join("lib");
+    fs::create_dir_all(&sub_dir).unwrap();
+
+    let result = discover_project_root(&sub_dir);
+
     assert_eq!(result, dunce::canonicalize(temp_dir.path()).unwrap());
 }
 

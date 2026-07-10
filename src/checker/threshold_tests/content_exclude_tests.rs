@@ -18,6 +18,16 @@ fn content_exclude_skips_matching_files() {
 }
 
 #[test]
+fn dot_prefixed_content_exclude_is_anchored_to_logical_root() {
+    let mut config = default_config();
+    config.content.exclude = vec!["./generated.rs".to_string()];
+    let checker = ThresholdChecker::new(config).unwrap();
+
+    assert!(!checker.should_process(Path::new("generated.rs")));
+    assert!(checker.should_process(Path::new("nested/generated.rs")));
+}
+
+#[test]
 fn content_exclude_takes_priority_over_extension_match() {
     let mut config = default_config();
     config.content.extensions = vec!["ts".to_string()];

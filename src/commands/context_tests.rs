@@ -1,5 +1,5 @@
 use crate::cli::ColorChoice;
-use crate::config::{Config, FetchPolicy, LoadResult, StructureConfig, StructureRule};
+use crate::config::{Config, FetchPolicy, LocatedLoadResult, StructureConfig, StructureRule};
 use crate::output::ColorMode;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED, Result, SlocGuardError};
 use std::io;
@@ -19,7 +19,7 @@ use crate::language::LanguageRegistry;
 ///
 /// Returns the `TempDir` guard alongside the result to ensure the temp directory
 /// lives long enough for the test assertions.
-fn load_config_from_content(content: &str) -> (TempDir, Result<LoadResult>) {
+fn load_config_from_content(content: &str) -> (TempDir, Result<LocatedLoadResult>) {
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join("test.toml");
     std::fs::write(&config_path, content).unwrap();
@@ -28,7 +28,7 @@ fn load_config_from_content(content: &str) -> (TempDir, Result<LoadResult>) {
 }
 
 /// Asserts that the result is a `SlocGuardError::Config` containing the expected substring.
-fn assert_config_error_contains(result: Result<LoadResult>, expected_substring: &str) {
+fn assert_config_error_contains(result: Result<LocatedLoadResult>, expected_substring: &str) {
     match result {
         Err(SlocGuardError::Config(msg)) => {
             assert!(
@@ -72,6 +72,7 @@ fn load_config_with_nonexistent_path_returns_error() {
 
 #[test]
 fn load_config_without_no_config_searches_defaults() {
+    let _lock = crate::lock_test_cwd();
     // Use temp dir with a known config to ensure test isolation
     let temp_dir = TempDir::new().unwrap();
     let config_path = temp_dir.path().join(".sloc-guard.toml");
@@ -463,6 +464,32 @@ fn resolve_project_root_discovers_project_root() {
     // Should discover the actual project root (walks up to find .git or .sloc-guard.toml)
     // In the test environment, this will find the workspace root with .git
     assert!(project_root.exists());
+}
+
+#[test]
+fn cli_excludes_are_rebased_from_invocation_cwd_while_config_patterns_stay_rooted() {
+    let project_paths = ProjectPaths::rooted_with_cwd(
+        PathBuf::from("/workspace/project"),
+        PathBuf::from("/workspace/project/core"),
+    );
+    let config_patterns = vec!["core/generated/**".to_string()];
+    let cli_patterns = vec![
+        "session/**".to_string(),
+        "../shared/**".to_string(),
+        "**/vendor/**".to_string(),
+    ];
+
+    let patterns = resolve_exclude_patterns(&config_patterns, &cli_patterns, &project_paths);
+
+    assert_eq!(
+        patterns,
+        vec![
+            "core/generated/**",
+            "core/session/**",
+            "shared/**",
+            "core/**/vendor/**",
+        ]
+    );
 }
 
 // =============================================================================

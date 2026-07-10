@@ -175,7 +175,7 @@ pub struct CheckArgs {
     #[arg(long, value_delimiter = ',')]
     pub ext: Option<Vec<String>>,
 
-    /// Exclude patterns (glob syntax, can be specified multiple times)
+    /// Exclude patterns relative to the invocation directory (glob syntax, repeatable)
     #[arg(long, short = 'x')]
     pub exclude: Vec<String>,
 
@@ -365,7 +365,7 @@ pub struct CommonStatsArgs {
     #[arg(long, value_delimiter = ',')]
     pub ext: Option<Vec<String>>,
 
-    /// Exclude patterns (glob syntax, can be specified multiple times)
+    /// Exclude patterns relative to the invocation directory (glob syntax, repeatable)
     #[arg(long, short = 'x')]
     pub exclude: Vec<String>,
 

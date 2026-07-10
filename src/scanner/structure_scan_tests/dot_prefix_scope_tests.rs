@@ -12,15 +12,11 @@
 //! test execution. They are run serially by using a mutex.
 
 use std::path::Path;
-use std::sync::Mutex;
 
 use tempfile::TempDir;
 
 use super::*;
 use crate::scanner::TestConfigParams;
-
-/// Global mutex to serialize tests that change current directory.
-static CWD_MUTEX: Mutex<()> = Mutex::new(());
 
 #[test]
 fn scan_with_dot_prefix_detects_deny_dirs_violation() {
@@ -28,7 +24,7 @@ fn scan_with_dot_prefix_detects_deny_dirs_violation() {
     // directories like "./src" against scope "{src,src/**}"
 
     // Acquire lock to prevent parallel execution with other cwd-changing tests
-    let _lock = CWD_MUTEX.lock().unwrap();
+    let _lock = crate::lock_test_cwd();
 
     let temp_dir = TempDir::new().unwrap();
 
@@ -92,7 +88,7 @@ fn scan_with_dot_prefix_detects_deny_files_violation() {
     // Regression test: When scanning from ".", per-rule deny_files should work
 
     // Acquire lock to prevent parallel execution with other cwd-changing tests
-    let _lock = CWD_MUTEX.lock().unwrap();
+    let _lock = crate::lock_test_cwd();
 
     let temp_dir = TempDir::new().unwrap();
 

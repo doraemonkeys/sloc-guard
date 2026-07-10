@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{GlobSet, GlobSetBuilder};
 
 use crate::config::Config;
 use crate::counter::LineStats;
-use crate::output::path::normalize_for_matching;
+use crate::project::{compile_logical_path_glob, normalize_for_matching};
 
 use super::Checker;
 use super::explain::{
@@ -66,12 +66,7 @@ impl ThresholdChecker {
     fn build_content_exclude(config: &Config) -> crate::Result<GlobSet> {
         let mut builder = GlobSetBuilder::new();
         for pattern in &config.content.exclude {
-            let glob = Glob::new(pattern).map_err(|source| {
-                crate::error::SlocGuardError::InvalidPattern {
-                    pattern: pattern.clone(),
-                    source,
-                }
-            })?;
+            let glob = compile_logical_path_glob(pattern)?;
             builder.add(glob);
         }
         builder.build().map_err(|source| {
@@ -141,12 +136,7 @@ impl ThresholdChecker {
 
         // Process content.rules (V2 format)
         for rule in &config.content.rules {
-            let glob = Glob::new(&rule.pattern).map_err(|source| {
-                crate::error::SlocGuardError::InvalidPattern {
-                    pattern: rule.pattern.clone(),
-                    source,
-                }
-            })?;
+            let glob = compile_logical_path_glob(&rule.pattern)?;
             builder.add(glob);
             rules.push(CompiledPathRule {
                 max_lines: rule.max_lines,

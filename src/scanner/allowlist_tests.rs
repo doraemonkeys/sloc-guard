@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use super::*;
+use crate::project::ProjectPaths;
 use crate::scanner::TestConfigParams;
 
 // =============================================================================
@@ -38,6 +39,14 @@ fn allowlist_rule_matches_directory_with_backslash_dot_prefix() {
 }
 
 #[test]
+fn allowlist_rule_matches_project_root_scope() {
+    let rule = AllowlistRuleBuilder::new(".".to_string()).build().unwrap();
+
+    assert!(rule.matches_directory(Path::new(".")));
+    assert!(!rule.matches_directory(Path::new("src")));
+}
+
+#[test]
 fn allowlist_rule_matches_directory_glob_star_with_dot_prefix() {
     let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
@@ -49,6 +58,20 @@ fn allowlist_rule_matches_directory_glob_star_with_dot_prefix() {
 
     // With dot prefix
     assert!(rule.matches_directory(Path::new("./src/lib")));
+}
+
+#[test]
+fn dot_prefixed_scope_pattern_matches_logical_directory() {
+    let rule = AllowlistRuleBuilder::new("./src/**".to_string())
+        .with_deny_files(vec!["bad.rs".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(rule.matches_directory(Path::new("src/lib")));
+    assert!(
+        rule.file_matches_deny(Path::new("src/lib/bad.rs"))
+            .is_some()
+    );
 }
 
 #[test]
@@ -110,6 +133,17 @@ fn allowlist_rule_file_matches_pattern() {
         .unwrap();
     assert!(rule.file_matches(Path::new("src/Makefile")));
     assert!(!rule.file_matches(Path::new("src/config.json")));
+}
+
+#[test]
+fn explicit_allow_pattern_is_anchored_to_the_logical_root() {
+    let rule = AllowlistRuleBuilder::new(".".to_string())
+        .with_patterns(vec!["./root.rs".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(rule.file_matches(Path::new("root.rs")));
+    assert!(!rule.file_matches(Path::new("nested/root.rs")));
 }
 
 #[test]
@@ -322,6 +356,20 @@ fn allowlist_rule_file_matches_deny_pattern() {
 }
 
 #[test]
+fn explicit_deny_pattern_is_anchored_to_the_logical_root() {
+    let rule = AllowlistRuleBuilder::new(".".to_string())
+        .with_deny_patterns(vec!["./root.rs".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(rule.file_matches_deny(Path::new("root.rs")).is_some());
+    assert!(
+        rule.file_matches_deny(Path::new("nested/root.rs"))
+            .is_none()
+    );
+}
+
+#[test]
 fn allowlist_rule_file_matches_deny_file_pattern() {
     let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_deny_files(vec!["*.bak".to_string(), "temp_*".to_string()])
@@ -350,6 +398,142 @@ impl FileFilter for AcceptAllFilter {
     fn should_include(&self, _path: &Path) -> bool {
         true
     }
+}
+
+#[test]
+fn root_scope_applies_allow_and_deny_file_rules() {
+    let temp_dir = TempDir::new().unwrap();
+    std::fs::write(temp_dir.path().join("allowed.rs"), "").unwrap();
+    std::fs::write(temp_dir.path().join("denied.rs"), "").unwrap();
+    std::fs::write(temp_dir.path().join("other.rs"), "").unwrap();
+
+    let allowlist_rule = AllowlistRuleBuilder::new(".".to_string())
+        .with_allow_files(vec!["allowed.rs".to_string(), "denied.rs".to_string()])
+        .with_deny_files(vec!["denied.rs".to_string()])
+        .build()
+        .unwrap();
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
+    .unwrap();
+    let project_paths =
+        ProjectPaths::rooted_with_cwd(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+    let filter = GlobFilter::with_project_paths(Vec::new(), &[], project_paths).unwrap();
+    let scanner = DirectoryScanner::new(filter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+
+    assert_eq!(result.allowlist_violations.len(), 2);
+    assert!(result.allowlist_violations.iter().any(|violation| {
+        violation.path.ends_with("denied.rs")
+            && matches!(violation.violation_type, ViolationType::DeniedFile { .. })
+    }));
+    assert!(result.allowlist_violations.iter().any(|violation| {
+        violation.path.ends_with("other.rs")
+            && matches!(violation.violation_type, ViolationType::DisallowedFile)
+    }));
+    assert!(
+        !result
+            .allowlist_violations
+            .iter()
+            .any(|violation| violation.path.ends_with("allowed.rs"))
+    );
+}
+
+#[test]
+fn root_scope_directory_allowlist_checks_children_but_not_project_root() {
+    let temp_dir = TempDir::new().unwrap();
+    let allowed = temp_dir.path().join("src");
+    let disallowed = temp_dir.path().join("vendor");
+    std::fs::create_dir(&allowed).unwrap();
+    std::fs::create_dir(&disallowed).unwrap();
+
+    let allowlist_rule = AllowlistRuleBuilder::new(".".to_string())
+        .with_allow_dirs(vec!["src".to_string()])
+        .build()
+        .unwrap();
+    let config = StructureScanConfig::new(TestConfigParams {
+        allowlist_rules: vec![allowlist_rule],
+        ..Default::default()
+    })
+    .unwrap();
+    let project_paths =
+        ProjectPaths::rooted_with_cwd(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+    let filter = GlobFilter::with_project_paths(Vec::new(), &[], project_paths).unwrap();
+    let scanner = DirectoryScanner::new(filter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+    let violations: Vec<_> = result
+        .allowlist_violations
+        .iter()
+        .filter(|violation| matches!(violation.violation_type, ViolationType::DisallowedDirectory))
+        .collect();
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, disallowed);
+    assert_ne!(violations[0].path, temp_dir.path());
+}
+
+#[test]
+fn global_directory_allowlist_does_not_check_project_root_itself() {
+    let temp_dir = TempDir::new().unwrap();
+    let allowed = temp_dir.path().join("src");
+    let disallowed = temp_dir.path().join("vendor");
+    std::fs::create_dir(&allowed).unwrap();
+    std::fs::create_dir(&disallowed).unwrap();
+
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_allow_dirs: vec!["src".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    let project_paths =
+        ProjectPaths::rooted_with_cwd(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+    let filter = GlobFilter::with_project_paths(Vec::new(), &[], project_paths).unwrap();
+    let scanner = DirectoryScanner::new(filter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+    let violations: Vec<_> = result
+        .allowlist_violations
+        .iter()
+        .filter(|violation| matches!(violation.violation_type, ViolationType::DisallowedDirectory))
+        .collect();
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, disallowed);
+    assert_ne!(violations[0].path, temp_dir.path());
+}
+
+#[test]
+fn unrooted_global_directory_allowlist_does_not_check_scan_root_itself() {
+    let temp_dir = TempDir::new().unwrap();
+    let allowed = temp_dir.path().join("src");
+    let disallowed = temp_dir.path().join("vendor");
+    std::fs::create_dir(&allowed).unwrap();
+    std::fs::create_dir(&disallowed).unwrap();
+
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_allow_dirs: vec!["src".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    let scanner = DirectoryScanner::new(AcceptAllFilter);
+    let result = scanner
+        .scan_with_structure(temp_dir.path(), Some(&config))
+        .unwrap();
+    let violations: Vec<_> = result
+        .allowlist_violations
+        .iter()
+        .filter(|violation| matches!(violation.violation_type, ViolationType::DisallowedDirectory))
+        .collect();
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, disallowed);
+    assert_ne!(violations[0].path, temp_dir.path());
 }
 
 #[test]

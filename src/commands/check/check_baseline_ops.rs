@@ -6,6 +6,7 @@ use crate::checker::{CheckResult, ViolationCategory, ViolationType};
 use crate::cli::{BaselineUpdateMode, CheckArgs};
 use crate::config::{Config, RatchetMode};
 use crate::counter::LineStats;
+use crate::project::ProjectPaths;
 use crate::state::{self, SaveOutcome};
 
 /// Result of baseline ratchet check.
@@ -53,14 +54,59 @@ pub fn load_baseline_optional(baseline_path: Option<&Path>) -> crate::Result<Opt
     Ok(Some(Baseline::load(path)?))
 }
 
+fn baseline_path_aliases(path: &Path, project_paths: &ProjectPaths) -> HashSet<String> {
+    fn insert_alias(aliases: &mut HashSet<String>, path: &Path) {
+        let normalized = path.to_string_lossy().replace('\\', "/");
+        if normalized.is_empty() || normalized == "." || normalized == "./" {
+            aliases.insert(String::new());
+            aliases.insert(".".to_string());
+            aliases.insert("./".to_string());
+            return;
+        }
+        aliases.insert(normalized.clone());
+        if !path.is_absolute() && !normalized.starts_with("./") {
+            aliases.insert(format!("./{normalized}"));
+        }
+    }
+
+    let mut aliases = HashSet::new();
+    insert_alias(&mut aliases, path);
+
+    let physical = project_paths.physical(path);
+    insert_alias(&mut aliases, &physical);
+
+    aliases
+}
+
+fn baseline_identity(path: &Path) -> String {
+    let normalized = path.to_string_lossy().replace('\\', "/");
+    if normalized.is_empty() {
+        ".".to_string()
+    } else {
+        normalized
+    }
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baseline) {
+    apply_baseline_comparison_with_project_paths(results, baseline, &ProjectPaths::unrooted());
+}
+
+/// Apply a baseline while accepting unambiguous legacy keys from older path semantics.
+pub fn apply_baseline_comparison_with_project_paths(
+    results: &mut [CheckResult],
+    baseline: &Baseline,
+    project_paths: &ProjectPaths,
+) {
     for result in results.iter_mut() {
         if !result.is_failed() {
             continue;
         }
 
-        let path_str = result.path().to_string_lossy().replace('\\', "/");
-        if baseline.contains(&path_str) {
+        if baseline_path_aliases(result.path(), project_paths)
+            .iter()
+            .any(|path| baseline.contains(path))
+        {
             // Replace the result with its grandfathered version
             let owned = std::mem::replace(
                 result,
@@ -81,11 +127,29 @@ pub fn apply_baseline_comparison(results: &mut [CheckResult], baseline: &Baselin
 /// Update baseline file from check results based on the specified mode.
 ///
 /// Returns `SaveOutcome::Saved` on success, `SaveOutcome::Skipped` if lock times out.
+#[allow(dead_code)] // Compatibility wrapper used by focused baseline callers/tests.
 pub fn update_baseline_from_results(
     results: &[CheckResult],
     mode: BaselineUpdateMode,
     baseline_path: &Path,
     existing_baseline: Option<&Baseline>,
+) -> crate::Result<SaveOutcome> {
+    update_baseline_from_results_with_project_paths(
+        results,
+        mode,
+        baseline_path,
+        existing_baseline,
+        &ProjectPaths::unrooted(),
+    )
+}
+
+/// Update a baseline using logical identities while hashing the corresponding physical files.
+pub fn update_baseline_from_results_with_project_paths(
+    results: &[CheckResult],
+    mode: BaselineUpdateMode,
+    baseline_path: &Path,
+    existing_baseline: Option<&Baseline>,
+    project_paths: &ProjectPaths,
 ) -> crate::Result<SaveOutcome> {
     let mut new_baseline = match mode {
         BaselineUpdateMode::New => {
@@ -100,7 +164,7 @@ pub fn update_baseline_from_results(
             continue;
         }
 
-        let path_str = result.path().to_string_lossy().replace('\\', "/");
+        let path_str = baseline_identity(result.path());
         let is_structure = is_structure_violation_result(result);
 
         // Apply mode filtering
@@ -110,7 +174,9 @@ pub fn update_baseline_from_results(
             BaselineUpdateMode::Structure => is_structure,
             BaselineUpdateMode::New => {
                 // In new mode, only add if not already in baseline
-                !new_baseline.contains(&path_str)
+                !baseline_path_aliases(result.path(), project_paths)
+                    .iter()
+                    .any(|path| new_baseline.contains(path))
             }
         };
 
@@ -125,7 +191,8 @@ pub fn update_baseline_from_results(
             }
         } else {
             // Content violation - compute file hash
-            let hash = compute_file_hash(result.path()).unwrap_or_default();
+            let hash =
+                compute_file_hash(&project_paths.physical(result.path())).unwrap_or_default();
             new_baseline.set_content(&path_str, result.stats().code, hash);
         }
     }
@@ -197,12 +264,22 @@ pub fn parse_structure_violation(
 ///
 /// Compares current violations with baseline entries. Returns `RatchetResult`
 /// containing the count of stale entries that can be removed from the baseline.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn check_baseline_ratchet(results: &[CheckResult], baseline: &Baseline) -> RatchetResult {
+    check_baseline_ratchet_with_project_paths(results, baseline, &ProjectPaths::unrooted())
+}
+
+/// Check baseline ratchet state while recognizing unambiguous legacy baseline keys.
+pub fn check_baseline_ratchet_with_project_paths(
+    results: &[CheckResult],
+    baseline: &Baseline,
+    project_paths: &ProjectPaths,
+) -> RatchetResult {
     // Collect all current failure paths (normalized)
     let current_failures: HashSet<String> = results
         .iter()
         .filter(|r| r.is_failed() || r.is_grandfathered())
-        .map(|r| r.path().to_string_lossy().replace('\\', "/"))
+        .flat_map(|r| baseline_path_aliases(r.path(), project_paths))
         .collect();
 
     // Find baseline entries that are no longer violations
@@ -244,6 +321,7 @@ pub fn handle_baseline_ratchet(
     results: &[CheckResult],
     baseline: &mut Option<Baseline>,
     project_root: &Path,
+    project_paths: &ProjectPaths,
     quiet: bool,
 ) -> crate::Result<bool> {
     // Determine effective ratchet mode: CLI takes precedence over config
@@ -271,7 +349,8 @@ pub fn handle_baseline_ratchet(
     };
 
     // Check for stale entries
-    let ratchet_result = check_baseline_ratchet(results, current_baseline);
+    let ratchet_result =
+        check_baseline_ratchet_with_project_paths(results, current_baseline, project_paths);
 
     if !ratchet_result.is_outdated() {
         return Ok(false);

@@ -28,6 +28,27 @@ fn path_rule_matches_glob_pattern() {
 }
 
 #[test]
+fn dot_prefixed_path_rule_matches_logical_path() {
+    let mut config = default_config();
+    config.content.rules.push(crate::config::ContentRule {
+        pattern: "./src/**".to_string(),
+        max_lines: 1000,
+        warn_threshold: None,
+        warn_at: None,
+        skip_comments: None,
+        skip_blank: None,
+        reason: None,
+        expires: None,
+    });
+    let checker = ThresholdChecker::new(config).unwrap();
+
+    let result = checker.check(Path::new("src/lib.rs"), &stats_with_code(800), None);
+
+    assert!(result.is_passed());
+    assert_eq!(result.limit(), 1000);
+}
+
+#[test]
 fn path_rule_does_not_match_unrelated_path() {
     let mut config = default_config();
     config.content.rules.push(crate::config::ContentRule {

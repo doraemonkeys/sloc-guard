@@ -8,6 +8,8 @@ use crate::stats::{TrendHistory, parse_duration};
 
 use super::collection::{collect_stats_with_config, save_cache_if_enabled};
 use super::formatting::format_report_output;
+use crate::cli::ReportOutputFormat;
+use crate::commands::config_notice::{print_config_notice, print_preset_notice};
 use crate::commands::context::{color_choice_to_mode, load_config, write_output};
 
 const DEFAULT_TOP_COUNT: usize = 20;
@@ -21,6 +23,22 @@ pub fn run_report(args: &ReportArgs, cli: &Cli) -> crate::Result<i32> {
         cli.no_extends,
         FetchPolicy::from_cli(cli.extends_policy),
     )?;
+    print_config_notice(
+        &load_result.origin,
+        cli.quiet,
+        cli.verbose,
+        args.format == ReportOutputFormat::Text,
+        color_choice_to_mode(cli.color),
+    );
+    if let Some(ref preset_name) = load_result.preset_used {
+        print_preset_notice(
+            preset_name,
+            cli.quiet,
+            cli.verbose,
+            args.format == ReportOutputFormat::Text,
+            color_choice_to_mode(cli.color),
+        );
+    }
     let report_config = &load_result.config.stats.report;
 
     // Merge CLI flags with config (CLI takes precedence)

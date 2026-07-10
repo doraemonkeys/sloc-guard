@@ -8,7 +8,7 @@ use crate::language::LanguageRegistry;
 use crate::output::FileStatistics;
 
 use crate::commands::context::{
-    FileProcessError, FileProcessResult, FileReader, FileSkipReason, process_file_with_cache,
+    FileProcessError, FileProcessResult, FileReader, FileSkipReason, process_file_with_cache_key,
 };
 
 /// Result of processing a file for the check command.
@@ -43,6 +43,7 @@ impl CheckFileResult {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn process_file_for_check(
     file_path: &Path,
     registry: &LanguageRegistry,
@@ -50,15 +51,27 @@ pub fn process_file_for_check(
     cache: &Mutex<Cache>,
     reader: &dyn FileReader,
 ) -> CheckFileResult {
-    let result = process_file_with_cache(file_path, registry, cache, reader);
+    process_file_for_check_with_logical_path(file_path, file_path, registry, checker, cache, reader)
+}
+
+/// Process a physical file while evaluating and reporting it under a stable logical path.
+pub fn process_file_for_check_with_logical_path(
+    file_path: &Path,
+    logical_path: &Path,
+    registry: &LanguageRegistry,
+    checker: &ThresholdChecker,
+    cache: &Mutex<Cache>,
+    reader: &dyn FileReader,
+) -> CheckFileResult {
+    let result = process_file_with_cache_key(file_path, logical_path, registry, cache, reader);
 
     match result {
         FileProcessResult::Success { stats, language } => {
-            let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(file_path);
+            let (skip_comments, skip_blank) = checker.get_skip_settings_for_path(logical_path);
             let effective_stats = compute_effective_stats(&stats, skip_comments, skip_blank);
-            let check_result = checker.check(file_path, &effective_stats, Some(&stats));
+            let check_result = checker.check(logical_path, &effective_stats, Some(&stats));
             let file_stats = FileStatistics {
-                path: file_path.to_path_buf(),
+                path: logical_path.to_path_buf(),
                 stats,
                 language,
             };
@@ -68,7 +81,9 @@ pub fn process_file_for_check(
             }
         }
         FileProcessResult::Skipped(reason) => CheckFileResult::Skipped(reason),
-        FileProcessResult::Error(error) => CheckFileResult::Error(error),
+        FileProcessResult::Error(error) => {
+            CheckFileResult::Error(error.with_display_path(logical_path))
+        }
     }
 }
 

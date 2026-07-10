@@ -222,6 +222,7 @@ impl ErrorOutput {
 
     /// Creates an error output formatter with explicit color control (for testing).
     #[cfg(test)]
+    #[must_use]
     pub const fn with_colors(use_colors: bool) -> Self {
         Self { use_colors }
     }

@@ -1,6 +1,7 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::*;
+use crate::project::ProjectPaths;
 use crate::scanner::TestConfigParams;
 
 // =============================================================================
@@ -48,7 +49,73 @@ fn structure_scan_config_with_scanner_exclude() {
 }
 
 #[test]
-fn structure_scan_config_extracts_dir_names() {
+fn scanner_exclude_directory_pattern_is_anchored_to_its_logical_path() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let config = StructureScanConfig::builder()
+        .scanner_exclude(vec!["core/vendor/**".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(config.is_scanner_excluded_with_project_paths(
+        &project_root.join("core/vendor"),
+        true,
+        &project_paths,
+    ));
+    assert!(!config.is_scanner_excluded_with_project_paths(
+        &project_root.join("other/vendor"),
+        true,
+        &project_paths,
+    ));
+}
+
+#[test]
+fn scanner_exclusions_do_not_gain_implicit_basename_semantics() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let config = StructureScanConfig::builder()
+        .scanner_exclude(vec!["vendor/**".to_string(), "secret.rs".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(config.is_scanner_excluded_with_project_paths(
+        &project_root.join("vendor"),
+        true,
+        &project_paths,
+    ));
+    assert!(!config.is_scanner_excluded_with_project_paths(
+        &project_root.join("apps/vendor"),
+        true,
+        &project_paths,
+    ));
+    assert!(config.is_scanner_excluded_with_project_paths(
+        &project_root.join("secret.rs"),
+        false,
+        &project_paths,
+    ));
+    assert!(!config.is_scanner_excluded_with_project_paths(
+        &project_root.join("nested/secret.rs"),
+        false,
+        &project_paths,
+    ));
+}
+
+#[test]
+fn file_only_exclusion_does_not_prune_a_same_named_directory() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let config = StructureScanConfig::builder()
+        .scanner_exclude(vec!["vendor".to_string()])
+        .build()
+        .unwrap();
+    let path = project_root.join("vendor");
+
+    assert!(config.is_scanner_excluded_with_project_paths(&path, false, &project_paths,));
+    assert!(!config.is_scanner_excluded_with_project_paths(&path, true, &project_paths,));
+}
+
+#[test]
+fn structure_scan_config_extracts_directory_prefixes() {
     let config = StructureScanConfig::new(TestConfigParams {
         scanner_exclude_patterns: vec!["target/**".to_string(), "node_modules/**".to_string()],
         ..Default::default()
@@ -102,6 +169,112 @@ fn structure_scan_config_is_count_excluded() {
 }
 
 #[test]
+fn count_exclude_preserves_root_anchors_and_basename_patterns() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let config = StructureScanConfig::new(TestConfigParams {
+        count_exclude_patterns: vec![
+            "./root.rs".to_string(),
+            "*.tmp".to_string(),
+            "./src/**".to_string(),
+        ],
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert!(
+        config.is_count_excluded_with_project_paths(&project_root.join("root.rs"), &project_paths,)
+    );
+    assert!(!config.is_count_excluded_with_project_paths(
+        &project_root.join("nested/root.rs"),
+        &project_paths,
+    ));
+    assert!(config.is_count_excluded_with_project_paths(
+        &project_root.join("nested/cache.tmp"),
+        &project_paths,
+    ));
+    assert!(config.is_count_excluded_with_project_paths(
+        &project_root.join("src/generated.rs"),
+        &project_paths,
+    ));
+    assert!(!config.is_count_excluded_with_project_paths(
+        &project_root.join("other/src/generated.rs"),
+        &project_paths,
+    ));
+}
+
+#[test]
+fn global_deny_patterns_preserve_root_anchors_and_basename_patterns() {
+    let config = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["./root.rs".to_string(), "temp_*".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert!(
+        config
+            .file_matches_global_deny(Path::new("root.rs"))
+            .is_some()
+    );
+    assert!(
+        config
+            .file_matches_global_deny(Path::new("nested/root.rs"))
+            .is_none()
+    );
+    assert!(
+        config
+            .file_matches_global_deny(Path::new("nested/temp_cache"))
+            .is_some()
+    );
+}
+
+#[test]
+fn directory_only_deny_patterns_preserve_path_qualification() {
+    let unqualified = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["node_modules/".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    assert!(
+        unqualified
+            .dir_matches_global_deny(Path::new("src/node_modules"))
+            .is_some()
+    );
+
+    let root_anchored = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["./node_modules/".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    assert!(
+        root_anchored
+            .dir_matches_global_deny(Path::new("node_modules"))
+            .is_some()
+    );
+    assert!(
+        root_anchored
+            .dir_matches_global_deny(Path::new("src/node_modules"))
+            .is_none()
+    );
+
+    let qualified = StructureScanConfig::new(TestConfigParams {
+        global_deny_patterns: vec!["src/node_modules/".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+    assert!(
+        qualified
+            .dir_matches_global_deny(Path::new("src/node_modules"))
+            .is_some()
+    );
+    assert!(
+        qualified
+            .dir_matches_global_deny(Path::new("other/src/node_modules"))
+            .is_none()
+    );
+}
+
+#[test]
 fn structure_scan_config_find_matching_allowlist_rule() {
     let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])
@@ -128,7 +301,7 @@ fn structure_scan_config_find_matching_allowlist_rule() {
 }
 
 #[test]
-fn structure_scan_config_extract_dir_names_windows_paths() {
+fn structure_scan_config_extracts_directory_prefixes_from_windows_paths() {
     let config = StructureScanConfig::new(TestConfigParams {
         scanner_exclude_patterns: vec!["target\\**".to_string()],
         ..Default::default()
@@ -142,7 +315,7 @@ fn structure_scan_config_extract_dir_names_windows_paths() {
 }
 
 #[test]
-fn structure_scan_config_is_scanner_excluded_by_dir_name() {
+fn structure_scan_config_records_target_directory_prefix() {
     let config = StructureScanConfig::new(TestConfigParams {
         scanner_exclude_patterns: vec!["target/**".to_string()],
         ..Default::default()
@@ -177,7 +350,7 @@ fn structure_scan_config_combined_patterns() {
 }
 
 #[test]
-fn structure_scan_config_is_scanner_excluded_directory_by_name() {
+fn structure_scan_config_records_node_modules_directory_prefix() {
     let config = StructureScanConfig::new(TestConfigParams {
         scanner_exclude_patterns: vec!["node_modules/**".to_string()],
         ..Default::default()
@@ -192,7 +365,7 @@ fn structure_scan_config_is_scanner_excluded_directory_by_name() {
 }
 
 #[test]
-fn structure_scan_config_extract_dir_names_complex() {
+fn structure_scan_config_preserves_complete_directory_prefix_globs() {
     let config = StructureScanConfig::new(TestConfigParams {
         scanner_exclude_patterns: vec![
             "**/node_modules/**".to_string(),
@@ -206,7 +379,7 @@ fn structure_scan_config_extract_dir_names_complex() {
     assert!(
         config
             .scanner_exclude_dir_names
-            .contains(&"node_modules".to_string())
+            .contains(&"**/node_modules".to_string())
     );
     assert!(
         config
@@ -219,6 +392,44 @@ fn structure_scan_config_extract_dir_names_complex() {
             .iter()
             .any(|n| n.contains("tmp"))
     );
+}
+
+#[test]
+fn structure_scan_config_strips_only_one_terminal_recursive_suffix() {
+    let config = StructureScanConfig::new(TestConfigParams {
+        scanner_exclude_patterns: vec!["vendor/**/**".to_string()],
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert_eq!(config.scanner_exclude_dir_names, vec!["vendor/**"]);
+}
+
+#[test]
+fn non_recursive_file_glob_is_not_a_directory_prefix() {
+    let project_root = PathBuf::from("/repo");
+    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
+    let config = StructureScanConfig::builder()
+        .scanner_exclude(vec!["vendor/[!x]*".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(config.scanner_exclude_dir_names.is_empty());
+    assert!(!config.is_scanner_excluded_with_project_paths(
+        &project_root.join("vendor"),
+        true,
+        &project_paths,
+    ));
+    assert!(config.is_scanner_excluded_with_project_paths(
+        &project_root.join("vendor/a.rs"),
+        false,
+        &project_paths,
+    ));
+    assert!(!config.is_scanner_excluded_with_project_paths(
+        &project_root.join("vendor/x.rs"),
+        false,
+        &project_paths,
+    ));
 }
 
 #[test]

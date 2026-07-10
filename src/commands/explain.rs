@@ -7,9 +7,13 @@ use crate::checker::{
 use crate::cli::{Cli, ExplainArgs, ExplainFormat};
 use crate::config::{ConfigLoader, FetchPolicy, FileConfigLoader, SourcedConfig};
 use crate::error::SlocGuardError;
+use crate::project::ProjectPaths;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
-use super::context::{load_config, print_preset_info};
+use super::config_notice::{print_config_notice, print_preset_notice};
+use super::context::{
+    color_choice_to_mode, load_config, resolve_config_root, resolve_project_root,
+};
 
 #[must_use]
 pub fn run_explain(args: &ExplainArgs, cli: &Cli) -> i32 {
@@ -39,31 +43,44 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
         cli.no_extends,
         FetchPolicy::from_cli(cli.extends_policy),
     )?;
+    let human_text = matches!(args.format, ExplainFormat::Text);
+    let color_mode = color_choice_to_mode(cli.color);
+    print_config_notice(
+        &load_result.origin,
+        cli.quiet,
+        cli.verbose,
+        human_text,
+        color_mode,
+    );
+    let project_root = resolve_project_root();
+    let config_root = resolve_config_root(&load_result, &project_root);
+    let project_paths = ProjectPaths::rooted(config_root);
     let config = load_result.config;
 
     // Print preset info if a preset was used
     if let Some(ref preset_name) = load_result.preset_used {
-        print_preset_info(preset_name);
+        print_preset_notice(preset_name, cli.quiet, cli.verbose, human_text, color_mode);
     }
 
     // INVARIANT: Clap enforces path is required when --sources is not set
     let path = args.path.as_ref().expect("clap enforces path requirement");
+    let logical_path = project_paths.logical(path);
 
     if path.is_file() {
         let checker = ThresholdChecker::new(config)?;
-        let explanation = checker.explain(path);
+        let explanation = checker.explain(&logical_path);
         println!("{}", format_content_explanation(&explanation, args.format)?);
     } else if path.is_dir() {
         match StructureChecker::new(&config.structure) {
             Ok(checker) if checker.is_enabled() => {
-                let explanation = checker.explain(path);
+                let explanation = checker.explain(&logical_path);
                 println!(
                     "{}",
                     format_structure_explanation(&explanation, args.format)?
                 );
             }
             Ok(_) => {
-                println!("Path: {}", path.display());
+                println!("Path: {}", logical_path.display());
                 println!();
                 println!("No structure rules configured.");
                 println!("Add [structure] section to your config to enable directory limits.");
@@ -90,7 +107,7 @@ fn run_explain_sources(args: &ExplainArgs, cli: &Cli) -> crate::Result<()> {
     }
 
     let fetch_policy = FetchPolicy::from_cli(cli.extends_policy);
-    let loader = FileConfigLoader::with_options(fetch_policy, None);
+    let loader = FileConfigLoader::with_options(fetch_policy, Some(resolve_project_root()));
 
     let result = if cli.no_extends {
         // --no-extends: load single file only, don't follow extends chain

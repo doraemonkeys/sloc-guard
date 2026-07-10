@@ -2,12 +2,13 @@ use std::fs;
 use std::path::Path;
 
 use crate::cli::{Cli, ConfigAction, ConfigOutputFormat};
-use crate::config::{
-    Config, ConfigLoader, FetchPolicy, FileConfigLoader, validate_config_semantics,
-};
+#[cfg(test)]
+use crate::config::validate_config_semantics;
+use crate::config::{Config, FetchPolicy};
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS, Result, SlocGuardError};
 
-use super::context::print_preset_info;
+use super::config_notice::{print_config_notice, print_preset_notice};
+use super::context::color_choice_to_mode;
 
 #[must_use]
 pub fn run_config(args: &crate::cli::ConfigArgs, cli: &Cli) -> i32 {
@@ -89,7 +90,20 @@ pub(crate) fn run_config_show_impl(
     format: ConfigOutputFormat,
     cli: &Cli,
 ) -> Result<String> {
-    let config = load_config(config_path, cli)?;
+    let load_result = load_config(config_path, cli)?;
+    let human_text = format == ConfigOutputFormat::Text;
+    let color_mode = color_choice_to_mode(cli.color);
+    print_config_notice(
+        &load_result.origin,
+        cli.quiet,
+        cli.verbose,
+        human_text,
+        color_mode,
+    );
+    if let Some(ref preset_name) = load_result.preset_used {
+        print_preset_notice(preset_name, cli.quiet, cli.verbose, human_text, color_mode);
+    }
+    let config = load_result.config;
 
     match format {
         ConfigOutputFormat::Json => {
@@ -100,24 +114,13 @@ pub(crate) fn run_config_show_impl(
     }
 }
 
-fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<Config> {
-    // Determine project root for consistent state file resolution
-    let project_root = Some(super::context::resolve_project_root());
-
-    let loader =
-        FileConfigLoader::with_options(FetchPolicy::from_cli(cli.extends_policy), project_root);
-    let load_result =
-        config_path.map_or_else(|| loader.load(), |path| loader.load_from_path(path))?;
-
-    // Validate semantic correctness after loading
-    validate_config_semantics(&load_result.config)?;
-
-    // Print preset info if a preset was used
-    if let Some(ref preset_name) = load_result.preset_used {
-        print_preset_info(preset_name);
-    }
-
-    Ok(load_result.config)
+fn load_config(config_path: Option<&Path>, cli: &Cli) -> Result<crate::config::LocatedLoadResult> {
+    super::context::load_config(
+        config_path,
+        cli.no_config,
+        cli.no_extends,
+        FetchPolicy::from_cli(cli.extends_policy),
+    )
 }
 
 #[must_use]

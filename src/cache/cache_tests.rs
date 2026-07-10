@@ -60,7 +60,7 @@ fn test_line_stats_from_cached() {
 fn test_cache_new() {
     let cache = Cache::new("config_hash_123".to_string());
 
-    assert_eq!(cache.version(), 3);
+    assert_eq!(cache.version(), 4);
     assert_eq!(cache.config_hash(), "config_hash_123");
     assert!(cache.is_empty());
 }
@@ -69,7 +69,7 @@ fn test_cache_new() {
 fn test_cache_default() {
     let cache = Cache::default();
 
-    assert_eq!(cache.version(), 3);
+    assert_eq!(cache.version(), 4);
     assert_eq!(cache.config_hash(), "");
     assert!(cache.is_empty());
 }

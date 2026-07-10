@@ -8,7 +8,10 @@ use crate::counter::LineStats;
 use crate::language::LanguageRegistry;
 use crate::output::FileStatistics;
 
-use super::{CheckFileResult, compute_effective_stats, process_file_for_check};
+use super::{
+    CheckFileResult, compute_effective_stats, process_file_for_check,
+    process_file_for_check_with_logical_path,
+};
 use crate::commands::context::{FileSkipReason, RealFileReader};
 
 /// Asserts that boxing the Success variant data is worthwhile.
@@ -109,6 +112,30 @@ fn process_file_nonexistent_returns_error() {
         matches!(result, CheckFileResult::Error(_)),
         "expected Error, got {result:?}"
     );
+}
+
+#[test]
+fn process_file_error_reports_logical_path() {
+    let registry = LanguageRegistry::default();
+    let checker = ThresholdChecker::new(Config::default()).unwrap();
+    let cache = Mutex::new(Cache::new(String::new()));
+    let reader = RealFileReader;
+    let physical_path = PathBuf::from("nested/nonexistent_file.rs");
+    let logical_path = PathBuf::from("core/nested/nonexistent_file.rs");
+
+    let result = process_file_for_check_with_logical_path(
+        &physical_path,
+        &logical_path,
+        &registry,
+        &checker,
+        &cache,
+        &reader,
+    );
+
+    let CheckFileResult::Error(error) = result else {
+        panic!("expected Error, got {result:?}");
+    };
+    assert_eq!(error.path(), logical_path);
 }
 
 #[test]

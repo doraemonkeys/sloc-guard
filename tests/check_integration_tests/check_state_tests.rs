@@ -118,9 +118,9 @@ fn check_with_baseline_grandfathers_violations() {
         .assert()
         .code(1);
 
-    // Second run with baseline: should pass (grandfathered)
+    // Second run from a child directory: the project-relative baseline key must remain stable.
     sloc_guard!()
-        .current_dir(fixture.path())
+        .current_dir(fixture.path().join("src"))
         .args([
             "check",
             "--no-sloc-cache",
@@ -130,6 +130,31 @@ fn check_with_baseline_grandfathers_violations() {
         ])
         .assert()
         .success();
+}
+
+#[test]
+fn cache_identity_is_stable_across_root_and_nested_invocations() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+    fixture.create_rust_file("src/main.rs", 10);
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "--quiet"])
+        .assert()
+        .success();
+    sloc_guard!()
+        .current_dir(fixture.path().join("src"))
+        .args(["check", "--quiet"])
+        .assert()
+        .success();
+
+    let cache_path = fixture.path().join(".sloc-guard/cache.json");
+    let cache: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(cache_path).unwrap()).unwrap();
+    let files = cache["files"].as_object().unwrap();
+    assert_eq!(files.len(), 1);
+    assert!(files.contains_key("src/main.rs"));
 }
 
 // =============================================================================

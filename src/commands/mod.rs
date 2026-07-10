@@ -1,5 +1,6 @@
 pub mod check;
 pub mod config;
+pub(crate) mod config_notice;
 pub mod context;
 pub mod detect;
 pub mod explain;

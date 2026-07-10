@@ -4,8 +4,13 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 
 use crate::SlocGuardError;
 use crate::error::Result;
+use crate::project::{
+    ProjectPaths, UNROOTED_PROJECT_PATHS, compile_logical_path_glob, matching_logical_path_globs,
+    normalize_for_matching,
+};
 
-use super::AllowlistRule;
+use super::filter::{DirectoryExclusions, normalize_scanner_exclude_patterns};
+use super::{AllowlistRule, DirectoryPruner};
 
 /// Configuration parameters for test helper constructor.
 ///
@@ -31,9 +36,13 @@ pub struct TestConfigParams {
 pub struct StructureScanConfig {
     /// Patterns to exclude from file/dir counting (`structure.count_exclude`).
     pub count_exclude: GlobSet,
+    /// Original count-exclude patterns used to preserve explicit-path vs basename semantics.
+    pub count_exclude_pattern_strs: Vec<String>,
     /// Scanner exclude patterns (scanner.exclude) - skip entirely.
     pub scanner_exclude: GlobSet,
-    /// Directory names extracted from scanner.exclude patterns ending with "/**".
+    /// Legacy-named field containing complete directory-prefix globs derived from terminal `/**`
+    /// scanner exclusions. Prefixes remain configuration-root-relative instead of being reduced
+    /// to basenames, so `core/vendor/**` cannot prune `apps/vendor`.
     pub scanner_exclude_dir_names: Vec<String>,
     /// Allowlist rules from structure.rules with `allow_extensions`/`allow_patterns`.
     pub allowlist_rules: Vec<AllowlistRule>,
@@ -199,9 +208,14 @@ impl StructureScanConfig {
 
     /// Build from a `StructureScanConfigBuilder`.
     fn from_builder(builder: StructureScanConfigBuilder) -> Result<Self> {
-        let count_exclude = Self::build_glob_set(&builder.count_exclude_patterns)?;
-        let scanner_exclude = Self::build_glob_set(&builder.scanner_exclude_patterns)?;
-        let scanner_exclude_dir_names = Self::extract_dir_names(&builder.scanner_exclude_patterns);
+        let count_exclude = Self::build_logical_path_glob_set(&builder.count_exclude_patterns)?;
+        let count_exclude_pattern_strs = builder.count_exclude_patterns.clone();
+        let scanner_exclude_patterns =
+            normalize_scanner_exclude_patterns(&builder.scanner_exclude_patterns);
+        let scanner_exclude = Self::build_logical_path_glob_set(&scanner_exclude_patterns)?;
+        let scanner_exclude_directories =
+            DirectoryExclusions::from_patterns(&scanner_exclude_patterns)?;
+        let scanner_exclude_dir_names = scanner_exclude_directories.prefixes().to_vec();
 
         // Build global allow file patterns (filename-only matching)
         let global_allow_file_strs = builder.global_allow_files;
@@ -227,8 +241,8 @@ impl StructureScanConfig {
         // Convert file_patterns from Vec<&String> to Vec<String> for build_glob_set
         let file_pattern_strs: Vec<String> = file_patterns.iter().map(|s| (*s).clone()).collect();
 
-        let global_deny_patterns_compiled = Self::build_glob_set(&file_pattern_strs)?;
-        let global_deny_dir_patterns = Self::build_glob_set(&dir_patterns_for_glob)?;
+        let global_deny_patterns_compiled = Self::build_logical_path_glob_set(&file_pattern_strs)?;
+        let global_deny_dir_patterns = Self::build_logical_path_glob_set(&dir_patterns_for_glob)?;
 
         // Build global deny file patterns (filename-only matching)
         let global_deny_file_strs = builder.global_deny_files;
@@ -240,6 +254,7 @@ impl StructureScanConfig {
 
         Ok(Self {
             count_exclude,
+            count_exclude_pattern_strs,
             scanner_exclude,
             scanner_exclude_dir_names,
             allowlist_rules: builder.allowlist_rules,
@@ -275,58 +290,93 @@ impl StructureScanConfig {
         })
     }
 
-    /// Extract directory names from patterns ending with "/**".
-    fn extract_dir_names(patterns: &[String]) -> Vec<String> {
-        patterns
-            .iter()
-            .filter_map(|p| {
-                let trimmed = p.trim_end_matches("/**").trim_end_matches("\\**");
-                if trimmed.len() < p.len() {
-                    let last_component = trimmed
-                        .rsplit(['/', '\\'])
-                        .next()
-                        .filter(|s| !s.is_empty() && !s.contains('*'));
-                    last_component.map(String::from)
-                } else {
-                    None
-                }
+    fn build_logical_path_glob_set(patterns: &[String]) -> Result<GlobSet> {
+        let mut builder = GlobSetBuilder::new();
+        for pattern in patterns {
+            builder.add(compile_logical_path_glob(pattern)?);
+        }
+        builder
+            .build()
+            .map_err(|source| SlocGuardError::InvalidPattern {
+                pattern: "combined logical path patterns".to_string(),
+                source,
             })
-            .collect()
     }
 
-    /// Check if a path should be excluded from scanning entirely.
-    pub(crate) fn is_scanner_excluded(&self, path: &Path, is_dir: bool) -> bool {
-        let file_name = path.file_name().unwrap_or_default();
-        let file_name_str = file_name.to_string_lossy();
+    /// Check scanner exclusions in an explicit logical path namespace.
+    #[cfg(test)]
+    pub(crate) fn is_scanner_excluded_with_project_paths(
+        &self,
+        path: &Path,
+        is_dir: bool,
+        project_paths: &ProjectPaths,
+    ) -> bool {
+        self.is_scanner_excluded_with_namespaces(path, is_dir, project_paths, false)
+    }
 
-        if self.scanner_exclude.is_match(file_name) || self.scanner_exclude.is_match(path) {
-            return true;
-        }
-
-        // For directories, check against extracted dir names
+    pub(crate) fn is_scanner_excluded_with_namespaces(
+        &self,
+        path: &Path,
+        is_dir: bool,
+        project_paths: &ProjectPaths,
+        match_identity_path: bool,
+    ) -> bool {
+        let logical = normalize_for_matching(&project_paths.logical(path));
         if is_dir {
-            for dir_name in &self.scanner_exclude_dir_names {
-                if file_name_str == *dir_name {
-                    return true;
-                }
-            }
+            return DirectoryExclusions::from_prefixes(self.scanner_exclude_dir_names.clone())
+                .is_ok_and(|exclusions| {
+                    exclusions.is_match(&logical)
+                        || (match_identity_path
+                            && exclusions.is_match(&normalize_for_matching(path)))
+                });
         }
 
-        false
+        self.scanner_exclude.is_match(&logical)
+            || (match_identity_path && self.scanner_exclude.is_match(normalize_for_matching(path)))
     }
 
-    /// Check if a path should be excluded from counting (but still traversed).
-    pub(crate) fn is_count_excluded(&self, path: &Path) -> bool {
-        let file_name = path.file_name().unwrap_or_default();
-        self.count_exclude.is_match(file_name) || self.count_exclude.is_match(path)
+    pub(crate) fn scanner_exclude_directory_pruner(
+        &self,
+        project_paths: ProjectPaths,
+        match_identity_path: bool,
+    ) -> Result<DirectoryPruner> {
+        let exclusions =
+            DirectoryExclusions::from_prefixes(self.scanner_exclude_dir_names.clone())?;
+        Ok(std::sync::Arc::new(move |path| {
+            let logical = normalize_for_matching(&project_paths.logical(path));
+            exclusions.is_match(&logical)
+                || (match_identity_path && exclusions.is_match(&normalize_for_matching(path)))
+        }))
+    }
+
+    pub(crate) fn is_count_excluded_with_project_paths(
+        &self,
+        path: &Path,
+        project_paths: &ProjectPaths,
+    ) -> bool {
+        let logical = normalize_for_matching(&project_paths.logical(path));
+        !matching_logical_path_globs(
+            &self.count_exclude,
+            &self.count_exclude_pattern_strs,
+            &logical,
+        )
+        .is_empty()
     }
 
     /// Find the first allowlist rule matching a directory.
     #[must_use]
     pub fn find_matching_allowlist_rule(&self, dir: &Path) -> Option<&AllowlistRule> {
+        let logical = UNROOTED_PROJECT_PATHS.logical(dir);
+        self.find_matching_allowlist_rule_logical(&logical)
+    }
+
+    pub(crate) fn find_matching_allowlist_rule_logical(
+        &self,
+        logical_dir: &Path,
+    ) -> Option<&AllowlistRule> {
         self.allowlist_rules
             .iter()
-            .find(|r| r.matches_directory(dir))
+            .find(|r| r.matches_directory(logical_dir))
     }
 
     /// Check if global file allowlist mode is enabled.
@@ -373,9 +423,10 @@ impl StructureScanConfig {
     /// Check if a file matches global deny patterns.
     /// Returns `Some(matched_pattern_or_extension)` if denied, `None` otherwise.
     pub(crate) fn file_matches_global_deny(&self, file_path: &Path) -> Option<String> {
+        let normalized = normalize_for_matching(file_path);
         // Check global deny extensions first
         if !self.global_deny_extensions.is_empty()
-            && let Some(ext) = file_path.extension()
+            && let Some(ext) = normalized.extension()
         {
             let ext_with_dot = format!(".{}", ext.to_string_lossy());
             if self.global_deny_extensions.contains(&ext_with_dot) {
@@ -383,28 +434,21 @@ impl StructureScanConfig {
             }
         }
 
-        let file_name = file_path.file_name().unwrap_or_default();
+        let file_name = normalized.file_name().unwrap_or_default();
 
         // Check global deny files (filename-only matching)
         if let Some(idx) = self.global_deny_files.matches(file_name).into_iter().next() {
             return self.global_deny_file_strs.get(idx).cloned();
         }
 
-        // Check global deny patterns (filename and full path)
-        if let Some(idx) = self
-            .global_deny_patterns
-            .matches(file_name)
-            .into_iter()
-            .next()
-        {
-            return self.global_deny_pattern_strs.get(idx).cloned();
-        }
-
-        if let Some(idx) = self
-            .global_deny_patterns
-            .matches(file_path)
-            .into_iter()
-            .next()
+        // Unqualified patterns retain basename matching; explicit paths only match the logical path.
+        if let Some(idx) = matching_logical_path_globs(
+            &self.global_deny_patterns,
+            &self.global_deny_pattern_strs,
+            &normalized,
+        )
+        .into_iter()
+        .next()
         {
             return self.global_deny_pattern_strs.get(idx).cloned();
         }
@@ -415,23 +459,15 @@ impl StructureScanConfig {
     /// Check if a directory matches global directory-only deny patterns (patterns ending with `/`).
     /// Returns `Some(original_pattern)` if denied, `None` otherwise.
     pub(crate) fn dir_matches_global_deny(&self, dir_path: &Path) -> Option<String> {
-        let dir_name = dir_path.file_name().unwrap_or_default();
+        let normalized = normalize_for_matching(dir_path);
 
-        // Check against compiled patterns (without trailing `/`)
-        if let Some(idx) = self
-            .global_deny_dir_patterns
-            .matches(dir_name)
-            .into_iter()
-            .next()
-        {
-            return self.global_deny_dir_pattern_strs.get(idx).cloned();
-        }
-
-        if let Some(idx) = self
-            .global_deny_dir_patterns
-            .matches(dir_path)
-            .into_iter()
-            .next()
+        if let Some(idx) = matching_logical_path_globs(
+            &self.global_deny_dir_patterns,
+            &self.global_deny_dir_pattern_strs,
+            &normalized,
+        )
+        .into_iter()
+        .next()
         {
             return self.global_deny_dir_pattern_strs.get(idx).cloned();
         }

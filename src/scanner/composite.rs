@@ -5,6 +5,7 @@ use super::directory::DirectoryScanner;
 use super::filter::GlobFilter;
 use super::{ScanResult, StructureScanConfig};
 use crate::error::Result;
+use crate::project::ProjectPaths;
 
 /// Composite scanner that handles gitignore-aware and regular scanning.
 ///
@@ -15,22 +16,46 @@ use crate::error::Result;
 pub struct CompositeScanner {
     exclude_patterns: Vec<String>,
     pub(crate) use_gitignore: bool,
+    project_paths: ProjectPaths,
 }
 
 impl CompositeScanner {
     /// Create a new composite scanner with exclude patterns and gitignore setting.
     #[must_use]
     pub const fn new(exclude_patterns: Vec<String>, use_gitignore: bool) -> Self {
+        Self::with_project_paths(exclude_patterns, use_gitignore, ProjectPaths::unrooted())
+    }
+
+    /// Create a scanner whose configured globs are evaluated against stable logical paths.
+    #[must_use]
+    pub const fn with_project_paths(
+        exclude_patterns: Vec<String>,
+        use_gitignore: bool,
+        project_paths: ProjectPaths,
+    ) -> Self {
         Self {
             exclude_patterns,
             use_gitignore,
+            project_paths,
         }
+    }
+
+    fn filter(&self) -> Result<GlobFilter> {
+        GlobFilter::with_project_paths(
+            Vec::new(),
+            &self.exclude_patterns,
+            self.project_paths.clone(),
+        )
     }
 }
 
 impl FileScanner for CompositeScanner {
+    fn project_paths(&self) -> &ProjectPaths {
+        &self.project_paths
+    }
+
     fn scan(&self, root: &Path) -> Result<Vec<PathBuf>> {
-        let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
+        let filter = self.filter()?;
         if self.use_gitignore {
             let scanner = DirectoryScanner::with_gitignore(filter, true);
             scanner.scan(root)
@@ -41,7 +66,7 @@ impl FileScanner for CompositeScanner {
     }
 
     fn scan_all(&self, paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
-        let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
+        let filter = self.filter()?;
         let scanner = if self.use_gitignore {
             DirectoryScanner::with_gitignore(filter, true)
         } else {
@@ -60,7 +85,7 @@ impl FileScanner for CompositeScanner {
         root: &Path,
         structure_config: Option<&StructureScanConfig>,
     ) -> Result<ScanResult> {
-        let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
+        let filter = self.filter()?;
         if self.use_gitignore {
             let scanner = DirectoryScanner::with_gitignore(filter, true);
             scanner.scan_with_structure(root, structure_config)
@@ -75,7 +100,7 @@ impl FileScanner for CompositeScanner {
         paths: &[PathBuf],
         structure_config: Option<&StructureScanConfig>,
     ) -> Result<ScanResult> {
-        let filter = GlobFilter::new(Vec::new(), &self.exclude_patterns)?;
+        let filter = self.filter()?;
         let scanner = if self.use_gitignore {
             DirectoryScanner::with_gitignore(filter, true)
         } else {
@@ -110,7 +135,25 @@ pub fn scan_files(
     exclude_patterns: &[String],
     use_gitignore: bool,
 ) -> Result<Vec<PathBuf>> {
-    let filter = GlobFilter::new(Vec::new(), exclude_patterns)?;
+    scan_files_with_project_paths(
+        paths,
+        exclude_patterns,
+        use_gitignore,
+        ProjectPaths::unrooted(),
+    )
+}
+
+/// Scan files while evaluating configured globs relative to a stable configuration root.
+///
+/// # Errors
+/// Returns an error if directory traversal fails or an exclude pattern is invalid.
+pub fn scan_files_with_project_paths(
+    paths: &[PathBuf],
+    exclude_patterns: &[String],
+    use_gitignore: bool,
+    project_paths: ProjectPaths,
+) -> Result<Vec<PathBuf>> {
+    let filter = GlobFilter::with_project_paths(Vec::new(), exclude_patterns, project_paths)?;
     let scanner = if use_gitignore {
         DirectoryScanner::with_gitignore(filter, true)
     } else {

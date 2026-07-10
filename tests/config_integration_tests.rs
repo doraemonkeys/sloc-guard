@@ -123,6 +123,34 @@ fn config_show_text_format() {
 }
 
 #[test]
+fn config_show_from_nested_directory_discovers_parent_and_honors_no_config() {
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+[content]
+max_lines = 321
+"#,
+    );
+    fixture.create_dir("core/session");
+    let nested_cwd = fixture.path().join("core/session");
+
+    sloc_guard!()
+        .current_dir(&nested_cwd)
+        .args(["config", "show", "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"max_lines\": 321"));
+
+    sloc_guard!()
+        .current_dir(nested_cwd)
+        .args(["config", "show", "--format", "json", "--no-config"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"max_lines\": 600"));
+}
+
+#[test]
 fn config_show_json_format() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);
@@ -134,6 +162,42 @@ fn config_show_json_format() {
         .success()
         .stdout(predicate::str::contains("{"))
         .stdout(predicate::str::contains("\"content\""));
+}
+
+#[test]
+fn config_show_verbose_reports_source_on_stderr_without_polluting_json() {
+    let fixture = TestFixture::new();
+    fixture.create_config(BASIC_CONFIG_V2);
+
+    let output = sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["config", "show", "--format", "json", "-v"])
+        .assert()
+        .success()
+        .get_output()
+        .clone();
+
+    let _: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Using configuration:"));
+}
+
+#[test]
+fn config_show_quiet_suppresses_source_and_preset_notices() {
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+extends = "preset:rust-strict"
+"#,
+    );
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["config", "show", "--format", "json", "--quiet", "-v"])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Using configuration:").not())
+        .stderr(predicate::str::contains("Using preset:").not());
 }
 
 #[test]

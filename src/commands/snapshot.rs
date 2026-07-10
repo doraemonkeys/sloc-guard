@@ -14,16 +14,18 @@ use crate::cli::{Cli, SnapshotArgs};
 use crate::config::FetchPolicy;
 use crate::git::GitContext;
 use crate::output::{ProjectStatistics, ScanProgress};
-use crate::scanner::scan_files;
+use crate::project::ProjectPaths;
+use crate::scanner::scan_files_with_project_paths;
 use crate::state;
 use crate::stats::TrendHistory;
 use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::context::{
-    RealFileReader, StatsContext, load_cache, load_config, print_preset_info, resolve_scan_paths,
-    save_cache,
+    RealFileReader, StatsContext, color_choice_to_mode, load_cache, load_config,
+    resolve_config_root, resolve_exclude_patterns, resolve_scan_paths, save_cache,
 };
-use super::stats::collect_file_stats;
+use super::stats::collect_file_stats_with_logical_path;
+use crate::commands::config_notice::{print_config_notice, print_preset_notice};
 
 /// Run the snapshot command.
 ///
@@ -52,15 +54,28 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
         cli.no_extends,
         FetchPolicy::from_cli(cli.extends_policy),
     )?;
+    print_config_notice(
+        &load_result.origin,
+        cli.quiet,
+        cli.verbose,
+        true,
+        color_choice_to_mode(cli.color),
+    );
+    let project_root = state::discover_project_root(Path::new("."));
+    let config_root = resolve_config_root(&load_result, &project_root);
+    let project_paths = ProjectPaths::rooted(config_root);
     let mut config = load_result.config;
 
     // 1a. Print preset info if a preset was used
     if let Some(ref preset_name) = load_result.preset_used {
-        print_preset_info(preset_name);
+        print_preset_notice(
+            preset_name,
+            cli.quiet,
+            cli.verbose,
+            true,
+            color_choice_to_mode(cli.color),
+        );
     }
-
-    // 1b. Discover project root
-    let project_root = state::discover_project_root(Path::new("."));
 
     // 1c. Load cache if not disabled
     let cache_path = state::cache_path(&project_root);
@@ -81,15 +96,23 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
     let ctx = StatsContext::from_config(&config);
 
     // 3. Prepare exclude patterns
-    let mut exclude_patterns = config.scanner.exclude.clone();
-    exclude_patterns.extend(args.common.exclude.clone());
+    let exclude_patterns = resolve_exclude_patterns(
+        &config.scanner.exclude,
+        &args.common.exclude,
+        &project_paths,
+    );
 
     // 4. Determine paths to scan
     let paths_to_scan = resolve_scan_paths(&args.common.paths, &args.common.include);
 
     // 5. Scan directories
     let use_gitignore = config.scanner.gitignore && !args.common.no_gitignore;
-    let all_files = scan_files(&paths_to_scan, &exclude_patterns, use_gitignore)?;
+    let all_files = scan_files_with_project_paths(
+        &paths_to_scan,
+        &exclude_patterns,
+        use_gitignore,
+        project_paths.clone(),
+    )?;
 
     // 6. Process files in parallel
     let reader = RealFileReader;
@@ -106,7 +129,14 @@ fn run_snapshot_inner(args: &SnapshotArgs, cli: &Cli) -> crate::Result<i32> {
                 .is_some_and(|ext| ctx.allowed_extensions.contains(ext))
         })
         .filter_map(|file_path| {
-            let result = collect_file_stats(file_path, &ctx.registry, &cache, &reader);
+            let logical_path = project_paths.logical(file_path);
+            let result = collect_file_stats_with_logical_path(
+                file_path,
+                &logical_path,
+                &ctx.registry,
+                &cache,
+                &reader,
+            );
             progress.inc();
             result
         })

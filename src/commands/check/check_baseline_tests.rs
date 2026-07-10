@@ -8,8 +8,12 @@ use crate::checker::CheckResult;
 use crate::cli::{CheckArgs, Cli, ColorChoice, Commands, ExtendsPolicy, InitArgs};
 use crate::counter::LineStats;
 use crate::output::OutputFormat;
+use crate::project::ProjectPaths;
 use crate::{EXIT_SUCCESS, EXIT_THRESHOLD_EXCEEDED};
 
+use super::check_baseline_ops::{
+    apply_baseline_comparison_with_project_paths, update_baseline_from_results_with_project_paths,
+};
 use super::*;
 use crate::commands::check::run_check_impl;
 
@@ -255,6 +259,114 @@ fn apply_baseline_comparison_handles_windows_paths() {
     assert!(results[0].is_grandfathered());
 }
 
+#[test]
+fn apply_baseline_comparison_accepts_legacy_dot_prefixed_project_key() {
+    let mut results = vec![CheckResult::Failed {
+        path: PathBuf::from("src/file.rs"),
+        stats: LineStats {
+            total: 600,
+            code: 600,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        raw_stats: None,
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+        violation_category: None,
+    }];
+    let paths =
+        ProjectPaths::rooted_with_cwd(PathBuf::from("C:/repo"), PathBuf::from("C:/repo/src"));
+    let mut baseline = Baseline::new();
+    baseline.set_content("./src/file.rs", 600, "hash123".to_string());
+
+    apply_baseline_comparison_with_project_paths(&mut results, &baseline, &paths);
+
+    assert!(results[0].is_grandfathered());
+}
+
+#[test]
+fn child_relative_legacy_key_does_not_grandfather_a_different_logical_path() {
+    let mut results = vec![CheckResult::Failed {
+        path: PathBuf::from("core/src/a.rs"),
+        stats: LineStats {
+            total: 600,
+            code: 600,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        raw_stats: None,
+        limit: 500,
+        override_reason: None,
+        suggestions: None,
+        violation_category: None,
+    }];
+    let paths =
+        ProjectPaths::rooted_with_cwd(PathBuf::from("C:/repo"), PathBuf::from("C:/repo/core"));
+    let mut baseline = Baseline::new();
+    baseline.set_content("src/a.rs", 600, "hash123".to_string());
+
+    apply_baseline_comparison_with_project_paths(&mut results, &baseline, &paths);
+
+    assert!(results[0].is_failed());
+}
+
+#[test]
+fn root_structure_violation_uses_dot_identity_and_can_be_grandfathered() {
+    use crate::baseline::StructureViolationType;
+    use crate::checker::{ViolationCategory, ViolationType};
+    use crate::cli::BaselineUpdateMode;
+
+    let temp_dir = TempDir::new().unwrap();
+    let baseline_path = temp_dir.path().join("baseline.json");
+    let paths =
+        ProjectPaths::rooted_with_cwd(temp_dir.path().to_path_buf(), temp_dir.path().to_path_buf());
+    let mut results = vec![CheckResult::Failed {
+        path: PathBuf::from("."),
+        stats: LineStats {
+            total: 7,
+            code: 7,
+            comment: 0,
+            blank: 0,
+            ignored: 0,
+        },
+        raw_stats: None,
+        limit: 5,
+        override_reason: None,
+        suggestions: None,
+        violation_category: Some(ViolationCategory::Structure {
+            violation_type: ViolationType::FileCount,
+            triggering_rule: None,
+        }),
+    }];
+
+    for legacy_key in ["", "./"] {
+        let mut legacy_baseline = Baseline::new();
+        legacy_baseline.set_structure(legacy_key, StructureViolationType::Files, 7);
+        let mut legacy_results = results.clone();
+        apply_baseline_comparison_with_project_paths(&mut legacy_results, &legacy_baseline, &paths);
+        assert!(legacy_results[0].is_grandfathered());
+    }
+
+    update_baseline_from_results_with_project_paths(
+        &results,
+        BaselineUpdateMode::All,
+        &baseline_path,
+        None,
+        &paths,
+    )
+    .unwrap();
+
+    let baseline = Baseline::load(&baseline_path).unwrap();
+    assert!(baseline.contains("."));
+    assert!(!baseline.contains(""));
+
+    apply_baseline_comparison_with_project_paths(&mut results, &baseline, &paths);
+    assert!(results[0].is_grandfathered());
+}
+
 // =============================================================================
 // Baseline Integration Tests
 // =============================================================================
@@ -269,8 +381,7 @@ fn run_check_impl_with_baseline_grandfathers_violations() {
 
     let baseline_path = temp_dir.path().join(".sloc-guard-baseline.json");
     let mut baseline = Baseline::new();
-    let file_path_str = test_file_path.to_string_lossy().replace('\\', "/");
-    baseline.set_content(&file_path_str, 102, "dummy_hash".to_string());
+    baseline.set_content("large_file.rs", 102, "dummy_hash".to_string());
     baseline.save(&baseline_path).unwrap();
 
     let config_path = temp_dir.path().join(".sloc-guard.toml");

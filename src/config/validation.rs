@@ -61,16 +61,10 @@ fn validate_content_section(config: &Config) -> Result<()> {
 
 fn validate_glob_patterns(config: &Config) -> Result<()> {
     for pattern in &config.scanner.exclude {
-        globset::Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: pattern.clone(),
-            source: e,
-        })?;
+        crate::project::compile_logical_path_glob(pattern)?;
     }
     for pattern in &config.content.exclude {
-        globset::Glob::new(pattern).map_err(|e| SlocGuardError::InvalidPattern {
-            pattern: pattern.clone(),
-            source: e,
-        })?;
+        crate::project::compile_logical_path_glob(pattern)?;
     }
     Ok(())
 }
