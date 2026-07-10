@@ -272,7 +272,7 @@ fn format_config_explanation_json() {
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert!(parsed.get("chain").is_some());
     assert!(parsed.get("fields").is_some());
-    assert!(parsed["chain"].as_array().unwrap().len() == 1);
+    assert_eq!(parsed["chain"].as_array().unwrap().len(), 1);
 }
 
 #[test]
