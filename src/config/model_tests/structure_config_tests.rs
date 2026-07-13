@@ -441,17 +441,30 @@ fn rule_unknown_field_rejected() {
 }
 
 #[test]
-fn rule_count_exclude_rejected_as_unknown_field() {
-    // count_exclude exists only at [structure] level today; inside a rule it
-    // must hard-error instead of being silently dropped.
+fn rule_count_exclude_deserializes() {
     let toml_str = r#"
         [[structure.rules]]
         scope = "src/**"
-        count_exclude = ["*.md"]
+        count_exclude = ["*.md", "src/**/*.gen"]
     "#;
 
-    let err = toml::from_str::<Config>(toml_str).unwrap_err();
-    assert!(err.to_string().contains("count_exclude"));
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert_eq!(
+        config.structure.rules[0].count_exclude,
+        vec!["*.md", "src/**/*.gen"]
+    );
+}
+
+#[test]
+fn rule_count_exclude_defaults_to_empty() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+        max_files = 10
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    assert!(config.structure.rules[0].count_exclude.is_empty());
 }
 
 #[test]

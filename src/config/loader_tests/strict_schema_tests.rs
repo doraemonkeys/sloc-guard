@@ -61,7 +61,7 @@ max_files = 20
 
 [[structure.rules]]
 scope = \"src/**\"
-count_exclude = [\"*.md\"]
+count_excludes = [\"*.md\"]
 ";
 
     let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
@@ -72,8 +72,33 @@ count_exclude = [\"*.md\"]
 
     let (origin, line, message) = expect_syntax(err);
     assert_file_origin(&origin, ".sloc-guard.toml");
-    assert_eq!(line, 6, "expected error at the count_exclude line");
-    assert!(message.contains("count_exclude"), "got: {message}");
+    assert_eq!(line, 6, "expected error at the count_excludes line");
+    assert!(message.contains("count_excludes"), "got: {message}");
+}
+
+#[test]
+fn rule_count_exclude_accepted_by_loader() {
+    let config_content = "\
+[structure]
+max_files = 20
+count_exclude = [\".gitkeep\"]
+
+[[structure.rules]]
+scope = \"src/**\"
+count_exclude = [\"*.gen\"]
+";
+
+    let fs = MockFileSystem::new().with_file("/project/.sloc-guard.toml", config_content);
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader
+        .load_from_path(Path::new("/project/.sloc-guard.toml"))
+        .unwrap();
+
+    assert_eq!(result.config.structure.count_exclude, vec![".gitkeep"]);
+    assert_eq!(
+        result.config.structure.rules[0].count_exclude,
+        vec!["*.gen"]
+    );
 }
 
 #[test]

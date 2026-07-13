@@ -220,3 +220,242 @@ fn invalid_count_exclude_pattern_returns_error() {
 
     assert!(result.is_err());
 }
+
+// =============================================================================
+// Rule-level count_exclude: the rule that wins limit resolution (last match)
+// also defines the counting caliber, unioned with the global exclusions.
+// =============================================================================
+
+#[test]
+fn rule_count_exclude_applies_only_within_rule_scope() {
+    let config = StructureConfig {
+        max_files: Some(1),
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            count_exclude: vec!["*.gen".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/api"),
+        stats_with_children(&["handler.rs", "schema.gen"], &[], 2),
+    );
+    stats.insert(
+        PathBuf::from("docs"),
+        stats_with_children(&["index.md", "site.gen"], &[], 1),
+    );
+
+    let violations = checker.check(&stats);
+
+    // The rule sets no limits, so max_files falls back to the global value,
+    // but its counting caliber still applies inside its scope. Outside the
+    // scope, *.gen counts normally.
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("docs"));
+    assert_eq!(violations[0].actual, 2);
+}
+
+#[test]
+fn earlier_matching_rule_count_exclude_is_superseded() {
+    // Both rules match src/api/v1; the LAST one wins and it defines the
+    // caliber, so the first rule's *.gen exclusion must not leak through.
+    let config = StructureConfig {
+        rules: vec![
+            StructureRule {
+                scope: "src/**".to_string(),
+                max_files: Some(1),
+                count_exclude: vec!["*.gen".to_string()],
+                ..Default::default()
+            },
+            StructureRule {
+                scope: "src/api/**".to_string(),
+                max_files: Some(1),
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/api/v1"),
+        stats_with_children(&["main.rs", "schema.gen"], &[], 3),
+    );
+    stats.insert(
+        PathBuf::from("src/lib"),
+        stats_with_children(&["main.rs", "schema.gen"], &[], 2),
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/api/v1"));
+    assert_eq!(violations[0].actual, 2);
+}
+
+#[test]
+fn last_matching_rule_count_exclude_wins() {
+    // Mirror of the superseded case: the exclusion sits on the LAST rule.
+    let config = StructureConfig {
+        rules: vec![
+            StructureRule {
+                scope: "src/**".to_string(),
+                max_files: Some(1),
+                ..Default::default()
+            },
+            StructureRule {
+                scope: "src/api/**".to_string(),
+                max_files: Some(1),
+                count_exclude: vec!["*.gen".to_string()],
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/api/v1"),
+        stats_with_children(&["main.rs", "schema.gen"], &[], 3),
+    );
+    stats.insert(
+        PathBuf::from("src/lib"),
+        stats_with_children(&["main.rs", "schema.gen"], &[], 2),
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/lib"));
+    assert_eq!(violations[0].actual, 2);
+}
+
+#[test]
+fn rule_count_exclude_unions_with_global() {
+    // Global housekeeping excludes stay active when a rule adds its own.
+    let config = StructureConfig {
+        count_exclude: vec![".gitkeep".to_string()],
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            max_files: Some(1),
+            count_exclude: vec!["*.gen".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/api"),
+        stats_with_children(&["main.rs", "schema.gen", ".gitkeep"], &[], 2),
+    );
+
+    let violations = checker.check(&stats);
+
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn global_count_exclude_applies_when_matched_rule_adds_none() {
+    let config = StructureConfig {
+        count_exclude: vec![".gitkeep".to_string()],
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            max_files: Some(1),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/api"),
+        stats_with_children(&["main.rs", ".gitkeep"], &[], 2),
+    );
+
+    let violations = checker.check(&stats);
+
+    assert!(violations.is_empty());
+}
+
+#[test]
+fn rule_count_exclude_path_qualified_vs_basename() {
+    // Within one rule's scope: a path-qualified pattern only excludes under
+    // its anchored directory, while an unqualified pattern matches basenames
+    // anywhere the rule applies.
+    let config = StructureConfig {
+        max_files: Some(1),
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            count_exclude: vec!["src/api/*.gen".to_string(), "*.tmp".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/api"),
+        stats_with_children(&["main.rs", "schema.gen", "cache.tmp"], &[], 2),
+    );
+    stats.insert(
+        PathBuf::from("src/lib"),
+        stats_with_children(&["main.rs", "schema.gen", "cache.tmp"], &[], 2),
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/lib"));
+    assert_eq!(violations[0].actual, 2);
+}
+
+#[test]
+fn rule_count_exclude_applies_to_dir_count() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            max_dirs: Some(1),
+            count_exclude: vec!["build".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let mut stats = HashMap::new();
+    stats.insert(
+        PathBuf::from("src/app"),
+        stats_with_children(&[], &["api", "build"], 2),
+    );
+    stats.insert(
+        PathBuf::from("src/pkg"),
+        stats_with_children(&[], &["api", "cache"], 2),
+    );
+
+    let violations = checker.check(&stats);
+
+    assert_eq!(violations.len(), 1);
+    assert_eq!(violations[0].path, PathBuf::from("src/pkg"));
+    assert_eq!(violations[0].violation_type, ViolationType::DirCount);
+    assert_eq!(violations[0].actual, 2);
+}
+
+#[test]
+fn invalid_rule_count_exclude_pattern_returns_error() {
+    let config = StructureConfig {
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            max_files: Some(10),
+            count_exclude: vec!["[invalid".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+
+    let result = StructureChecker::new(&config);
+
+    assert!(result.is_err());
+}

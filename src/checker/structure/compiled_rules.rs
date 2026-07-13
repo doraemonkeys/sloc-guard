@@ -70,6 +70,9 @@ pub(super) struct CompiledStructureRule {
     pub warn_files_threshold: Option<f64>,
     /// Percentage threshold for directory count warnings.
     pub warn_dirs_threshold: Option<f64>,
+    /// Rule-scoped `count_exclude` patterns; unioned with the global set when
+    /// this rule wins limit resolution.
+    pub count_exclude: CompiledCountExclude,
     /// Optional reason for this rule (audit trail).
     pub reason: Option<String>,
 }
@@ -116,7 +119,7 @@ pub(super) enum CompiledSiblingRule {
 
 /// Resolved limits for a directory path.
 #[derive(Debug, Clone, Default)]
-pub(super) struct StructureLimits {
+pub(super) struct StructureLimits<'a> {
     pub max_files: Option<i64>,
     pub max_dirs: Option<i64>,
     pub max_depth: Option<i64>,
@@ -133,5 +136,9 @@ pub(super) struct StructureLimits {
     pub warn_files_threshold: Option<f64>,
     /// Percentage threshold for directory count warnings.
     pub warn_dirs_threshold: Option<f64>,
+    /// The winning rule's `count_exclude` matcher; `None` when limits come
+    /// from global defaults. The rule that defines the limits also defines
+    /// the counting caliber, so this is resolved by the same last-match pass.
+    pub count_exclude: Option<&'a CompiledCountExclude>,
     pub override_reason: Option<String>,
 }

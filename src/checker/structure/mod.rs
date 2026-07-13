@@ -104,7 +104,7 @@ impl StructureChecker {
     /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
     /// - `src/components/**` — matches ALL descendants recursively
     /// - `src/features`      — exact directory match only
-    fn resolve_limits(&self, path: &Path) -> StructureLimits {
+    fn resolve_limits(&self, path: &Path) -> StructureLimits<'_> {
         let normalized = normalize_for_matching(path);
         // Check rules (glob patterns) - last match wins
         // Iterate in reverse to find the last matching rule
@@ -121,6 +121,7 @@ impl StructureChecker {
                     warn_dirs_at: rule.warn_dirs_at.or(self.warn_dirs_at),
                     warn_files_threshold: rule.warn_files_threshold.or(self.warn_files_threshold),
                     warn_dirs_threshold: rule.warn_dirs_threshold.or(self.warn_dirs_threshold),
+                    count_exclude: Some(&rule.count_exclude),
                     override_reason: rule.reason.clone(),
                 };
             }
@@ -138,6 +139,7 @@ impl StructureChecker {
             warn_dirs_at: self.warn_dirs_at,
             warn_files_threshold: self.warn_files_threshold,
             warn_dirs_threshold: self.warn_dirs_threshold,
+            count_exclude: None,
             override_reason: None,
         }
     }
@@ -146,8 +148,9 @@ impl StructureChecker {
     ///
     /// Only directories are checked (files are not tracked in `dir_stats`).
     /// Effective file/dir counts are derived from each directory's raw child
-    /// inventory by applying `count_exclude` patterns, then compared against
-    /// applicable limits. Limits of `-1` (UNLIMITED) are skipped.
+    /// inventory by applying the union of global and winning-rule
+    /// `count_exclude` patterns, then compared against applicable limits.
+    /// Limits of `-1` (UNLIMITED) are skipped.
     #[must_use]
     #[allow(
         clippy::cast_possible_truncation,
@@ -159,10 +162,12 @@ impl StructureChecker {
 
         for (path, stats) in dir_stats {
             let limits = self.resolve_limits(path);
-            // Exclusions union: rule-level count_exclude (resolved by
-            // resolve_limits alongside the limits it scopes) joins this list.
-            let count_excludes = [&self.count_exclude];
-            let (file_count, dir_count) = effective_counts(path, stats, &count_excludes);
+            // The winning rule's count_exclude extends — never replaces — the
+            // global set, so housekeeping excludes stay active under any rule.
+            let (file_count, dir_count) = limits.count_exclude.map_or_else(
+                || effective_counts(path, stats, &[&self.count_exclude]),
+                |rule_exclude| effective_counts(path, stats, &[&self.count_exclude, rule_exclude]),
+            );
 
             // Check file count (skip if unlimited)
             if let Some(limit) = limits.max_files

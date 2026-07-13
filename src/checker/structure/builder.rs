@@ -6,7 +6,7 @@ use crate::config::StructureRule;
 use crate::error::{Result, SlocGuardError};
 use crate::project::{compile_logical_path_glob, normalize_pattern_for_matching};
 
-use super::compiled_rules::{CompiledSiblingRule, CompiledStructureRule};
+use super::compiled_rules::{CompiledCountExclude, CompiledSiblingRule, CompiledStructureRule};
 
 /// Build compiled structure rules from config rules.
 pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructureRule>> {
@@ -31,6 +31,7 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
                 warn_dirs_at: rule.warn_dirs_at,
                 warn_files_threshold: rule.warn_files_threshold,
                 warn_dirs_threshold: rule.warn_dirs_threshold,
+                count_exclude: CompiledCountExclude::new(&rule.count_exclude)?,
                 reason: rule.reason.clone(),
             })
         })

@@ -747,6 +747,14 @@ pub struct StructureRule {
     #[serde(default)]
     pub warn_dirs_threshold: Option<f64>,
 
+    /// Glob patterns for items not counted toward structure limits in matched
+    /// directories. When this rule wins limit resolution, these patterns are
+    /// unioned with the global `count_exclude` — global exclusions never
+    /// deactivate. Same semantics as the global list: config-root-relative
+    /// paths, with basename matching for patterns without a path component.
+    #[serde(default)]
+    pub count_exclude: Vec<String>,
+
     /// Allowlist of allowed file extensions (with leading dot, e.g., ".rs", ".go").
     /// Files NOT matching these extensions are violations.
     /// Combined with `allow_patterns` using OR logic.
