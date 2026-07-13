@@ -45,7 +45,8 @@ fn config_validate_invalid_toml_syntax() {
         .args(["config", "validate"])
         .assert()
         .code(2)
-        .stderr(predicate::str::contains("error"));
+        .stderr(predicate::str::contains("line 1"))
+        .stderr(predicate::str::contains(".sloc-guard.toml"));
 }
 
 #[test]

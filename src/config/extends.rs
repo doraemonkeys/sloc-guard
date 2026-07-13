@@ -15,6 +15,7 @@ use crate::error::{ConfigSource, Result, SlocGuardError};
 
 use super::filesystem::FileSystem;
 use super::merge::{merge_toml_values, strip_reset_markers, validate_reset_positions};
+use super::parse::parse_source;
 use super::presets;
 use super::remote::{FetchPolicy, fetch_remote_config, is_remote_url};
 
@@ -56,14 +57,6 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
         }
     }
 
-    /// Parse content to `toml::Value` with precise syntax error reporting.
-    pub fn parse_value_with_location(
-        content: &str,
-        source: Option<ConfigSource>,
-    ) -> Result<toml::Value> {
-        toml::from_str(content).map_err(|e| SlocGuardError::syntax_from_toml(&e, content, source))
-    }
-
     /// Load config with extends chain, optionally tracking sources.
     ///
     /// When `sources` is `Some`, records each config source in the chain for
@@ -96,7 +89,7 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         let source = ConfigSource::file(path);
-        let config_value = Self::parse_value_with_location(content, Some(source))?;
+        let config_value = parse_source(content, &source)?.value;
         self.load_with_extends_from_value(path, config_value, visited, sources, depth)
     }
 
@@ -162,7 +155,7 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
         let content =
             fetch_remote_config(url, self.project_root, expected_hash, self.fetch_policy)?;
         let source = ConfigSource::remote(url);
-        let config_value = Self::parse_value_with_location(&content, Some(source))?;
+        let config_value = parse_source(&content, &source)?.value;
 
         // Process extends chain (base sources come first via recursion)
         // Clone only when tracking sources; move otherwise for efficiency

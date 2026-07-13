@@ -1,5 +1,7 @@
-use crate::error::{Result, SlocGuardError};
+use crate::error::{ConfigSource, Result, SlocGuardError};
 use toml::Value;
+
+use super::parse::parse_source;
 
 /// Available preset names.
 pub const AVAILABLE_PRESETS: &[&str] = &[
@@ -32,8 +34,9 @@ pub fn load_preset(name: &str) -> Result<Value> {
         }
     };
 
-    toml::from_str(content)
-        .map_err(|e| SlocGuardError::Config(format!("Failed to parse preset '{name}': {e}")))
+    // Presets are compile-time constants; strict parsing here guards against
+    // schema drift between the preset texts and the Config model.
+    Ok(parse_source(content, &ConfigSource::preset(name))?.value)
 }
 
 const PRESET_RUST_STRICT: &str = r#"

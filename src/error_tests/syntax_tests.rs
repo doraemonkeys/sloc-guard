@@ -226,15 +226,3 @@ fn syntax_from_toml_without_origin() {
         panic!("Expected Syntax error");
     }
 }
-
-// =============================================================================
-// TomlParse Tests
-// =============================================================================
-
-#[test]
-fn toml_parse_suggestion() {
-    let toml_err: std::result::Result<toml::Value, _> = toml::from_str("invalid = [");
-    let err = SlocGuardError::TomlParse(toml_err.unwrap_err());
-    let suggestion = err.suggestion().unwrap();
-    assert!(suggestion.contains("TOML syntax"));
-}

@@ -412,3 +412,152 @@ fn sibling_rule_directed_missing_match_rejected() {
     let err_msg = result.unwrap_err().to_string();
     assert!(err_msg.contains("match"));
 }
+
+// =============================================================================
+// Unknown Field Rejection Tests
+// =============================================================================
+
+#[test]
+fn structure_unknown_field_rejected() {
+    let toml_str = r"
+        [structure]
+        max_filez = 10
+    ";
+
+    let err = toml::from_str::<Config>(toml_str).unwrap_err();
+    assert!(err.to_string().contains("max_filez"));
+}
+
+#[test]
+fn rule_unknown_field_rejected() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+        warn_threshhold = 0.8
+    "#;
+
+    let err = toml::from_str::<Config>(toml_str).unwrap_err();
+    assert!(err.to_string().contains("warn_threshhold"));
+}
+
+#[test]
+fn rule_count_exclude_rejected_as_unknown_field() {
+    // count_exclude exists only at [structure] level today; inside a rule it
+    // must hard-error instead of being silently dropped.
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+        count_exclude = ["*.md"]
+    "#;
+
+    let err = toml::from_str::<Config>(toml_str).unwrap_err();
+    assert!(err.to_string().contains("count_exclude"));
+}
+
+#[test]
+fn sibling_rule_unknown_field_rejected() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = "{stem}.test.tsx"
+        severty = "warn"
+    "#;
+
+    let err = toml::from_str::<Config>(toml_str).unwrap_err();
+    assert!(err.to_string().contains("severty"));
+}
+
+// =============================================================================
+// SiblingRequire Shape Tests
+// =============================================================================
+
+#[test]
+fn sibling_require_rejects_table() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = { pattern = "{stem}.test.tsx" }
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("a sibling pattern string or an array of pattern strings"),
+        "got: {err_msg}"
+    );
+}
+
+#[test]
+fn sibling_require_rejects_integer() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = 5
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("a sibling pattern string or an array of pattern strings"),
+        "got: {err_msg}"
+    );
+}
+
+#[test]
+fn sibling_require_rejects_array_of_non_strings() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = [1, 2]
+    "#;
+
+    let result: Result<Config, _> = toml::from_str(toml_str);
+    assert!(result.is_err());
+}
+
+#[test]
+fn sibling_require_accepts_string_and_array() {
+    let toml_str = r#"
+        [[structure.rules]]
+        scope = "src/**"
+
+        [[structure.rules.siblings]]
+        match = "*.tsx"
+        require = "{stem}.test.tsx"
+
+        [[structure.rules.siblings]]
+        match = "*.rs"
+        require = ["{stem}_tests.rs", "{stem}.md"]
+    "#;
+
+    let config: Config = toml::from_str(toml_str).unwrap();
+    let siblings = &config.structure.rules[0].siblings;
+    assert_eq!(siblings.len(), 2);
+
+    match &siblings[0] {
+        SiblingRule::Directed { require, .. } => {
+            assert_eq!(require.as_patterns(), vec!["{stem}.test.tsx"]);
+        }
+        SiblingRule::Group { .. } => panic!("Expected Directed rule"),
+    }
+    match &siblings[1] {
+        SiblingRule::Directed { require, .. } => {
+            assert_eq!(require.as_patterns(), vec!["{stem}_tests.rs", "{stem}.md"]);
+        }
+        SiblingRule::Group { .. } => panic!("Expected Directed rule"),
+    }
+}

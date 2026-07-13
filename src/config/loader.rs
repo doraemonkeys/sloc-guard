@@ -13,8 +13,7 @@ use crate::project::lexical_absolute;
 use super::Config;
 use super::extends::ExtendsResolver;
 use super::filesystem::FileSystem;
-use super::merge::{has_any_reset_markers, strip_reset_markers, validate_reset_positions};
-use super::model::CONFIG_VERSION;
+use super::parse::{finalize_merged_config, parse_source, validate_version};
 use super::remote::FetchPolicy;
 
 // Re-export types that are part of the loader's public API
@@ -174,18 +173,6 @@ pub trait ConfigLoader {
 const LOCAL_CONFIG_NAME: &str = ".sloc-guard.toml";
 const USER_CONFIG_NAME: &str = "config.toml";
 
-/// Validate config version. Returns an error if version is unsupported.
-fn validate_config_version(config: &Config) -> Result<()> {
-    match &config.version {
-        None => Ok(()),                           // No version specified - use defaults
-        Some(v) if v == CONFIG_VERSION => Ok(()), // V2 - valid
-        Some(v) => Err(SlocGuardError::Config(format!(
-            "Unsupported config version '{v}'. Only version '{CONFIG_VERSION}' is supported. \
-             Please update your configuration to the V2 format."
-        ))),
-    }
-}
-
 /// Loads configuration from the filesystem.
 ///
 /// Search order:
@@ -283,35 +270,6 @@ impl<F: FileSystem> FileConfigLoader<F> {
         Ok(ConfigOrigin::BuiltInDefaults)
     }
 
-    fn parse_config(content: &str) -> Result<Config> {
-        let config: Config = toml::from_str(content).map_err(SlocGuardError::from)?;
-        validate_config_version(&config)?;
-        Ok(config)
-    }
-
-    /// Finalize a parsed TOML value into a Config.
-    ///
-    /// Validates `$reset` marker positions, strips markers, and parses to Config.
-    fn finalize_value_to_config(mut value: toml::Value) -> Result<Config> {
-        validate_reset_positions(&value, "")?;
-        strip_reset_markers(&mut value);
-        let config_str =
-            toml::to_string(&value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
-        Self::parse_config(&config_str)
-    }
-
-    /// Parse config from content or value, depending on presence of reset markers.
-    ///
-    /// - With reset markers: validates positions, strips markers, parses via Value
-    /// - Without reset markers: parses directly from content for precise line numbers
-    fn parse_config_with_reset_handling(content: &str, value: toml::Value) -> Result<Config> {
-        if has_any_reset_markers(&value) {
-            Self::finalize_value_to_config(value)
-        } else {
-            Self::parse_config(content)
-        }
-    }
-
     /// Create an extends resolver for this loader.
     fn resolver(&self) -> ExtendsResolver<'_, F> {
         ExtendsResolver::new(&self.fs, self.fetch_policy, self.project_root.as_deref())
@@ -405,8 +363,6 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
     }
 
     fn load_from_path(&self, path: &Path) -> Result<LoadResult> {
-        // Dual-path loading: use precise line numbers for single-file,
-        // source chain tracking for inheritance mode
         let content =
             self.fs
                 .read_to_string(path)
@@ -416,27 +372,23 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                 })?;
 
         let source = ConfigSource::file(path);
+        let parsed = parse_source(&content, &source)?;
 
-        // Parse once and check for extends
-        let value = ExtendsResolver::<F>::parse_value_with_location(&content, Some(source))?;
-        let has_extends = value.get("extends").is_some();
-
-        if has_extends {
-            // Inheritance mode: pass pre-parsed value to avoid re-parsing
-            // Line numbers after merge are meaningless, use source chain tracking
+        if parsed.value.get("extends").is_some() {
+            // Inheritance mode: line numbers after merge are meaningless, but every
+            // chain member is schema-checked at parse time, so errors name real files.
             let mut visited = IndexSet::new();
             let (merged_value, preset_used) =
-                self.load_with_extends_from_value(path, value, &mut visited, 0)?;
-            let config = Self::finalize_value_to_config(merged_value)?;
+                self.load_with_extends_from_value(path, parsed.value, &mut visited, 0)?;
+            let config = finalize_merged_config(merged_value, &source)?;
             Ok(LoadResult {
                 config,
                 preset_used,
             })
         } else {
-            // Single-file mode: use appropriate path based on reset marker presence
-            let config = Self::parse_config_with_reset_handling(&content, value)?;
+            validate_version(&parsed.config)?;
             Ok(LoadResult {
-                config,
+                config: parsed.config,
                 preset_used: None,
             })
         }
@@ -455,14 +407,11 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                     path: path.to_path_buf(),
                     source,
                 })?;
-        // Single-file mode: use precise syntax error reporting
         let source = ConfigSource::file(path);
-        let value = ExtendsResolver::<F>::parse_value_with_location(&content, Some(source))?;
-
-        // Single-file mode: use appropriate path based on reset marker presence
-        let config = Self::parse_config_with_reset_handling(&content, value)?;
+        let parsed = parse_source(&content, &source)?;
+        validate_version(&parsed.config)?;
         Ok(LoadResult {
-            config,
+            config: parsed.config,
             preset_used: None,
         })
     }
@@ -491,35 +440,33 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                 })?;
 
         let source = ConfigSource::file(path);
-        let value = ExtendsResolver::<F>::parse_value_with_location(&content, Some(source))?;
-        let has_extends = value.get("extends").is_some();
+        let parsed = parse_source(&content, &source)?;
 
-        if has_extends {
+        if parsed.value.get("extends").is_some() {
             // Inheritance mode with source tracking
             let mut visited = IndexSet::new();
             let mut sources = Vec::new();
             let (merged_value, preset_used) = self.load_with_extends_from_value_tracking(
                 path,
-                value,
+                parsed.value,
                 &mut visited,
                 &mut sources,
                 0,
             )?;
-            let config = Self::finalize_value_to_config(merged_value)?;
+            let config = finalize_merged_config(merged_value, &source)?;
             Ok(LoadResultWithSources {
                 config,
                 preset_used,
                 source_chain: sources,
             })
         } else {
-            // Single-file mode: use appropriate path based on reset marker presence
-            let config = Self::parse_config_with_reset_handling(&content, value.clone())?;
+            validate_version(&parsed.config)?;
             Ok(LoadResultWithSources {
-                config,
+                config: parsed.config,
                 preset_used: None,
                 source_chain: vec![SourcedConfig {
-                    source: ConfigSource::file(path),
-                    value,
+                    source,
+                    value: parsed.value,
                 }],
             })
         }
@@ -552,17 +499,15 @@ impl<F: FileSystem> ConfigLoader for FileConfigLoader<F> {
                 })?;
 
         let source = ConfigSource::file(path);
-        let value = ExtendsResolver::<F>::parse_value_with_location(&content, Some(source))?;
-
-        // Single-file mode: use appropriate path based on reset marker presence
-        let config = Self::parse_config_with_reset_handling(&content, value.clone())?;
+        let parsed = parse_source(&content, &source)?;
+        validate_version(&parsed.config)?;
 
         Ok(LoadResultWithSources {
-            config,
+            config: parsed.config,
             preset_used: None,
             source_chain: vec![SourcedConfig {
-                source: ConfigSource::file(path),
-                value,
+                source,
+                value: parsed.value,
             }],
         })
     }

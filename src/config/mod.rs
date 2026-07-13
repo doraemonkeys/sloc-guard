@@ -4,6 +4,7 @@ mod filesystem;
 mod loader;
 pub(crate) mod merge;
 mod model;
+mod parse;
 pub mod presets;
 mod remote;
 mod validation;

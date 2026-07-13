@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::Path;
 
 use crate::cli::{Cli, ConfigAction, ConfigOutputFormat};
@@ -38,9 +37,9 @@ fn run_config_validate(config_path: &Path) -> i32 {
 
 /// Validates a configuration file.
 ///
-/// Two-phase validation:
-/// 1. Direct TOML parse - catches syntax errors with detailed error messages
-/// 2. Full load with extends - validates inheritance chain and semantics
+/// Delegates to the full loader: per-source schema checks report syntax and
+/// unknown-field errors with origin and line/column, and the extends chain
+/// plus semantics are validated on the merged result.
 ///
 /// # Errors
 /// Returns an error if the file doesn't exist, contains invalid TOML,
@@ -53,11 +52,6 @@ pub(crate) fn run_config_validate_impl(config_path: &Path) -> Result<()> {
         )));
     }
 
-    // Phase 1: Direct parse for better syntax error messages
-    let content = fs::read_to_string(config_path)?;
-    let _: Config = toml::from_str(&content)?;
-
-    // Phase 2: Full load with extends chain and semantic validation
     super::context::load_config(Some(config_path), false, false, FetchPolicy::Normal)?;
 
     Ok(())

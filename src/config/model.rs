@@ -34,6 +34,7 @@ impl From<crate::cli::RatchetMode> for RatchetMode {
 
 /// Baseline configuration for grandfathering violations.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BaselineConfig {
     /// Ratchet enforcement mode.
     /// - `warn`: emit warning when baseline can be tightened (default when enabled)
@@ -48,6 +49,7 @@ pub struct BaselineConfig {
 /// Controls how many historical entries are kept and how often new entries
 /// are recorded. This prevents unbounded growth of the history file.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct TrendConfig {
     /// Maximum number of entries to keep. Oldest entries are removed when exceeded.
     /// Default: None (unlimited).
@@ -89,6 +91,7 @@ pub struct TrendConfig {
 ///
 /// Controls how the `check` command handles warnings and failures.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct CheckConfig {
     /// Treat warnings as errors (exit code 1).
     /// Equivalent to `--warnings-as-errors` CLI flag.
@@ -103,6 +106,7 @@ pub struct CheckConfig {
 
 /// Stats command configuration, specifically for report subcommand defaults.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct StatsConfig {
     /// Report subcommand configuration.
     #[serde(default)]
@@ -113,6 +117,7 @@ pub struct StatsConfig {
 ///
 /// Controls which sections to include in comprehensive reports and their defaults.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct StatsReportConfig {
     /// Sections to exclude from report output.
     /// Valid values: "summary", "files", "breakdown", "trend"
@@ -147,6 +152,7 @@ pub struct StatsReportConfig {
 /// Scanner finds ALL files - no extension filtering here.
 /// This ensures Structure Guard sees the complete directory structure.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct ScannerConfig {
     /// Respect .gitignore rules (default: true)
     #[serde(default = "default_true")]
@@ -177,6 +183,7 @@ impl Default for ScannerConfig {
 /// Content configuration for SLOC limits.
 /// Extensions filter is HERE (not in scanner) - only these files get SLOC analysis.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ContentConfig {
     /// File extensions for SLOC counting.
     #[serde(default = "default_extensions")]
@@ -231,6 +238,7 @@ impl Default for ContentConfig {
 
 /// Content rule for path-based SLOC limits [[content.rules]].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct ContentRule {
     /// Glob pattern for file matching.
     pub pattern: String,
@@ -271,6 +279,7 @@ pub struct ContentRule {
 /// GitHub Code Scanning (and equivalents). Kept separate from `[content]` because
 /// the floor applies to *all* result categories (content + structure), not just SLOC.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct SarifConfig {
     /// Minimum severity to emit into SARIF. Results below this are omitted entirely,
     /// so they never surface as Code Scanning alerts.
@@ -292,6 +301,7 @@ impl Default for SarifConfig {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     /// Config schema version. Must be "2".
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -343,6 +353,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct CustomLanguageConfig {
     #[serde(default)]
     pub extensions: Vec<String>,
@@ -448,7 +459,11 @@ pub enum SiblingRule {
 }
 
 /// Intermediate struct for deserializing `SiblingRule` with ambiguity detection.
+///
+/// `deny_unknown_fields` must be repeated here: the attribute on `StructureRule`
+/// does not reach through `SiblingRule`'s hand-written `Deserialize`.
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SiblingRuleHelper {
     #[serde(rename = "match")]
     match_pattern: Option<String>,
@@ -504,13 +519,52 @@ impl<'de> serde::Deserialize<'de> for SiblingRule {
 }
 
 /// Sibling require field: single pattern or array of patterns.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(untagged)]
 pub enum SiblingRequire {
     /// Single required sibling pattern.
     Single(String),
     /// Multiple required sibling patterns.
     Multiple(Vec<String>),
+}
+
+/// Hand-written instead of `#[serde(untagged)]`: the derived untagged enum reports
+/// a generic "did not match any variant" on bad input, hiding the accepted shapes.
+impl<'de> serde::Deserialize<'de> for SiblingRequire {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct RequireVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for RequireVisitor {
+            type Value = SiblingRequire;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a sibling pattern string or an array of pattern strings")
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(SiblingRequire::Single(value.to_string()))
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> std::result::Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut patterns = Vec::new();
+                while let Some(pattern) = seq.next_element::<String>()? {
+                    patterns.push(pattern);
+                }
+                Ok(SiblingRequire::Multiple(patterns))
+            }
+        }
+
+        deserializer.deserialize_any(RequireVisitor)
+    }
 }
 
 impl SiblingRequire {
@@ -526,6 +580,7 @@ impl SiblingRequire {
 
 /// Configuration for directory structure limits.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct StructureConfig {
     /// Global default limit for files per directory.
     /// Use `-1` for unlimited (no check), `0` for prohibited, `>0` for limit.
@@ -642,6 +697,7 @@ impl StructureConfig {
 
 /// Rule for overriding structure limits on specific directories.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct StructureRule {
     /// Glob pattern defining the directory scope where this rule applies.
     /// Example: `scope = "src/**"` applies to all directories under `src/`.

@@ -5,5 +5,6 @@ mod language_config_tests;
 mod sarif_config_tests;
 mod scanner_config_tests;
 mod stats_config_tests;
+mod strict_fields_tests;
 mod structure_config_tests;
 mod trend_config_tests;

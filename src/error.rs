@@ -142,9 +142,6 @@ pub enum SlocGuardError {
         operation: Option<&'static str>,
     },
 
-    #[error("TOML parse error: {0}")]
-    TomlParse(#[from] toml::de::Error),
-
     #[error("JSON serialization error: {0}")]
     JsonSerialize(#[from] serde_json::Error),
 
@@ -258,7 +255,6 @@ impl SlocGuardError {
             Self::FileAccess { .. } => "FileAccess",
             Self::InvalidPattern { .. } => "InvalidPattern",
             Self::Io { .. } => "IO",
-            Self::TomlParse(_) => "TOML",
             Self::JsonSerialize(_) => "JSON",
             Self::Git(_) | Self::GitRepoNotFound(_) => "Git",
             Self::RemoteConfigHashMismatch { .. } => "RemoteConfig",
@@ -286,7 +282,6 @@ impl SlocGuardError {
                 (None, Some(op)) => format!("{op}: {source}"),
                 (None, None) => source.to_string(),
             },
-            Self::TomlParse(e) => e.to_string(),
             Self::JsonSerialize(e) => e.to_string(),
             Self::Config(msg) | Self::Git(msg) | Self::GitRepoNotFound(msg) => msg.clone(),
             Self::RemoteConfigHashMismatch { url, .. } => format!("hash mismatch for {url}"),
@@ -362,7 +357,7 @@ impl SlocGuardError {
             Self::InvalidPattern { .. } => Some(
                 "Check glob pattern syntax: use '*' for wildcards, '**' for recursive matching",
             ),
-            Self::TomlParse(_) | Self::Syntax { .. } => {
+            Self::Syntax { .. } => {
                 Some("Check TOML syntax: ensure proper quoting and bracket matching")
             }
             Self::JsonSerialize(_) => {
