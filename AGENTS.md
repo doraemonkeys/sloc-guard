@@ -11,3 +11,4 @@
 - **Prefer Deep Modules**: Avoid coupling all functionality at one layer; use meaningful module boundaries to contain complexity.
 - **Semantic Precision**: Avoid ambiguous or overloaded fields.
 - Don't name your package util, common, or misc. Packages should differ by what they provide, not what they contain.
+- **Concise User-Facing Docs**: Keep externally maintained docs (README, docs/) concise and easy to follow; nobody reads verbose documentation.
