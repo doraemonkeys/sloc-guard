@@ -23,7 +23,7 @@ fn explain_structure_rule_matches() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src/components/Button"));
+    let explanation = checker.explain(&PathBuf::from("src/components/Button"), None);
 
     assert!(matches!(
         explanation.matched_rule,
@@ -48,7 +48,7 @@ fn explain_structure_rule_with_reason() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src/legacy/module"));
+    let explanation = checker.explain(&PathBuf::from("src/legacy/module"), None);
 
     assert!(matches!(
         &explanation.matched_rule,
@@ -70,7 +70,7 @@ fn explain_structure_default_matches() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"));
+    let explanation = checker.explain(&PathBuf::from("src"), None);
 
     assert!(matches!(
         explanation.matched_rule,
@@ -105,7 +105,7 @@ fn explain_structure_rule_chain_statuses() {
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
 
     // Check a path that matches the first rule
-    let explanation = checker.explain(&PathBuf::from("src/components"));
+    let explanation = checker.explain(&PathBuf::from("src/components"), None);
 
     let chain = &explanation.rule_chain;
 

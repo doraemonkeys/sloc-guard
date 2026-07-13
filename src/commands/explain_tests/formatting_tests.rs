@@ -272,7 +272,7 @@ fn format_structure_text_output_contains_expected_sections() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"));
+    let explanation = checker.explain(&PathBuf::from("src"), None);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Path:"));
@@ -292,7 +292,7 @@ fn format_structure_json_output_is_valid() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"));
+    let explanation = checker.explain(&PathBuf::from("src"), None);
     let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
 
     // Verify it's valid JSON
@@ -317,7 +317,7 @@ fn format_structure_with_rule_reason_shows_reason() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("legacy/module"));
+    let explanation = checker.explain(&PathBuf::from("legacy/module"), None);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Reason:"));
@@ -333,7 +333,7 @@ fn format_structure_with_unlimited_shows_unlimited() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"));
+    let explanation = checker.explain(&PathBuf::from("src"), None);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("max_files=unlimited"));
@@ -349,12 +349,110 @@ fn format_structure_with_no_limits_shows_none() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"));
+    let explanation = checker.explain(&PathBuf::from("src"), None);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("max_files=none"));
     assert!(output.contains("max_dirs=none"));
     assert!(output.contains("max_depth=none"));
+}
+
+// ============================================================================
+// Count exclude formatting tests
+// ============================================================================
+
+fn count_exclude_config() -> StructureConfig {
+    StructureConfig {
+        max_files: Some(10),
+        count_exclude: vec!["*.md".to_string(), ".gitkeep".to_string()],
+        rules: vec![StructureRule {
+            scope: "src/*".to_string(),
+            count_exclude: vec!["*.gen".to_string(), "build".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    }
+}
+
+fn count_exclude_inventory() -> crate::checker::DirStats {
+    crate::checker::DirStats {
+        files: vec!["a.rs".into(), "README.md".into(), "x.gen".into()],
+        dirs: vec!["build".into()],
+        depth: 2,
+    }
+}
+
+#[test]
+fn format_structure_text_shows_counts_and_count_exclude_hits() {
+    let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
+    let inventory = count_exclude_inventory();
+
+    let explanation = checker.explain(&PathBuf::from("src/api"), Some(&inventory));
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
+
+    assert!(output.contains("Counts:  files=3 raw -> 1 effective, dirs=1 raw -> 0 effective"));
+    assert!(output.contains("Count Exclude (global + matched rule):"));
+    assert!(output.contains("\"*.md\" (from [structure]) -> excluded: README.md"));
+    assert!(output.contains("\".gitkeep\" (from [structure]) -> excluded: (none)"));
+    assert!(output.contains("\"*.gen\" (from structure.rules[0] \"src/*\") -> excluded: x.gen"));
+    // Excluded directories are marked with a trailing slash.
+    assert!(output.contains("\"build\" (from structure.rules[0] \"src/*\") -> excluded: build/"));
+}
+
+#[test]
+fn format_structure_text_without_inventory_lists_patterns_without_hits() {
+    let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
+
+    let explanation = checker.explain(&PathBuf::from("src/api"), None);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
+
+    assert!(!output.contains("Counts:"));
+    assert!(!output.contains("excluded:"));
+    assert!(output.contains("\"*.md\" (from [structure])"));
+    assert!(output.contains("\"*.gen\" (from structure.rules[0] \"src/*\")"));
+}
+
+#[test]
+fn format_structure_text_without_count_exclude_omits_section() {
+    let config = StructureConfig {
+        max_files: Some(10),
+        ..Default::default()
+    };
+
+    let checker = crate::checker::StructureChecker::new(&config).unwrap();
+    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
+
+    assert!(!output.contains("Count Exclude"));
+}
+
+#[test]
+fn format_structure_json_includes_count_exclude_and_counts() {
+    let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
+    let inventory = count_exclude_inventory();
+
+    let explanation = checker.explain(&PathBuf::from("src/api"), Some(&inventory));
+    let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
+    assert_eq!(parsed["counts"]["raw_file_count"], 3);
+    assert_eq!(parsed["counts"]["effective_file_count"], 1);
+    assert_eq!(parsed["count_exclude"][0]["source"]["type"], "global");
+    assert_eq!(parsed["count_exclude"][0]["excluded_files"][0], "README.md");
+    assert_eq!(parsed["count_exclude"][2]["source"]["type"], "rule");
+    assert_eq!(parsed["count_exclude"][2]["source"]["index"], 0);
+    assert_eq!(parsed["count_exclude"][2]["source"]["scope"], "src/*");
+}
+
+#[test]
+fn format_structure_json_counts_null_without_inventory() {
+    let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
+
+    let explanation = checker.explain(&PathBuf::from("src/api"), None);
+    let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
+    assert!(parsed["counts"].is_null());
 }
 
 // ============================================================================

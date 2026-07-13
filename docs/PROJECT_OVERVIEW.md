@@ -50,7 +50,7 @@ StatsReportConfig { exclude, top_count, breakdown_by, depth, trend_since }
 ContentConfig { extensions, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, exclude, rules }
 ContentRule { pattern, max_lines, warn_threshold, warn_at, skip_comments, skip_blank, reason, expires }
 StructureConfig { max_files, max_dirs, max_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, deny_extensions, deny_patterns, deny_files, deny_dirs, allow_extensions, allow_files, allow_dirs, rules }
-StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, siblings, reason, expires }
+StructureRule { scope, max_files, max_dirs, max_depth, relative_depth, warn_threshold, warn_files_at, warn_dirs_at, warn_files_threshold, warn_dirs_threshold, count_exclude, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, file_naming_pattern, siblings, reason, expires }
 SiblingRule::Directed { match_pattern, require, severity } | Group { group, severity }
 SiblingSeverity::Error | Warn
 CustomLanguageConfig { extensions, single_line_comments, multi_line_comments }
@@ -67,8 +67,9 @@ CheckResult::Passed { path, stats, raw_stats, limit, override_reason, violation_
           | Grandfathered { ... }
 ViolationCategory::Content | Structure { violation_type, triggering_rule }
 
-// Structure checking
-DirStats { file_count, dir_count, depth }
+// Structure checking (scan records the raw child inventory; StructureChecker
+// derives effective counts at check time via global ∪ winning-rule count_exclude)
+DirStats { files, dirs, depth }
 ViolationType::FileCount | DirCount | MaxDepth | DisallowedFile | DisallowedDirectory | DeniedFile { pattern_or_extension } | DeniedDirectory { pattern } | NamingConvention { expected_pattern } | MissingSibling { expected_sibling_pattern } | GroupIncomplete { group_patterns, missing_patterns }
 StructureViolation { path, violation_type, actual, limit, is_warning, override_reason, triggering_rule_pattern }
 
@@ -78,7 +79,10 @@ ContentRuleMatch::Excluded { pattern } | Rule { index, pattern, reason } | Defau
 WarnAtSource::RuleAbsolute { index } | RulePercentage { index, threshold } | GlobalAbsolute | GlobalPercentage { threshold }
 ContentExplanation { path, is_excluded, matched_rule, effective_limit, effective_warn_at, warn_at_source, warn_threshold, skip_*, rule_chain }
 StructureRuleMatch::Rule { index, pattern, reason } | Default
-StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, rule_chain }
+CountExcludeSource::Global | Rule { index, scope }
+CountExcludePattern { pattern, source, excluded_files, excluded_dirs }
+StructureCounts { raw_file_count, raw_dir_count, effective_file_count, effective_dir_count }
+StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, count_exclude, counts, rule_chain }
 
 // Config Error Types
 ConfigSource::File { path } | Remote { url } | Preset { name }
@@ -128,7 +132,7 @@ FileReader trait { read(), metadata() }
 RealFileReader
 FileScanner trait { scan(), scan_all(), scan_with_structure(), scan_all_with_structure() }
 ScanResult { files, dir_stats, allowlist_violations }
-StructureScanConfig { count_exclude + original pattern strings, scanner_exclude, scanner_exclude_dir_names (legacy name; complete terminal-`/**` directory-prefix globs), allowlist_rules, global_allow_*, global_deny_* }
+StructureScanConfig { scanner_exclude, scanner_exclude_dir_names (legacy name; complete terminal-`/**` directory-prefix globs), allowlist_rules, global_allow_*, global_deny_* }
 AllowlistRule { scope, allow_extensions, allow_patterns, allow_files, allow_dirs, deny_extensions, deny_patterns, deny_files, deny_dirs, naming_pattern_str }
 CompositeScanner
 CheckContext { registry, threshold_checker, structure_checker, structure_scan_config, scanner, file_reader }

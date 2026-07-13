@@ -43,9 +43,19 @@ impl CompiledCountExclude {
         self.patterns.is_empty()
     }
 
+    /// Original pattern strings as authored in the configuration.
+    pub(super) fn patterns(&self) -> &[String] {
+        &self.patterns
+    }
+
+    /// Indices into [`Self::patterns`] matching a logical child path.
+    pub(super) fn matching_pattern_indices(&self, logical_path: &Path) -> Vec<usize> {
+        matching_logical_path_globs(&self.matcher, &self.patterns, logical_path)
+    }
+
     /// Whether a logical child path is excluded from structure counting.
     pub(super) fn matches(&self, logical_path: &Path) -> bool {
-        !matching_logical_path_globs(&self.matcher, &self.patterns, logical_path).is_empty()
+        !self.matching_pattern_indices(logical_path).is_empty()
     }
 }
 

@@ -6,7 +6,7 @@
 use crate::cli::ExplainFormat;
 use crate::config::{CheckConfig, Config, ContentConfig, ScannerConfig, StructureConfig};
 
-use super::super::{
+use super::{
     ConfigExplanation, FieldWithSource, KEY_FIELDS, format_config_explanation, format_config_text,
     format_toml_value, get_nested_value,
 };

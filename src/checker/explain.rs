@@ -96,6 +96,47 @@ pub enum StructureRuleMatch {
     Default,
 }
 
+/// Provenance of an active `count_exclude` pattern.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CountExcludeSource {
+    /// From global `structure.count_exclude`.
+    Global,
+    /// From the winning rule's `count_exclude`.
+    Rule { index: usize, scope: String },
+}
+
+/// An active count-exclusion pattern with provenance and its concrete hits.
+///
+/// The counting caliber is the union of the global set and the winning
+/// (last-match) rule's set; superseded rules contribute nothing, even when
+/// their patterns would match.
+#[derive(Debug, Clone, Serialize)]
+pub struct CountExcludePattern {
+    /// The glob pattern as authored in the configuration.
+    pub pattern: String,
+    /// Where the pattern comes from (global section or the winning rule).
+    pub source: CountExcludeSource,
+    /// Immediate child files this pattern excludes from counting (sorted).
+    /// Empty when no directory inventory was supplied.
+    pub excluded_files: Vec<String>,
+    /// Immediate child directories this pattern excludes from counting (sorted).
+    pub excluded_dirs: Vec<String>,
+}
+
+/// Raw vs effective child counts for an explained directory.
+///
+/// Raw counts describe the supplied inventory; effective counts result from
+/// applying the active `count_exclude` union and are what limits compare
+/// against.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct StructureCounts {
+    pub raw_file_count: usize,
+    pub raw_dir_count: usize,
+    pub effective_file_count: usize,
+    pub effective_dir_count: usize,
+}
+
 /// A candidate rule evaluated during structure rule matching.
 #[derive(Debug, Clone, Serialize)]
 pub struct StructureRuleCandidate {
@@ -130,6 +171,11 @@ pub struct StructureExplanation {
     pub warn_threshold: f64,
     /// Override reason if applicable
     pub override_reason: Option<String>,
+    /// Active count-exclusion patterns: the global set first, then the
+    /// winning rule's (their union defines the counting caliber)
+    pub count_exclude: Vec<CountExcludePattern>,
+    /// Raw vs effective counts; `None` when no child inventory was supplied
+    pub counts: Option<StructureCounts>,
     /// All candidates evaluated (for debugging)
     pub rule_chain: Vec<StructureRuleCandidate>,
 }

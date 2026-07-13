@@ -4,8 +4,9 @@ mod structure;
 mod threshold;
 
 pub use explain::{
-    ContentExplanation, ContentRuleCandidate, ContentRuleMatch, MatchStatus, StructureExplanation,
-    StructureRuleCandidate, StructureRuleMatch, WarnAtSource,
+    ContentExplanation, ContentRuleCandidate, ContentRuleMatch, CountExcludePattern,
+    CountExcludeSource, MatchStatus, StructureCounts, StructureExplanation, StructureRuleCandidate,
+    StructureRuleMatch, WarnAtSource,
 };
 pub use result::CheckResult;
 pub use structure::StructureChecker;

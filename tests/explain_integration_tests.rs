@@ -322,6 +322,42 @@ fn explain_directory_with_unlimited_setting() {
         .stdout(predicate::str::contains("-1").or(predicate::str::contains("unlimited")));
 }
 
+#[test]
+fn explain_directory_shows_count_exclude_provenance_and_counts() {
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[structure]
+max_files = 10
+count_exclude = ["*.md"]
+
+[[structure.rules]]
+scope = "src/**"
+count_exclude = ["*.gen"]
+"#,
+    );
+    fixture.create_rust_file("src/api/main.rs", 5);
+    fixture.create_file("src/api/README.md", "# doc\n");
+    fixture.create_file("src/api/schema.gen", "generated\n");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["explain", "src/api"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Counts:  files=3 raw -> 1 effective",
+        ))
+        .stdout(predicate::str::contains(
+            "\"*.md\" (from [structure]) -> excluded: README.md",
+        ))
+        .stdout(predicate::str::contains(
+            "\"*.gen\" (from structure.rules[0] \"src/**\") -> excluded: schema.gen",
+        ));
+}
+
 // =============================================================================
 // Custom Config Path Tests
 // =============================================================================

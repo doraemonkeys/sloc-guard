@@ -120,7 +120,8 @@ max_depth = 8                                # Max nesting depth
 warn_threshold = 0.8                         # Warn at 80% of limits
 warn_files_at = 25                           # Absolute threshold (takes precedence)
 warn_dirs_at = 8                             # Absolute threshold (takes precedence)
-count_exclude = ["*.md", ".gitkeep"]         # Don't count these toward limits
+count_exclude = ["*.md", ".gitkeep"]         # Don't count these toward limits (path-qualified
+                                             # globs like "web/**/*_test.go" also work)
 deny_extensions = [".exe", ".dll", ".bak"]   # Forbidden file types
 deny_files = [".DS_Store", "Thumbs.db"]      # Forbidden files
 
@@ -180,6 +181,7 @@ Override structure limits and enforce naming conventions:
 [[structure.rules]]
 scope = "src/components/**"
 max_files = 50
+count_exclude = ["*.css"]                    # Styles don't count toward this rule's limits
 file_naming_pattern = "^[A-Z][a-zA-Z0-9]*\\.(tsx|css)$"
 allow_extensions = [".tsx", ".css"]          # Only these extensions allowed
 reason = "React components: PascalCase required"
@@ -200,6 +202,15 @@ max_files = -1
 max_dirs = -1
 reason = "No limits for test directories"
 ```
+
+Rules follow **last match wins**. Rule-level `count_exclude`:
+
+- The winning rule defines the counting caliber together with the limits — even when its limit fields fall back to global values. Superseded rules contribute nothing.
+- Unioned with the global `structure.count_exclude`, with the same semantics: config-root-relative globs, bare names match by basename, applies to both file and dir counts.
+- Excluded entries are only exempt from counting — allowlist/deny/naming checks still apply.
+- No rule needed for simple cases: global `count_exclude` accepts path-qualified globs like `web/**/*_test.go`.
+
+Run `sloc-guard explain <dir>` to see the winning rule, raw vs effective counts, and which children each pattern excludes.
 
 ### Git Integration
 

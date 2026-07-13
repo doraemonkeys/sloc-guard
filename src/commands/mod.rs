@@ -4,6 +4,7 @@ pub(crate) mod config_notice;
 pub mod context;
 pub mod detect;
 pub mod explain;
+pub mod explain_sources;
 pub mod init;
 pub mod snapshot;
 pub mod stats;

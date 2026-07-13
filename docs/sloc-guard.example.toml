@@ -81,16 +81,23 @@ max_files = 30                       # Max files per directory
 max_dirs = 10                        # Max subdirectories per directory
 max_depth = 8                        # Max nesting depth
 warn_threshold = 0.8                 # Warn at 80% of limits
-count_exclude = ["*.md", ".gitkeep"] # Don't count these toward limits
+# Don't count these toward file/dir limits. Bare names match by basename
+# everywhere; path-qualified globs (e.g. "web/**/*_test.go") match relative to
+# the config root, so per-area exclusions work here without needing a rule.
+count_exclude = ["*.md", ".gitkeep"]
 
 # Global deny lists
 deny_extensions = [".exe", ".dll", ".so"]
 deny_files = ["*.bak", "*.tmp", ".DS_Store"]
 
-# Structure Rules: Override for specific directories
+# Structure Rules: Override for specific directories.
+# The last matching rule decides the limits AND the counting caliber: its
+# count_exclude is unioned with the global list (superseded rules contribute
+# nothing). Count-excluded entries still face allowlist/deny/naming checks.
 [[structure.rules]]
 scope = "src/components/**"
 max_files = 50
+count_exclude = ["*.css"] # Styles don't count toward max_files here, on top of the global excludes
 allow_extensions = [".tsx", ".ts", ".css"]
 file_naming_pattern = "^[A-Z][a-zA-Z0-9]*\\.(tsx|ts|css)$"
 reason = "React components: PascalCase naming required"

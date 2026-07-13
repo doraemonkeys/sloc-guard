@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
 
+use crate::checker::CountExcludeSource;
+
 use super::*;
 
 fn stats_with_children(files: &[&str], dirs: &[&str], depth: usize) -> DirStats {
@@ -458,4 +460,189 @@ fn invalid_rule_count_exclude_pattern_returns_error() {
     let result = StructureChecker::new(&config);
 
     assert!(result.is_err());
+}
+
+// =============================================================================
+// Explain: count_exclude provenance and raw vs effective counts.
+// =============================================================================
+
+#[test]
+fn explain_lists_global_then_winning_rule_count_exclude() {
+    let config = StructureConfig {
+        count_exclude: vec![".gitkeep".to_string()],
+        rules: vec![
+            StructureRule {
+                scope: "src/**".to_string(),
+                count_exclude: vec!["*.gen".to_string()],
+                ..Default::default()
+            },
+            StructureRule {
+                scope: "src/api/**".to_string(),
+                count_exclude: vec!["*.tmp".to_string()],
+                ..Default::default()
+            },
+        ],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let explanation = checker.explain(&PathBuf::from("src/api/v1"), None);
+
+    // Global first, then the winning (last-match) rule; the superseded
+    // rule's *.gen contributes nothing even though its scope matches.
+    assert_eq!(explanation.counts, None);
+    assert_eq!(explanation.count_exclude.len(), 2);
+    assert_eq!(explanation.count_exclude[0].pattern, ".gitkeep");
+    assert_eq!(
+        explanation.count_exclude[0].source,
+        CountExcludeSource::Global
+    );
+    assert_eq!(explanation.count_exclude[1].pattern, "*.tmp");
+    assert_eq!(
+        explanation.count_exclude[1].source,
+        CountExcludeSource::Rule {
+            index: 1,
+            scope: "src/api/**".to_string()
+        }
+    );
+    assert!(explanation.count_exclude[1].excluded_files.is_empty());
+}
+
+#[test]
+fn explain_reports_raw_and_effective_counts_with_per_pattern_hits() {
+    let config = StructureConfig {
+        count_exclude: vec!["*.md".to_string()],
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            count_exclude: vec!["*.gen".to_string(), "build".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let stats = stats_with_children(
+        &["main.rs", "README.md", "schema.gen"],
+        &["api", "build"],
+        2,
+    );
+
+    let explanation = checker.explain(&PathBuf::from("src/app"), Some(&stats));
+
+    let counts = explanation.counts.unwrap();
+    assert_eq!(counts.raw_file_count, 3);
+    assert_eq!(counts.raw_dir_count, 2);
+    assert_eq!(counts.effective_file_count, 1);
+    assert_eq!(counts.effective_dir_count, 1);
+
+    assert_eq!(
+        explanation.count_exclude[0].excluded_files,
+        vec!["README.md"]
+    );
+    assert!(explanation.count_exclude[0].excluded_dirs.is_empty());
+    assert_eq!(
+        explanation.count_exclude[1].excluded_files,
+        vec!["schema.gen"]
+    );
+    assert_eq!(explanation.count_exclude[2].excluded_dirs, vec!["build"]);
+    assert!(explanation.count_exclude[2].excluded_files.is_empty());
+}
+
+#[test]
+fn explain_attributes_child_to_every_matching_pattern() {
+    // A child matched by both a global and a rule pattern shows up under
+    // each, while the effective count drops it only once.
+    let config = StructureConfig {
+        count_exclude: vec!["*.md".to_string()],
+        rules: vec![StructureRule {
+            scope: "docs/**".to_string(),
+            count_exclude: vec!["README.*".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let stats = stats_with_children(&["README.md", "guide.md"], &[], 2);
+
+    let explanation = checker.explain(&PathBuf::from("docs/site"), Some(&stats));
+
+    assert_eq!(
+        explanation.count_exclude[0].excluded_files,
+        vec!["README.md", "guide.md"]
+    );
+    assert_eq!(
+        explanation.count_exclude[1].excluded_files,
+        vec!["README.md"]
+    );
+    assert_eq!(explanation.counts.unwrap().effective_file_count, 0);
+}
+
+#[test]
+fn explain_shows_rule_caliber_even_when_limits_fall_back_to_global() {
+    // The winning rule defines the counting caliber even though every limit
+    // field falls back to the global value.
+    let config = StructureConfig {
+        max_files: Some(5),
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            count_exclude: vec!["*.gen".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let explanation = checker.explain(&PathBuf::from("src/api"), None);
+
+    assert_eq!(explanation.effective_max_files, Some(5));
+    assert_eq!(explanation.count_exclude.len(), 1);
+    assert_eq!(
+        explanation.count_exclude[0].source,
+        CountExcludeSource::Rule {
+            index: 0,
+            scope: "src/**".to_string()
+        }
+    );
+}
+
+#[test]
+fn explain_outside_any_rule_lists_only_global_patterns() {
+    let config = StructureConfig {
+        count_exclude: vec!["*.md".to_string()],
+        rules: vec![StructureRule {
+            scope: "src/**".to_string(),
+            count_exclude: vec!["*.gen".to_string()],
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let stats = stats_with_children(&["site.gen", "index.md"], &[], 1);
+
+    let explanation = checker.explain(&PathBuf::from("docs"), Some(&stats));
+
+    assert_eq!(explanation.count_exclude.len(), 1);
+    assert_eq!(
+        explanation.count_exclude[0].source,
+        CountExcludeSource::Global
+    );
+    let counts = explanation.counts.unwrap();
+    assert_eq!(counts.raw_file_count, 2);
+    // *.gen is not active here: the rule did not win for this directory.
+    assert_eq!(counts.effective_file_count, 1);
+}
+
+#[test]
+fn explain_path_qualified_pattern_reports_no_hits_elsewhere() {
+    let config = StructureConfig {
+        count_exclude: vec!["docs/*.md".to_string()],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+    let stats = stats_with_children(&["README.md"], &[], 1);
+
+    let explanation = checker.explain(&PathBuf::from("src"), Some(&stats));
+
+    assert!(explanation.count_exclude[0].excluded_files.is_empty());
+    let counts = explanation.counts.unwrap();
+    assert_eq!(counts.effective_file_count, counts.raw_file_count);
 }
