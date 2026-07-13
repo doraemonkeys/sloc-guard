@@ -11,7 +11,7 @@ inputs:
     required: false
     default: '.'
   config-path:
-    description: 'Path to sloc-guard.toml configuration file'
+    description: 'Path to .sloc-guard.toml configuration file'
     required: false
     default: ''
   fail-on-warning:
@@ -311,7 +311,8 @@ runs:
       run: |
         CONFIG_PATH="${{ inputs.config-path }}"
         if [ -z "$CONFIG_PATH" ]; then
-          CONFIG_PATH="sloc-guard.toml"
+          # Mirror the binary's auto-discovery name; the undotted form is never auto-loaded.
+          CONFIG_PATH=".sloc-guard.toml"
         fi
         if [ -f "$CONFIG_PATH" ]; then
           CONFIG_HASH=$(sha256sum "$CONFIG_PATH" | cut -d' ' -f1 | head -c 16)
