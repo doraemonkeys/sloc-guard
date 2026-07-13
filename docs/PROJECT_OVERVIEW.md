@@ -80,9 +80,12 @@ WarnAtSource::RuleAbsolute { index } | RulePercentage { index, threshold } | Glo
 ContentExplanation { path, is_excluded, matched_rule, effective_limit, effective_warn_at, warn_at_source, warn_threshold, skip_*, rule_chain }
 StructureRuleMatch::Rule { index, pattern, reason } | Default
 CountExcludeSource::Global | Rule { index, scope }
-CountExcludePattern { pattern, source, excluded_files, excluded_dirs }
+CountExcludePattern { pattern, source, hits: Option<CountExcludeHits> }
+CountExcludeHits { files, dirs }
 StructureCounts { raw_file_count, raw_dir_count, effective_file_count, effective_dir_count }
-StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, count_exclude, counts, rule_chain }
+DirInventorySource::ConfiguredScan(&DirStats) | ExcludedFromScan | NotScanned   // explain input
+DirInventory::ConfiguredScan { counts } | ExcludedFromScan | NotScanned         // explain output; JSON "basis" tag
+StructureExplanation { path, matched_rule, effective_max_files, effective_max_dirs, effective_max_depth, warn_threshold, count_exclude, inventory, rule_chain }
 
 // Config Error Types
 ConfigSource::File { path } | Remote { url } | Preset { name }
@@ -204,9 +207,10 @@ show: load_config() → format_config_text() or JSON
 ### explain-specific
 
 ```
-→ load_config() → path.is_file()?
+→ load_config() → CheckContext::from_config_with_project_paths() → path.is_file()?
    [file] ThresholdChecker::explain(path) → ContentExplanation
-   [dir]  StructureChecker::explain(path) → StructureExplanation
+   [dir]  config-driven scan (same regime as check: scanner.exclude + gitignore + no-follow symlinks)
+          → DirInventorySource → StructureChecker::explain(path, inventory) → StructureExplanation
 → format (Text/Json) → output rule chain with match status
 ```
 

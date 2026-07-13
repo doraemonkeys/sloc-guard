@@ -21,6 +21,20 @@ fn stats_with_children(files: &[&str], dirs: &[&str], depth: usize) -> DirStats 
     }
 }
 
+fn scanned_counts(explanation: &StructureExplanation) -> StructureCounts {
+    match explanation.inventory {
+        DirInventory::ConfiguredScan { counts } => counts,
+        other => panic!("expected scanned inventory, got {other:?}"),
+    }
+}
+
+fn hits(explanation: &StructureExplanation, index: usize) -> &CountExcludeHits {
+    explanation.count_exclude[index]
+        .hits
+        .as_ref()
+        .expect("inventory was supplied, so hits must be recorded")
+}
+
 fn config_with_count_exclude(max_files: i64, count_exclude: &[&str]) -> StructureConfig {
     StructureConfig {
         max_files: Some(max_files),
@@ -446,7 +460,7 @@ fn rule_count_exclude_applies_to_dir_count() {
 }
 
 #[test]
-fn invalid_rule_count_exclude_pattern_returns_error() {
+fn invalid_rule_count_exclude_pattern_error_identifies_the_rule() {
     let config = StructureConfig {
         rules: vec![StructureRule {
             scope: "src/**".to_string(),
@@ -457,9 +471,16 @@ fn invalid_rule_count_exclude_pattern_returns_error() {
         ..Default::default()
     };
 
-    let result = StructureChecker::new(&config);
+    let Err(error) = StructureChecker::new(&config) else {
+        panic!("invalid pattern must fail checker construction");
+    };
 
-    assert!(result.is_err());
+    // With many [[structure.rules]], the pattern alone does not locate the
+    // offending entry; the error must name the rule's index and scope.
+    let message = error.to_string();
+    assert!(message.contains("[invalid"), "message: {message}");
+    assert!(message.contains("structure.rules[0]"), "message: {message}");
+    assert!(message.contains("src/**"), "message: {message}");
 }
 
 // =============================================================================
@@ -486,11 +507,11 @@ fn explain_lists_global_then_winning_rule_count_exclude() {
     };
     let checker = StructureChecker::new(&config).unwrap();
 
-    let explanation = checker.explain(&PathBuf::from("src/api/v1"), None);
+    let explanation = checker.explain(&PathBuf::from("src/api/v1"), DirInventorySource::NotScanned);
 
     // Global first, then the winning (last-match) rule; the superseded
     // rule's *.gen contributes nothing even though its scope matches.
-    assert_eq!(explanation.counts, None);
+    assert_eq!(explanation.inventory, DirInventory::NotScanned);
     assert_eq!(explanation.count_exclude.len(), 2);
     assert_eq!(explanation.count_exclude[0].pattern, ".gitkeep");
     assert_eq!(
@@ -505,7 +526,8 @@ fn explain_lists_global_then_winning_rule_count_exclude() {
             scope: "src/api/**".to_string()
         }
     );
-    assert!(explanation.count_exclude[1].excluded_files.is_empty());
+    // No inventory means no hits at all, not merely empty hit lists.
+    assert!(explanation.count_exclude[1].hits.is_none());
 }
 
 #[test]
@@ -526,25 +548,22 @@ fn explain_reports_raw_and_effective_counts_with_per_pattern_hits() {
         2,
     );
 
-    let explanation = checker.explain(&PathBuf::from("src/app"), Some(&stats));
+    let explanation = checker.explain(
+        &PathBuf::from("src/app"),
+        DirInventorySource::ConfiguredScan(&stats),
+    );
 
-    let counts = explanation.counts.unwrap();
+    let counts = scanned_counts(&explanation);
     assert_eq!(counts.raw_file_count, 3);
     assert_eq!(counts.raw_dir_count, 2);
     assert_eq!(counts.effective_file_count, 1);
     assert_eq!(counts.effective_dir_count, 1);
 
-    assert_eq!(
-        explanation.count_exclude[0].excluded_files,
-        vec!["README.md"]
-    );
-    assert!(explanation.count_exclude[0].excluded_dirs.is_empty());
-    assert_eq!(
-        explanation.count_exclude[1].excluded_files,
-        vec!["schema.gen"]
-    );
-    assert_eq!(explanation.count_exclude[2].excluded_dirs, vec!["build"]);
-    assert!(explanation.count_exclude[2].excluded_files.is_empty());
+    assert_eq!(hits(&explanation, 0).files, vec!["README.md"]);
+    assert!(hits(&explanation, 0).dirs.is_empty());
+    assert_eq!(hits(&explanation, 1).files, vec!["schema.gen"]);
+    assert_eq!(hits(&explanation, 2).dirs, vec!["build"]);
+    assert!(hits(&explanation, 2).files.is_empty());
 }
 
 #[test]
@@ -563,17 +582,14 @@ fn explain_attributes_child_to_every_matching_pattern() {
     let checker = StructureChecker::new(&config).unwrap();
     let stats = stats_with_children(&["README.md", "guide.md"], &[], 2);
 
-    let explanation = checker.explain(&PathBuf::from("docs/site"), Some(&stats));
+    let explanation = checker.explain(
+        &PathBuf::from("docs/site"),
+        DirInventorySource::ConfiguredScan(&stats),
+    );
 
-    assert_eq!(
-        explanation.count_exclude[0].excluded_files,
-        vec!["README.md", "guide.md"]
-    );
-    assert_eq!(
-        explanation.count_exclude[1].excluded_files,
-        vec!["README.md"]
-    );
-    assert_eq!(explanation.counts.unwrap().effective_file_count, 0);
+    assert_eq!(hits(&explanation, 0).files, vec!["README.md", "guide.md"]);
+    assert_eq!(hits(&explanation, 1).files, vec!["README.md"]);
+    assert_eq!(scanned_counts(&explanation).effective_file_count, 0);
 }
 
 #[test]
@@ -591,7 +607,7 @@ fn explain_shows_rule_caliber_even_when_limits_fall_back_to_global() {
     };
     let checker = StructureChecker::new(&config).unwrap();
 
-    let explanation = checker.explain(&PathBuf::from("src/api"), None);
+    let explanation = checker.explain(&PathBuf::from("src/api"), DirInventorySource::NotScanned);
 
     assert_eq!(explanation.effective_max_files, Some(5));
     assert_eq!(explanation.count_exclude.len(), 1);
@@ -618,14 +634,17 @@ fn explain_outside_any_rule_lists_only_global_patterns() {
     let checker = StructureChecker::new(&config).unwrap();
     let stats = stats_with_children(&["site.gen", "index.md"], &[], 1);
 
-    let explanation = checker.explain(&PathBuf::from("docs"), Some(&stats));
+    let explanation = checker.explain(
+        &PathBuf::from("docs"),
+        DirInventorySource::ConfiguredScan(&stats),
+    );
 
     assert_eq!(explanation.count_exclude.len(), 1);
     assert_eq!(
         explanation.count_exclude[0].source,
         CountExcludeSource::Global
     );
-    let counts = explanation.counts.unwrap();
+    let counts = scanned_counts(&explanation);
     assert_eq!(counts.raw_file_count, 2);
     // *.gen is not active here: the rule did not win for this directory.
     assert_eq!(counts.effective_file_count, 1);
@@ -640,9 +659,33 @@ fn explain_path_qualified_pattern_reports_no_hits_elsewhere() {
     let checker = StructureChecker::new(&config).unwrap();
     let stats = stats_with_children(&["README.md"], &[], 1);
 
-    let explanation = checker.explain(&PathBuf::from("src"), Some(&stats));
+    let explanation = checker.explain(
+        &PathBuf::from("src"),
+        DirInventorySource::ConfiguredScan(&stats),
+    );
 
-    assert!(explanation.count_exclude[0].excluded_files.is_empty());
-    let counts = explanation.counts.unwrap();
+    // An inventory exists, so the pattern reports empty hits (not absent).
+    assert!(hits(&explanation, 0).files.is_empty());
+    let counts = scanned_counts(&explanation);
     assert_eq!(counts.effective_file_count, counts.raw_file_count);
+}
+
+#[test]
+fn explain_excluded_from_scan_reports_no_counts_and_no_hits() {
+    // A directory the configured scan prunes has no roster: the explanation
+    // must say so instead of inventing counts `check` would never enforce.
+    let config = StructureConfig {
+        max_files: Some(5),
+        count_exclude: vec!["*.md".to_string()],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let explanation = checker.explain(
+        &PathBuf::from("vendor"),
+        DirInventorySource::ExcludedFromScan,
+    );
+
+    assert_eq!(explanation.inventory, DirInventory::ExcludedFromScan);
+    assert!(explanation.count_exclude[0].hits.is_none());
 }

@@ -67,6 +67,85 @@ fn check_structure_max_dirs_violation() {
 }
 
 #[test]
+fn check_count_exclude_path_qualified_pattern_applies_through_real_scan() {
+    // Drives a path-qualified count_exclude pattern through the production
+    // scan -> rebase_logical_paths -> check pipeline: the pattern must exempt
+    // src/x.gen from the quota while an identical file outside the anchored
+    // path keeps counting (no basename fallback for qualified patterns).
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
+[content]
+extensions = ["rs"]
+max_lines = 100
+
+[structure]
+max_files = 1
+count_exclude = ["src/*.gen"]
+"#,
+    );
+    fixture.create_rust_file("src/a.rs", 1);
+    fixture.create_file("src/x.gen", "generated\n");
+    fixture.create_rust_file("other/b.rs", 1);
+    fixture.create_file("other/y.gen", "generated\n");
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "src", "--no-sloc-cache", "--quiet"])
+        .assert()
+        .success();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", "other", "--no-sloc-cache", "--quiet"])
+        .assert()
+        .code(1);
+}
+
+#[test]
+fn check_count_exclude_root_anchor_survives_nested_invocation() {
+    // Root-anchored count_exclude patterns match configuration-root-relative
+    // keys. Running check from a subdirectory forces the scan's physical
+    // paths through rebase_logical_paths: a rebase regression would leave
+    // "../"-style keys, silently disable "./a.gen", and fail this check.
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = []
+
+[content]
+extensions = ["rs"]
+max_lines = 100
+
+[structure]
+max_files = 2
+count_exclude = ["./a.gen"]
+"#,
+    );
+    // Config root holds 3 files (.sloc-guard.toml, a.gen, a.rs); the
+    // root-anchored exclusion brings the effective count to the limit of 2.
+    fixture.create_file("a.gen", "generated\n");
+    fixture.create_rust_file("a.rs", 1);
+    fixture.create_rust_file("sub/s.rs", 1);
+
+    sloc_guard!()
+        .current_dir(fixture.path().join("sub"))
+        .args(["check", "..", "--no-sloc-cache", "--quiet"])
+        .assert()
+        .success();
+}
+
+#[test]
 fn check_structure_cli_override() {
     let fixture = TestFixture::new();
     fixture.create_config(BASIC_CONFIG_V2);

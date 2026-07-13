@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use crate::checker::{MatchStatus, StructureRuleMatch};
+use crate::checker::{DirInventorySource, MatchStatus, StructureRuleMatch};
 use crate::config::{StructureConfig, StructureRule};
 
 #[test]
@@ -23,7 +23,10 @@ fn explain_structure_rule_matches() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src/components/Button"), None);
+    let explanation = checker.explain(
+        &PathBuf::from("src/components/Button"),
+        DirInventorySource::NotScanned,
+    );
 
     assert!(matches!(
         explanation.matched_rule,
@@ -48,7 +51,10 @@ fn explain_structure_rule_with_reason() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src/legacy/module"), None);
+    let explanation = checker.explain(
+        &PathBuf::from("src/legacy/module"),
+        DirInventorySource::NotScanned,
+    );
 
     assert!(matches!(
         &explanation.matched_rule,
@@ -70,7 +76,7 @@ fn explain_structure_default_matches() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let explanation = checker.explain(&PathBuf::from("src"), DirInventorySource::NotScanned);
 
     assert!(matches!(
         explanation.matched_rule,
@@ -105,7 +111,10 @@ fn explain_structure_rule_chain_statuses() {
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
 
     // Check a path that matches the first rule
-    let explanation = checker.explain(&PathBuf::from("src/components"), None);
+    let explanation = checker.explain(
+        &PathBuf::from("src/components"),
+        DirInventorySource::NotScanned,
+    );
 
     let chain = &explanation.rule_chain;
 

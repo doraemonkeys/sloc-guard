@@ -172,7 +172,10 @@ fn explain_reports_last_matching_rule() {
     };
     let checker = StructureChecker::new(&config).unwrap();
 
-    let explanation = checker.explain(&PathBuf::from("src/lib/utils"), None);
+    let explanation = checker.explain(
+        &PathBuf::from("src/lib/utils"),
+        DirInventorySource::NotScanned,
+    );
 
     // The matched rule should be the LAST one (index 1)
     match explanation.matched_rule {

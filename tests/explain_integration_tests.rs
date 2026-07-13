@@ -323,6 +323,76 @@ fn explain_directory_with_unlimited_setting() {
 }
 
 #[test]
+fn explain_counts_match_check_when_gitignore_excludes_children() {
+    // Regression lock: explain's inventory must come from the same
+    // config-driven scan check counts, not from the raw on-disk listing.
+    // 12 files on disk, 5 gitignored: check counts 7 against max_files = 10.
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = true
+
+[structure]
+max_files = 10
+"#,
+    );
+    fixture.create_file(".gitignore", "*.log\n");
+    for i in 0..7 {
+        fixture.create_rust_file(&format!("pkg/f{i}.rs"), 1);
+    }
+    for i in 0..5 {
+        fixture.create_file(&format!("pkg/tmp{i}.log"), "x\n");
+    }
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["check", ".", "--no-sloc-cache", "--quiet"])
+        .assert()
+        .success();
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["explain", "pkg"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("files=7 raw -> 7 effective"))
+        .stdout(predicate::str::contains("check-time CLI flags"));
+}
+
+#[test]
+fn explain_labels_directory_pruned_by_scanner_exclude() {
+    // check never evaluates a scanner-excluded directory; explain must say
+    // so rather than reporting counts check would never enforce.
+    let fixture = TestFixture::new();
+    fixture.create_config(
+        r#"
+version = "2"
+
+[scanner]
+gitignore = false
+exclude = ["vendor/**"]
+
+[structure]
+max_files = 10
+"#,
+    );
+    fixture.create_rust_file("vendor/lib.rs", 1);
+
+    sloc_guard!()
+        .current_dir(fixture.path())
+        .args(["explain", "vendor"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "the configured scan excludes this directory",
+        ))
+        .stdout(predicate::str::contains("raw ->").not());
+}
+
+#[test]
 fn explain_directory_shows_count_exclude_provenance_and_counts() {
     let fixture = TestFixture::new();
     fixture.create_config(

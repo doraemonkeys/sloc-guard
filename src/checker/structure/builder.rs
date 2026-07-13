@@ -12,7 +12,8 @@ use super::compiled_rules::{CompiledCountExclude, CompiledSiblingRule, CompiledS
 pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructureRule>> {
     rules
         .iter()
-        .map(|rule| {
+        .enumerate()
+        .map(|(index, rule)| {
             let glob = compile_logical_path_glob(&rule.scope)?;
 
             // Calculate base_depth: count path components before first glob metacharacter
@@ -31,11 +32,27 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
                 warn_dirs_at: rule.warn_dirs_at,
                 warn_files_threshold: rule.warn_files_threshold,
                 warn_dirs_threshold: rule.warn_dirs_threshold,
-                count_exclude: CompiledCountExclude::new(&rule.count_exclude)?,
+                count_exclude: CompiledCountExclude::new(&rule.count_exclude)
+                    .map_err(|error| locate_count_exclude_error(error, index, &rule.scope))?,
                 reason: rule.reason.clone(),
             })
         })
         .collect()
+}
+
+/// Point an invalid rule-level `count_exclude` pattern error at its owning
+/// rule; with many `[[structure.rules]]`, the bare pattern alone does not
+/// locate the offending entry.
+fn locate_count_exclude_error(error: SlocGuardError, index: usize, scope: &str) -> SlocGuardError {
+    match error {
+        SlocGuardError::InvalidPattern { pattern, source } => SlocGuardError::InvalidPattern {
+            pattern: format!(
+                "{pattern} (count_exclude in structure.rules[{index}], scope \"{scope}\")"
+            ),
+            source,
+        },
+        other => other,
+    }
 }
 
 /// Build sibling rules from the new `siblings` array in structure rules.

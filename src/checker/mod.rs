@@ -4,9 +4,10 @@ mod structure;
 mod threshold;
 
 pub use explain::{
-    ContentExplanation, ContentRuleCandidate, ContentRuleMatch, CountExcludePattern,
-    CountExcludeSource, MatchStatus, StructureCounts, StructureExplanation, StructureRuleCandidate,
-    StructureRuleMatch, WarnAtSource,
+    ContentExplanation, ContentRuleCandidate, ContentRuleMatch, CountExcludeHits,
+    CountExcludePattern, CountExcludeSource, DirInventory, DirInventorySource, MatchStatus,
+    StructureCounts, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
+    WarnAtSource,
 };
 pub use result::CheckResult;
 pub use structure::StructureChecker;

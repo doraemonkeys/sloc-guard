@@ -210,7 +210,7 @@ Rules follow **last match wins**. Rule-level `count_exclude`:
 - Excluded entries are only exempt from counting — allowlist/deny/naming checks still apply.
 - No rule needed for simple cases: global `count_exclude` accepts path-qualified globs like `web/**/*_test.go`.
 
-Run `sloc-guard explain <dir>` to see the winning rule, raw vs effective counts, and which children each pattern excludes.
+Run `sloc-guard explain <dir>` to see the winning rule, raw vs effective counts, and which children each pattern excludes. Counts come from a scan under the configured excludes and gitignore — the same roster `check` counts — though check-time CLI flags such as `--exclude` are not visible to `explain`.
 
 ### Git Integration
 

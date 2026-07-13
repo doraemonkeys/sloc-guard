@@ -5,6 +5,7 @@
 
 use std::path::PathBuf;
 
+use crate::checker::DirInventorySource;
 use crate::cli::ExplainFormat;
 use crate::config::{Config, ContentConfig, ContentRule, StructureConfig, StructureRule};
 
@@ -272,7 +273,7 @@ fn format_structure_text_output_contains_expected_sections() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let explanation = checker.explain(&PathBuf::from("src"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Path:"));
@@ -292,7 +293,7 @@ fn format_structure_json_output_is_valid() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let explanation = checker.explain(&PathBuf::from("src"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
 
     // Verify it's valid JSON
@@ -317,7 +318,10 @@ fn format_structure_with_rule_reason_shows_reason() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("legacy/module"), None);
+    let explanation = checker.explain(
+        &PathBuf::from("legacy/module"),
+        DirInventorySource::NotScanned,
+    );
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Reason:"));
@@ -333,7 +337,7 @@ fn format_structure_with_unlimited_shows_unlimited() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let explanation = checker.explain(&PathBuf::from("src"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("max_files=unlimited"));
@@ -349,7 +353,7 @@ fn format_structure_with_no_limits_shows_none() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let explanation = checker.explain(&PathBuf::from("src"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("max_files=none"));
@@ -387,10 +391,16 @@ fn format_structure_text_shows_counts_and_count_exclude_hits() {
     let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
     let inventory = count_exclude_inventory();
 
-    let explanation = checker.explain(&PathBuf::from("src/api"), Some(&inventory));
+    let explanation = checker.explain(
+        &PathBuf::from("src/api"),
+        DirInventorySource::ConfiguredScan(&inventory),
+    );
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(output.contains("Counts:  files=3 raw -> 1 effective, dirs=1 raw -> 0 effective"));
+    // Residual divergence (check-time CLI flags) is labeled, not hidden.
+    assert!(output.contains("Note:    counts reflect the configured scan"));
+    assert!(output.contains("check-time CLI flags"));
     assert!(output.contains("Count Exclude (global + matched rule):"));
     assert!(output.contains("\"*.md\" (from [structure]) -> excluded: README.md"));
     assert!(output.contains("\".gitkeep\" (from [structure]) -> excluded: (none)"));
@@ -403,7 +413,7 @@ fn format_structure_text_shows_counts_and_count_exclude_hits() {
 fn format_structure_text_without_inventory_lists_patterns_without_hits() {
     let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
 
-    let explanation = checker.explain(&PathBuf::from("src/api"), None);
+    let explanation = checker.explain(&PathBuf::from("src/api"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(!output.contains("Counts:"));
@@ -420,7 +430,7 @@ fn format_structure_text_without_count_exclude_omits_section() {
     };
 
     let checker = crate::checker::StructureChecker::new(&config).unwrap();
-    let explanation = checker.explain(&PathBuf::from("src"), None);
+    let explanation = checker.explain(&PathBuf::from("src"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
 
     assert!(!output.contains("Count Exclude"));
@@ -431,28 +441,68 @@ fn format_structure_json_includes_count_exclude_and_counts() {
     let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
     let inventory = count_exclude_inventory();
 
-    let explanation = checker.explain(&PathBuf::from("src/api"), Some(&inventory));
+    let explanation = checker.explain(
+        &PathBuf::from("src/api"),
+        DirInventorySource::ConfiguredScan(&inventory),
+    );
     let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
-    assert_eq!(parsed["counts"]["raw_file_count"], 3);
-    assert_eq!(parsed["counts"]["effective_file_count"], 1);
+    assert_eq!(parsed["inventory"]["basis"], "configured_scan");
+    assert_eq!(parsed["inventory"]["counts"]["raw_file_count"], 3);
+    assert_eq!(parsed["inventory"]["counts"]["effective_file_count"], 1);
     assert_eq!(parsed["count_exclude"][0]["source"]["type"], "global");
-    assert_eq!(parsed["count_exclude"][0]["excluded_files"][0], "README.md");
+    assert_eq!(parsed["count_exclude"][0]["hits"]["files"][0], "README.md");
     assert_eq!(parsed["count_exclude"][2]["source"]["type"], "rule");
     assert_eq!(parsed["count_exclude"][2]["source"]["index"], 0);
     assert_eq!(parsed["count_exclude"][2]["source"]["scope"], "src/*");
 }
 
 #[test]
-fn format_structure_json_counts_null_without_inventory() {
+fn format_structure_json_distinguishes_not_scanned_from_no_hits() {
     let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
 
-    let explanation = checker.explain(&PathBuf::from("src/api"), None);
+    let explanation = checker.explain(&PathBuf::from("src/api"), DirInventorySource::NotScanned);
     let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
 
     let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
-    assert!(parsed["counts"].is_null());
+    assert_eq!(parsed["inventory"]["basis"], "not_scanned");
+    assert!(parsed["inventory"].get("counts").is_none());
+    // Without an inventory the hit lists are omitted entirely, so "no hits"
+    // (empty arrays) stays distinguishable from "no inventory" in isolation.
+    assert!(parsed["count_exclude"][0].get("hits").is_none());
+}
+
+#[test]
+fn format_structure_text_labels_directory_excluded_from_scan() {
+    let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
+
+    let explanation = checker.explain(
+        &PathBuf::from("src/api"),
+        DirInventorySource::ExcludedFromScan,
+    );
+    let output = format_structure_explanation(&explanation, ExplainFormat::Text).unwrap();
+
+    assert!(output.contains("Counts:  unavailable"));
+    assert!(output.contains("the configured scan excludes this directory"));
+    assert!(!output.contains("raw ->"));
+    assert!(!output.contains("excluded:"));
+}
+
+#[test]
+fn format_structure_json_labels_directory_excluded_from_scan() {
+    let checker = crate::checker::StructureChecker::new(&count_exclude_config()).unwrap();
+
+    let explanation = checker.explain(
+        &PathBuf::from("src/api"),
+        DirInventorySource::ExcludedFromScan,
+    );
+    let output = format_structure_explanation(&explanation, ExplainFormat::Json).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&output).expect("Invalid JSON output");
+    assert_eq!(parsed["inventory"]["basis"], "excluded_from_scan");
+    assert!(parsed["inventory"].get("counts").is_none());
+    assert!(parsed["count_exclude"][0].get("hits").is_none());
 }
 
 // ============================================================================

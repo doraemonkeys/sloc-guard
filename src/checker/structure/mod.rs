@@ -21,8 +21,8 @@ use crate::error::Result;
 use crate::project::normalize_for_matching;
 
 use super::explain::{
-    CountExcludePattern, CountExcludeSource, MatchStatus, StructureCounts, StructureExplanation,
-    StructureRuleCandidate, StructureRuleMatch,
+    CountExcludeHits, CountExcludePattern, CountExcludeSource, DirInventory, DirInventorySource,
+    MatchStatus, StructureCounts, StructureExplanation, StructureRuleCandidate, StructureRuleMatch,
 };
 pub use violation::{DirStats, StructureViolation, ViolationType};
 
@@ -544,10 +544,12 @@ impl StructureChecker {
     ///
     /// Returns a detailed breakdown of all evaluated rules and which one won,
     /// plus the active count-exclusion patterns with their provenance. When a
-    /// raw child inventory is supplied, the explanation also reports raw vs
-    /// effective counts and the concrete children each pattern excludes.
+    /// scanned child inventory is supplied, the explanation also reports raw
+    /// vs effective counts and the concrete children each pattern excludes;
+    /// the other [`DirInventorySource`] variants surface honestly in the
+    /// output instead of pretending counts exist.
     #[must_use]
-    pub fn explain(&self, path: &Path, inventory: Option<&DirStats>) -> StructureExplanation {
+    pub fn explain(&self, path: &Path, inventory: DirInventorySource<'_>) -> StructureExplanation {
         let normalized = normalize_for_matching(path);
         let mut rule_chain = Vec::new();
         let mut matched_rule = StructureRuleMatch::Default;
@@ -611,23 +613,29 @@ impl StructureChecker {
         let limits = self.resolve_limits(path);
 
         let mut count_exclude = self.build_count_exclude_entries(last_matching_rule_idx);
-        let counts = inventory.map(|inventory| {
-            Self::record_count_exclude_hits(
-                path,
-                inventory,
-                &self.count_exclude,
-                limits.count_exclude,
-                &mut count_exclude,
-            );
-            let (effective_file_count, effective_dir_count) =
-                self.effective_counts_for(path, inventory, limits.count_exclude);
-            StructureCounts {
-                raw_file_count: inventory.files.len(),
-                raw_dir_count: inventory.dirs.len(),
-                effective_file_count,
-                effective_dir_count,
+        let inventory = match inventory {
+            DirInventorySource::ConfiguredScan(stats) => {
+                Self::record_count_exclude_hits(
+                    path,
+                    stats,
+                    &self.count_exclude,
+                    limits.count_exclude,
+                    &mut count_exclude,
+                );
+                let (effective_file_count, effective_dir_count) =
+                    self.effective_counts_for(path, stats, limits.count_exclude);
+                DirInventory::ConfiguredScan {
+                    counts: StructureCounts {
+                        raw_file_count: stats.files.len(),
+                        raw_dir_count: stats.dirs.len(),
+                        effective_file_count,
+                        effective_dir_count,
+                    },
+                }
             }
-        });
+            DirInventorySource::ExcludedFromScan => DirInventory::ExcludedFromScan,
+            DirInventorySource::NotScanned => DirInventory::NotScanned,
+        };
 
         StructureExplanation {
             path: path.to_path_buf(),
@@ -638,14 +646,14 @@ impl StructureChecker {
             warn_threshold: limits.warn_threshold.unwrap_or(DEFAULT_WARN_THRESHOLD),
             override_reason,
             count_exclude,
-            counts,
+            inventory,
             rule_chain,
         }
     }
 
     /// Active count-exclusion patterns for a directory: the global set plus
-    /// the winning rule's, mirroring the union `check` applies. Hit lists
-    /// start empty; `record_count_exclude_hits` fills them from an inventory.
+    /// the winning rule's, mirroring the union `check` applies. Hits start
+    /// absent; `record_count_exclude_hits` fills them from an inventory.
     fn build_count_exclude_entries(
         &self,
         winning_rule_idx: Option<usize>,
@@ -653,8 +661,7 @@ impl StructureChecker {
         let entry = |pattern: &String, source: CountExcludeSource| CountExcludePattern {
             pattern: pattern.clone(),
             source,
-            excluded_files: Vec::new(),
-            excluded_dirs: Vec::new(),
+            hits: None,
         };
 
         let mut entries: Vec<CountExcludePattern> = self
@@ -691,6 +698,11 @@ impl StructureChecker {
         rule: Option<&CompiledCountExclude>,
         entries: &mut [CountExcludePattern],
     ) {
+        // An inventory exists, so every pattern gets concrete (possibly empty)
+        // hits — distinguishing "no hits" from "no inventory" in the output.
+        for entry in entries.iter_mut() {
+            entry.hits = Some(CountExcludeHits::default());
+        }
         let global_len = global.patterns().len();
         let mut record = |names: &[OsString], is_dir: bool| {
             for name in names {
@@ -703,11 +715,13 @@ impl StructureChecker {
                     .into_iter()
                     .map(|index| global_len + index);
                 for index in global_hits.chain(rule_hits) {
-                    let entry = &mut entries[index];
+                    let Some(hits) = entries[index].hits.as_mut() else {
+                        continue;
+                    };
                     if is_dir {
-                        entry.excluded_dirs.push(display.clone());
+                        hits.dirs.push(display.clone());
                     } else {
-                        entry.excluded_files.push(display.clone());
+                        hits.files.push(display.clone());
                     }
                 }
             }
@@ -717,8 +731,10 @@ impl StructureChecker {
 
         // Inventory order is not guaranteed; sort for deterministic output.
         for entry in entries {
-            entry.excluded_files.sort_unstable();
-            entry.excluded_dirs.sort_unstable();
+            if let Some(hits) = entry.hits.as_mut() {
+                hits.files.sort_unstable();
+                hits.dirs.sort_unstable();
+            }
         }
     }
 }

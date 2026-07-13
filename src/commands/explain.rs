@@ -2,8 +2,8 @@ use std::fmt::Write;
 use std::path::Path;
 
 use crate::checker::{
-    ContentExplanation, ContentRuleMatch, CountExcludeSource, DirStats, MatchStatus,
-    StructureChecker, StructureExplanation, StructureRuleMatch, ThresholdChecker, WarnAtSource,
+    ContentExplanation, ContentRuleMatch, CountExcludeSource, DirInventory, DirInventorySource,
+    DirStats, MatchStatus, StructureExplanation, StructureRuleMatch, WarnAtSource,
 };
 use crate::cli::{Cli, ExplainArgs, ExplainFormat};
 use crate::config::FetchPolicy;
@@ -13,7 +13,7 @@ use crate::{EXIT_CONFIG_ERROR, EXIT_SUCCESS};
 
 use super::config_notice::{print_config_notice, print_preset_notice};
 use super::context::{
-    color_choice_to_mode, load_config, resolve_config_root, resolve_project_root,
+    CheckContext, color_choice_to_mode, load_config, resolve_config_root, resolve_project_root,
 };
 use super::explain_sources::run_explain_sources;
 
@@ -68,28 +68,40 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
     let path = args.path.as_ref().expect("clap enforces path requirement");
     let logical_path = project_paths.logical(path);
 
+    // Explain reports what `check` would enforce, so it builds the same
+    // context `check` builds from this configuration (checkers plus the
+    // config-driven scanner) instead of a parallel approximation. Check-time
+    // CLI flags (`--exclude`, `--no-gitignore`) have no counterpart here.
+    let ctx = CheckContext::from_config_with_project_paths(
+        &config,
+        config.content.warn_threshold,
+        config.scanner.exclude.clone(),
+        config.scanner.gitignore,
+        project_paths,
+    )?;
+
     if path.is_file() {
-        let checker = ThresholdChecker::new(config)?;
-        let explanation = checker.explain(&logical_path);
+        let explanation = ctx.threshold_checker.explain(&logical_path);
         println!("{}", format_content_explanation(&explanation, args.format)?);
     } else if path.is_dir() {
-        match StructureChecker::new(&config.structure) {
-            Ok(checker) if checker.is_enabled() => {
-                let inventory = read_dir_inventory(path, project_paths.logical_depth(path))?;
-                let explanation = checker.explain(&logical_path, Some(&inventory));
+        match ctx.structure_checker.as_ref() {
+            Some(checker) if checker.is_enabled() => {
+                let stats = scan_dir_inventory(&ctx, path, &logical_path)?;
+                let inventory = stats.as_ref().map_or(
+                    DirInventorySource::ExcludedFromScan,
+                    DirInventorySource::ConfiguredScan,
+                );
+                let explanation = checker.explain(&logical_path, inventory);
                 println!(
                     "{}",
                     format_structure_explanation(&explanation, args.format)?
                 );
             }
-            Ok(_) => {
+            _ => {
                 println!("Path: {}", logical_path.display());
                 println!();
                 println!("No structure rules configured.");
                 println!("Add [structure] section to your config to enable directory limits.");
-            }
-            Err(e) => {
-                return Err(e);
             }
         }
     } else {
@@ -102,28 +114,29 @@ pub(crate) fn run_explain_impl(args: &ExplainArgs, cli: &Cli) -> crate::Result<(
     Ok(())
 }
 
-/// Inventory a directory's immediate children on disk.
+/// Inventory a directory's immediate children via the config-driven scan.
 ///
-/// `explain` reads the physical directory directly instead of scanning: the
-/// raw counts describe what exists on disk, before scanner-level exclusions
-/// (gitignore, `scanner.exclude`) are applied. Symlinks count as files,
-/// matching the scanner's no-follow traversal.
-fn read_dir_inventory(path: &Path, depth: usize) -> crate::Result<DirStats> {
-    let mut files = Vec::new();
-    let mut dirs = Vec::new();
-    for entry in
-        std::fs::read_dir(path).map_err(|e| SlocGuardError::io_with_path(e, path.to_path_buf()))?
-    {
-        let entry = entry.map_err(|e| SlocGuardError::io_with_path(e, path.to_path_buf()))?;
-        if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
-            dirs.push(entry.file_name());
-        } else {
-            files.push(entry.file_name());
-        }
-    }
-    files.sort_unstable();
-    dirs.sort_unstable();
-    Ok(DirStats { files, dirs, depth })
+/// Runs the same structure-aware scan `check` runs — scanner excludes,
+/// gitignore, and no-follow symlink handling included — rooted at the
+/// configuration root, so a directory the scan prunes is absent here exactly
+/// as it is absent from `check`'s roster. A directory outside the
+/// configuration root is scanned as its own root, mirroring `check <dir>`.
+/// Returns `None` when the scan never reaches the directory.
+fn scan_dir_inventory(
+    ctx: &CheckContext,
+    path: &Path,
+    logical_path: &Path,
+) -> crate::Result<Option<DirStats>> {
+    let scan_root = if logical_path.is_absolute() || logical_path.starts_with("..") {
+        path.to_path_buf()
+    } else {
+        ctx.project_paths().physical(Path::new("."))
+    };
+    let mut scan_result = ctx
+        .scanner
+        .scan_all_with_structure(&[scan_root], ctx.structure_scan_config.as_ref())?;
+    scan_result.rebase_logical_paths(ctx.project_paths());
+    Ok(scan_result.dir_stats.remove(logical_path))
 }
 
 fn format_content_explanation(
@@ -285,15 +298,26 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
     );
     let _ = writeln!(output, "  Warn at: {:.0}%", exp.warn_threshold * 100.0);
 
-    if let Some(counts) = &exp.counts {
-        let _ = writeln!(
-            output,
-            "  Counts:  files={} raw -> {} effective, dirs={} raw -> {} effective",
-            counts.raw_file_count,
-            counts.effective_file_count,
-            counts.raw_dir_count,
-            counts.effective_dir_count
-        );
+    match &exp.inventory {
+        DirInventory::ConfiguredScan { counts } => {
+            let _ = writeln!(
+                output,
+                "  Counts:  files={} raw -> {} effective, dirs={} raw -> {} effective",
+                counts.raw_file_count,
+                counts.effective_file_count,
+                counts.raw_dir_count,
+                counts.effective_dir_count
+            );
+            output.push_str(
+                "  Note:    counts reflect the configured scan (scanner excludes + gitignore); check-time CLI flags such as --exclude are not visible here\n",
+            );
+        }
+        DirInventory::ExcludedFromScan => {
+            output.push_str(
+                "  Counts:  unavailable - the configured scan excludes this directory, so check does not evaluate its limits\n",
+            );
+        }
+        DirInventory::NotScanned => {}
     }
 
     if let Some(reason) = &exp.override_reason {
@@ -340,8 +364,8 @@ fn format_structure_text(exp: &StructureExplanation) -> String {
 
 /// Render the active count-exclusion patterns with provenance and hits.
 ///
-/// Hit lists are rendered only when an inventory was available (`counts` is
-/// set); directories are marked with a trailing `/`.
+/// Hit lists are rendered only when an inventory was available (the entry
+/// carries hits); directories are marked with a trailing `/`.
 fn format_count_exclude_section(exp: &StructureExplanation, output: &mut String) {
     if exp.count_exclude.is_empty() {
         return;
@@ -356,21 +380,19 @@ fn format_count_exclude_section(exp: &StructureExplanation, output: &mut String)
                 format!("structure.rules[{index}] \"{scope}\"")
             }
         };
-        let hits_str = if exp.counts.is_none() {
-            String::new()
-        } else {
-            let hits: Vec<String> = entry
-                .excluded_files
+        let hits_str = entry.hits.as_ref().map_or_else(String::new, |hits| {
+            let rendered: Vec<String> = hits
+                .files
                 .iter()
                 .cloned()
-                .chain(entry.excluded_dirs.iter().map(|dir| format!("{dir}/")))
+                .chain(hits.dirs.iter().map(|dir| format!("{dir}/")))
                 .collect();
-            if hits.is_empty() {
+            if rendered.is_empty() {
                 " -> excluded: (none)".to_string()
             } else {
-                format!(" -> excluded: {}", hits.join(", "))
+                format!(" -> excluded: {}", rendered.join(", "))
             }
-        };
+        });
         let _ = writeln!(
             output,
             "    \"{}\" (from {source_str}){hits_str}",

@@ -117,24 +117,72 @@ pub struct CountExcludePattern {
     pub pattern: String,
     /// Where the pattern comes from (global section or the winning rule).
     pub source: CountExcludeSource,
-    /// Immediate child files this pattern excludes from counting (sorted).
-    /// Empty when no directory inventory was supplied.
-    pub excluded_files: Vec<String>,
-    /// Immediate child directories this pattern excludes from counting (sorted).
-    pub excluded_dirs: Vec<String>,
+    /// Concrete children the pattern excludes. `None` when no inventory was
+    /// supplied (the field is then omitted from JSON); `Some` with empty
+    /// lists when an inventory existed but the pattern excluded nothing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hits: Option<CountExcludeHits>,
+}
+
+/// Immediate children a count-exclusion pattern removes from the counts.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct CountExcludeHits {
+    /// Excluded child files (sorted).
+    pub files: Vec<String>,
+    /// Excluded child directories (sorted).
+    pub dirs: Vec<String>,
 }
 
 /// Raw vs effective child counts for an explained directory.
 ///
 /// Raw counts describe the supplied inventory; effective counts result from
-/// applying the active `count_exclude` union and are what limits compare
-/// against.
+/// applying the active `count_exclude` union to that inventory and are what
+/// limits compare against for the same roster. The CLI supplies the
+/// config-driven scan's roster (see [`DirInventorySource`]), so these are the
+/// numbers `check` enforces unless check-time CLI flags alter its scan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct StructureCounts {
     pub raw_file_count: usize,
     pub raw_dir_count: usize,
     pub effective_file_count: usize,
     pub effective_dir_count: usize,
+}
+
+/// Child inventory supplied to [`crate::checker::StructureChecker::explain`].
+///
+/// The CLI inventories a directory by scanning under the loaded
+/// configuration's exclusion regime (`scanner.exclude`, gitignore, no-follow
+/// symlink handling) — the same regime `check` scans under. Check-time CLI
+/// flags (`--exclude`, `--no-gitignore`, scan roots) can still change what
+/// `check` sees; that residual divergence is not knowable from configuration
+/// and is labeled, not resolved, in the output.
+#[derive(Debug, Clone, Copy)]
+pub enum DirInventorySource<'a> {
+    /// Roster produced by the config-driven scan.
+    ConfiguredScan(&'a super::DirStats),
+    /// The config-driven scan never reaches this directory (scanner.exclude,
+    /// gitignore, or symlink handling prunes it), so `check` has nothing to
+    /// count here.
+    ExcludedFromScan,
+    /// No scan was performed; counts and per-pattern hits are unknowable.
+    NotScanned,
+}
+
+/// Directory child inventory outcome in a structure explanation.
+///
+/// Mirrors [`DirInventorySource`], with counts materialized for the scanned
+/// case. The serialized `basis` tag tells JSON consumers whether the counts
+/// exist and where the roster came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(tag = "basis", rename_all = "snake_case")]
+pub enum DirInventory {
+    /// Counts measured from the config-driven scan's roster.
+    ConfiguredScan { counts: StructureCounts },
+    /// The config-driven scan excludes this directory; `check` does not
+    /// evaluate limits for it under this configuration.
+    ExcludedFromScan,
+    /// No inventory was supplied; counts and per-pattern hits are omitted.
+    NotScanned,
 }
 
 /// A candidate rule evaluated during structure rule matching.
@@ -174,8 +222,8 @@ pub struct StructureExplanation {
     /// Active count-exclusion patterns: the global set first, then the
     /// winning rule's (their union defines the counting caliber)
     pub count_exclude: Vec<CountExcludePattern>,
-    /// Raw vs effective counts; `None` when no child inventory was supplied
-    pub counts: Option<StructureCounts>,
+    /// Child inventory outcome; counts are present when a roster was supplied
+    pub inventory: DirInventory,
     /// All candidates evaluated (for debugging)
     pub rule_chain: Vec<StructureRuleCandidate>,
 }
