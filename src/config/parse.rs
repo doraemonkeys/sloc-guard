@@ -44,11 +44,34 @@ pub fn parse_source(content: &str, origin: &ConfigSource) -> Result<ParsedSource
 /// `origin` names the entry config file. Per-source schema checks in
 /// [`parse_source`] have already run on every chain member, so a failure here
 /// indicates a merge artifact rather than a typo in one file; reported line
-/// numbers refer to the merged rendering, not any source file.
+/// numbers refer to the merged rendering, not any source file — schema errors
+/// are marked "(in merged config ...)" so users are not sent to a wrong
+/// location in a real file.
 pub fn finalize_merged_config(value: toml::Value, origin: &ConfigSource) -> Result<Config> {
-    let config = config_from_value(value, origin)?;
+    let config = config_from_value(value, origin).map_err(mark_as_merged)?;
     validate_version(&config)?;
     Ok(config)
+}
+
+/// Tag schema errors on the merged value: the named origin is the entry file,
+/// but line/column resolve against the invisible merged rendering.
+fn mark_as_merged(err: SlocGuardError) -> SlocGuardError {
+    match err {
+        SlocGuardError::Syntax {
+            origin,
+            line,
+            column,
+            message,
+        } => SlocGuardError::Syntax {
+            origin,
+            line,
+            column,
+            message: format!(
+                "{message} (in merged config; line/column refer to the merged extends result, not a source file)"
+            ),
+        },
+        other => other,
+    }
 }
 
 /// Validate the config schema version. `None` means "use defaults" and is accepted.
@@ -73,7 +96,7 @@ pub fn validate_version(config: &Config) -> Result<()> {
 /// resolve against; those line numbers describe the rendering, not the
 /// original source.
 fn config_from_value(mut value: toml::Value, origin: &ConfigSource) -> Result<Config> {
-    validate_reset_positions(&value, "")?;
+    validate_reset_positions(&value, "", Some(origin))?;
     strip_reset_markers(&mut value);
     let rendered = toml::to_string(&value).map_err(|e| SlocGuardError::Config(e.to_string()))?;
     config_from_str(&rendered, origin)

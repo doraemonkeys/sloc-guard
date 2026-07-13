@@ -251,7 +251,6 @@ extends = "/parent.toml"
 
 [[content.rules]]
 pattern = "$reset"
-max_lines = 0
 
 [[content.rules]]
 pattern = "src/**"

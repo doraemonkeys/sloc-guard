@@ -79,15 +79,87 @@ fn parse_source_unknown_field_detected_alongside_reset_markers() {
 }
 
 #[test]
-fn parse_source_rejects_misplaced_reset_marker() {
+fn parse_source_rejects_misplaced_reset_marker_with_origin() {
     let content = "[scanner]\nexclude = [\"build/**\", \"$reset\"]\n";
 
     let err = parse_source(content, &file_origin()).unwrap_err();
 
-    assert!(matches!(
-        err,
-        SlocGuardError::Config(msg) if msg.contains("$reset") && msg.contains("first element")
-    ));
+    match err {
+        SlocGuardError::Semantic {
+            field,
+            message,
+            origin,
+            ..
+        } => {
+            assert_eq!(field, "scanner.exclude");
+            assert!(
+                message.contains("first element") && message.contains("position 1"),
+                "got: {message}"
+            );
+            assert_eq!(origin, Some(file_origin()));
+        }
+        other => panic!("Expected Semantic error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn parse_source_rejects_reset_marker_element_with_real_field() {
+    // "Reset parents and define this rule" in one element: the sibling field
+    // would be silently discarded with the marker, so it must be rejected.
+    let content = "[[content.rules]]\npattern = \"$reset\"\nmax_lines = 900\n";
+
+    let err = parse_source(content, &file_origin()).unwrap_err();
+
+    match err {
+        SlocGuardError::Semantic {
+            field,
+            message,
+            origin,
+            ..
+        } => {
+            assert_eq!(field, "content.rules");
+            assert!(message.contains("max_lines"), "got: {message}");
+            assert_eq!(origin, Some(file_origin()));
+        }
+        other => panic!("Expected Semantic error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn parse_source_rejects_reset_marker_element_with_typo_field() {
+    // Marker elements are peeled off before the schema check, so a typo here
+    // escapes unknown-field validation unless the payload itself is rejected.
+    let content = "[[structure.rules]]\nscope = \"$reset\"\nmax_filez = 3\n";
+
+    let err = parse_source(content, &file_origin()).unwrap_err();
+
+    match err {
+        SlocGuardError::Semantic {
+            field,
+            message,
+            origin,
+            ..
+        } => {
+            assert_eq!(field, "structure.rules");
+            assert!(message.contains("max_filez"), "got: {message}");
+            assert_eq!(origin, Some(file_origin()));
+        }
+        other => panic!("Expected Semantic error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn parse_source_accepts_bare_reset_marker_element() {
+    let content = "[[content.rules]]\npattern = \"$reset\"\n\n[[content.rules]]\npattern = \"**/*.go\"\nmax_lines = 600\n";
+
+    let parsed = parse_source(content, &file_origin()).unwrap();
+
+    // The marker is stripped from the schema-checked config, kept in the raw value.
+    assert_eq!(parsed.config.content.rules.len(), 1);
+    assert_eq!(
+        parsed.value["content"]["rules"].as_array().unwrap().len(),
+        2
+    );
 }
 
 #[test]
@@ -98,6 +170,47 @@ fn finalize_merged_config_parses_and_accepts_current_version() {
     let config = finalize_merged_config(value, &file_origin()).unwrap();
 
     assert_eq!(config.content.max_lines, 100);
+}
+
+#[test]
+fn finalize_merged_config_marks_schema_errors_as_merged() {
+    // A merge artifact: each source may legally use either the field or its
+    // alias, but the merged table carrying both fails the schema. The line
+    // number then points into the invisible merged rendering, so the message
+    // must say so instead of sending the user into the named file.
+    let value: toml::Value =
+        toml::from_str("[structure]\ndeny_files = [\"*.tmp\"]\ndeny_file_patterns = [\"*.bak\"]\n")
+            .unwrap();
+
+    let err = finalize_merged_config(value, &file_origin()).unwrap_err();
+
+    match err {
+        SlocGuardError::Syntax {
+            origin, message, ..
+        } => {
+            assert_eq!(origin, Some(file_origin()));
+            assert!(message.contains("in merged config"), "got: {message}");
+        }
+        other => panic!("Expected Syntax error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn finalize_merged_config_attributes_misplaced_reset_marker() {
+    // Non-Syntax errors pass through the merged-config marker unchanged but
+    // still carry the entry-file origin.
+    let value: toml::Value =
+        toml::from_str("[scanner]\nexclude = [\"build/**\", \"$reset\"]\n").unwrap();
+
+    let err = finalize_merged_config(value, &file_origin()).unwrap_err();
+
+    match err {
+        SlocGuardError::Semantic { field, origin, .. } => {
+            assert_eq!(field, "scanner.exclude");
+            assert_eq!(origin, Some(file_origin()));
+        }
+        other => panic!("Expected Semantic error, got: {other:?}"),
+    }
 }
 
 #[test]

@@ -42,7 +42,7 @@ fn returns_syntax_error_for_invalid_toml_without_extends() {
     assert!(result.is_err());
     let err = result.unwrap_err();
 
-    // Should be a Syntax error with line/column, not TomlParse
+    // Should be a Syntax error with line/column
     match err {
         SlocGuardError::Syntax {
             origin,
@@ -143,19 +143,14 @@ fn returns_error_for_nonexistent_explicit_path() {
 
 #[test]
 fn syntax_error_includes_remote_origin() {
-    // Verify that syntax errors from remote configs include Remote origin
-    // This tests the parse_value_with_location path with ConfigSource::Remote
+    // Verify that syntax errors from remote configs include Remote origin,
+    // driving parse_source the way the extends resolver does for remote content
     let invalid_content = "invalid[[[";
     let source = ConfigSource::Remote {
         url: "https://example.com/config.toml".to_string(),
     };
 
-    // Call the internal parsing function via a type alias to verify behavior
-    let result: Result<toml::Value, SlocGuardError> = toml::from_str(invalid_content)
-        .map_err(|e| SlocGuardError::syntax_from_toml(&e, invalid_content, Some(source.clone())));
-
-    assert!(result.is_err());
-    let err = result.unwrap_err();
+    let err = crate::config::parse::parse_source(invalid_content, &source).unwrap_err();
     match err {
         SlocGuardError::Syntax { origin, line, .. } => {
             let origin = origin.expect("Should have origin");

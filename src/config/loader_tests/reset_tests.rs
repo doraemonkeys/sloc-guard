@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::config::FileConfigLoader;
 use crate::config::loader::ConfigLoader;
-use crate::error::SlocGuardError;
+use crate::error::{ConfigSource, SlocGuardError};
 
 use super::mock_fs::MockFileSystem;
 
@@ -63,7 +63,6 @@ extends = "/base.toml"
 
 [[content.rules]]
 pattern = "$reset"
-max_lines = 0
 
 [[content.rules]]
 pattern = "**/*.go"
@@ -164,10 +163,61 @@ exclude = ["**/build/**", "$reset"]
     let result = loader.load_from_path(Path::new("/child.toml"));
 
     assert!(result.is_err());
-    let err = result.unwrap_err();
-    assert!(
-        matches!(err, SlocGuardError::Config(msg) if msg.contains("$reset") && msg.contains("first element"))
-    );
+    match result.unwrap_err() {
+        SlocGuardError::Semantic {
+            field,
+            message,
+            origin,
+            ..
+        } => {
+            assert_eq!(field, "scanner.exclude");
+            assert!(message.contains("first element"), "got: {message}");
+            assert_eq!(origin, Some(ConfigSource::file("/child.toml")));
+        }
+        other => panic!("Expected Semantic error, got: {other:?}"),
+    }
+}
+
+#[test]
+fn extends_reset_marker_with_extra_fields_fails() {
+    // "Reset parents and define this rule" in one element previously cleared
+    // the parents and silently dropped the rule; it must fail loudly instead.
+    let base_content = r#"
+version = "2"
+
+[[content.rules]]
+pattern = "**/*.rs"
+max_lines = 300
+"#;
+    let child_content = r#"
+version = "2"
+extends = "/base.toml"
+
+[[content.rules]]
+pattern = "$reset"
+max_lines = 900
+"#;
+
+    let fs = MockFileSystem::new()
+        .with_file("/base.toml", base_content)
+        .with_file("/child.toml", child_content);
+
+    let loader = FileConfigLoader::with_fs(fs);
+    let result = loader.load_from_path(Path::new("/child.toml"));
+
+    match result.unwrap_err() {
+        SlocGuardError::Semantic {
+            field,
+            message,
+            origin,
+            ..
+        } => {
+            assert_eq!(field, "content.rules");
+            assert!(message.contains("max_lines"), "got: {message}");
+            assert_eq!(origin, Some(ConfigSource::file("/child.toml")));
+        }
+        other => panic!("Expected Semantic error, got: {other:?}"),
+    }
 }
 
 #[test]

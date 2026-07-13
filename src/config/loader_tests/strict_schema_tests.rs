@@ -247,6 +247,26 @@ max_lines = 123
 }
 
 #[test]
+fn merge_artifact_schema_error_is_marked_as_merged_config() {
+    // Each source alone is valid, but the merged table carries both the field
+    // and its alias, which the schema rejects. The error names the entry file,
+    // yet its line number resolves against the invisible merged rendering —
+    // the message must say so.
+    let base_content = "[structure]\ndeny_file_patterns = [\"*.bak\"]\n";
+    let child_content = "extends = \"/base.toml\"\n\n[structure]\ndeny_files = [\"*.tmp\"]\n";
+
+    let fs = MockFileSystem::new()
+        .with_file("/base.toml", base_content)
+        .with_file("/child.toml", child_content);
+    let loader = FileConfigLoader::with_fs(fs);
+    let err = loader.load_from_path(Path::new("/child.toml")).unwrap_err();
+
+    let (origin, _line, message) = expect_syntax(err);
+    assert_file_origin(&origin, "child.toml");
+    assert!(message.contains("in merged config"), "got: {message}");
+}
+
+#[test]
 fn deny_file_patterns_alias_accepted_by_strict_schema() {
     let config_content = r#"
 [structure]

@@ -5,7 +5,7 @@
 //! - Array appending (parent + child)
 //! - `$reset` marker support for clearing parent arrays
 
-use crate::error::{Result, SlocGuardError};
+use crate::error::{ConfigSource, Result, SlocGuardError};
 
 /// The reset marker used to clear parent arrays during merge.
 pub const RESET_MARKER: &str = "$reset";
@@ -123,9 +123,16 @@ pub fn has_any_reset_markers(value: &toml::Value) -> bool {
     }
 }
 
-/// Validate that `$reset` markers are only in first position of arrays.
-/// Returns an error if `$reset` is found in any position other than first.
-pub fn validate_reset_positions(value: &toml::Value, path: &str) -> Result<()> {
+/// Validate `$reset` marker usage: markers must be the first element of their
+/// array and marker elements must not carry sibling keys.
+///
+/// Errors carry `origin` so a misused marker names the config that contains it,
+/// consistent with the other per-source schema errors.
+pub fn validate_reset_positions(
+    value: &toml::Value,
+    path: &str,
+    origin: Option<&ConfigSource>,
+) -> Result<()> {
     match value {
         toml::Value::Table(table) => {
             for (key, val) in table {
@@ -134,21 +141,72 @@ pub fn validate_reset_positions(value: &toml::Value, path: &str) -> Result<()> {
                 } else {
                     format!("{path}.{key}")
                 };
-                validate_reset_positions(val, &child_path)?;
+                validate_reset_positions(val, &child_path, origin)?;
             }
         }
         toml::Value::Array(arr) => {
             for (i, val) in arr.iter().enumerate() {
-                if i > 0 && is_reset_element(val) {
-                    return Err(SlocGuardError::Config(format!(
-                        "'{RESET_MARKER}' must be the first element in array '{path}', found at position {i}"
-                    )));
+                if is_reset_element(val) {
+                    if i > 0 {
+                        return Err(SlocGuardError::Semantic {
+                            field: path.to_string(),
+                            message: format!(
+                                "'{RESET_MARKER}' must be the first element of the array, found at position {i}"
+                            ),
+                            origin: origin.cloned(),
+                            suggestion: Some(format!(
+                                "Move '{RESET_MARKER}' to the first element of the array"
+                            )),
+                        });
+                    }
+                    validate_reset_element_payload(val, path, origin)?;
                 }
                 // Recursively validate nested values
-                validate_reset_positions(val, path)?;
+                validate_reset_positions(val, path, origin)?;
             }
         }
         _ => {}
     }
     Ok(())
+}
+
+/// Reject `$reset` marker table elements that carry sibling keys.
+///
+/// The whole marker element is discarded during merge/strip before the schema
+/// check runs, so any sibling key — a typo'd field as much as a real rule —
+/// would vanish silently. A marker element has no legitimate payload.
+fn validate_reset_element_payload(
+    value: &toml::Value,
+    path: &str,
+    origin: Option<&ConfigSource>,
+) -> Result<()> {
+    let toml::Value::Table(table) = value else {
+        return Ok(());
+    };
+    // Mirror is_reset_element's precedence: `pattern` claims the marker before `scope`.
+    let marker_key = if table.get("pattern").and_then(toml::Value::as_str) == Some(RESET_MARKER) {
+        "pattern"
+    } else {
+        "scope"
+    };
+    let extra_keys: Vec<&str> = table
+        .keys()
+        .map(String::as_str)
+        .filter(|key| *key != marker_key)
+        .collect();
+    if extra_keys.is_empty() {
+        return Ok(());
+    }
+    Err(SlocGuardError::Semantic {
+        field: path.to_string(),
+        message: format!(
+            "a '{RESET_MARKER}' marker element must contain only the marker field '{marker_key}', \
+             but also has: {}",
+            extra_keys.join(", ")
+        ),
+        origin: origin.cloned(),
+        suggestion: Some(format!(
+            "Keep the '{RESET_MARKER}' element bare and put real fields in a separate array element"
+        )),
+    })
 }

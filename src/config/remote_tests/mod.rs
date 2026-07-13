@@ -1,4 +1,5 @@
 mod cache_tests;
+mod extends_origin_tests;
 mod fetch_tests;
 mod hash_verification_tests;
 mod policy_tests;

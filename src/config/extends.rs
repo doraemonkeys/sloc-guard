@@ -125,7 +125,13 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
             return Err(SlocGuardError::CircularExtends { chain });
         }
 
-        self.process_config_value(config_value, Some(path), visited, sources, depth)
+        self.process_config_value(
+            config_value,
+            &ConfigSource::file(path),
+            visited,
+            sources,
+            depth,
+        )
     }
 
     /// Load remote config with extends chain, optionally tracking sources.
@@ -134,7 +140,7 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
         url: &str,
         expected_hash: Option<&str>,
         visited: &mut IndexSet<String>,
-        mut sources: Option<&mut Vec<SourcedConfig>>,
+        sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
     ) -> Result<(toml::Value, Option<String>)> {
         if depth > MAX_EXTENDS_DEPTH {
@@ -157,50 +163,24 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
         let source = ConfigSource::remote(url);
         let config_value = parse_source(&content, &source)?.value;
 
-        // Process extends chain (base sources come first via recursion)
-        // Clone only when tracking sources; move otherwise for efficiency
-        if sources.is_some() {
-            let (merged_value, preset_used) = self.process_config_value(
-                config_value.clone(),
-                None, // No base_path for remote configs
-                visited,
-                sources.as_deref_mut(),
-                depth,
-            )?;
-
-            // Record remote source (after recursion, so base sources come first)
-            // INVARIANT: sources was Some, unwrap is safe
-            sources.as_mut().unwrap().push(SourcedConfig {
-                source: ConfigSource::remote(url),
-                value: config_value,
-            });
-
-            Ok((merged_value, preset_used))
-        } else {
-            self.process_config_value(
-                config_value, // Move, no clone needed
-                None,
-                visited,
-                None,
-                depth,
-            )
-        }
+        self.process_config_value(config_value, &source, visited, sources, depth)
     }
 
     /// Process pre-parsed config value, optionally tracking sources.
     ///
     /// This is the core method that handles extends resolution and optional source collection.
-    /// When `sources` is `Some`, records each config in the inheritance chain.
+    /// When `sources` is `Some`, records each config in the inheritance chain
+    /// (base sources first, via recursion). `origin` identifies the config the
+    /// value came from; relative `extends` paths resolve against it, so they
+    /// are only valid for file origins.
     //
     // Note: We use `as_mut().map(|v| &mut **v)` instead of `as_deref_mut()` because we need
     // `Option<&mut Vec<T>>` (for `push()`), not `Option<&mut [T]>` (slice) which `as_deref_mut` returns.
-    // The `useless_let_if_seq` lint is suppressed because the conditional mutation pattern
-    // is clearer with explicit `let mut` for this complex extends resolution logic.
-    #[allow(clippy::option_as_ref_deref, clippy::useless_let_if_seq)]
+    #[allow(clippy::option_as_ref_deref)]
     fn process_config_value(
         &self,
         config_value: toml::Value,
-        base_path: Option<&Path>,
+        origin: &ConfigSource,
         visited: &mut IndexSet<String>,
         mut sources: Option<&mut Vec<SourcedConfig>>,
         depth: usize,
@@ -240,35 +220,31 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
                 let extends_path = Path::new(&extends);
                 let resolved_path = if extends_path.is_absolute() {
                     extends_path.to_path_buf()
-                } else if let Some(base) = base_path {
+                } else if let ConfigSource::File { path: base } = origin {
                     base.parent()
                         .unwrap_or_else(|| Path::new("."))
                         .join(extends_path)
                 } else {
                     return Err(SlocGuardError::ExtendsResolution {
                         path: extends,
-                        base: "remote config".to_string(),
+                        base: origin.to_string(),
                     });
                 };
                 self.load_with_extends(&resolved_path, visited, sources.as_deref_mut(), depth + 1)?
             };
             // Record source before merge (clone only when tracking is needed)
-            if let Some(src_vec) = sources.as_mut()
-                && let Some(path) = base_path
-            {
+            if let Some(src_vec) = sources.as_mut() {
                 src_vec.push(SourcedConfig {
-                    source: ConfigSource::file(path),
+                    source: origin.clone(),
                     value: config_value.clone(),
                 });
             }
             (merge_toml_values(base_value, config_value), preset_used)
         } else {
             // Record source before return (clone only when tracking is needed)
-            if let Some(src_vec) = sources.as_mut()
-                && let Some(path) = base_path
-            {
+            if let Some(src_vec) = sources.as_mut() {
                 src_vec.push(SourcedConfig {
-                    source: ConfigSource::file(path),
+                    source: origin.clone(),
                     value: config_value.clone(),
                 });
             }
@@ -280,7 +256,10 @@ impl<'a, F: FileSystem> ExtendsResolver<'a, F> {
             table.remove("extends_sha256");
         }
 
-        validate_reset_positions(&merged_value, "")?;
+        // Defense in depth: per-source checks in parse_source have already
+        // validated every chain member, so attribute any merge-level residue
+        // to the config whose merge produced it.
+        validate_reset_positions(&merged_value, "", Some(origin))?;
         strip_reset_markers(&mut merged_value);
 
         Ok((merged_value, preset_used))
