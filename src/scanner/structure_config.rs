@@ -19,7 +19,6 @@ use super::{AllowlistRule, DirectoryPruner};
 #[cfg(test)]
 #[derive(Debug, Default)]
 pub struct TestConfigParams {
-    pub count_exclude_patterns: Vec<String>,
     pub scanner_exclude_patterns: Vec<String>,
     pub allowlist_rules: Vec<AllowlistRule>,
     pub global_allow_extensions: Vec<String>,
@@ -34,10 +33,6 @@ pub struct TestConfigParams {
 /// Configuration for structure-aware scanning.
 #[derive(Debug, Clone, Default)]
 pub struct StructureScanConfig {
-    /// Patterns to exclude from file/dir counting (`structure.count_exclude`).
-    pub count_exclude: GlobSet,
-    /// Original count-exclude patterns used to preserve explicit-path vs basename semantics.
-    pub count_exclude_pattern_strs: Vec<String>,
     /// Scanner exclude patterns (scanner.exclude) - skip entirely.
     pub scanner_exclude: GlobSet,
     /// Legacy-named field containing complete directory-prefix globs derived from terminal `/**`
@@ -79,7 +74,6 @@ pub struct StructureScanConfig {
 /// Builder for `StructureScanConfig`.
 #[derive(Debug, Default)]
 pub struct StructureScanConfigBuilder {
-    count_exclude_patterns: Vec<String>,
     scanner_exclude_patterns: Vec<String>,
     allowlist_rules: Vec<AllowlistRule>,
     global_allow_extensions: Vec<String>,
@@ -96,13 +90,6 @@ impl StructureScanConfigBuilder {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
-    }
-
-    /// Set patterns to exclude from file/dir counting.
-    #[must_use]
-    pub fn count_exclude(mut self, patterns: Vec<String>) -> Self {
-        self.count_exclude_patterns = patterns;
-        self
     }
 
     /// Set scanner exclude patterns (skip entirely).
@@ -193,7 +180,6 @@ impl StructureScanConfig {
     #[cfg(test)]
     pub fn new(params: TestConfigParams) -> Result<Self> {
         Self::builder()
-            .count_exclude(params.count_exclude_patterns)
             .scanner_exclude(params.scanner_exclude_patterns)
             .allowlist_rules(params.allowlist_rules)
             .global_allow_extensions(params.global_allow_extensions)
@@ -208,8 +194,6 @@ impl StructureScanConfig {
 
     /// Build from a `StructureScanConfigBuilder`.
     fn from_builder(builder: StructureScanConfigBuilder) -> Result<Self> {
-        let count_exclude = Self::build_logical_path_glob_set(&builder.count_exclude_patterns)?;
-        let count_exclude_pattern_strs = builder.count_exclude_patterns.clone();
         let scanner_exclude_patterns =
             normalize_scanner_exclude_patterns(&builder.scanner_exclude_patterns);
         let scanner_exclude = Self::build_logical_path_glob_set(&scanner_exclude_patterns)?;
@@ -253,8 +237,6 @@ impl StructureScanConfig {
         let global_deny_dir_basenames = Self::build_glob_set(&global_deny_dir_basename_strs)?;
 
         Ok(Self {
-            count_exclude,
-            count_exclude_pattern_strs,
             scanner_exclude,
             scanner_exclude_dir_names,
             allowlist_rules: builder.allowlist_rules,
@@ -347,20 +329,6 @@ impl StructureScanConfig {
             exclusions.is_match(&logical)
                 || (match_identity_path && exclusions.is_match(&normalize_for_matching(path)))
         }))
-    }
-
-    pub(crate) fn is_count_excluded_with_project_paths(
-        &self,
-        path: &Path,
-        project_paths: &ProjectPaths,
-    ) -> bool {
-        let logical = normalize_for_matching(&project_paths.logical(path));
-        !matching_logical_path_globs(
-            &self.count_exclude,
-            &self.count_exclude_pattern_strs,
-            &logical,
-        )
-        .is_empty()
     }
 
     /// Find the first allowlist rule matching a directory.

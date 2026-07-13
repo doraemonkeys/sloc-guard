@@ -87,7 +87,7 @@ fn default_scanner_config_excludes_git_directory() {
     let root_stats = result.dir_stats.get(temp_dir.path());
     assert!(root_stats.is_some());
     assert_eq!(
-        root_stats.unwrap().dir_count,
+        root_stats.unwrap().dirs.len(),
         1,
         "Root should only have 1 subdirectory (src), .git should be excluded"
     );
@@ -133,7 +133,7 @@ fn scan_with_structure_scanner_exclude_prunes_directory_subtree() {
 
     // Root dir should NOT count .git as a subdirectory
     let root_stats = result.dir_stats.get(temp_dir.path());
-    assert!(root_stats.is_none() || root_stats.unwrap().dir_count == 0);
+    assert!(root_stats.is_none() || root_stats.unwrap().dirs.is_empty());
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn scan_with_structure_scanner_exclude_dotgit_pattern() {
 
     // src is in stats
     assert!(result.dir_stats.contains_key(&src_dir));
-    assert_eq!(result.dir_stats[&src_dir].file_count, 1);
+    assert_eq!(result.dir_stats[&src_dir].files.len(), 1);
 }
 
 #[test]
@@ -260,10 +260,10 @@ fn scan_with_structure_excluded_dir_not_counted_in_parent_stats() {
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
 
-    // Root should only count src as subdirectory, not .git
+    // Root should only record src as subdirectory, not .git
     let root_stats = result.dir_stats.get(temp_dir.path());
     assert!(root_stats.is_some());
-    assert_eq!(root_stats.unwrap().dir_count, 1);
+    assert_eq!(root_stats.unwrap().dirs.len(), 1);
 }
 
 #[test]

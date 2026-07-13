@@ -25,7 +25,7 @@ use crate::project::{ProjectPaths, UNROOTED_PROJECT_PATHS};
 pub struct ScanResult {
     /// All file paths discovered during scanning.
     pub files: Vec<PathBuf>,
-    /// Directory statistics: immediate children counts and depth.
+    /// Directory statistics: raw immediate child inventory and depth.
     pub dir_stats: HashMap<PathBuf, DirStats>,
     /// Allowlist violations detected during scanning.
     pub allowlist_violations: Vec<StructureViolation>,

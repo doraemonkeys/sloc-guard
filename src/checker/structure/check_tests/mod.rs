@@ -1,14 +1,31 @@
 //! Structure checker tests organized by domain.
 
 mod basic_tests;
+mod count_exclude_tests;
 mod depth_tests;
 mod limit_tests;
 mod rule_priority_tests;
 mod sibling_tests;
 mod validation_tests;
 
+use std::ffi::OsString;
+
 use crate::checker::structure::*;
 use crate::config::{StructureConfig, StructureRule, UNLIMITED};
+
+/// Build a raw child inventory with synthetic names for count-oriented tests
+/// that only care about how many children a directory has.
+fn dir_stats(file_count: usize, dir_count: usize, depth: usize) -> DirStats {
+    DirStats {
+        files: (0..file_count)
+            .map(|i| OsString::from(format!("file_{i}.rs")))
+            .collect(),
+        dirs: (0..dir_count)
+            .map(|i| OsString::from(format!("dir_{i}")))
+            .collect(),
+        depth,
+    }
+}
 
 /// Create a default config with no limits set.
 fn default_config() -> StructureConfig {

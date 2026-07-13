@@ -32,11 +32,10 @@ fn multiple_matching_rules_last_match_wins() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/generated/protos"),
-        DirStats {
-            file_count: 50, // Above 10 (first rule), below 100 (second rule)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            50, // Above 10 (first rule), below 100 (second rule)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -68,11 +67,10 @@ fn last_match_wins_more_restrictive_rule_last() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/core/engine"),
-        DirStats {
-            file_count: 15, // Above 10 (second rule), below 50 (first rule)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            15, // Above 10 (second rule), below 50 (first rule)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -109,11 +107,10 @@ fn three_rules_last_matching_wins() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/lib/utils"),
-        DirStats {
-            file_count: 15, // Above 5, above 10, below 20
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            15, // Above 5, above 10, below 20
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -144,11 +141,10 @@ fn non_matching_rules_skipped_in_priority() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/lib"),
-        DirStats {
-            file_count: 15, // Above 10
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            15, // Above 10
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);

@@ -18,7 +18,7 @@ fn scan_with_structure_collects_files_and_stats() {
 
     assert_eq!(result.files.len(), 2);
     assert!(result.dir_stats.contains_key(&src_dir));
-    assert_eq!(result.dir_stats[&src_dir].file_count, 2);
+    assert_eq!(result.dir_stats[&src_dir].files.len(), 2);
 }
 
 #[test]
@@ -35,7 +35,7 @@ fn scan_with_structure_counts_subdirectories() {
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
 
-    assert_eq!(result.dir_stats[&src_dir].dir_count, 2);
+    assert_eq!(result.dir_stats[&src_dir].dirs.len(), 2);
 }
 
 #[test]
@@ -76,32 +76,29 @@ fn scan_with_structure_respects_scanner_exclude() {
         result
             .dir_stats
             .get(temp_dir.path())
-            .is_none_or(|s| s.dir_count <= 1)
+            .is_none_or(|s| s.dirs.len() <= 1)
     );
 }
 
 #[test]
-fn scan_with_structure_respects_count_exclude() {
+fn scan_with_structure_records_raw_child_inventory() {
+    // The scanner is rule-agnostic: it records every child by name, and the
+    // structure checker applies count_exclude at check time.
     let temp_dir = TempDir::new().unwrap();
     let src_dir = temp_dir.path().join("src");
-    std::fs::create_dir_all(&src_dir).unwrap();
+    let sub_dir = src_dir.join("sub");
+    std::fs::create_dir_all(&sub_dir).unwrap();
     std::fs::write(src_dir.join("main.rs"), "").unwrap();
     std::fs::write(src_dir.join("generated.txt"), "").unwrap();
 
-    let config = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec!["*.txt".to_string()],
-        ..Default::default()
-    })
-    .unwrap();
     let scanner = DirectoryScanner::new(AcceptAllFilter);
-    let result = scanner
-        .scan_with_structure(temp_dir.path(), Some(&config))
-        .unwrap();
+    let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
 
-    // txt files should be found but not counted
-    assert_eq!(result.files.len(), 2);
-    // Only .rs file is counted (txt is excluded from count)
-    assert_eq!(result.dir_stats[&src_dir].file_count, 1);
+    let src_stats = &result.dir_stats[&src_dir];
+    let mut file_names = src_stats.files.clone();
+    file_names.sort_unstable();
+    assert_eq!(file_names, vec!["generated.txt", "main.rs"]);
+    assert_eq!(src_stats.dirs, vec!["sub"]);
 }
 
 #[test]
@@ -165,7 +162,7 @@ fn scan_with_structure_empty_directory() {
     let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
 
     assert!(result.dir_stats.contains_key(&empty_dir));
-    assert_eq!(result.dir_stats[&empty_dir].file_count, 0);
+    assert!(result.dir_stats[&empty_dir].files.is_empty());
 }
 
 #[test]
@@ -182,8 +179,8 @@ fn scan_with_structure_filter_excludes_files() {
     // Only .rs file in files list
     assert_eq!(result.files.len(), 1);
     assert!(result.files[0].ends_with("main.rs"));
-    // But dir_stats still counts both files (filter doesn't affect counting)
-    assert_eq!(result.dir_stats[&src_dir].file_count, 2);
+    // But dir_stats still records both files (filter doesn't affect the inventory)
+    assert_eq!(result.dir_stats[&src_dir].files.len(), 2);
 }
 
 #[test]
@@ -212,7 +209,7 @@ fn scan_with_structure_multiple_dirs_at_same_level() {
     let scanner = DirectoryScanner::new(AcceptAllFilter);
     let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
 
-    assert_eq!(result.dir_stats[temp_dir.path()].dir_count, 3);
+    assert_eq!(result.dir_stats[temp_dir.path()].dirs.len(), 3);
 }
 
 #[test]
@@ -225,7 +222,7 @@ fn scan_with_structure_handles_files_at_root() {
     let result = scanner.scan_with_structure(temp_dir.path(), None).unwrap();
 
     assert_eq!(result.files.len(), 2);
-    assert_eq!(result.dir_stats[temp_dir.path()].file_count, 2);
+    assert_eq!(result.dir_stats[temp_dir.path()].files.len(), 2);
 }
 
 #[test]
@@ -263,7 +260,9 @@ fn scan_with_structure_nested_directory_depth() {
 }
 
 #[test]
-fn scan_with_structure_with_count_exclude_does_not_affect_file_list() {
+fn count_excluded_file_is_exempt_from_quota_but_not_from_policy() {
+    // A count-excluded file no longer skips allowlist/deny checks: it is
+    // exempt from quotas, not invisible to policy.
     let temp_dir = TempDir::new().unwrap();
     let src_dir = temp_dir.path().join("src");
     std::fs::create_dir(&src_dir).unwrap();
@@ -271,7 +270,7 @@ fn scan_with_structure_with_count_exclude_does_not_affect_file_list() {
     std::fs::write(src_dir.join("test.gen"), "").unwrap();
 
     let config = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec!["*.gen".to_string()],
+        global_deny_patterns: vec!["*.gen".to_string()],
         ..Default::default()
     })
     .unwrap();
@@ -280,10 +279,21 @@ fn scan_with_structure_with_count_exclude_does_not_affect_file_list() {
         .scan_with_structure(temp_dir.path(), Some(&config))
         .unwrap();
 
-    // Both files in file list
+    // Both files in file list and in the raw inventory
     assert_eq!(result.files.len(), 2);
-    // Only .rs counted
-    assert_eq!(result.dir_stats[&src_dir].file_count, 1);
+    assert_eq!(result.dir_stats[&src_dir].files.len(), 2);
+    // The denied file is reported even though count_exclude drops it from counts
+    assert_eq!(result.allowlist_violations.len(), 1);
+    assert!(result.allowlist_violations[0].path.ends_with("test.gen"));
+
+    let structure_config = crate::config::StructureConfig {
+        max_files: Some(1),
+        count_exclude: vec!["*.gen".to_string()],
+        ..Default::default()
+    };
+    let checker = crate::checker::StructureChecker::new(&structure_config).unwrap();
+    let violations = checker.check(&result.dir_stats);
+    assert!(violations.is_empty());
 }
 
 #[test]

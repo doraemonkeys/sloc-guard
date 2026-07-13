@@ -279,18 +279,16 @@ impl<'a> StructureScanState<'a> {
             return;
         }
 
-        // Check count_exclude - don't count but continue
-        let is_count_excluded = self
-            .structure_config
-            .is_some_and(|cfg| cfg.is_count_excluded_with_project_paths(path, &self.project_paths));
-
         // Add to files list if filter allows
         if filter.should_include(path) {
             self.result.files.push(path.to_path_buf());
         }
 
-        // Count for parent directory (if not excluded)
-        if !is_count_excluded && let Some(parent) = path.parent() {
+        // Record in the parent's raw child inventory; count_exclude is applied
+        // by the structure checker at check time. Allowlist/naming checks run
+        // for every recorded file: count-excluded entries are exempt from
+        // quotas, not from policy.
+        if let Some(parent) = path.parent() {
             let parent_stats = self
                 .dir_entries
                 .entry(parent.to_path_buf())
@@ -298,7 +296,9 @@ impl<'a> StructureScanState<'a> {
                     depth: if depth > 0 { depth - 1 } else { 0 },
                     ..Default::default()
                 });
-            parent_stats.file_count += 1;
+            if let Some(name) = path.file_name() {
+                parent_stats.files.push(name.to_os_string());
+            }
 
             self.check_allowlist_violations(path, parent, abs_path);
         }
@@ -478,11 +478,6 @@ impl<'a> StructureScanState<'a> {
             }
         }
 
-        // Check count_exclude
-        let is_count_excluded = self
-            .structure_config
-            .is_some_and(|cfg| cfg.is_count_excluded_with_project_paths(path, &self.project_paths));
-
         // Initialize this directory's stats
         self.dir_entries
             .entry(path.to_path_buf())
@@ -491,10 +486,10 @@ impl<'a> StructureScanState<'a> {
                 ..Default::default()
             });
 
-        // Count as subdirectory for parent (if not excluded and not root)
+        // Record in the parent's raw child inventory (if not root)
         if depth > 0
-            && !is_count_excluded
             && let Some(parent) = path.parent()
+            && let Some(name) = path.file_name()
         {
             let parent_stats = self
                 .dir_entries
@@ -503,7 +498,7 @@ impl<'a> StructureScanState<'a> {
                     depth: depth - 1,
                     ..Default::default()
                 });
-            parent_stats.dir_count += 1;
+            parent_stats.dirs.push(name.to_os_string());
         }
     }
 

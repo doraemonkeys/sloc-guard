@@ -3,7 +3,51 @@
 //! Contains pre-compiled glob matchers and resolved limit structures
 //! used internally by the `StructureChecker` implementation.
 
-use globset::GlobMatcher;
+use std::path::Path;
+
+use globset::{GlobMatcher, GlobSet, GlobSetBuilder};
+
+use crate::error::{Result, SlocGuardError};
+use crate::project::{compile_logical_path_glob, matching_logical_path_globs};
+
+/// Compiled `count_exclude` patterns with logical-path semantics.
+///
+/// Keeps the original pattern strings alongside the compiled set because
+/// unqualified patterns (no path component) also match child basenames,
+/// while path-qualified patterns only match the full logical path.
+#[derive(Debug, Default)]
+pub(super) struct CompiledCountExclude {
+    matcher: GlobSet,
+    patterns: Vec<String>,
+}
+
+impl CompiledCountExclude {
+    pub(super) fn new(patterns: &[String]) -> Result<Self> {
+        let mut builder = GlobSetBuilder::new();
+        for pattern in patterns {
+            builder.add(compile_logical_path_glob(pattern)?);
+        }
+        let matcher = builder
+            .build()
+            .map_err(|source| SlocGuardError::InvalidPattern {
+                pattern: "combined count_exclude patterns".to_string(),
+                source,
+            })?;
+        Ok(Self {
+            matcher,
+            patterns: patterns.to_vec(),
+        })
+    }
+
+    pub(super) const fn is_empty(&self) -> bool {
+        self.patterns.is_empty()
+    }
+
+    /// Whether a logical child path is excluded from structure counting.
+    pub(super) fn matches(&self, logical_path: &Path) -> bool {
+        !matching_logical_path_globs(&self.matcher, &self.patterns, logical_path).is_empty()
+    }
+}
 
 /// Compiled structure rule with precompiled glob matcher.
 pub(super) struct CompiledStructureRule {

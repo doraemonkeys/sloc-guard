@@ -13,6 +13,7 @@ mod validation;
 pub mod violation;
 
 use std::collections::{HashMap, HashSet};
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use crate::config::{StructureConfig, UNLIMITED};
@@ -25,7 +26,9 @@ use super::explain::{
 pub use violation::{DirStats, StructureViolation, ViolationType};
 
 use builder::{build_rules, build_sibling_rules};
-use compiled_rules::{CompiledSiblingRule, CompiledStructureRule, StructureLimits};
+use compiled_rules::{
+    CompiledCountExclude, CompiledSiblingRule, CompiledStructureRule, StructureLimits,
+};
 use validation::{validate_allow_deny_mutual_exclusion, validate_limits, validate_sibling_rules};
 
 /// Checker for directory structure limits.
@@ -40,6 +43,9 @@ pub struct StructureChecker {
     warn_dirs_threshold: Option<f64>,
     rules: Vec<CompiledStructureRule>,
     sibling_rules: Vec<CompiledSiblingRule>,
+    /// Global `structure.count_exclude` patterns, applied when deriving
+    /// effective counts from the raw child inventory at check time.
+    count_exclude: CompiledCountExclude,
 }
 
 /// Default warn threshold when none specified.
@@ -57,6 +63,7 @@ impl StructureChecker {
         validate_allow_deny_mutual_exclusion(config)?;
         let rules = build_rules(&config.rules)?;
         let sibling_rules = build_sibling_rules(&config.rules)?;
+        let count_exclude = CompiledCountExclude::new(&config.count_exclude)?;
 
         Ok(Self {
             max_files: config.max_files,
@@ -69,6 +76,7 @@ impl StructureChecker {
             warn_dirs_threshold: config.warn_dirs_threshold,
             rules,
             sibling_rules,
+            count_exclude,
         })
     }
 
@@ -137,8 +145,9 @@ impl StructureChecker {
     /// Check directory stats against limits and return violations.
     ///
     /// Only directories are checked (files are not tracked in `dir_stats`).
-    /// Each directory's immediate children counts are compared against applicable limits.
-    /// Limits of `-1` (UNLIMITED) are skipped.
+    /// Effective file/dir counts are derived from each directory's raw child
+    /// inventory by applying `count_exclude` patterns, then compared against
+    /// applicable limits. Limits of `-1` (UNLIMITED) are skipped.
     #[must_use]
     #[allow(
         clippy::cast_possible_truncation,
@@ -150,6 +159,10 @@ impl StructureChecker {
 
         for (path, stats) in dir_stats {
             let limits = self.resolve_limits(path);
+            // Exclusions union: rule-level count_exclude (resolved by
+            // resolve_limits alongside the limits it scopes) joins this list.
+            let count_excludes = [&self.count_exclude];
+            let (file_count, dir_count) = effective_counts(path, stats, &count_excludes);
 
             // Check file count (skip if unlimited)
             if let Some(limit) = limits.max_files
@@ -165,19 +178,19 @@ impl StructureChecker {
                     DEFAULT_WARN_THRESHOLD,
                 );
 
-                if stats.file_count > limit_usize {
+                if file_count > limit_usize {
                     violations.push(StructureViolation::new(
                         path.clone(),
                         ViolationType::FileCount,
-                        stats.file_count,
+                        file_count,
                         limit_usize,
                         limits.override_reason.clone(),
                     ));
-                } else if stats.file_count > warn_limit {
+                } else if file_count > warn_limit {
                     violations.push(StructureViolation::warning(
                         path.clone(),
                         ViolationType::FileCount,
-                        stats.file_count,
+                        file_count,
                         limit_usize,
                         limits.override_reason.clone(),
                     ));
@@ -198,19 +211,19 @@ impl StructureChecker {
                     DEFAULT_WARN_THRESHOLD,
                 );
 
-                if stats.dir_count > limit_usize {
+                if dir_count > limit_usize {
                     violations.push(StructureViolation::new(
                         path.clone(),
                         ViolationType::DirCount,
-                        stats.dir_count,
+                        dir_count,
                         limit_usize,
                         limits.override_reason.clone(),
                     ));
-                } else if stats.dir_count > warn_limit {
+                } else if dir_count > warn_limit {
                     violations.push(StructureViolation::warning(
                         path.clone(),
                         ViolationType::DirCount,
-                        stats.dir_count,
+                        dir_count,
                         limit_usize,
                         limits.override_reason.clone(),
                     ));
@@ -587,6 +600,34 @@ impl StructureChecker {
             rule_chain,
         }
     }
+}
+
+/// Derive effective child counts from a directory's raw inventory by dropping
+/// children matched by any of the count-exclusion matchers (their union).
+///
+/// Children are matched as `dir_path/name` so the logical namespace follows
+/// the `dir_stats` keys, which are configuration-root-relative after
+/// `ScanResult::rebase_logical_paths`.
+fn effective_counts(
+    dir_path: &Path,
+    stats: &DirStats,
+    excludes: &[&CompiledCountExclude],
+) -> (usize, usize) {
+    if excludes.iter().all(|exclude| exclude.is_empty()) {
+        return (stats.files.len(), stats.dirs.len());
+    }
+
+    let count_included = |names: &[OsString]| {
+        names
+            .iter()
+            .filter(|name| {
+                let child = dir_path.join(name);
+                !excludes.iter().any(|exclude| exclude.matches(&child))
+            })
+            .count()
+    };
+
+    (count_included(&stats.files), count_included(&stats.dirs))
 }
 
 #[cfg(test)]

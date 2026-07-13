@@ -576,8 +576,9 @@ impl CheckContext {
             }
         }
 
+        // count_exclude is deliberately absent here: the scanner records the raw
+        // child inventory and StructureChecker applies count_exclude at check time.
         let structure_scan_config = StructureScanConfig::builder()
-            .count_exclude(config.structure.count_exclude.clone())
             .scanner_exclude(exclude_patterns.to_vec())
             .allowlist_rules(allowlist_rules)
             .global_allow_extensions(config.structure.allow_extensions.clone())

@@ -283,14 +283,7 @@ fn dot_prefixed_scope_applies_to_limits_and_siblings() {
     };
     let checker = StructureChecker::new(&config).unwrap();
     let mut stats = std::collections::HashMap::new();
-    stats.insert(
-        PathBuf::from("src/lib"),
-        DirStats {
-            file_count: 1,
-            dir_count: 0,
-            depth: 2,
-        },
-    );
+    stats.insert(PathBuf::from("src/lib"), dir_stats(1, 0, 2));
 
     let limit_violations = checker.check(&stats);
     let sibling_violations = checker.check_siblings(&[PathBuf::from("src/lib/foo.ts")]);

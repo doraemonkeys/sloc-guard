@@ -19,30 +19,9 @@ fn checker_enabled_with_depth_limit() {
 fn check_depth_under_limit_returns_no_violations() {
     let checker = StructureChecker::new(&config_with_depth_limit(3)).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("root"),
-        DirStats {
-            file_count: 0,
-            dir_count: 1,
-            depth: 0,
-        },
-    );
-    stats.insert(
-        PathBuf::from("root/sub1"),
-        DirStats {
-            file_count: 0,
-            dir_count: 1,
-            depth: 1,
-        },
-    );
-    stats.insert(
-        PathBuf::from("root/sub1/sub2"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 2,
-        },
-    );
+    stats.insert(PathBuf::from("root"), dir_stats(0, 1, 0));
+    stats.insert(PathBuf::from("root/sub1"), dir_stats(0, 1, 1));
+    stats.insert(PathBuf::from("root/sub1/sub2"), dir_stats(0, 0, 2));
 
     let violations = checker.check(&stats);
     assert!(violations.is_empty());
@@ -52,37 +31,14 @@ fn check_depth_under_limit_returns_no_violations() {
 fn check_depth_over_limit_returns_violation() {
     let checker = StructureChecker::new(&config_with_depth_limit(2)).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("root"),
-        DirStats {
-            file_count: 0,
-            dir_count: 1,
-            depth: 0,
-        },
-    );
-    stats.insert(
-        PathBuf::from("root/sub1"),
-        DirStats {
-            file_count: 0,
-            dir_count: 1,
-            depth: 1,
-        },
-    );
-    stats.insert(
-        PathBuf::from("root/sub1/sub2"),
-        DirStats {
-            file_count: 0,
-            dir_count: 1,
-            depth: 2,
-        },
-    );
+    stats.insert(PathBuf::from("root"), dir_stats(0, 1, 0));
+    stats.insert(PathBuf::from("root/sub1"), dir_stats(0, 1, 1));
+    stats.insert(PathBuf::from("root/sub1/sub2"), dir_stats(0, 1, 2));
     stats.insert(
         PathBuf::from("root/sub1/sub2/sub3"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 3, // Exceeds limit of 2
-        },
+        dir_stats(
+            0, 0, 3, // Exceeds limit of 2
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -102,11 +58,9 @@ fn unlimited_depth_skips_check() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("root/a/b/c/d/e/f"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 100, // Very deep, but unlimited
-        },
+        dir_stats(
+            0, 0, 100, // Very deep, but unlimited
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -128,11 +82,9 @@ fn rule_overrides_global_depth_limit() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/a/b/c"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 4, // Exceeds global (2), but within rule (5)
-        },
+        dir_stats(
+            0, 0, 4, // Exceeds global (2), but within rule (5)
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -150,11 +102,9 @@ fn depth_warn_threshold() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("root/a/b/c"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 4, // Above 3 (warn), below 5 (limit)
-        },
+        dir_stats(
+            0, 0, 4, // Above 3 (warn), below 5 (limit)
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -176,11 +126,9 @@ fn depth_warn_threshold_does_not_warn_at_threshold_boundary() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("root/a/b"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 3, // Exactly at warn threshold
-        },
+        dir_stats(
+            0, 0, 3, // Exactly at warn threshold
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -242,14 +190,7 @@ fn calculate_base_depth_simple_pattern() {
     // Verify base_depth calculation via behavior
     let mut stats = HashMap::new();
     // src/features/module at absolute depth 3, relative depth 1 (within limit)
-    stats.insert(
-        PathBuf::from("src/features/module"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 3,
-        },
-    );
+    stats.insert(PathBuf::from("src/features/module"), dir_stats(0, 0, 3));
 
     let violations = checker.check(&stats);
     assert!(violations.is_empty()); // depth 3 - base 2 = 1, within limit of 2
@@ -268,14 +209,7 @@ fn relative_depth_uses_normalized_dot_prefixed_scope() {
     };
     let checker = StructureChecker::new(&config).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("src/a/b"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 3,
-        },
-    );
+    stats.insert(PathBuf::from("src/a/b"), dir_stats(0, 0, 3));
 
     let violations = checker.check(&stats);
 
@@ -301,14 +235,7 @@ fn relative_depth_allows_deep_nesting_within_base() {
 
     let mut stats = HashMap::new();
     // src/features/module/sub at absolute depth 4, relative depth 2
-    stats.insert(
-        PathBuf::from("src/features/module/sub"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 4,
-        },
-    );
+    stats.insert(PathBuf::from("src/features/module/sub"), dir_stats(0, 0, 4));
 
     let violations = checker.check(&stats);
     assert!(violations.is_empty()); // 4 - 2 = 2, exactly at limit
@@ -332,11 +259,9 @@ fn relative_depth_violates_when_too_deep() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/features/a/b/c"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 5, // absolute depth
-        },
+        dir_stats(
+            0, 0, 5, // absolute depth
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -362,14 +287,7 @@ fn relative_depth_false_uses_absolute_depth() {
 
     let mut stats = HashMap::new();
     // src/features/module at absolute depth 3 (exceeds limit of 2)
-    stats.insert(
-        PathBuf::from("src/features/module"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 3,
-        },
-    );
+    stats.insert(PathBuf::from("src/features/module"), dir_stats(0, 0, 3));
 
     let violations = checker.check(&stats);
     assert_eq!(violations.len(), 1);
@@ -396,11 +314,7 @@ fn relative_depth_with_wildcard_in_middle() {
     // src/feature/utils/helpers at depth 4, base_depth=1, relative=3 (exceeds 1)
     stats.insert(
         PathBuf::from("src/feature/utils/helpers"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 4,
-        },
+        dir_stats(0, 0, 4),
     );
 
     let violations = checker.check(&stats);
@@ -424,14 +338,7 @@ fn relative_depth_with_double_star_at_start() {
     let checker = StructureChecker::new(&config).unwrap();
 
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("a/b/c/d"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 4,
-        },
-    );
+    stats.insert(PathBuf::from("a/b/c/d"), dir_stats(0, 0, 4));
 
     let violations = checker.check(&stats);
     // base_depth = 0, so relative = absolute = 4, exceeds limit 3
@@ -457,11 +364,9 @@ fn relative_depth_warn_threshold() {
     // Relative depth 4 (abs 6) - above 3 (warn), below 5 (limit)
     stats.insert(
         PathBuf::from("src/features/a/b/c/d"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 6, // abs depth
-        },
+        dir_stats(
+            0, 0, 6, // abs depth
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -493,11 +398,7 @@ fn relative_depth_moving_base_works() {
     // relative = 6 - 4 = 2 (within limit)
     stats.insert(
         PathBuf::from("packages/core/src/features/module/sub"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 6,
-        },
+        dir_stats(0, 0, 6),
     );
 
     let violations = checker.check(&stats);
@@ -521,14 +422,7 @@ fn relative_depth_saturating_sub_for_shallow_paths() {
 
     let mut stats = HashMap::new();
     // Path matching the pattern but with depth=1 (should result in relative 0)
-    stats.insert(
-        PathBuf::from("src/features"),
-        DirStats {
-            file_count: 0,
-            dir_count: 0,
-            depth: 2,
-        },
-    );
+    stats.insert(PathBuf::from("src/features"), dir_stats(0, 0, 2));
 
     let violations = checker.check(&stats);
     // relative = 2 - 2 = 0, within limit of 1

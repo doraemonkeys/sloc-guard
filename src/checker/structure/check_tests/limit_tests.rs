@@ -13,14 +13,7 @@ use super::*;
 fn check_over_file_limit_returns_violation() {
     let checker = StructureChecker::new(&config_with_file_limit(10)).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("src"),
-        DirStats {
-            file_count: 15,
-            dir_count: 2,
-            depth: 0,
-        },
-    );
+    stats.insert(PathBuf::from("src"), dir_stats(15, 2, 0));
 
     let violations = checker.check(&stats);
 
@@ -35,14 +28,7 @@ fn check_over_file_limit_returns_violation() {
 fn check_over_dir_limit_returns_violation() {
     let checker = StructureChecker::new(&config_with_dir_limit(3)).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("src"),
-        DirStats {
-            file_count: 5,
-            dir_count: 5,
-            depth: 0,
-        },
-    );
+    stats.insert(PathBuf::from("src"), dir_stats(5, 5, 0));
 
     let violations = checker.check(&stats);
 
@@ -62,14 +48,7 @@ fn check_both_limits_exceeded_returns_both_violations() {
     };
     let checker = StructureChecker::new(&config).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("src"),
-        DirStats {
-            file_count: 10,
-            dir_count: 5,
-            depth: 0,
-        },
-    );
+    stats.insert(PathBuf::from("src"), dir_stats(10, 5, 0));
 
     let violations = checker.check(&stats);
 
@@ -89,14 +68,7 @@ fn rule_overrides_global_limit() {
     };
     let checker = StructureChecker::new(&config).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("src/generated/protos"),
-        DirStats {
-            file_count: 50,
-            dir_count: 0,
-            depth: 0,
-        },
-    );
+    stats.insert(PathBuf::from("src/generated/protos"), dir_stats(50, 0, 0));
 
     let violations = checker.check(&stats);
 
@@ -120,11 +92,10 @@ fn rule_inherits_unset_limit_from_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/generated/protos"),
-        DirStats {
-            file_count: 50,
-            dir_count: 5, // Exceeds inherited limit of 3
-            depth: 0,
-        },
+        dir_stats(
+            50, 5, // Exceeds inherited limit of 3
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -149,11 +120,10 @@ fn warn_threshold_triggers_warning_below_hard_limit() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 47, // Above 45 (warn), below 50 (limit)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            47, // Above 45 (warn), below 50 (limit)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -178,11 +148,10 @@ fn warn_threshold_does_not_warn_at_threshold_boundary() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 45, // Exactly at warn threshold
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            45, // Exactly at warn threshold
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -200,11 +169,10 @@ fn warn_threshold_no_warning_below_threshold() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 44, // Below 45 (warn threshold)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            44, // Below 45 (warn threshold)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -223,11 +191,10 @@ fn warn_threshold_error_above_hard_limit() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 55, // Above 50 (hard limit)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            55, // Above 50 (hard limit)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -250,11 +217,10 @@ fn warn_threshold_dir_count() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 0,
-            dir_count: 9, // Above 8 (warn), below 10 (limit)
-            depth: 0,
-        },
+        dir_stats(
+            0, 9, // Above 8 (warn), below 10 (limit)
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -277,11 +243,10 @@ fn warn_threshold_dir_count_does_not_warn_at_threshold_boundary() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 0,
-            dir_count: 8, // Exactly at warn threshold
-            depth: 0,
-        },
+        dir_stats(
+            0, 8, // Exactly at warn threshold
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -304,11 +269,10 @@ fn warn_threshold_rule_overrides_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/special/dir"),
-        DirStats {
-            file_count: 30, // Above 25 (rule warn), below 50 (limit)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            30, // Above 25 (rule warn), below 50 (limit)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -329,11 +293,10 @@ fn no_warn_threshold_uses_default_0_8() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 39, // Below 40 (80% of 50)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            39, // Below 40 (80% of 50)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -357,11 +320,10 @@ fn unlimited_file_limit_skips_check() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 1000, // Would exceed any normal limit
-            dir_count: 1,
-            depth: 0,
-        },
+        dir_stats(
+            1000, // Would exceed any normal limit
+            1, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -381,11 +343,10 @@ fn unlimited_dir_limit_skips_check() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 3,
-            dir_count: 100, // Would exceed any normal limit
-            depth: 0,
-        },
+        dir_stats(
+            3, 100, // Would exceed any normal limit
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -411,11 +372,11 @@ fn rule_can_set_unlimited_to_override_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/generated/protos"),
-        DirStats {
-            file_count: 500, // Would exceed global limit but unlimited by rule
-            dir_count: 5,    // Exceeds inherited limit of 2
-            depth: 0,
-        },
+        dir_stats(
+            500, // Would exceed global limit but unlimited by rule
+            5,   // Exceeds inherited limit of 2
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -440,19 +401,17 @@ fn unconfigured_max_dirs_allows_unlimited_directories() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 5,
-            dir_count: 99, // Large number of subdirectories
-            depth: 0,
-        },
+        dir_stats(
+            5, 99, // Large number of subdirectories
+            0,
+        ),
     );
     stats.insert(
         PathBuf::from("tests"),
-        DirStats {
-            file_count: 3,
-            dir_count: 50, // Another directory with many subdirs
-            depth: 0,
-        },
+        dir_stats(
+            3, 50, // Another directory with many subdirs
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -550,11 +509,10 @@ fn warn_files_at_absolute_takes_precedence() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 42, // Above 40 (absolute), below 45 (percentage)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            42, // Above 40 (absolute), below 45 (percentage)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -577,11 +535,10 @@ fn warn_dirs_at_absolute_takes_precedence() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 0,
-            dir_count: 7, // Above 6 (absolute), below 9 (percentage)
-            depth: 0,
-        },
+        dir_stats(
+            0, 7, // Above 6 (absolute), below 9 (percentage)
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -604,11 +561,10 @@ fn warn_files_threshold_overrides_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 30, // Above 25 (per-metric), below 45 (global)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            30, // Above 25 (per-metric), below 45 (global)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -630,11 +586,10 @@ fn warn_dirs_threshold_overrides_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 0,
-            dir_count: 6, // Above 5 (per-metric), below 9 (global)
-            depth: 0,
-        },
+        dir_stats(
+            0, 6, // Above 5 (per-metric), below 9 (global)
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -659,11 +614,11 @@ fn granular_warn_different_for_files_and_dirs() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/a"),
-        DirStats {
-            file_count: 46, // Above 45 (files warn)
-            dir_count: 4,   // Below 5 (dirs OK)
-            depth: 0,
-        },
+        dir_stats(
+            46, // Above 45 (files warn)
+            4,  // Below 5 (dirs OK)
+            0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -689,11 +644,10 @@ fn granular_warn_in_rule_overrides_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/special/dir"),
-        DirStats {
-            file_count: 30, // Above 25 (rule), below 45 (global)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            30, // Above 25 (rule), below 45 (global)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -714,11 +668,10 @@ fn default_warn_threshold_is_0_8() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src"),
-        DirStats {
-            file_count: 9, // Above 8 (80% of 10), below 10
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            9, // Above 8 (80% of 10), below 10
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);
@@ -744,11 +697,10 @@ fn rule_inherits_granular_threshold_from_global() {
     let mut stats = HashMap::new();
     stats.insert(
         PathBuf::from("src/lib"),
-        DirStats {
-            file_count: 42, // Above 40 (inherited)
-            dir_count: 0,
-            depth: 0,
-        },
+        dir_stats(
+            42, // Above 40 (inherited)
+            0, 0,
+        ),
     );
 
     let violations = checker.check(&stats);

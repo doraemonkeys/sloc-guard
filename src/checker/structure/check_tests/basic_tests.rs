@@ -61,14 +61,7 @@ fn check_empty_stats_returns_no_violations() {
 fn check_under_limit_returns_no_violations() {
     let checker = StructureChecker::new(&config_with_file_limit(10)).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("src"),
-        DirStats {
-            file_count: 5,
-            dir_count: 2,
-            depth: 0,
-        },
-    );
+    stats.insert(PathBuf::from("src"), dir_stats(5, 2, 0));
 
     let violations = checker.check(&stats);
 
@@ -79,30 +72,9 @@ fn check_under_limit_returns_no_violations() {
 fn violations_sorted_by_path() {
     let checker = StructureChecker::new(&config_with_file_limit(5)).unwrap();
     let mut stats = HashMap::new();
-    stats.insert(
-        PathBuf::from("z_dir"),
-        DirStats {
-            file_count: 10,
-            dir_count: 0,
-            depth: 0,
-        },
-    );
-    stats.insert(
-        PathBuf::from("a_dir"),
-        DirStats {
-            file_count: 10,
-            dir_count: 0,
-            depth: 0,
-        },
-    );
-    stats.insert(
-        PathBuf::from("m_dir"),
-        DirStats {
-            file_count: 10,
-            dir_count: 0,
-            depth: 0,
-        },
-    );
+    stats.insert(PathBuf::from("z_dir"), dir_stats(10, 0, 0));
+    stats.insert(PathBuf::from("a_dir"), dir_stats(10, 0, 0));
+    stats.insert(PathBuf::from("m_dir"), dir_stats(10, 0, 0));
 
     let violations = checker.check(&stats);
 
@@ -115,8 +87,9 @@ fn violations_sorted_by_path() {
 #[test]
 fn dir_stats_default() {
     let stats = DirStats::default();
-    assert_eq!(stats.file_count, 0);
-    assert_eq!(stats.dir_count, 0);
+    assert!(stats.files.is_empty());
+    assert!(stats.dirs.is_empty());
+    assert_eq!(stats.depth, 0);
 }
 
 #[test]

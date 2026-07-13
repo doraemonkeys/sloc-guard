@@ -1,12 +1,20 @@
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use serde::Serialize;
 
-/// Counts of immediate children in a directory.
+/// Raw inventory of a directory's immediate children.
+///
+/// Collected rule-agnostically at scan time; the structure checker derives
+/// effective file/dir counts at check time by applying count-exclusion
+/// patterns, mirroring how content checking stores the raw line
+/// decomposition and derives effective SLOC per rule.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DirStats {
-    pub file_count: usize,
-    pub dir_count: usize,
+    /// Names of immediate child files.
+    pub files: Vec<OsString>,
+    /// Names of immediate child directories.
+    pub dirs: Vec<OsString>,
     /// Depth relative to scan root (root = 0).
     pub depth: usize,
 }

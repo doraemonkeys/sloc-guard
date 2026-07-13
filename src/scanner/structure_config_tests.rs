@@ -27,17 +27,6 @@ fn structure_scan_config_new_creates_config() {
 }
 
 #[test]
-fn structure_scan_config_with_count_exclude() {
-    let config = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec!["*.generated".to_string()],
-        ..Default::default()
-    })
-    .unwrap();
-    let path = Path::new("foo.generated");
-    assert!(config.count_exclude.is_match(path));
-}
-
-#[test]
 fn structure_scan_config_with_scanner_exclude() {
     let config = StructureScanConfig::new(TestConfigParams {
         scanner_exclude_patterns: vec!["**/target/**".to_string()],
@@ -136,7 +125,7 @@ fn structure_scan_config_extracts_directory_prefixes() {
 #[test]
 fn structure_scan_config_invalid_pattern_returns_error() {
     let result = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec!["[invalid".to_string()],
+        scanner_exclude_patterns: vec!["[invalid".to_string()],
         ..Default::default()
     });
     assert!(result.is_err());
@@ -151,56 +140,6 @@ fn structure_scan_config_is_scanner_excluded_file() {
     .unwrap();
     assert!(config.scanner_exclude.is_match(Path::new("Cargo.lock")));
     assert!(!config.scanner_exclude.is_match(Path::new("Cargo.toml")));
-}
-
-#[test]
-fn structure_scan_config_is_count_excluded() {
-    let config = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec!["*.generated.rs".to_string()],
-        ..Default::default()
-    })
-    .unwrap();
-    assert!(
-        config
-            .count_exclude
-            .is_match(Path::new("types.generated.rs"))
-    );
-    assert!(!config.count_exclude.is_match(Path::new("types.rs")));
-}
-
-#[test]
-fn count_exclude_preserves_root_anchors_and_basename_patterns() {
-    let project_root = PathBuf::from("/repo");
-    let project_paths = ProjectPaths::rooted_with_cwd(project_root.clone(), project_root.clone());
-    let config = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec![
-            "./root.rs".to_string(),
-            "*.tmp".to_string(),
-            "./src/**".to_string(),
-        ],
-        ..Default::default()
-    })
-    .unwrap();
-
-    assert!(
-        config.is_count_excluded_with_project_paths(&project_root.join("root.rs"), &project_paths,)
-    );
-    assert!(!config.is_count_excluded_with_project_paths(
-        &project_root.join("nested/root.rs"),
-        &project_paths,
-    ));
-    assert!(config.is_count_excluded_with_project_paths(
-        &project_root.join("nested/cache.tmp"),
-        &project_paths,
-    ));
-    assert!(config.is_count_excluded_with_project_paths(
-        &project_root.join("src/generated.rs"),
-        &project_paths,
-    ));
-    assert!(!config.is_count_excluded_with_project_paths(
-        &project_root.join("other/src/generated.rs"),
-        &project_paths,
-    ));
 }
 
 #[test]
@@ -331,20 +270,17 @@ fn structure_scan_config_records_target_directory_prefix() {
 #[test]
 fn structure_scan_config_empty_patterns_match_nothing() {
     let config = StructureScanConfig::new(TestConfigParams::default()).unwrap();
-    assert!(!config.count_exclude.is_match(Path::new("any.rs")));
     assert!(!config.scanner_exclude.is_match(Path::new("any.rs")));
 }
 
 #[test]
 fn structure_scan_config_combined_patterns() {
     let config = StructureScanConfig::new(TestConfigParams {
-        count_exclude_patterns: vec!["*.gen".to_string()],
         scanner_exclude_patterns: vec!["vendor/**".to_string(), "dist/**".to_string()],
         ..Default::default()
     })
     .unwrap();
 
-    assert!(config.count_exclude.is_match(Path::new("foo.gen")));
     assert!(config.scanner_exclude.is_match(Path::new("vendor/lib.rs")));
     assert!(config.scanner_exclude.is_match(Path::new("dist/bundle.js")));
 }
