@@ -71,6 +71,27 @@ fn subtree_scope_with_brace_alternation_covers_both_roots() {
 }
 
 #[test]
+fn star_subtree_scope_does_not_cover_config_root() {
+    let config = StructureConfig {
+        rules: vec![make_rule("*/", Some(0))],
+        ..Default::default()
+    };
+    let checker = StructureChecker::new(&config).unwrap();
+
+    let mut stats = HashMap::new();
+    stats.insert(PathBuf::from("."), dir_stats(3, 0, 0));
+    stats.insert(PathBuf::from("top"), dir_stats(3, 0, 1));
+    stats.insert(PathBuf::from("top/nested"), dir_stats(3, 0, 2));
+
+    let violations = checker.check(&stats);
+    let violating_paths: Vec<_> = violations.iter().map(|v| v.path.clone()).collect();
+    assert_eq!(
+        violating_paths,
+        vec![PathBuf::from("top"), PathBuf::from("top/nested")]
+    );
+}
+
+#[test]
 fn subtree_scope_participates_in_last_match_wins() {
     let config = StructureConfig {
         rules: vec![

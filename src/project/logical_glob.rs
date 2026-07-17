@@ -18,11 +18,15 @@ use crate::error::{Result, SlocGuardError};
 pub enum ScopeMatcher {
     /// Scope without a trailing separator: plain glob semantics.
     Pattern(GlobMatcher),
-    /// Trailing-separator scope (`X/`): the base directory plus all descendants.
+    /// Trailing-separator scope (`X/`) with a non-root base: the base
+    /// directories plus all their descendants — never the config root, even
+    /// when the base glob (e.g. `*`) happens to match the empty path.
     Subtree {
         base: GlobMatcher,
         descendants: GlobMatcher,
     },
+    /// Explicit root-subtree scope (`./`): the config root and everything below.
+    RootSubtree,
 }
 
 impl ScopeMatcher {
@@ -40,11 +44,10 @@ impl ScopeMatcher {
 
         let base = normalize_pattern_for_matching(trimmed);
         // `.` (the config root) normalizes to an empty base; its subtree is everything.
-        let descendants = if base.is_empty() {
-            "**".to_string()
-        } else {
-            format!("{base}/**")
-        };
+        if base.is_empty() {
+            return Ok(Self::RootSubtree);
+        }
+        let descendants = format!("{base}/**");
         let compile = |pattern: &str| {
             Glob::new(pattern).map_err(|source| SlocGuardError::InvalidPattern {
                 pattern: scope.to_string(),
@@ -63,8 +66,12 @@ impl ScopeMatcher {
         match self {
             Self::Pattern(matcher) => matcher.is_match(path),
             Self::Subtree { base, descendants } => {
-                base.is_match(path) || descendants.is_match(path)
+                // The config root (empty logical path) belongs only to the
+                // explicit `./` scope; a non-root base must not capture it via
+                // glob empty-string quirks.
+                !path.as_os_str().is_empty() && (base.is_match(path) || descendants.is_match(path))
             }
+            Self::RootSubtree => true,
         }
     }
 }
@@ -238,6 +245,17 @@ mod tests {
         assert!(matcher.is_match(normalize_for_matching(Path::new("."))));
         assert!(matcher.is_match(Path::new("src")));
         assert!(matcher.is_match(Path::new("src/nested/deep")));
+    }
+
+    #[test]
+    fn star_subtree_scope_excludes_config_root() {
+        // Globset's `*` matches the empty string, but the config root (empty
+        // logical path) must stay reserved for the explicit `./` scope.
+        let matcher = ScopeMatcher::compile("*/").unwrap();
+        assert!(!matcher.is_match(normalize_for_matching(Path::new("."))));
+        assert!(!matcher.is_match(Path::new("")));
+        assert!(matcher.is_match(Path::new("top")));
+        assert!(matcher.is_match(Path::new("top/nested")));
     }
 
     #[test]
