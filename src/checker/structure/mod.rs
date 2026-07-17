@@ -103,7 +103,8 @@ impl StructureChecker {
     /// # Glob Semantics (structure rules only match directories)
     ///
     /// - `src/components/*`  — matches DIRECT children only (e.g., `Button/`, `Icon/`)
-    /// - `src/components/**` — matches ALL descendants recursively
+    /// - `src/components/**` — matches ALL descendants recursively (NOT the directory itself)
+    /// - `src/components/`   — subtree: the directory itself plus all descendants
     /// - `src/features`      — exact directory match only
     fn resolve_limits(&self, path: &Path) -> StructureLimits<'_> {
         let normalized = normalize_for_matching(path);

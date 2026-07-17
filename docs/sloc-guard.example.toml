@@ -102,8 +102,10 @@ allow_extensions = [".tsx", ".ts", ".css"]
 file_naming_pattern = "^[A-Z][a-zA-Z0-9]*\\.(tsx|ts|css)$"
 reason = "React components: PascalCase naming required"
 
+# scope forms: "dir" exact, "dir/*" direct children, "dir/**" descendants only,
+# "dir/" the directory plus its whole subtree.
 [[structure.rules]]
-scope = "tests/**"
+scope = "tests/"
 max_files = -1                                # -1 = unlimited
 max_depth = 3
 reason = "No file limit for test directories"

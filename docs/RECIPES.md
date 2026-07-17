@@ -17,7 +17,7 @@ max_files = 50
 max_dirs = 15
 
 [[structure.rules]]
-scope = "packages/*/src/**"
+scope = "packages/*/src/"  # Trailing / = each src directory plus its whole subtree
 siblings = [
     { group = ["index.ts", "types.ts"] }  # If one exists, both must exist
 ]
@@ -40,13 +40,13 @@ max_lines = 300
 reason = "Components should be small and focused"
 
 [[structure.rules]]
-scope = "src/components/**"
+scope = "src/components/"  # Subtree: includes src/components itself
 file_naming_pattern = "^[A-Z][a-zA-Z0-9]*\\.(tsx|css|module\\.css)$"
 allow_extensions = [".tsx", ".css"]
 reason = "React components: PascalCase required"
 
 [[structure.rules]]
-scope = "src/components/**"
+scope = "src/components/"
 siblings = [
     { match = "*.tsx", require = "{stem}.test.tsx", severity = "warn" }
 ]
@@ -120,7 +120,7 @@ max_lines = 600
 reason = "Test files need more space"
 
 [[structure.rules]]
-scope = "**/migrations/**"
+scope = "**/migrations/"  # Subtree: migration files live in the directory itself
 max_files = -1
 max_dirs = -1
 reason = "No limits for migration directories"
@@ -138,7 +138,7 @@ reason = "Refactoring in progress - JIRA-1234"
 expires = "2025-06-01"
 
 [[structure.rules]]
-scope = "src/legacy/**"
+scope = "src/legacy/"
 max_files = -1
 reason = "Legacy code - to be refactored"
 expires = "2025-12-31"

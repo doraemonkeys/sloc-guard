@@ -2,9 +2,72 @@
 
 use std::path::{Path, PathBuf};
 
-use globset::{Glob, GlobSet};
+use globset::{Glob, GlobMatcher, GlobSet};
 
 use crate::error::{Result, SlocGuardError};
+
+/// Compiled matcher for a directory-scope pattern (structure `scope` fields).
+///
+/// Scope patterns select directories with plain glob semantics — `X` exact,
+/// `X/*` direct children, `X/**` strict descendants — plus one addition: a
+/// trailing separator selects the *subtree*, i.e. `X/` matches the directory
+/// itself and every descendant. The subtree form exists because globset's
+/// `X/**` excludes the base directory, which would otherwise force every
+/// subtree rule to be written twice (`X` and `X/**`).
+#[derive(Debug, Clone)]
+pub enum ScopeMatcher {
+    /// Scope without a trailing separator: plain glob semantics.
+    Pattern(GlobMatcher),
+    /// Trailing-separator scope (`X/`): the base directory plus all descendants.
+    Subtree {
+        base: GlobMatcher,
+        descendants: GlobMatcher,
+    },
+}
+
+impl ScopeMatcher {
+    /// Compile a configuration-root-relative directory-scope pattern.
+    ///
+    /// # Errors
+    /// Returns an invalid-pattern error containing the original user-authored scope.
+    pub fn compile(scope: &str) -> Result<Self> {
+        let trimmed = scope.trim_end_matches(['/', '\\']);
+        if trimmed.len() == scope.len() {
+            return Ok(Self::Pattern(
+                compile_logical_path_glob(scope)?.compile_matcher(),
+            ));
+        }
+
+        let base = normalize_pattern_for_matching(trimmed);
+        // `.` (the config root) normalizes to an empty base; its subtree is everything.
+        let descendants = if base.is_empty() {
+            "**".to_string()
+        } else {
+            format!("{base}/**")
+        };
+        let compile = |pattern: &str| {
+            Glob::new(pattern).map_err(|source| SlocGuardError::InvalidPattern {
+                pattern: scope.to_string(),
+                source,
+            })
+        };
+        Ok(Self::Subtree {
+            base: compile(&base)?.compile_matcher(),
+            descendants: compile(&descendants)?.compile_matcher(),
+        })
+    }
+
+    /// Whether a normalized logical directory path falls inside this scope.
+    pub fn is_match(&self, logical_path: impl AsRef<Path>) -> bool {
+        let path = logical_path.as_ref();
+        match self {
+            Self::Pattern(matcher) => matcher.is_match(path),
+            Self::Subtree { base, descendants } => {
+                base.is_match(path) || descendants.is_match(path)
+            }
+        }
+    }
+}
 
 /// Normalize a logical path for consistent glob pattern matching.
 ///
@@ -130,6 +193,60 @@ mod tests {
             .unwrap()
             .compile_matcher();
         assert!(src.is_match(normalize_for_matching(Path::new("./src/lib"))));
+    }
+
+    #[test]
+    fn scope_without_trailing_separator_keeps_plain_glob_semantics() {
+        let exact = ScopeMatcher::compile("web/src").unwrap();
+        assert!(exact.is_match(Path::new("web/src")));
+        assert!(!exact.is_match(Path::new("web/src/components")));
+
+        let descendants = ScopeMatcher::compile("web/src/**").unwrap();
+        assert!(!descendants.is_match(Path::new("web/src")));
+        assert!(descendants.is_match(Path::new("web/src/components")));
+    }
+
+    #[test]
+    fn trailing_separator_scope_matches_base_and_descendants() {
+        for scope in ["web/src/", r"web\src\", "web/src//"] {
+            let matcher = ScopeMatcher::compile(scope).unwrap();
+            assert!(matcher.is_match(Path::new("web/src")), "base for {scope}");
+            assert!(
+                matcher.is_match(Path::new("web/src/components/button")),
+                "descendant for {scope}"
+            );
+            assert!(
+                !matcher.is_match(Path::new("web/src2")),
+                "sibling prefix for {scope}"
+            );
+            assert!(!matcher.is_match(Path::new("web")), "parent for {scope}");
+        }
+    }
+
+    #[test]
+    fn trailing_separator_scope_supports_brace_alternation() {
+        let matcher = ScopeMatcher::compile("web/{src,test}/").unwrap();
+        assert!(matcher.is_match(Path::new("web/src")));
+        assert!(matcher.is_match(Path::new("web/test")));
+        assert!(matcher.is_match(Path::new("web/test/fixtures")));
+        assert!(!matcher.is_match(Path::new("web/docs")));
+    }
+
+    #[test]
+    fn config_root_subtree_scope_matches_everything() {
+        let matcher = ScopeMatcher::compile("./").unwrap();
+        assert!(matcher.is_match(normalize_for_matching(Path::new("."))));
+        assert!(matcher.is_match(Path::new("src")));
+        assert!(matcher.is_match(Path::new("src/nested/deep")));
+    }
+
+    #[test]
+    fn invalid_subtree_scope_error_reports_authored_pattern() {
+        let error = ScopeMatcher::compile("web/{src/").unwrap_err();
+        match error {
+            SlocGuardError::InvalidPattern { pattern, .. } => assert_eq!(pattern, "web/{src/"),
+            other => panic!("expected InvalidPattern, got {other:?}"),
+        }
     }
 
     #[test]

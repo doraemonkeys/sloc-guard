@@ -700,7 +700,9 @@ impl StructureConfig {
 #[serde(deny_unknown_fields)]
 pub struct StructureRule {
     /// Glob pattern defining the directory scope where this rule applies.
-    /// Example: `scope = "src/**"` applies to all directories under `src/`.
+    /// Example: `scope = "src/**"` applies to all directories under `src/`
+    /// (not `src` itself). A trailing `/` selects the subtree including its
+    /// root: `scope = "src/"` applies to `src` and everything below it.
     pub scope: String,
 
     /// Override limit for files in matched directories.

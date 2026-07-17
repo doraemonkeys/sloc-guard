@@ -197,11 +197,13 @@ siblings = [
 reason = "Feature modules: max 3 levels deep, every component needs a test"
 
 [[structure.rules]]
-scope = "tests/**"
+scope = "tests/"                             # Trailing / = tests itself plus its whole subtree
 max_files = -1
 max_dirs = -1
 reason = "No limits for test directories"
 ```
+
+`scope` selects directories: `dir` (exact match), `dir/*` (direct children), `dir/**` (descendants only), `dir/` (the directory plus its whole subtree).
 
 Rules follow **last match wins**. Rule-level `count_exclude`:
 

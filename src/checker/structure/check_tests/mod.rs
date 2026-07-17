@@ -6,6 +6,7 @@ mod depth_tests;
 mod limit_tests;
 mod rule_priority_tests;
 mod sibling_tests;
+mod subtree_scope_tests;
 mod validation_tests;
 
 use std::ffi::OsString;

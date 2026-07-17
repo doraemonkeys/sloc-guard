@@ -9,7 +9,7 @@ mod logical_glob;
 use std::path::{Path, PathBuf};
 
 pub(crate) use logical_glob::{
-    compile_logical_path_glob, matching_logical_path_globs, normalize_for_matching,
+    ScopeMatcher, compile_logical_path_glob, matching_logical_path_globs, normalize_for_matching,
     normalize_pattern_for_matching,
 };
 

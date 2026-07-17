@@ -47,6 +47,21 @@ fn allowlist_rule_matches_project_root_scope() {
 }
 
 #[test]
+fn allowlist_rule_subtree_scope_matches_base_and_descendants() {
+    // Trailing `/` selects the subtree including its root: `src/` = `src` + `src/**`.
+    let rule = AllowlistRuleBuilder::new("src/".to_string())
+        .with_extensions(vec![".rs".to_string()])
+        .build()
+        .unwrap();
+
+    assert!(rule.matches_directory(Path::new("src")));
+    assert!(rule.matches_directory(Path::new("./src")));
+    assert!(rule.matches_directory(Path::new("src/lib/nested")));
+    assert!(!rule.matches_directory(Path::new("src2")));
+    assert!(!rule.matches_directory(Path::new("tests")));
+}
+
+#[test]
 fn allowlist_rule_matches_directory_glob_star_with_dot_prefix() {
     let rule = AllowlistRuleBuilder::new("src/**".to_string())
         .with_extensions(vec![".rs".to_string()])

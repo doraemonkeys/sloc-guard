@@ -6,7 +6,7 @@ use regex::Regex;
 use crate::SlocGuardError;
 use crate::error::Result;
 use crate::project::{
-    compile_logical_path_glob, matching_logical_path_globs, normalize_for_matching,
+    ScopeMatcher, compile_logical_path_glob, matching_logical_path_globs, normalize_for_matching,
 };
 
 /// A compiled allowlist rule for checking allowed file types in a directory.
@@ -14,7 +14,7 @@ use crate::project::{
 pub struct AllowlistRule {
     /// Glob pattern defining the directory scope where this rule applies.
     pub scope: String,
-    matcher: globset::GlobMatcher,
+    matcher: ScopeMatcher,
     /// Validated extensions (with leading dot, e.g., ".rs").
     pub allow_extensions: Vec<String>,
     /// Compiled patterns for allowlist matching.
@@ -261,7 +261,7 @@ impl AllowlistRuleBuilder {
     /// # Errors
     /// Returns an error if any pattern is invalid.
     pub fn build(self) -> Result<AllowlistRule> {
-        let glob = compile_logical_path_glob(&self.scope)?;
+        let matcher = ScopeMatcher::compile(&self.scope)?;
 
         let mut pattern_builder = GlobSetBuilder::new();
         for p in &self.allow_patterns {
@@ -370,7 +370,7 @@ impl AllowlistRuleBuilder {
 
         Ok(AllowlistRule {
             scope: self.scope,
-            matcher: glob.compile_matcher(),
+            matcher,
             allow_extensions: self.allow_extensions,
             allow_patterns,
             allow_pattern_strs: self.allow_patterns,

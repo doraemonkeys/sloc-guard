@@ -4,7 +4,7 @@ use globset::Glob;
 
 use crate::config::StructureRule;
 use crate::error::{Result, SlocGuardError};
-use crate::project::{compile_logical_path_glob, normalize_pattern_for_matching};
+use crate::project::{ScopeMatcher, normalize_pattern_for_matching};
 
 use super::compiled_rules::{CompiledCountExclude, CompiledSiblingRule, CompiledStructureRule};
 
@@ -14,14 +14,14 @@ pub(super) fn build_rules(rules: &[StructureRule]) -> Result<Vec<CompiledStructu
         .iter()
         .enumerate()
         .map(|(index, rule)| {
-            let glob = compile_logical_path_glob(&rule.scope)?;
+            let matcher = ScopeMatcher::compile(&rule.scope)?;
 
             // Calculate base_depth: count path components before first glob metacharacter
             let base_depth = calculate_base_depth(&normalize_pattern_for_matching(&rule.scope));
 
             Ok(CompiledStructureRule {
                 scope: rule.scope.clone(),
-                matcher: glob.compile_matcher(),
+                matcher,
                 max_files: rule.max_files,
                 max_dirs: rule.max_dirs,
                 max_depth: rule.max_depth,
@@ -62,8 +62,7 @@ pub(super) fn build_sibling_rules(rules: &[StructureRule]) -> Result<Vec<Compile
     let mut compiled_rules = Vec::new();
 
     for rule in rules {
-        let dir_glob = compile_logical_path_glob(&rule.scope)?;
-        let dir_matcher = dir_glob.compile_matcher();
+        let dir_matcher = ScopeMatcher::compile(&rule.scope)?;
 
         for sibling in &rule.siblings {
             match sibling {

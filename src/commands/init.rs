@@ -121,14 +121,16 @@ warn_threshold = 0.8                      # Warn at 80% of limits
 # deny_files = ["*.bak", "*.tmp", ".DS_Store"]
 
 # Structure Rules: Override for specific directories
+# scope forms: "dir" exact, "dir/*" direct children, "dir/**" descendants only,
+# "dir/" the directory plus its whole subtree
 # [[structure.rules]]
-# scope = "src/components/**"
+# scope = "src/components/"
 # max_files = 50
 # allow_extensions = [".tsx", ".ts", ".css"]
 # reason = "React components directory"
 
 # [[structure.rules]]
-# scope = "tests/**"
+# scope = "tests/"
 # max_files = -1                          # -1 = unlimited
 # reason = "No file limit for test directories"
 

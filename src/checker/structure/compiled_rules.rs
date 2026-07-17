@@ -8,7 +8,7 @@ use std::path::Path;
 use globset::{GlobMatcher, GlobSet, GlobSetBuilder};
 
 use crate::error::{Result, SlocGuardError};
-use crate::project::{compile_logical_path_glob, matching_logical_path_globs};
+use crate::project::{ScopeMatcher, compile_logical_path_glob, matching_logical_path_globs};
 
 /// Compiled `count_exclude` patterns with logical-path semantics.
 ///
@@ -62,7 +62,7 @@ impl CompiledCountExclude {
 /// Compiled structure rule with precompiled glob matcher.
 pub(super) struct CompiledStructureRule {
     pub scope: String,
-    pub matcher: GlobMatcher,
+    pub matcher: ScopeMatcher,
     pub max_files: Option<i64>,
     pub max_dirs: Option<i64>,
     pub max_depth: Option<i64>,
@@ -101,7 +101,7 @@ pub(super) enum CompiledSiblingRule {
         /// Original directory scope string from config (for violation messages).
         dir_scope: String,
         /// Pre-compiled matcher for directory (parent of files).
-        dir_matcher: GlobMatcher,
+        dir_matcher: ScopeMatcher,
         /// Pre-compiled matcher for files that trigger the rule.
         file_matcher: GlobMatcher,
         /// Templates for deriving sibling filename(s), e.g., `"{stem}.test.tsx"`.
@@ -118,7 +118,7 @@ pub(super) enum CompiledSiblingRule {
         /// Original directory scope string from config (for violation messages).
         dir_scope: String,
         /// Pre-compiled matcher for directory (parent of files).
-        dir_matcher: GlobMatcher,
+        dir_matcher: ScopeMatcher,
         /// Patterns that form an atomic set, e.g., `["{stem}.tsx", "{stem}.test.tsx"]`.
         /// Each pattern must contain `{stem}` for stem extraction and expansion.
         group_patterns: Vec<String>,
